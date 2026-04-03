@@ -242,13 +242,15 @@ def send_invites(
     isn't in AVAILABILITY_COLLECTED state yet.
     """
     cycle = _get_cycle_or_404(cycleId, cycle_repo)
-    try:
-        # Validate transition is allowed before committing any side effects
-        workflow_engine.validate_transition(
-            cycle.get("workflow_state", ""), "MEETING_SCHEDULED"
-        )
-    except WorkflowViolationError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+    current_state = cycle.get("workflow_state", "")
+    # Only enforce the forward transition if the cycle hasn't reached MEETING_SCHEDULED yet.
+    # If already scheduled, allow re-invite (e.g. adding more attendees or re-sending).
+    meeting_scheduled_idx = workflow_engine.state_index("MEETING_SCHEDULED")
+    if workflow_engine.state_index(current_state) < meeting_scheduled_idx:
+        try:
+            workflow_engine.validate_transition(current_state, "MEETING_SCHEDULED")
+        except WorkflowViolationError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
     return svc.send_invites(cycleId, slot_id, organiser_id)
 
 

@@ -34,13 +34,14 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
   {
     attendee_id: 'a1',
     stakeholder_id: 's1',
-    name: 'Alex Thompson',
-    email: 'alex.thompson@zensar.com',
+    name: 'Alex Johnson',
+    email: 'alex@zensar.com',
     role: 'VMO_COORDINATOR',
     organisation: 'Zensar VMO',
     is_key: true,
     invite_status: 'PENDING',
     availability_submitted: false,
+    user_id: 'u1',
   },
   {
     attendee_id: 'a2',
@@ -52,6 +53,7 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     is_key: true,
     invite_status: 'PENDING',
     availability_submitted: false,
+    user_id: 'u2',
   },
   {
     attendee_id: 'a3',
@@ -63,17 +65,19 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: false,
+    user_id: 'u3',
   },
   {
     attendee_id: 'a4',
     stakeholder_id: 's4',
-    name: 'Marcus Williams',
-    email: 'marcus.williams@zensar.com',
+    name: 'Marcus Chen',
+    email: 'marcus@zensar.com',
     role: 'VENDOR_MANAGER',
     organisation: 'Zensar VMO',
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: false,
+    user_id: 'u4',
   },
   {
     attendee_id: 'a5',
@@ -85,6 +89,7 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: false,
+    user_id: 'u5',
   },
   {
     attendee_id: 'a6',
@@ -96,6 +101,7 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: false,
+    user_id: 'u6',
   },
   {
     attendee_id: 'a7',
@@ -107,6 +113,7 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: false,
+    user_id: 'u7',
   },
   {
     attendee_id: 'a8',
@@ -118,6 +125,7 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: false,
+    user_id: 'u8',
   },
   {
     attendee_id: 'a9',
@@ -129,6 +137,7 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: false,
+    user_id: 'u9',
   },
 ]
 

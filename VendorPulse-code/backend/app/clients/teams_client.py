@@ -24,30 +24,29 @@ class TeamsBackendClient:
     def __init__(self, base_url: str, timeout: float = 10.0) -> None:
         self._base = base_url.rstrip("/")
         self._timeout = timeout
+        # Persistent connection pool — avoids TCP handshake overhead on every call.
+        # This is the singleton instance shared across all requests (see dependencies.py).
+        self._client = httpx.Client(timeout=timeout)
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
     def _get(self, path: str) -> dict:
-        url = f"{self._base}{path}"
-        r = httpx.get(url, timeout=self._timeout)
+        r = self._client.get(f"{self._base}{path}")
         r.raise_for_status()
         return r.json()
 
     def _post(self, path: str, body: dict) -> dict:
-        url = f"{self._base}{path}"
-        r = httpx.post(url, json=body, timeout=self._timeout)
+        r = self._client.post(f"{self._base}{path}", json=body)
         r.raise_for_status()
         return r.json()
 
     def _put(self, path: str, body: dict) -> dict:
-        url = f"{self._base}{path}"
-        r = httpx.put(url, json=body, timeout=self._timeout)
+        r = self._client.put(f"{self._base}{path}", json=body)
         r.raise_for_status()
         return r.json()
 
     def _delete(self, path: str, body: dict) -> dict:
-        url = f"{self._base}{path}"
-        r = httpx.delete(url, json=body, timeout=self._timeout)
+        r = self._client.delete(f"{self._base}{path}", json=body)
         r.raise_for_status()
         return r.json()
 

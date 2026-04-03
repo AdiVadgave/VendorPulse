@@ -25,13 +25,13 @@ function ErrorScreen() {
         <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠</div>
         <h2 className="text-base font-semibold text-[#242424] mb-2">Cannot connect to backend</h2>
         <p className="text-[#616161] text-sm mb-4 leading-relaxed">
-          The mock Teams backend is not running. Start it first:
+          The Teams backend (FastAPI) is not running. Start it with:
         </p>
         <div className="bg-[#f5f5f5] rounded-lg px-4 py-3 text-left mb-4">
           <code className="text-xs text-[#6264A7] font-mono leading-relaxed block">
             cd teams-backend<br />
-            npm install<br />
-            npm run dev
+            pip install fastapi uvicorn httpx<br />
+            uvicorn app:app --port 3001 --reload
           </code>
         </div>
         <button

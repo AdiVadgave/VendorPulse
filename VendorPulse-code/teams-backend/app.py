@@ -27,6 +27,43 @@ def _write_json(filename: str, data) -> None:
 
 
 # ----------------------
+# Booked-slots helpers
+# ----------------------
+
+def _add_booked_slot(user_id: str, date: str, slot: str, users: list) -> None:
+    """Add a booked slot entry for user_id on date. Mutates the users list in place."""
+    idx = next((i for i, u in enumerate(users) if u.get("userId") == user_id), None)
+    if idx is None:
+        return
+    booked: list = list(users[idx].setdefault("booked_slots", []))
+    day_idx = next((i for i, b in enumerate(booked) if b.get("date") == date), None)
+    if day_idx is not None:
+        slots: list = list(booked[day_idx].get("slots", []))
+        if slot not in slots:
+            slots.append(slot)
+        booked[day_idx] = {"date": date, "slots": slots}
+    else:
+        booked.append({"date": date, "slots": [slot]})
+    users[idx]["booked_slots"] = booked
+
+
+def _remove_booked_slot(user_id: str, date: str, slot: str, users: list) -> None:
+    """Remove a booked slot entry for user_id on date. Mutates the users list in place."""
+    idx = next((i for i, u in enumerate(users) if u.get("userId") == user_id), None)
+    if idx is None:
+        return
+    booked: list = list(users[idx].get("booked_slots", []))
+    day_idx = next((i for i, b in enumerate(booked) if b.get("date") == date), None)
+    if day_idx is not None:
+        remaining = [s for s in booked[day_idx].get("slots", []) if s != slot]
+        if remaining:
+            booked[day_idx] = {"date": date, "slots": remaining}
+        else:
+            booked.pop(day_idx)
+    users[idx]["booked_slots"] = booked
+
+
+# ----------------------
 # Pydantic models (Swagger examples)
 # ----------------------
 
@@ -68,6 +105,11 @@ class CancelMeeting(BaseModel):
     organizerId: str = Field(..., examples=["u12345678"])
 
 
+class NudgeCreate(BaseModel):
+    userId: str = Field(..., examples=["u23456789"])
+    message: str = Field(..., examples=["Please respond to the meeting invite."])
+
+
 # ----------------------
 # FastAPI app
 # ----------------------
@@ -82,8 +124,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"] ,
+    allow_credentials=False,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -249,11 +291,17 @@ def create_meeting(payload: MeetingCreate):
     meetings.append(new_meeting)
     _write_json("meetings.json", meetings)
 
+    # Book the slot for the organizer in booked_slots (organizer is committed on creation)
+    slot_str = f"{payload.timeSlot.startTime}-{payload.timeSlot.endTime}"
+    _add_booked_slot(payload.organizerId, payload.timeSlot.date, slot_str, users)
+    _write_json("users.json", users)
+
     return {"meeting": new_meeting, "message": "Meeting invite sent successfully"}
 
 
 @app.put("/api/meetings/{meetingId}/respond")
 def respond_to_meeting(meetingId: str, payload: MeetingRespond):
+    from datetime import timezone as _tz
     meetings = _read_json("meetings.json")
     idx = next((i for i, m in enumerate(meetings) if m.get("meetingId") == meetingId), None)
     if idx is None:
@@ -264,10 +312,25 @@ def respond_to_meeting(meetingId: str, payload: MeetingRespond):
     if pidx is None:
         raise HTTPException(status_code=403, detail="User is not a participant in this meeting")
 
+    prev_status = participants[pidx].get("status", "pending")
     participants[pidx]["status"] = payload.status
-    participants[pidx]["respondedAt"] = datetime.utcnow().isoformat() + "Z"
+    participants[pidx]["respondedAt"] = datetime.now(_tz.utc).isoformat()
 
     _write_json("meetings.json", meetings)
+
+    # Sync booked_slots: add when accepted, remove when declined
+    ts = meetings[idx].get("timeSlot", {})
+    slot_date = ts.get("date", "")
+    slot_str = f"{ts.get('startTime', '')}-{ts.get('endTime', '')}"
+
+    if slot_date and slot_str != "-":
+        users = _read_json("users.json")
+        if payload.status == "accepted" and prev_status != "accepted":
+            _add_booked_slot(payload.userId, slot_date, slot_str, users)
+        elif payload.status == "declined" and prev_status == "accepted":
+            _remove_booked_slot(payload.userId, slot_date, slot_str, users)
+        _write_json("users.json", users)
+
     return {"meeting": meetings[idx], "message": f"Meeting {payload.status} successfully"}
 
 
@@ -289,4 +352,49 @@ def cancel_meeting(
 
     meetings[idx]["status"] = "cancelled"
     _write_json("meetings.json", meetings)
+
+    # Remove booked slots for organizer and all accepted participants
+    ts = meetings[idx].get("timeSlot", {})
+    slot_date = ts.get("date", "")
+    slot_str = f"{ts.get('startTime', '')}-{ts.get('endTime', '')}"
+
+    if slot_date and slot_str != "-":
+        users = _read_json("users.json")
+        _remove_booked_slot(meetings[idx].get("organizerId", ""), slot_date, slot_str, users)
+        for p in meetings[idx].get("participants", []):
+            if p.get("status") in ("accepted", "pending"):
+                _remove_booked_slot(p.get("userId", ""), slot_date, slot_str, users)
+        _write_json("users.json", users)
+
     return {"message": "Meeting cancelled successfully", "meeting": meetings[idx]}
+
+
+# ----------------------
+# Nudges (reminders)
+# ----------------------
+
+
+@app.post("/api/meetings/{meetingId}/nudge", status_code=201)
+def send_nudge(meetingId: str, payload: NudgeCreate):
+    meetings = _read_json("meetings.json")
+    idx = next((i for i, m in enumerate(meetings) if m.get("meetingId") == meetingId), None)
+    if idx is None:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    nudge = {
+        "userId": payload.userId,
+        "message": payload.message or "Please respond to your meeting invitation.",
+        "sentAt": datetime.utcnow().isoformat() + "Z",
+    }
+    meetings[idx].setdefault("nudges", []).append(nudge)
+    _write_json("meetings.json", meetings)
+    return {"message": "Nudge sent successfully", "meeting": meetings[idx]}
+
+
+@app.get("/api/meetings/{meetingId}/nudges")
+def get_nudges(meetingId: str):
+    meetings = _read_json("meetings.json")
+    meeting = next((m for m in meetings if m.get("meetingId") == meetingId), None)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return {"nudges": meeting.get("nudges", [])}

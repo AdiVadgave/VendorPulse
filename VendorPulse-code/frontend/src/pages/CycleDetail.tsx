@@ -72,7 +72,9 @@ import EmptyState from '@/components/shared/EmptyState'
 import { cn } from '@/utils/cn'
 import type { TabKey, WorkflowState } from '@/utils/constants'
 import { WORKFLOW_STATES, TAB_LABELS, TAB_MIN_STATE_INDEX } from '@/utils/constants'
+import { apiFetch } from '@/lib/api'
 import { useCycleStore } from '@/store/useCycleStore'
+import type { GovernanceCycle } from '@/types/cycle.types'
 import type { SchedulingPhase, CycleAttendee } from '@/types/scheduling.types'
 import type { StakeholderSubmission } from '@/types/scorecard.types'
 import type { ExtractedAction } from '@/types/alignment.types'
@@ -114,7 +116,17 @@ export default function CycleDetail() {
   // Store-driven: covers both mock cycles and API-created cycles
   const storeWorkflowState = useCycleStore((s) => cycleId ? s.workflowStates[cycleId] : undefined)
   const advanceWorkflow = useCycleStore((s) => s.advanceWorkflow)
+  const addCycle = useCycleStore((s) => s.addCycle)
   const storeCycle = useCycleStore((s) => cycleId ? s.getCycleById(cycleId) : undefined)
+
+  // If not in store/mock, fetch from API (handles direct URL navigation after refresh)
+  useEffect(() => {
+    if (!cycleId || storeCycle || getMockCycleById(cycleId)) return
+    apiFetch<{ cycle: GovernanceCycle }>(`/api/cycles/${cycleId}`)
+      .then(({ cycle: remote }) => addCycle(remote))
+      .catch(() => {/* cycle not found — will show empty state */})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cycleId])
 
   // Store takes precedence (includes API-created cycles); fall back to mock
   const cycle = storeCycle ?? (cycleId ? getMockCycleById(cycleId) : undefined)
@@ -132,6 +144,8 @@ export default function CycleDetail() {
   )
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
   const [teamsMeetingId, setTeamsMeetingId] = useState<string | null>(null)
+  // Real slot proposals fetched from API for new (non-mock) cycles
+  const [apiSlotProposals, setApiSlotProposals] = useState<typeof MOCK_SLOT_PROPOSALS>([])
 
   // --- Module B state ---
   const [scorecardDispatched, setScorecardDispatched] = useState(false)
@@ -172,6 +186,31 @@ export default function CycleDetail() {
     setSearchParams({ tab: activeTab }, { replace: true })
   }, [activeTab, setSearchParams])
 
+  // Reload persisted attendees from backend on refresh for all cycles
+  useEffect(() => {
+    if (!cycleId) return
+    apiFetch<{ attendees: CycleAttendee[] }>(`/api/cycles/${cycleId}/attendees`)
+      .then(({ attendees }) => {
+        if (attendees.length > 0) setSchedulingAttendees(attendees)
+      })
+      .catch(() => {/* backend offline — keep existing state */})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cycleId])
+
+  // Load persisted slot proposals on mount so page refreshes don't lose ranked slots
+  useEffect(() => {
+    if (!cycleId || isMockCycle) return
+    apiFetch<{ proposals: typeof MOCK_SLOT_PROPOSALS }>(`/api/cycles/${cycleId}/scheduling/slots`)
+      .then(({ proposals }) => {
+        if (proposals && proposals.length > 0) {
+          setApiSlotProposals(proposals)
+          setSchedulingPhase('slot_ranking')
+        }
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cycleId])
+
   if (!cycle) {
     return (
       <div className="p-6">
@@ -201,14 +240,50 @@ export default function CycleDetail() {
     setActiveTab(tab)
   }
 
-  const selectedSlot = MOCK_SLOT_PROPOSALS.find((s) => s.slot_id === selectedSlotId) ?? MOCK_SLOT_PROPOSALS[0]
+  // Always use API-returned slot proposals (populated after rank-slots call)
+  const slotPool = apiSlotProposals
+  const selectedSlot = slotPool.find((s) => s.slot_id === selectedSlotId) ?? slotPool[0]
 
   // Module A: advance workflow state as scheduling progresses
-  function advanceScheduling(next: SchedulingPhase) {
+  async function advanceScheduling(next: SchedulingPhase, attendees?: CycleAttendee[]) {
     setSchedulingPhase(next)
-    if (next === 'slot_ranking') {
-      // Skip ATTENDEE_REFRESH_SENT — go straight to AVAILABILITY_COLLECTED
+    if (next === 'slot_ranking' && cycleId) {
       advanceWorkflow(cycle!.cycle_id, 'AVAILABILITY_COLLECTED')
+      // Rank slots based on actual selected attendees from the backend
+      const atts = attendees ?? schedulingAttendees
+      const attsWithUserId = atts.filter((a) => a.user_id)
+      if (attsWithUserId.length > 0) {
+        try {
+          const today = new Date()
+          const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000)
+          const start = tomorrow.toISOString().slice(0, 10)
+          const end = new Date(today.getTime() + 21 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+          // Identify organiser (VMO_COORDINATOR) and exec sponsor (EGB_CHAIR) from selected attendees
+          const organiser = attsWithUserId.find((a) => a.role === 'VMO_COORDINATOR') ?? attsWithUserId[0]
+          const execSponsor = attsWithUserId.find((a) => a.role === 'EGB_CHAIR') ?? attsWithUserId[1] ?? attsWithUserId[0]
+          const result = await apiFetch<{ data?: { proposals: typeof MOCK_SLOT_PROPOSALS }; proposals?: typeof MOCK_SLOT_PROPOSALS }>(
+            `/api/cycles/${cycleId}/scheduling/rank-slots`,
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                cycle_id: cycleId,
+                attendee_user_ids: attsWithUserId.map((a) => a.user_id),
+                attendee_names: Object.fromEntries(attsWithUserId.map(a => [a.user_id!, a.name])),
+                attendee_key_flags: Object.fromEntries(attsWithUserId.map(a => [a.user_id!, a.is_key])),
+                organiser_id: organiser?.user_id ?? '',
+                exec_sponsor_id: execSponsor?.user_id ?? '',
+                date_range_start: start,
+                date_range_end: end,
+              }),
+            }
+          )
+          const proposals = result.data?.proposals ?? (result as unknown as { proposals: typeof MOCK_SLOT_PROPOSALS }).proposals ?? []
+          setApiSlotProposals(proposals)
+        } catch {
+          // Backend unavailable — stay with empty slots
+          setApiSlotProposals([])
+        }
+      }
     }
     if (next === 'confirmation_tracking') {
       advanceWorkflow(cycle!.cycle_id, 'MEETING_SCHEDULED')
@@ -346,6 +421,7 @@ export default function CycleDetail() {
             cycle={cycle}
             schedulingPhase={schedulingPhase}
             attendees={schedulingAttendees}
+            slots={slotPool}
             selectedSlot={selectedSlot}
             onPhaseChange={advanceScheduling}
             onAttendeesUpdated={setSchedulingAttendees}
@@ -497,14 +573,15 @@ function OverviewTab({
 
 /* ── Scheduling Tab ───────────────────────────────────────── */
 function SchedulingTab({
-  cycle, schedulingPhase, attendees, selectedSlot, onPhaseChange, onAttendeesUpdated, onSlotSelected,
+  cycle, schedulingPhase, attendees, slots, selectedSlot, onPhaseChange, onAttendeesUpdated, onSlotSelected,
   teamsMeetingId, onTeamsMeetingCreated, isMockCycle, onScorecardProceed,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   schedulingPhase: SchedulingPhase
   attendees: CycleAttendee[]
+  slots: typeof MOCK_SLOT_PROPOSALS
   selectedSlot: (typeof MOCK_SLOT_PROPOSALS)[0]
-  onPhaseChange: (p: SchedulingPhase) => void
+  onPhaseChange: (p: SchedulingPhase, attendees?: CycleAttendee[]) => void
   onAttendeesUpdated: (a: CycleAttendee[]) => void
   onSlotSelected: (id: string) => void
   teamsMeetingId: string | null
@@ -550,36 +627,49 @@ function SchedulingTab({
           onDispatchComplete={() => {}}
           onResponsesSimulated={(updated) => {
             onAttendeesUpdated(updated)
-            onPhaseChange('slot_ranking')
+            onPhaseChange('slot_ranking', updated)
           }}
         />
       )}
       {schedulingPhase === 'slot_ranking' && (
         <SlotRankingPanel
-          slots={MOCK_SLOT_PROPOSALS}
-          onSlotApproved={(slotId) => { onSlotSelected(slotId); onPhaseChange('invite_approval') }}
+          slots={slots}
+          attendeeCount={attendees.length}
+          onSlotApproved={async (slotId) => {
+            // Persist approval in the backend before advancing to invite step
+            const organiser = attendees.find((a) => a.role === 'VMO_COORDINATOR' && a.user_id)
+              ?? attendees.find((a) => a.user_id)
+            const approverId = organiser?.user_id ?? 'u1'
+            try {
+              await apiFetch(`/api/cycles/${cycle.cycle_id}/scheduling/slots/${slotId}/approve`, {
+                method: 'PUT',
+                body: JSON.stringify({ approved_by: approverId }),
+              })
+            } catch { /* non-critical — proceed regardless */ }
+            onSlotSelected(slotId)
+            onPhaseChange('invite_approval')
+          }}
         />
       )}
-      {schedulingPhase === 'invite_approval' && (
+      {schedulingPhase === 'invite_approval' && selectedSlot && (
         <InviteApprovalPanel
+          cycleId={cycle.cycle_id}
+          slotId={selectedSlot.slot_id}
           slot={selectedSlot}
           attendees={attendees}
           vendorName={cycle.vendor_name}
           quarter={cycle.quarter}
           year={cycle.year}
-          onInviteSent={(meetingId) => {
-            onTeamsMeetingCreated(meetingId)
-            // For mock cycles seed pre-built RSVP data; for new cycles keep attendees as-is (Teams will update them)
-            if (isMockCycle) {
-              onAttendeesUpdated(MOCK_ATTENDEES_RSVP)
-            }
+          onInviteSent={(teamsMeetingId) => {
+            onTeamsMeetingCreated(teamsMeetingId)
             onPhaseChange('confirmation_tracking')
           }}
         />
       )}
-      {schedulingPhase === 'confirmation_tracking' && (
+      {schedulingPhase === 'confirmation_tracking' && selectedSlot && (
         <ConfirmationTracker
-          attendees={attendees.length > 0 ? attendees : MOCK_ATTENDEES_RSVP}
+          cycleId={cycle.cycle_id}
+          attendees={attendees}
           slot={selectedSlot}
           teamsMeetingId={teamsMeetingId}
           onProceed={onScorecardProceed}

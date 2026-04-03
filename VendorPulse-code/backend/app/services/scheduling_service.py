@@ -190,6 +190,12 @@ class SchedulingService:
         for p in proposals:
             self._slots.insert(p)
 
+        # Advance ATTENDEE_REFRESH_SENT → AVAILABILITY_COLLECTED (idempotent: skip if already past)
+        now = datetime.now(timezone.utc).isoformat()
+        cycle = self._cycles.get_by_cycle_id(request.cycle_id)
+        if cycle and workflow_engine.can_transition(cycle.get("workflow_state", ""), "AVAILABILITY_COLLECTED"):
+            workflow_engine.advance(cycle, self._cycles, now)
+
         return AgentResponse(
             status="pending_approval",
             agent=self.AGENT_NAME,
@@ -338,11 +344,20 @@ class SchedulingService:
         for att in attendees:
             self._attendees.update_invite_status(att["attendee_id"], "PENDING")
 
-        # Advance cycle workflow state through the engine (validates transition)
+        # Book the slot for the organiser and all participants in the booked_slots model
+        all_user_ids = [organiser_id] + participant_ids
+        booked_slot_str = f"{slot_start}-{slot_end}"
+        for uid in all_user_ids:
+            try:
+                self._users.add_booked_slot(uid, slot_date, booked_slot_str)
+            except Exception:
+                pass  # Non-critical — best-effort booking
+
+        # Advance cycle workflow state — idempotent if already at MEETING_SCHEDULED
         now = datetime.now(timezone.utc).isoformat()
         cycle = self._cycles.get_by_cycle_id(cycle_id)
-        if cycle:
-            workflow_engine.transition_to(cycle, "MEETING_SCHEDULED", self._cycles, now)
+        if cycle and workflow_engine.can_transition(cycle.get("workflow_state", ""), "MEETING_SCHEDULED"):
+            workflow_engine.advance(cycle, self._cycles, now)
 
         return AgentResponse(
             status="success",

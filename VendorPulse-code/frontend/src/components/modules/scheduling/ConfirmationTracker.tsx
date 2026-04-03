@@ -12,25 +12,14 @@ import {
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
+import { apiFetch } from '@/lib/api'
 import type { CycleAttendee, InviteStatus, SlotProposal } from '@/types/scheduling.types'
 import { ROLE_LABELS } from '@/types/cycle.types'
 
 const TEAMS_API = 'http://localhost:3001/api'
 
-// Maps VendorPulse attendee emails to Teams backend userIds
-const EMAIL_TO_TEAMS_ID: Record<string, string> = {
-  'alex.thompson@zensar.com':   'u1',
-  'sarah.chen@zensar.com':      'u2',
-  'priya.sharma@zensar.com':    'u3',
-  'marcus.williams@zensar.com': 'u4',
-  'james.obrien@zensar.com':    'u5',
-  'emma.davies@zensar.com':     'u6',
-  'raj.patel@novatech.com':     'u7',
-  'lisa.wang@novatech.com':     'u8',
-  'david.kim@novatech.com':     'u9',
-}
-
 interface ConfirmationTrackerProps {
+  cycleId: string
   attendees: CycleAttendee[]
   slot: SlotProposal
   teamsMeetingId: string | null
@@ -59,6 +48,7 @@ const STATUS_CONFIG: Record<
 }
 
 export default function ConfirmationTracker({
+  cycleId,
   attendees: initialAttendees,
   slot,
   teamsMeetingId,
@@ -75,7 +65,7 @@ export default function ConfirmationTracker({
   const pending   = attendees.filter((a) => a.invite_status === 'PENDING')
   const allResponded = pending.length === 0
 
-  // Poll Teams backend every 5 seconds for RSVP status updates
+  // Poll Teams backend every 5 seconds for RSVP status updates, then sync to VendorPulse
   useEffect(() => {
     if (!teamsMeetingId) return
 
@@ -86,9 +76,10 @@ export default function ConfirmationTracker({
         const data = await res.json()
         const participants: { userId: string; status: string }[] = data.meeting?.participants ?? []
 
-        setAttendees((prev) =>
-          prev.map((a) => {
-            const teamsId = EMAIL_TO_TEAMS_ID[a.email]
+        setAttendees((prev) => {
+          const next = prev.map((a) => {
+            // Match by user_id (which equals the Teams userId)
+            const teamsId = a.user_id
             if (!teamsId) return a
             const p = participants.find((x) => x.userId === teamsId)
             if (!p) return a
@@ -96,9 +87,16 @@ export default function ConfirmationTracker({
               p.status === 'accepted' ? 'ACCEPTED'
               : p.status === 'declined' ? 'DECLINED'
               : 'PENDING'
+            if (mapped === a.invite_status) return a
+            // Sync changed status back to VendorPulse backend
+            apiFetch(
+              `/api/cycles/${cycleId}/scheduling/rsvp/${a.attendee_id}`,
+              { method: 'PUT', body: JSON.stringify({ status: mapped }) }
+            ).catch(() => {/* non-critical */})
             return { ...a, invite_status: mapped }
           })
-        )
+          return next
+        })
         setLastPolled(new Date())
       } catch {
         // Teams backend offline — keep showing current state
@@ -108,12 +106,12 @@ export default function ConfirmationTracker({
     fetchRsvps()
     const interval = setInterval(fetchRsvps, 5000)
     return () => clearInterval(interval)
-  }, [teamsMeetingId])
+  }, [teamsMeetingId, cycleId])
 
   async function sendNudge(attendee: CycleAttendee) {
     setNudgingId(attendee.attendee_id)
 
-    const teamsId = EMAIL_TO_TEAMS_ID[attendee.email]
+    const teamsId = attendee.user_id
     if (teamsId && teamsMeetingId) {
       try {
         await fetch(`${TEAMS_API}/meetings/${teamsMeetingId}/nudge`, {

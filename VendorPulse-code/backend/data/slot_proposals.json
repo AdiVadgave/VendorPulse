@@ -75,5 +75,58 @@
       "Raj Patel",
       "David Kim"
     ]
+  },
+  {
+    "slot_id": "sl_031c6303",
+    "cycle_id": "c_c068740e",
+    "proposed_time": "2026-04-04T09:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": [],
+    "approved_by": "u3",
+    "approved_at": "2026-04-03T09:37:32.846031+00:00"
+  },
+  {
+    "slot_id": "sl_c02b6ce8",
+    "cycle_id": "c_c068740e",
+    "proposed_time": "2026-04-04T10:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_ebe7a322",
+    "cycle_id": "c_c068740e",
+    "proposed_time": "2026-04-04T11:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": []
   }
 ]

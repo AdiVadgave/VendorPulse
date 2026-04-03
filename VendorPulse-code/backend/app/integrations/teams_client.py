@@ -108,6 +108,25 @@ class TeamsBackendClient:
             return None
 
     # ------------------------------------------------------------------
+    # Availability (per-user)
+    # ------------------------------------------------------------------
+
+    def get_user_availability(self, user_id: str) -> list[dict]:
+        """Return the availability list for a user (empty list on failure)."""
+        if not self._enabled:
+            return []
+        try:
+            r = httpx.get(
+                f"{self._base_url}/api/users/{user_id}/availability", timeout=5.0
+            )
+            if r.status_code == 404:
+                return []
+            r.raise_for_status()
+            return r.json().get("availability", [])
+        except Exception:
+            return []
+
+    # ------------------------------------------------------------------
     # Meetings
     # ------------------------------------------------------------------
 
@@ -120,6 +139,45 @@ class TeamsBackendClient:
             return r.json().get("meetings", [])
         except Exception:
             return None
+
+    def create_meeting(self, payload: dict) -> Optional[dict]:
+        """
+        Create a meeting in the Teams backend.
+        Returns the created meeting dict, or None on failure.
+        """
+        if not self._enabled:
+            return None
+        try:
+            r = httpx.post(
+                f"{self._base_url}/api/meetings",
+                json=payload,
+                timeout=10.0,
+            )
+            r.raise_for_status()
+            return r.json().get("meeting")
+        except Exception:
+            return None
+
+    def get_user_meetings(self, user_id: str) -> list[dict]:
+        """Return all meetings for a user (empty list on failure)."""
+        if not self._enabled:
+            return []
+        try:
+            r = httpx.get(
+                f"{self._base_url}/api/users/{user_id}/meetings", timeout=5.0
+            )
+            if r.status_code == 404:
+                return []
+            r.raise_for_status()
+            return r.json().get("meetings", [])
+        except Exception:
+            return []
+
+    def _post(self, path: str, body: dict) -> dict:
+        """Generic POST helper used by the users route."""
+        r = httpx.post(f"{self._base_url}{path}", json=body, timeout=10.0)
+        r.raise_for_status()
+        return r.json()
 
 
 # Module-level singleton — import and use directly

@@ -51,8 +51,12 @@ export const useCycleStore = create<CycleStore>()((set, get) => ({
     })),
 
   addCycle: (cycle) =>
-    set((s) => ({
-      cycles: [cycle, ...s.cycles],
-      workflowStates: { ...s.workflowStates, [cycle.cycle_id]: cycle.workflow_state },
-    })),
+    set((s) => {
+      // Idempotent: if already in store, just update workflow state
+      const exists = s.cycles.some((c) => c.cycle_id === cycle.cycle_id)
+      return {
+        cycles: exists ? s.cycles : [cycle, ...s.cycles],
+        workflowStates: { ...s.workflowStates, [cycle.cycle_id]: cycle.workflow_state },
+      }
+    }),
 }))

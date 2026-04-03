@@ -173,5 +173,28 @@
     "createdAt": "2026-04-02T10:19:02.385020+00:00",
     "cycleId": "c3",
     "meetingType": "EGB_QBR"
+  },
+  {
+    "meetingId": "m953826db",
+    "title": "Governance Review — Test8",
+    "description": "Governance meeting for cycle c_c068740e",
+    "agenda": "1) Scorecard Review\n2) Actions\n3) Next Steps",
+    "organizerId": "u3",
+    "participants": [
+      {
+        "userId": "u2",
+        "status": "pending"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-04-04",
+      "startTime": "09:00",
+      "endTime": "10:00"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-03T09:37:34.748680+00:00",
+    "cycleId": "c_c068740e",
+    "meetingType": "EGB_QBR",
+    "teamsMeetingId": "m384c9513"
   }
 ]

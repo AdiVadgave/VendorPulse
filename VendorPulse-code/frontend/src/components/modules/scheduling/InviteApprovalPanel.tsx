@@ -11,26 +11,17 @@ import {
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
+import { apiFetch } from '@/lib/api'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
 
-// Maps VendorPulse attendee emails to Teams backend userIds
-const EMAIL_TO_TEAMS_ID: Record<string, string> = {
-  'alex.thompson@zensar.com':  'u1',
-  'sarah.chen@zensar.com':     'u2',
-  'priya.sharma@zensar.com':   'u3',
-  'marcus.williams@zensar.com':'u4',
-  'james.obrien@zensar.com':   'u5',
-  'emma.davies@zensar.com':    'u6',
-  'raj.patel@novatech.com':    'u7',
-  'lisa.wang@novatech.com':    'u8',
-  'david.kim@novatech.com':    'u9',
-}
-
 const TEAMS_API = 'http://localhost:3001/api'
-const ORGANIZER_ID = 'u1' // Alex Thompson / VMO Coordinator
+// Organizer is the first VMO_COORDINATOR in the attendees list; fall back to u1
+const DEFAULT_ORGANIZER_ID = 'u1'
 
 interface InviteApprovalPanelProps {
+  cycleId: string
+  slotId: string | null
   slot: SlotProposal
   attendees: CycleAttendee[]
   vendorName: string
@@ -40,6 +31,8 @@ interface InviteApprovalPanelProps {
 }
 
 export default function InviteApprovalPanel({
+  cycleId,
+  slotId,
   slot,
   attendees,
   vendorName,
@@ -59,16 +52,40 @@ export default function InviteApprovalPanel({
     setAgentStatus('running')
     setTeamsError(null)
 
-    // Build participant list from attendees (excluding organizer)
-    const participantIds = attendees
-      .map((a) => EMAIL_TO_TEAMS_ID[a.email])
-      .filter((id): id is string => !!id && id !== ORGANIZER_ID)
+    // Organizer = VMO_COORDINATOR attendee, or first attendee with a user_id
+    const organizer = attendees.find((a) => a.role === 'VMO_COORDINATOR' && a.user_id)
+      ?? attendees.find((a) => a.user_id)
+    const organizerId = organizer?.user_id ?? DEFAULT_ORGANIZER_ID
 
-    // Remove duplicates
-    const uniqueParticipantIds = [...new Set(participantIds)]
+    // Participants = ALL selected attendees with a user_id (including organizer for Teams)
+    const allUserIds = [...new Set(attendees.map((a) => a.user_id).filter((id): id is string => !!id))]
+    // Teams participantIds excludes organizer (Teams adds them as organizer)
+    const participantIds = allUserIds.filter((id) => id !== organizerId)
 
+    const timeSlot = {
+      date: format(dateObj, 'yyyy-MM-dd'),
+      startTime: format(dateObj, 'HH:mm'),
+      endTime: format(endTime, 'HH:mm'),
+    }
+
+    // Step 1: Persist meeting in VendorPulse backend
+    if (slotId && cycleId) {
+      try {
+        await apiFetch(
+          `/api/cycles/${cycleId}/scheduling/send-invites`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ organiser_id: organizerId, slot_id: slotId }),
+          }
+        )
+      } catch {
+        // Non-critical — VP may not have a persisted slot (e.g. workflow state mismatch)
+      }
+    }
+
+    // Step 2: Always create meeting in Teams backend so invites appear in Teams UI
+    // This is the authoritative Teams meetingId used for RSVP polling
     let teamsMeetingId: string | null = null
-
     try {
       const res = await fetch(`${TEAMS_API}/meetings`, {
         method: 'POST',
@@ -78,30 +95,25 @@ export default function InviteApprovalPanel({
           description: `Quarterly Business Review governance meeting for ${vendorName}.`,
           agenda:
             '1) Q Performance Review & Scorecard Discussion\n2) Key Issues, Concerns and Pushback Responses\n3) Commitments and Action Items Review\n4) Forward Planning & AOB',
-          organizerId: ORGANIZER_ID,
-          participantIds: uniqueParticipantIds.length > 0 ? uniqueParticipantIds : ['u2'],
-          timeSlot: {
-            date: format(dateObj, 'yyyy-MM-dd'),
-            startTime: format(dateObj, 'HH:mm'),
-            endTime: format(endTime, 'HH:mm'),
-          },
+          organizerId,
+          participantIds: participantIds.length > 0 ? participantIds : allUserIds,
+          timeSlot,
         }),
       })
-
       if (res.ok) {
         const data = await res.json()
         teamsMeetingId = data.meeting?.meetingId ?? null
       } else {
         const err = await res.json().catch(() => ({}))
-        setTeamsError(`Teams invite failed: ${err.error ?? res.statusText}`)
+        setTeamsError(`Teams invite failed: ${err.detail ?? err.error ?? res.statusText}`)
       }
     } catch {
-      // Teams backend offline — continue without it
-      setTeamsError('Teams backend unavailable — invite sent locally only.')
+      setTeamsError('Teams backend unavailable — invite saved to VendorPulse only. RSVP sync will not work.')
     }
 
     setAgentStatus('complete')
     setIsProcessing(false)
+    // Pass the real Teams meetingId (used for RSVP polling in ConfirmationTracker)
     onInviteSent(teamsMeetingId)
   }
 

@@ -172,7 +172,8 @@
     "participants": [
       {
         "userId": "u2",
-        "status": "pending"
+        "status": "accepted",
+        "respondedAt": "2026-04-03T09:38:16.803075+00:00"
       }
     ],
     "timeSlot": {
@@ -182,5 +183,140 @@
     },
     "status": "scheduled",
     "createdAt": "2026-04-03T04:13:40.621467Z"
+  },
+  {
+    "meetingId": "mb3c89d3e",
+    "title": "EGB/QBR Governance Review \u2014 GGL Q1 2026",
+    "description": "Quarterly Business Review governance meeting for GGL.",
+    "agenda": "1) Q Performance Review & Scorecard Discussion\n2) Key Issues, Concerns and Pushback Responses\n3) Commitments and Action Items Review\n4) Forward Planning & AOB",
+    "organizerId": "ubf6b035d",
+    "participants": [
+      {
+        "userId": "u1a7e2215",
+        "status": "accepted",
+        "respondedAt": "2026-04-03T05:25:56.224280Z"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-03-28",
+      "startTime": "15:30",
+      "endTime": "17:30"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-03T05:25:10.798854Z"
+  },
+  {
+    "meetingId": "md903aec6",
+    "title": "EGB/QBR Governance Review \u2014 ABCD Q1 2026",
+    "description": "Quarterly Business Review governance meeting for ABCD.",
+    "agenda": "1) Q Performance Review & Scorecard Discussion\n2) Key Issues, Concerns and Pushback Responses\n3) Commitments and Action Items Review\n4) Forward Planning & AOB",
+    "organizerId": "u1a7e2215",
+    "participants": [
+      {
+        "userId": "ubf6b035d",
+        "status": "pending"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-03-28",
+      "startTime": "15:30",
+      "endTime": "17:30"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-03T06:12:55.067725Z"
+  },
+  {
+    "meetingId": "mc33192e2",
+    "title": "EGB/QBR Governance Review \u2014 Games Global Q1 2026",
+    "description": "Quarterly Business Review governance meeting for Games Global.",
+    "agenda": "1) Q Performance Review & Scorecard Discussion\n2) Key Issues, Concerns and Pushback Responses\n3) Commitments and Action Items Review\n4) Forward Planning & AOB",
+    "organizerId": "u1",
+    "participants": [
+      {
+        "userId": "u1a7e2215",
+        "status": "pending"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-03-28",
+      "startTime": "15:30",
+      "endTime": "17:30"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-03T06:36:04.335351Z",
+    "nudges": [
+      {
+        "userId": "u1",
+        "message": "Reminder: Please respond to the meeting invite for the governance review on 28 March 2026.",
+        "sentAt": "2026-04-03T06:36:17.564066Z"
+      },
+      {
+        "userId": "u1a7e2215",
+        "message": "Reminder: Please respond to the meeting invite for the governance review on 28 March 2026.",
+        "sentAt": "2026-04-03T06:36:20.174708Z"
+      }
+    ]
+  },
+  {
+    "meetingId": "m325d5b9c",
+    "title": "EGB/QBR Governance Review \u2014 fqwerqwerqw Q1 2026",
+    "description": "Quarterly Business Review governance meeting for fqwerqwerqw.",
+    "agenda": "1) Q Performance Review & Scorecard Discussion\n2) Key Issues, Concerns and Pushback Responses\n3) Commitments and Action Items Review\n4) Forward Planning & AOB",
+    "organizerId": "ubf6b035d",
+    "participants": [
+      {
+        "userId": "u1a7e2215",
+        "status": "pending"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-03-28",
+      "startTime": "15:30",
+      "endTime": "17:30"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-03T06:56:53.915298Z"
+  },
+  {
+    "meetingId": "m384c9513",
+    "title": "Governance Review \u2014 Test8",
+    "description": "Governance meeting for cycle c_c068740e",
+    "agenda": "1) Scorecard Review\n2) Actions\n3) Next Steps",
+    "organizerId": "u3",
+    "participants": [
+      {
+        "userId": "u2",
+        "status": "accepted",
+        "respondedAt": "2026-04-03T09:38:14.690202+00:00"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-04-04",
+      "startTime": "09:00",
+      "endTime": "10:00"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-03T09:37:36.832609Z"
+  },
+  {
+    "meetingId": "m816b4a14",
+    "title": "EGB/QBR Governance Review \u2014 Test8 Q1 2026",
+    "description": "Quarterly Business Review governance meeting for Test8.",
+    "agenda": "1) Q Performance Review & Scorecard Discussion\n2) Key Issues, Concerns and Pushback Responses\n3) Commitments and Action Items Review\n4) Forward Planning & AOB",
+    "organizerId": "u3",
+    "participants": [
+      {
+        "userId": "u2",
+        "status": "accepted",
+        "respondedAt": "2026-04-03T09:38:16.259772+00:00"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-04-04",
+      "startTime": "14:30",
+      "endTime": "16:30"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-03T09:37:37.371500Z"
   }
 ]

@@ -102,7 +102,7 @@
     "organiser_available": true,
     "exec_sponsor_available": true,
     "rank_score": 100.0,
-    "is_approved": false,
+    "is_approved": true,
     "attendance_count": 2,
     "total_attendees": 2,
     "conflict_count": 0,
@@ -110,7 +110,9 @@
       "Priya Sharma",
       "Sarah Chen"
     ],
-    "conflicts": []
+    "conflicts": [],
+    "approved_by": "u3",
+    "approved_at": "2026-04-03T09:40:43.380640+00:00"
   },
   {
     "slot_id": "sl_ebe7a322",

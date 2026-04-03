@@ -318,5 +318,47 @@
     },
     "status": "scheduled",
     "createdAt": "2026-04-03T09:37:37.371500Z"
+  },
+  {
+    "meetingId": "m3a5a7f60",
+    "title": "Governance Review \u2014 Test8",
+    "description": "Governance meeting for cycle c_c068740e",
+    "agenda": "1) Scorecard Review\n2) Actions\n3) Next Steps",
+    "organizerId": "u3",
+    "participants": [
+      {
+        "userId": "u2",
+        "status": "accepted",
+        "respondedAt": "2026-04-03T09:41:27.325811+00:00"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-04-04",
+      "startTime": "10:00",
+      "endTime": "11:00"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-03T09:40:47.632477Z"
+  },
+  {
+    "meetingId": "m70d2e637",
+    "title": "EGB/QBR Governance Review \u2014 Test8 Q1 2026",
+    "description": "Quarterly Business Review governance meeting for Test8.",
+    "agenda": "1) Q Performance Review & Scorecard Discussion\n2) Key Issues, Concerns and Pushback Responses\n3) Commitments and Action Items Review\n4) Forward Planning & AOB",
+    "organizerId": "u3",
+    "participants": [
+      {
+        "userId": "u2",
+        "status": "accepted",
+        "respondedAt": "2026-04-03T09:41:35.282838+00:00"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-04-04",
+      "startTime": "15:30",
+      "endTime": "17:30"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-03T09:40:48.130607Z"
   }
 ]

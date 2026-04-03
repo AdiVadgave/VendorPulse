@@ -1,0 +1,20 @@
+[
+  {
+    "vendor_id": "v1",
+    "name": "NovaTech Services",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v2",
+    "name": "CoreSystems Ltd",
+    "category": "Software Development",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v3",
+    "name": "Meridian IT",
+    "category": "Managed Services",
+    "status": "active"
+  }
+]

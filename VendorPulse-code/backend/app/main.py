@@ -1,0 +1,76 @@
+"""
+VendorPulse Backend — FastAPI application entry point.
+
+Serves:
+  • /api/users          — User management
+  • /api/meetings       — Meeting CRUD + invite response
+  • /api/cycles/...     — Governance cycles + Module A scheduling workflow
+  • /api/health         — Health check
+  • /docs               — Auto-generated Swagger UI
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routes import meetings, scheduling, users
+from app.config import settings
+
+app = FastAPI(
+    title="VendorPulse Backend",
+    version="1.0.0",
+    description=(
+        "Backend engine for VendorPulse — governance cycle automation. "
+        "Handles meeting scheduling, availability management, and the Module A "
+        "scheduling agent workflow."
+    ),
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+# Allow all origins during development. Restrict in production.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── Register routers ──────────────────────────────────────────────────────────
+app.include_router(users.router)
+app.include_router(meetings.router)
+app.include_router(scheduling.router)
+
+
+# ── Health check ──────────────────────────────────────────────────────────────
+@app.get("/api/health", tags=["system"])
+def health():
+    return {
+        "status": "ok",
+        "service": "vendorpulse-backend",
+        "version": "1.0.0",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "llm_enabled": settings.enable_llm,
+        "teams_backend_enabled": settings.use_teams_backend,
+        "endpoints": {
+            "users": "GET|POST /api/users",
+            "userDetail": "GET|PUT /api/users/{userId}",
+            "userAvailability": "GET|PUT /api/users/{userId}/availability",
+            "userMeetings": "GET /api/users/{userId}/meetings",
+            "meetings": "GET|POST /api/meetings",
+            "meetingDetail": "GET|PUT|DELETE /api/meetings/{meetingId}",
+            "meetingRespond": "PUT /api/meetings/{meetingId}/respond",
+            "cycles": "GET|POST /api/cycles",
+            "cycleDetail": "GET /api/cycles/{cycleId}",
+            "attendees": "GET|POST /api/cycles/{cycleId}/attendees",
+            "simulateResponses": "POST /api/cycles/{cycleId}/scheduling/simulate-responses",
+            "rankSlots": "POST /api/cycles/{cycleId}/scheduling/rank-slots",
+            "slots": "GET /api/cycles/{cycleId}/scheduling/slots",
+            "approveSlot": "PUT /api/cycles/{cycleId}/scheduling/slots/{slotId}/approve",
+            "sendInvites": "POST /api/cycles/{cycleId}/scheduling/send-invites",
+            "rsvp": "GET|PUT /api/cycles/{cycleId}/scheduling/rsvp",
+        },
+    }

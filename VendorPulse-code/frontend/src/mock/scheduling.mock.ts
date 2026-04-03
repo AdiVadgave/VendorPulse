@@ -1,14 +1,40 @@
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 
+/** Users in the system database — used for attendee search / lookup */
+export interface SystemUser {
+  user_id: string
+  name: string
+  email: string
+  organisation: string
+}
+
+export const MOCK_SYSTEM_USERS: SystemUser[] = [
+  { user_id: 'u1', name: 'Alex Thompson',   email: 'alex.thompson@zensar.com',    organisation: 'Zensar VMO' },
+  { user_id: 'u2', name: 'Sarah Chen',      email: 'sarah.chen@zensar.com',       organisation: 'Zensar IDT' },
+  { user_id: 'u3', name: 'Priya Sharma',    email: 'priya.sharma@zensar.com',     organisation: 'Zensar IDT' },
+  { user_id: 'u4', name: 'Marcus Williams', email: 'marcus.williams@zensar.com',  organisation: 'Zensar VMO' },
+  { user_id: 'u5', name: "James O'Brien",   email: 'james.obrien@zensar.com',     organisation: 'Zensar IDT' },
+  { user_id: 'u6', name: 'Emma Davies',     email: 'emma.davies@zensar.com',      organisation: 'Zensar VMO' },
+  { user_id: 'u7', name: 'Raj Patel',       email: 'raj.patel@novatech.com',      organisation: 'NovaTech Services' },
+  { user_id: 'u8', name: 'Lisa Wang',       email: 'lisa.wang@novatech.com',      organisation: 'NovaTech Services' },
+  { user_id: 'u9', name: 'David Kim',       email: 'david.kim@novatech.com',      organisation: 'NovaTech Services' },
+  { user_id: 'u10', name: 'Tom Baker',      email: 'tom.baker@zensar.com',        organisation: 'Zensar VMO' },
+  { user_id: 'u11', name: 'Nina Okafor',    email: 'nina.okafor@coresystems.com', organisation: 'CoreSystems Ltd' },
+  { user_id: 'u12', name: 'Liam Nguyen',    email: 'liam.nguyen@meridianit.com',  organisation: 'Meridian IT' },
+  { user_id: 'u13', name: 'Sophie Hart',    email: 'sophie.hart@zensar.com',      organisation: 'Zensar IDT' },
+  { user_id: 'u14', name: 'Carlos Rivera',  email: 'carlos.rivera@novatech.com',  organisation: 'NovaTech Services' },
+  { user_id: 'u15', name: 'Aisha Malik',    email: 'aisha.malik@coresystems.com', organisation: 'CoreSystems Ltd' },
+]
+
 /** Attendees loaded from previous cycle (before refresh responses) */
 export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
   {
     attendee_id: 'a1',
     stakeholder_id: 's1',
     name: 'Alex Thompson',
-    email: 'alex.thompson@shell.com',
+    email: 'alex.thompson@zensar.com',
     role: 'VMO_COORDINATOR',
-    organisation: 'Shell VMO',
+    organisation: 'Zensar VMO',
     is_key: true,
     invite_status: 'PENDING',
     availability_submitted: false,
@@ -17,9 +43,9 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     attendee_id: 'a2',
     stakeholder_id: 's2',
     name: 'Sarah Chen',
-    email: 'sarah.chen@shell.com',
+    email: 'sarah.chen@zensar.com',
     role: 'EGB_CHAIR',
-    organisation: 'Shell IDT',
+    organisation: 'Zensar IDT',
     is_key: true,
     invite_status: 'PENDING',
     availability_submitted: false,
@@ -28,9 +54,9 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     attendee_id: 'a3',
     stakeholder_id: 's3',
     name: 'Priya Sharma',
-    email: 'priya.sharma@shell.com',
+    email: 'priya.sharma@zensar.com',
     role: 'INTERNAL_LEAD',
-    organisation: 'Shell IDT',
+    organisation: 'Zensar IDT',
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: false,
@@ -39,9 +65,9 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     attendee_id: 'a4',
     stakeholder_id: 's4',
     name: 'Marcus Williams',
-    email: 'marcus.williams@shell.com',
+    email: 'marcus.williams@zensar.com',
     role: 'VENDOR_MANAGER',
-    organisation: 'Shell VMO',
+    organisation: 'Zensar VMO',
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: false,
@@ -50,9 +76,9 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     attendee_id: 'a5',
     stakeholder_id: 's5',
     name: "James O'Brien",
-    email: 'james.obrien@shell.com',
+    email: 'james.obrien@zensar.com',
     role: 'TECHNICAL_LEAD',
-    organisation: 'Shell IDT',
+    organisation: 'Zensar IDT',
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: false,
@@ -61,9 +87,9 @@ export const MOCK_ATTENDEES_INITIAL: CycleAttendee[] = [
     attendee_id: 'a6',
     stakeholder_id: 's6',
     name: 'Emma Davies',
-    email: 'emma.davies@shell.com',
+    email: 'emma.davies@zensar.com',
     role: 'COMMERCIAL_LEAD',
-    organisation: 'Shell VMO',
+    organisation: 'Zensar VMO',
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: false,
@@ -113,9 +139,9 @@ export const MOCK_ATTENDEES_AFTER_RESPONSES: CycleAttendee[] = [
     attendee_id: 'a4b',
     stakeholder_id: 's4b',
     name: 'Tom Baker',
-    email: 'tom.baker@shell.com',
+    email: 'tom.baker@zensar.com',
     role: 'VENDOR_MANAGER',
-    organisation: 'Shell VMO',
+    organisation: 'Zensar VMO',
     is_key: false,
     invite_status: 'PENDING',
     availability_submitted: true,

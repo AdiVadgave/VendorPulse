@@ -7,11 +7,28 @@ import {
   Users,
   MapPin,
   FileText,
+  AlertCircle,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
+
+// Maps VendorPulse attendee emails to Teams backend userIds
+const EMAIL_TO_TEAMS_ID: Record<string, string> = {
+  'alex.thompson@zensar.com':  'u1',
+  'sarah.chen@zensar.com':     'u2',
+  'priya.sharma@zensar.com':   'u3',
+  'marcus.williams@zensar.com':'u4',
+  'james.obrien@zensar.com':   'u5',
+  'emma.davies@zensar.com':    'u6',
+  'raj.patel@novatech.com':    'u7',
+  'lisa.wang@novatech.com':    'u8',
+  'david.kim@novatech.com':    'u9',
+}
+
+const TEAMS_API = 'http://localhost:3001/api'
+const ORGANIZER_ID = 'u1' // Alex Thompson / VMO Coordinator
 
 interface InviteApprovalPanelProps {
   slot: SlotProposal
@@ -19,7 +36,7 @@ interface InviteApprovalPanelProps {
   vendorName: string
   quarter: string
   year: number
-  onInviteSent: () => void
+  onInviteSent: (teamsMeetingId: string | null) => void
 }
 
 export default function InviteApprovalPanel({
@@ -32,18 +49,60 @@ export default function InviteApprovalPanel({
 }: InviteApprovalPanelProps) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('awaiting_approval')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [teamsError, setTeamsError] = useState<string | null>(null)
 
   const dateObj = new Date(slot.proposed_time)
   const endTime = new Date(dateObj.getTime() + 2 * 60 * 60 * 1000)
 
-  function handleSend() {
+  async function handleSend() {
     setIsProcessing(true)
     setAgentStatus('running')
-    setTimeout(() => {
-      setAgentStatus('complete')
-      setIsProcessing(false)
-      onInviteSent()
-    }, 1200)
+    setTeamsError(null)
+
+    // Build participant list from attendees (excluding organizer)
+    const participantIds = attendees
+      .map((a) => EMAIL_TO_TEAMS_ID[a.email])
+      .filter((id): id is string => !!id && id !== ORGANIZER_ID)
+
+    // Remove duplicates
+    const uniqueParticipantIds = [...new Set(participantIds)]
+
+    let teamsMeetingId: string | null = null
+
+    try {
+      const res = await fetch(`${TEAMS_API}/meetings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `EGB/QBR Governance Review — ${vendorName} ${quarter} ${year}`,
+          description: `Quarterly Business Review governance meeting for ${vendorName}.`,
+          agenda:
+            '1) Q Performance Review & Scorecard Discussion\n2) Key Issues, Concerns and Pushback Responses\n3) Commitments and Action Items Review\n4) Forward Planning & AOB',
+          organizerId: ORGANIZER_ID,
+          participantIds: uniqueParticipantIds.length > 0 ? uniqueParticipantIds : ['u2'],
+          timeSlot: {
+            date: format(dateObj, 'yyyy-MM-dd'),
+            startTime: format(dateObj, 'HH:mm'),
+            endTime: format(endTime, 'HH:mm'),
+          },
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        teamsMeetingId = data.meeting?.meetingId ?? null
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setTeamsError(`Teams invite failed: ${err.error ?? res.statusText}`)
+      }
+    } catch {
+      // Teams backend offline — continue without it
+      setTeamsError('Teams backend unavailable — invite sent locally only.')
+    }
+
+    setAgentStatus('complete')
+    setIsProcessing(false)
+    onInviteSent(teamsMeetingId)
   }
 
   return (
@@ -60,12 +119,19 @@ export default function InviteApprovalPanel({
                 Invite Approval
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Review and approve the calendar invite before it is sent
+                Review and approve the calendar invite — it will be sent via Teams
               </p>
             </div>
           </div>
           <AgentStatusBadge status={agentStatus} />
         </div>
+
+        {teamsError && (
+          <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
+            <AlertCircle size={13} className="shrink-0 mt-0.5" />
+            {teamsError}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -136,7 +202,7 @@ export default function InviteApprovalPanel({
           <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
             <FileText size={14} className="text-slate-400" />
             <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-              Email Preview
+              Teams Invite Preview
             </span>
             <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 font-medium">
               Pending approval
@@ -194,8 +260,7 @@ export default function InviteApprovalPanel({
                 <li>Forward Planning &amp; AOB</li>
               </ol>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Please accept or decline this invitation at your earliest
-                convenience.
+                Please accept or decline this invitation via Microsoft Teams at your earliest convenience.
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 — VendorPulse Scheduling Agent
@@ -208,11 +273,12 @@ export default function InviteApprovalPanel({
       {/* Action buttons */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex items-center justify-between gap-4">
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          By approving, you confirm this invite will be sent to{' '}
+          By approving, this invite will be sent to{' '}
           <strong className="text-slate-800 dark:text-slate-200">
             {attendees.length} attendees
           </strong>{' '}
-          via the mock email service.
+          via <strong className="text-slate-800 dark:text-slate-200">Microsoft Teams</strong>.
+          RSVPs will be tracked automatically.
         </p>
         <button
           onClick={handleSend}
@@ -223,7 +289,7 @@ export default function InviteApprovalPanel({
           )}
         >
           <Send size={14} />
-          {isProcessing ? 'Sending...' : 'Approve & Send Invite'}
+          {isProcessing ? 'Sending via Teams...' : 'Approve & Send Invite'}
         </button>
       </div>
     </div>

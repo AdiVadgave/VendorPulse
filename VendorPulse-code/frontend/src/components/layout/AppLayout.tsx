@@ -4,7 +4,7 @@ import { cn } from '@/utils/cn'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
-export default function AppShell() {
+export default function AppLayout() {
   const { theme } = useUIStore()
 
   return (

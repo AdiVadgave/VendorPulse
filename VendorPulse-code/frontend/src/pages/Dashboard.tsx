@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
@@ -11,11 +12,16 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  X,
+  Loader2,
 } from 'lucide-react'
-import { MOCK_CYCLES } from '@/mock/cycles.mock'
 import { WORKFLOW_STATE_LABELS, WORKFLOW_STATES } from '@/utils/constants'
 import type { WorkflowState } from '@/utils/constants'
 import { cn } from '@/utils/cn'
+import { apiFetch } from '@/lib/api'
+import { useCycleStore } from '@/store/useCycleStore'
+import type { GovernanceCycle } from '@/types/cycle.types'
+import { MOCK_VENDORS } from '@/mock/cycles.mock'
 
 const STATE_BADGE: Record<string, { classes: string; progress: number }> = {
   CYCLE_CREATED:         { classes: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400', progress: 5 },
@@ -49,19 +55,228 @@ function getStateIndex(state: WorkflowState) {
   return WORKFLOW_STATES.indexOf(state)
 }
 
+// ── New Cycle Modal ──────────────────────────────────────────────────────────
+
+interface NewCycleForm {
+  vendor_id: string
+  vendor_name: string
+  quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4'
+  year: number
+}
+
+function NewCycleModal({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void
+  onCreate: (cycle: GovernanceCycle) => void
+}) {
+  const currentYear = new Date().getFullYear()
+  const [form, setForm] = useState<NewCycleForm>({
+    vendor_id: MOCK_VENDORS[0].vendor_id,
+    vendor_name: MOCK_VENDORS[0].name,
+    quarter: 'Q1',
+    year: currentYear,
+  })
+  const [customVendor, setCustomVendor] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function handleVendorChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const val = e.target.value
+    if (val === '__custom__') {
+      setCustomVendor(true)
+      setForm((f) => ({ ...f, vendor_id: 'v_custom', vendor_name: '' }))
+    } else {
+      setCustomVendor(false)
+      const v = MOCK_VENDORS.find((v) => v.vendor_id === val)
+      setForm((f) => ({ ...f, vendor_id: val, vendor_name: v?.name ?? '' }))
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.vendor_name.trim()) {
+      setError('Vendor name is required.')
+      return
+    }
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      const res = await apiFetch<{ cycle: GovernanceCycle; message: string }>('/api/cycles', {
+        method: 'POST',
+        body: JSON.stringify({
+          vendor_id: form.vendor_id,
+          vendor_name: form.vendor_name.trim(),
+          quarter: form.quarter,
+          year: form.year,
+        }),
+      })
+      onCreate(res.cycle)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create cycle')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <Building2 size={16} className="text-indigo-600 dark:text-indigo-400" />
+            <h3 className="font-semibold text-slate-900 dark:text-white text-sm">
+              New Governance Cycle
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <X size={15} className="text-slate-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Vendor */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              Vendor
+            </label>
+            <select
+              value={customVendor ? '__custom__' : form.vendor_id}
+              onChange={handleVendorChange}
+              className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              {MOCK_VENDORS.map((v) => (
+                <option key={v.vendor_id} value={v.vendor_id}>
+                  {v.name}
+                </option>
+              ))}
+              <option value="__custom__">+ Custom vendor...</option>
+            </select>
+          </div>
+
+          {customVendor && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                Vendor Name
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Accenture Services"
+                value={form.vendor_name}
+                onChange={(e) => setForm((f) => ({ ...f, vendor_name: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                autoFocus
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Quarter */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                Quarter
+              </label>
+              <select
+                value={form.quarter}
+                onChange={(e) => setForm((f) => ({ ...f, quarter: e.target.value as NewCycleForm['quarter'] }))}
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="Q1">Q1</option>
+                <option value="Q2">Q2</option>
+                <option value="Q3">Q3</option>
+                <option value="Q4">Q4</option>
+              </select>
+            </div>
+
+            {/* Year */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                Year
+              </label>
+              <input
+                type="number"
+                value={form.year}
+                onChange={(e) => setForm((f) => ({ ...f, year: parseInt(e.target.value) || currentYear }))}
+                min={currentYear - 1}
+                max={currentYear + 3}
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5">
+              <AlertCircle size={13} />
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors',
+                isSubmitting && 'opacity-70 cursor-not-allowed'
+              )}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Cycle'
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const today = new Date()
+  const { cycles, addCycle } = useCycleStore()
+  const [showNewCycleModal, setShowNewCycleModal] = useState(false)
 
   const stats = [
-    { label: 'Active Cycles', value: MOCK_CYCLES.length, icon: <Layers size={18} />, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/30' },
+    { label: 'Active Cycles', value: cycles.length, icon: <Layers size={18} />, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/30' },
     { label: 'Pending Approvals', value: 2, icon: <AlertCircle size={18} />, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30' },
     { label: 'Upcoming Meetings', value: 1, icon: <CalendarClock size={18} />, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30' },
     { label: 'Agent Runs Today', value: MOCK_AGENT_RUNS.length, icon: <Activity size={18} />, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30' },
   ]
 
+  function handleCycleCreated(cycle: GovernanceCycle) {
+    addCycle(cycle)
+    setShowNewCycleModal(false)
+    navigate(`/cycles/${cycle.cycle_id}?tab=scheduling`)
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {showNewCycleModal && (
+        <NewCycleModal
+          onClose={() => setShowNewCycleModal(false)}
+          onCreate={handleCycleCreated}
+        />
+      )}
+
       {/* Welcome header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -69,11 +284,11 @@ export default function Dashboard() {
             Welcome back, Alex
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            {format(today, 'EEEE, d MMMM yyyy')} · Shell VMO — Governance Platform
+            {format(today, 'EEEE, d MMMM yyyy')} · Zensar VMO — Governance Platform
           </p>
         </div>
         <button
-          onClick={() => navigate('/cycles/c3?tab=scheduling')}
+          onClick={() => setShowNewCycleModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors shrink-0"
         >
           <Plus size={16} />
@@ -114,14 +329,14 @@ export default function Dashboard() {
               </span>
             </div>
             <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full text-xs">
-              Q1 2026
+              {new Date().getFullYear()}
             </span>
           </div>
 
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {MOCK_CYCLES.map((cycle) => {
+            {cycles.map((cycle) => {
               const badge = STATE_BADGE[cycle.workflow_state]
-              const stateIdx = getStateIndex(cycle.workflow_state)
+              const stateIdx = getStateIndex(cycle.workflow_state as WorkflowState)
               const trend = VENDOR_TRENDS[cycle.vendor_name]
 
               return (
@@ -156,10 +371,10 @@ export default function Dashboard() {
                       <span
                         className={cn(
                           'px-2.5 py-0.5 rounded-full text-xs font-medium',
-                          badge.classes
+                          badge?.classes ?? 'bg-slate-100 text-slate-600'
                         )}
                       >
-                        {WORKFLOW_STATE_LABELS[cycle.workflow_state]}
+                        {WORKFLOW_STATE_LABELS[cycle.workflow_state as WorkflowState] ?? cycle.workflow_state}
                       </span>
                       <ArrowRight size={14} className="text-slate-400" />
                     </div>
@@ -231,7 +446,7 @@ export default function Dashboard() {
           Quick Access
         </p>
         <div className="flex flex-wrap gap-2">
-          {MOCK_CYCLES.map((cycle) => (
+          {cycles.map((cycle) => (
             <button
               key={cycle.cycle_id}
               onClick={() => navigate(`/cycles/${cycle.cycle_id}?tab=scheduling`)}

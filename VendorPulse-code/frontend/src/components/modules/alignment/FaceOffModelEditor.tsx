@@ -47,8 +47,8 @@ export default function FaceOffModelEditor({ positions: initialPositions }: Prop
       <div className="grid grid-cols-[2.5rem_1fr_1fr_2.5rem] gap-0 bg-slate-50 dark:bg-slate-800/50 px-4 py-2 border-b border-slate-200 dark:border-slate-800">
         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">#</span>
         <div className="grid grid-cols-2 gap-2">
-          <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">Shell Name</span>
-          <span className="text-xs font-semibold text-blue-500 dark:text-blue-500">Shell Role</span>
+          <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">Zensar Name</span>
+          <span className="text-xs font-semibold text-blue-500 dark:text-blue-500">Zensar Role</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <span className="text-xs font-semibold text-orange-600 dark:text-orange-400">Vendor Name</span>
@@ -69,27 +69,27 @@ export default function FaceOffModelEditor({ positions: initialPositions }: Prop
                 {pos.position_number}
               </span>
 
-              {/* Shell side */}
+              {/* Zensar side */}
               <div className="grid grid-cols-2 gap-2 pr-4">
                 {isEditing ? (
                   <>
                     <input
-                      value={editDraft.shell_name ?? ''}
-                      onChange={(e) => setEditDraft((d) => ({ ...d, shell_name: e.target.value }))}
+                      value={editDraft.client_name ?? ''}
+                      onChange={(e) => setEditDraft((d) => ({ ...d, client_name: e.target.value }))}
                       className="text-xs border border-blue-300 dark:border-blue-700 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       placeholder="Name"
                     />
                     <input
-                      value={editDraft.shell_role ?? ''}
-                      onChange={(e) => setEditDraft((d) => ({ ...d, shell_role: e.target.value }))}
+                      value={editDraft.client_role ?? ''}
+                      onChange={(e) => setEditDraft((d) => ({ ...d, client_role: e.target.value }))}
                       className="text-xs border border-blue-300 dark:border-blue-700 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       placeholder="Role"
                     />
                   </>
                 ) : (
                   <>
-                    <p className="text-sm text-slate-800 dark:text-slate-200 font-medium truncate">{pos.shell_name || '—'}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{pos.shell_role || '—'}</p>
+                    <p className="text-sm text-slate-800 dark:text-slate-200 font-medium truncate">{pos.client_name || '—'}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{pos.client_role || '—'}</p>
                   </>
                 )}
               </div>

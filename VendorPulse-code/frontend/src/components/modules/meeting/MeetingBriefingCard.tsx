@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function MeetingBriefingCard({
-  vendorName: _vendorName,
+  
   overallScore,
   trend,
   mostImproved,

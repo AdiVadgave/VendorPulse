@@ -69,12 +69,12 @@ export const MOCK_ALIGNMENT_FLAGS: AlignmentFlag[] = [
 ]
 
 export const MOCK_FACE_OFF: FaceOffPosition[] = [
-  { position_number: 1, shell_name: 'Alex Thompson', shell_role: 'VMO Coordinator', vendor_name: 'Raj Patel', vendor_role: 'Account Director' },
-  { position_number: 2, shell_name: 'Sarah Chen', shell_role: 'EGB Chair', vendor_name: 'Lisa Wang', vendor_role: 'Delivery Director' },
-  { position_number: 3, shell_name: 'Priya Sharma', shell_role: 'Internal Lead', vendor_name: 'David Kim', vendor_role: 'Commercial Manager' },
-  { position_number: 4, shell_name: "James O'Brien", shell_role: 'Technical Lead', vendor_name: 'Chen Wei', vendor_role: 'Technical Architect' },
-  { position_number: 5, shell_name: 'Tom Baker', shell_role: 'Vendor Manager', vendor_name: 'Anita Ross', vendor_role: 'Operations Lead' },
-  { position_number: 6, shell_name: 'Emma Davies', shell_role: 'Commercial Lead', vendor_name: '', vendor_role: '' },
+  { position_number: 1, client_name: 'Alex Thompson', client_role: 'VMO Coordinator', vendor_name: 'Raj Patel', vendor_role: 'Account Director' },
+  { position_number: 2, client_name: 'Sarah Chen', client_role: 'EGB Chair', vendor_name: 'Lisa Wang', vendor_role: 'Delivery Director' },
+  { position_number: 3, client_name: 'Priya Sharma', client_role: 'Internal Lead', vendor_name: 'David Kim', vendor_role: 'Commercial Manager' },
+  { position_number: 4, client_name: "James O'Brien", client_role: 'Technical Lead', vendor_name: 'Chen Wei', vendor_role: 'Technical Architect' },
+  { position_number: 5, client_name: 'Tom Baker', client_role: 'Vendor Manager', vendor_name: 'Anita Ross', vendor_role: 'Operations Lead' },
+  { position_number: 6, client_name: 'Emma Davies', client_role: 'Commercial Lead', vendor_name: '', vendor_role: '' },
 ]
 
 export const MOCK_ALIGNMENT_ACTIONS: ExtractedAction[] = [

@@ -61,3 +61,8 @@ export function getCycleById(id: string): GovernanceCycle | undefined {
 export function getVendorById(id: string): Vendor | undefined {
   return MOCK_VENDORS.find((v) => v.vendor_id === id)
 }
+
+// Alias expected by some pages
+export function getMockCycleById(id: string): GovernanceCycle | undefined {
+  return getCycleById(id)
+}

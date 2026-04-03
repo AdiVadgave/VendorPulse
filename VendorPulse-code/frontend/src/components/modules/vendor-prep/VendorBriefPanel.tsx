@@ -211,7 +211,7 @@ export default function VendorBriefPanel({ vendorName, brief, onBriefGenerated, 
         <ApprovalPanel
           title="Approve Vendor Brief"
           summary={`Review the AI-generated vendor brief for ${vendorName} before the prep call.`}
-          warnings={['This brief will be used to prepare the Shell team — vendor does not see it directly.']}
+          warnings={['This brief will be used to prepare the Zensar team — vendor does not see it directly.']}
           previewContent={
             <div className="space-y-2">
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">

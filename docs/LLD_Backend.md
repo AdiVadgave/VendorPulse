@@ -1952,12 +1952,12 @@ VENDORS = [
 ]
 
 STAKEHOLDERS = [
-    {"name": "Alex Chen",      "email": "alex.chen@shell.com",    "role": "VMO_COORDINATOR",  "organisation": "SHELL"},
-    {"name": "Priya Kapoor",   "email": "priya.kapoor@shell.com", "role": "INTERNAL_LEAD",    "organisation": "SHELL"},
-    {"name": "Marcus Webb",    "email": "marcus.webb@shell.com",  "role": "VENDOR_MANAGER",   "organisation": "SHELL"},
-    {"name": "Sandra Mills",   "email": "sandra.mills@shell.com", "role": "EGB_CHAIR",        "organisation": "SHELL"},
-    {"name": "David Park",     "email": "david.park@shell.com",   "role": "TECHNICAL_LEAD",   "organisation": "SHELL"},
-    {"name": "Fatima Al-Said", "email": "fatima@shell.com",       "role": "COMMERCIAL_LEAD",  "organisation": "SHELL"},
+    {"name": "Alex Chen",      "email": "alex.chen@zensar.com",    "role": "VMO_COORDINATOR",  "organisation": "SHELL"},
+    {"name": "Priya Kapoor",   "email": "priya.kapoor@zensar.com", "role": "INTERNAL_LEAD",    "organisation": "SHELL"},
+    {"name": "Marcus Webb",    "email": "marcus.webb@zensar.com",  "role": "VENDOR_MANAGER",   "organisation": "SHELL"},
+    {"name": "Sandra Mills",   "email": "sandra.mills@zensar.com", "role": "EGB_CHAIR",        "organisation": "SHELL"},
+    {"name": "David Park",     "email": "david.park@zensar.com",   "role": "TECHNICAL_LEAD",   "organisation": "SHELL"},
+    {"name": "Fatima Al-Said", "email": "fatima@zensar.com",       "role": "COMMERCIAL_LEAD",  "organisation": "SHELL"},
     {"name": "James Okafor",   "email": "j.okafor@novatech.com",  "role": "VENDOR_CONTACT",   "organisation": "VENDOR"},
     {"name": "Li Wei",         "email": "l.wei@coresystems.com",  "role": "VENDOR_CONTACT",   "organisation": "VENDOR"},
     {"name": "Anna Richter",   "email": "a.richter@meridian.com", "role": "VENDOR_CONTACT",   "organisation": "VENDOR"},

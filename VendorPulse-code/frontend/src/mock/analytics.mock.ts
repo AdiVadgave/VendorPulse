@@ -119,7 +119,7 @@ export const MOCK_LEADERSHIP_BRIEFS: Record<string, LeadershipBrief> = {
     recommended_focus: [
       'Resolve internal Innovation score divergence — Priya Sharma\'s outlier score (2 vs group avg 4) needs discussion',
       'Formalise AI pilot Phase 2 scope via contract amendment to unblock delivery',
-      'Confirm CPI pricing clause interpretation with Shell Commercial Lead before Q2',
+      'Confirm CPI pricing clause interpretation with Zensar Commercial Lead before Q2',
     ],
     generated_at: '2026-03-28T12:00:00Z',
   },
@@ -167,6 +167,6 @@ export const MOCK_ALL_ACTIONS: (ExtractedAction & { cycle_ref: string })[] = [
   { action_id: 'ac3', description: 'Review Q4 innovation KPI contract commitments', owner: "James O'Brien", due_date: '2026-03-25', source: 'alignment', status: 'CLOSED', cycle_ref: 'NovaTech Q1 2026' },
   { action_id: 'ac4', description: 'Submit root cause analysis for February SLA incident', owner: 'Raj Patel (NovaTech)', due_date: '2026-04-02', source: 'vendor_prep', status: 'OPEN', cycle_ref: 'NovaTech Q1 2026' },
   { action_id: 'ac5', description: 'Schedule joint SLA incident timeline review session', owner: 'Alex Thompson', due_date: '2026-04-04', source: 'meeting', status: 'OPEN', cycle_ref: 'NovaTech Q1 2026' },
-  { action_id: 'ac6', description: 'Submit written AI pilot Phase 2 scope proposal for Shell Legal', owner: 'Lisa Wang (NovaTech)', due_date: '2026-04-15', source: 'meeting', status: 'OPEN', cycle_ref: 'NovaTech Q1 2026' },
-  { action_id: 'ac7', description: 'Review pricing CPI clause with Shell Commercial Lead', owner: 'Emma Davies', due_date: '2026-04-07', source: 'meeting', status: 'IN_PROGRESS', cycle_ref: 'NovaTech Q1 2026' },
+  { action_id: 'ac6', description: 'Submit written AI pilot Phase 2 scope proposal for Zensar Legal', owner: 'Lisa Wang (NovaTech)', due_date: '2026-04-15', source: 'meeting', status: 'OPEN', cycle_ref: 'NovaTech Q1 2026' },
+  { action_id: 'ac7', description: 'Review pricing CPI clause with Zensar Commercial Lead', owner: 'Emma Davies', due_date: '2026-04-07', source: 'meeting', status: 'IN_PROGRESS', cycle_ref: 'NovaTech Q1 2026' },
 ]

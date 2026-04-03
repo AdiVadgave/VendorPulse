@@ -862,7 +862,7 @@ Unified action log filtered across all modules for this cycle
 **Approval Panel** — used before every "send" action:
 
 ```
-┌──────────────────────────────────────────────────────┐│  Agent summary:  Attendee refresh form ready         ││  Preview:        [email / form content rendered]     ││  Recipients:     Alex (alex@shell.com), Priya, Marcus││  [Approve & Send]         [Edit]         [Cancel]    │└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐│  Agent summary:  Attendee refresh form ready         ││  Preview:        [email / form content rendered]     ││  Recipients:     Alex (alex@zensar.com), Priya, Marcus││  [Approve & Send]         [Edit]         [Cancel]    │└──────────────────────────────────────────────────────┘
 ```
 
 **Workflow Progress Bar** — always visible in the cycle workspace:

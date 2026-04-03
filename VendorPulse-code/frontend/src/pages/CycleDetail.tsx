@@ -14,10 +14,9 @@ import {
   Clock,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { getCycleById } from '@/mock/cycles.mock'
+import { getMockCycleById as getMockCycleById } from '@/mock/cycles.mock'
 import {
   MOCK_ATTENDEES_INITIAL,
-  MOCK_ATTENDEES_AFTER_RESPONSES,
   MOCK_SLOT_PROPOSALS,
   MOCK_ATTENDEES_RSVP,
 } from '@/mock/scheduling.mock'
@@ -98,7 +97,7 @@ function getInitialSchedulingPhase(state: string): SchedulingPhase {
 }
 
 const SCHEDULING_STEPS: { key: SchedulingPhase; label: string }[] = [
-  { key: 'attendee_refresh', label: 'Attendee Refresh' },
+  { key: 'attendee_refresh', label: 'Attendees' },
   { key: 'slot_ranking', label: 'Slot Ranking' },
   { key: 'invite_approval', label: 'Invite Approval' },
   { key: 'confirmation_tracking', label: 'Confirmation' },
@@ -112,11 +111,13 @@ export default function CycleDetail() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
 
-  // Store-driven workflow state (overrides static mock as user advances)
+  // Store-driven: covers both mock cycles and API-created cycles
   const storeWorkflowState = useCycleStore((s) => cycleId ? s.workflowStates[cycleId] : undefined)
   const advanceWorkflow = useCycleStore((s) => s.advanceWorkflow)
+  const storeCycle = useCycleStore((s) => cycleId ? s.getCycleById(cycleId) : undefined)
 
-  const cycle = cycleId ? getCycleById(cycleId) : undefined
+  // Store takes precedence (includes API-created cycles); fall back to mock
+  const cycle = storeCycle ?? (cycleId ? getMockCycleById(cycleId) : undefined)
   const tabParam = (searchParams.get('tab') as TabKey) ?? 'overview'
   const [activeTab, setActiveTab] = useState<TabKey>(tabParam)
 
@@ -124,8 +125,13 @@ export default function CycleDetail() {
   const [schedulingPhase, setSchedulingPhase] = useState<SchedulingPhase>(() =>
     cycle ? getInitialSchedulingPhase(cycle.workflow_state) : 'attendee_refresh'
   )
-  const [schedulingAttendees, setSchedulingAttendees] = useState<CycleAttendee[]>(MOCK_ATTENDEES_INITIAL)
+  // For mock cycles pre-seed attendees; for new API-created cycles start empty
+  const isMockCycle = cycleId ? !!getMockCycleById(cycleId) : false
+  const [schedulingAttendees, setSchedulingAttendees] = useState<CycleAttendee[]>(
+    isMockCycle ? MOCK_ATTENDEES_INITIAL : []
+  )
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
+  const [teamsMeetingId, setTeamsMeetingId] = useState<string | null>(null)
 
   // --- Module B state ---
   const [scorecardDispatched, setScorecardDispatched] = useState(false)
@@ -197,18 +203,22 @@ export default function CycleDetail() {
 
   const selectedSlot = MOCK_SLOT_PROPOSALS.find((s) => s.slot_id === selectedSlotId) ?? MOCK_SLOT_PROPOSALS[0]
 
-  // Module A: advance to MEETING_SCHEDULED when invite is sent (entering confirmation phase)
+  // Module A: advance workflow state as scheduling progresses
   function advanceScheduling(next: SchedulingPhase) {
     setSchedulingPhase(next)
+    if (next === 'slot_ranking') {
+      // Skip ATTENDEE_REFRESH_SENT — go straight to AVAILABILITY_COLLECTED
+      advanceWorkflow(cycle!.cycle_id, 'AVAILABILITY_COLLECTED')
+    }
     if (next === 'confirmation_tracking') {
-      advanceWorkflow(cycle.cycle_id, 'MEETING_SCHEDULED')
+      advanceWorkflow(cycle!.cycle_id, 'MEETING_SCHEDULED')
     }
   }
 
   // Module B: advance to SCORECARD_COMPILED when submissions are simulated
   function handleSimulateSubmissions() {
     setSubmissionsSimulated(true)
-    advanceWorkflow(cycle.cycle_id, 'SCORECARD_COMPILED')
+    advanceWorkflow(cycle!.cycle_id, 'SCORECARD_COMPILED')
   }
 
   function handlePushbackAdd(item: Omit<PushbackItem, 'pushback_id' | 'cycle_id' | 'created_at'>) {
@@ -256,7 +266,7 @@ export default function CycleDetail() {
   // Module E: advance to POST_MEETING_COMPLETE when minutes are approved
   function handleMinutesApproved() {
     setMinutesApproved(true)
-    advanceWorkflow(cycle.cycle_id, 'POST_MEETING_COMPLETE')
+    advanceWorkflow(cycle!.cycle_id, 'POST_MEETING_COMPLETE')
     const newActions = MOCK_MEETING_ACTIONS.map(a => ({ ...a, cycle_ref: `${cycle!.vendor_name} ${cycle!.quarter} ${cycle!.year}` }))
     setAllActions((prev) => {
       const existing = prev.map(a => a.action_id)
@@ -340,6 +350,13 @@ export default function CycleDetail() {
             onPhaseChange={advanceScheduling}
             onAttendeesUpdated={setSchedulingAttendees}
             onSlotSelected={setSelectedSlotId}
+            teamsMeetingId={teamsMeetingId}
+            onTeamsMeetingCreated={setTeamsMeetingId}
+            isMockCycle={isMockCycle}
+            onScorecardProceed={() => {
+              advanceWorkflow(cycle!.cycle_id, 'SCORECARD_REQUEST_SENT')
+              changeTab('scorecard')
+            }}
           />
         )}
 
@@ -367,7 +384,7 @@ export default function CycleDetail() {
                 return [...prev, ...fresh]
               })
               // Module C: advance to INTERNAL_ALIGNMENT when actions are extracted
-              advanceWorkflow(cycle.cycle_id, 'INTERNAL_ALIGNMENT')
+              advanceWorkflow(cycle!.cycle_id, 'INTERNAL_ALIGNMENT')
             }}
           />
         )}
@@ -380,7 +397,7 @@ export default function CycleDetail() {
             onBriefApproved={() => {
               setBriefApproved(true)
               // Module D: advance to VENDOR_PREP when brief is approved
-              advanceWorkflow(cycle.cycle_id, 'VENDOR_PREP')
+              advanceWorkflow(cycle!.cycle_id, 'VENDOR_PREP')
             }}
             pushbackItems={pushbackItems}
             pushbackResponses={pushbackResponses}
@@ -409,7 +426,7 @@ export default function CycleDetail() {
             actions={allActions}
             workflowState={workflowState}
             onStatusChange={handleActionStatusChange}
-            onArchive={() => advanceWorkflow(cycle.cycle_id, 'ARCHIVED')}
+            onArchive={() => advanceWorkflow(cycle!.cycle_id, 'ARCHIVED')}
           />
         )}
       </div>
@@ -422,7 +439,7 @@ function OverviewTab({
   cycle,
   currentStateIndex,
 }: {
-  cycle: NonNullable<ReturnType<typeof getCycleById>>
+  cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   currentStateIndex: number
 }) {
   return (
@@ -481,14 +498,19 @@ function OverviewTab({
 /* ── Scheduling Tab ───────────────────────────────────────── */
 function SchedulingTab({
   cycle, schedulingPhase, attendees, selectedSlot, onPhaseChange, onAttendeesUpdated, onSlotSelected,
+  teamsMeetingId, onTeamsMeetingCreated, isMockCycle, onScorecardProceed,
 }: {
-  cycle: NonNullable<ReturnType<typeof getCycleById>>
+  cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   schedulingPhase: SchedulingPhase
   attendees: CycleAttendee[]
   selectedSlot: (typeof MOCK_SLOT_PROPOSALS)[0]
   onPhaseChange: (p: SchedulingPhase) => void
   onAttendeesUpdated: (a: CycleAttendee[]) => void
   onSlotSelected: (id: string) => void
+  teamsMeetingId: string | null
+  onTeamsMeetingCreated: (id: string | null) => void
+  isMockCycle: boolean
+  onScorecardProceed: () => void
 }) {
   const currentPhaseIndex = PHASE_ORDER.indexOf(schedulingPhase)
   return (
@@ -522,10 +544,14 @@ function SchedulingTab({
       </div>
       {schedulingPhase === 'attendee_refresh' && (
         <AttendeeRefreshPanel
+          cycleId={cycle.cycle_id}
           attendees={attendees}
-          simulatedAttendees={MOCK_ATTENDEES_AFTER_RESPONSES}
+          onAttendeesChanged={onAttendeesUpdated}
           onDispatchComplete={() => {}}
-          onResponsesSimulated={(updated) => { onAttendeesUpdated(updated); onPhaseChange('slot_ranking') }}
+          onResponsesSimulated={(updated) => {
+            onAttendeesUpdated(updated)
+            onPhaseChange('slot_ranking')
+          }}
         />
       )}
       {schedulingPhase === 'slot_ranking' && (
@@ -541,13 +567,22 @@ function SchedulingTab({
           vendorName={cycle.vendor_name}
           quarter={cycle.quarter}
           year={cycle.year}
-          onInviteSent={() => { onAttendeesUpdated(MOCK_ATTENDEES_RSVP); onPhaseChange('confirmation_tracking') }}
+          onInviteSent={(meetingId) => {
+            onTeamsMeetingCreated(meetingId)
+            // For mock cycles seed pre-built RSVP data; for new cycles keep attendees as-is (Teams will update them)
+            if (isMockCycle) {
+              onAttendeesUpdated(MOCK_ATTENDEES_RSVP)
+            }
+            onPhaseChange('confirmation_tracking')
+          }}
         />
       )}
       {schedulingPhase === 'confirmation_tracking' && (
         <ConfirmationTracker
           attendees={attendees.length > 0 ? attendees : MOCK_ATTENDEES_RSVP}
           slot={selectedSlot}
+          teamsMeetingId={teamsMeetingId}
+          onProceed={onScorecardProceed}
         />
       )}
     </div>
@@ -558,7 +593,7 @@ function SchedulingTab({
 function ScorecardTab({
   cycle, dispatched, onDispatched, submissions, simulated, onSimulate,
 }: {
-  cycle: NonNullable<ReturnType<typeof getCycleById>>
+  cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   dispatched: boolean
   onDispatched: () => void
   submissions: StakeholderSubmission[]
@@ -590,7 +625,7 @@ function ScorecardTab({
 function AlignmentTab({
   cycle, whatChangedBullets, actions, onActionsExtracted,
 }: {
-  cycle: NonNullable<ReturnType<typeof getCycleById>>
+  cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   whatChangedBullets: string[]
   actions: ExtractedAction[]
   onActionsExtracted: (a: ExtractedAction[]) => void
@@ -618,7 +653,7 @@ function VendorPrepTab({
   cycle, vendorBrief, onBriefGenerated, onBriefApproved,
   pushbackItems, pushbackResponses, onPushbackAdd, onGenerateResponses, onSelectResponse, onPushbackStatusChange,
 }: {
-  cycle: NonNullable<ReturnType<typeof getCycleById>>
+  cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   vendorBrief: VendorBrief | null
   onBriefGenerated: (b: VendorBrief) => void
   onBriefApproved: () => void
@@ -657,7 +692,7 @@ function VendorPrepTab({
 function MeetingTab({
   cycle, meetingNotes, minutesApproved, onNoteAdd, onTranscriptParsed, onMinutesApproved, allActions, onActionStatusChange,
 }: {
-  cycle: NonNullable<ReturnType<typeof getCycleById>>
+  cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   meetingNotes: MeetingNote[]
   minutesApproved: boolean
   onNoteAdd: (n: Omit<MeetingNote, 'note_id' | 'meeting_id'>) => void

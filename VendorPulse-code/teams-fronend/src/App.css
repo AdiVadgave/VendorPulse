@@ -1,0 +1,15 @@
+/* Teams global style overrides — Tailwind handles utilities */
+
+* {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Teams-style thin scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c8c8c8; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+
+/* Teams focus ring */
+button:focus-visible { outline: 2px solid #6264A7; outline-offset: 2px; }
+input:focus-visible  { outline: 2px solid #6264A7; outline-offset: 1px; }

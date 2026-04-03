@@ -1,0 +1,177 @@
+[
+  {
+    "meetingId": "m1",
+    "title": "Q1 EGB Governance Review — NovaTech",
+    "description": "Quarterly Executive Governance Board review for NovaTech vendor performance. All key stakeholders required.",
+    "agenda": "1. Q1 Scorecard Review\n2. SLA Compliance Update\n3. Innovation KPIs Discussion\n4. Open Action Items Review",
+    "organizerId": "u1",
+    "participants": [
+      {
+        "userId": "u2",
+        "status": "accepted",
+        "respondedAt": "2026-04-01T09:00:00Z"
+      },
+      {
+        "userId": "u3",
+        "status": "accepted",
+        "respondedAt": "2026-04-01T10:30:00Z"
+      },
+      {
+        "userId": "u4",
+        "status": "accepted",
+        "respondedAt": "2026-04-02T09:00:00Z"
+      },
+      {
+        "userId": "u5",
+        "status": "pending"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-04-10",
+      "startTime": "10:00",
+      "endTime": "11:30"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-01T08:00:00Z",
+    "cycleId": "c1",
+    "meetingType": "EGB_QBR"
+  },
+  {
+    "meetingId": "m2",
+    "title": "Internal Alignment Call — NovaTech Q1",
+    "description": "Internal team alignment session before the vendor prep call.",
+    "agenda": "1. Score diff analysis vs Q4\n2. Alignment flags review\n3. Pushback strategy planning",
+    "organizerId": "u2",
+    "participants": [
+      {
+        "userId": "u1",
+        "status": "pending"
+      },
+      {
+        "userId": "u3",
+        "status": "accepted",
+        "respondedAt": "2026-04-01T14:00:00Z"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-04-09",
+      "startTime": "11:00",
+      "endTime": "12:00"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-01T11:00:00Z",
+    "cycleId": "c1",
+    "meetingType": "INTERNAL_ALIGNMENT"
+  },
+  {
+    "meetingId": "m3",
+    "title": "Vendor Prep Call — NovaTech",
+    "description": "Pre-EGB preparation call with NovaTech team to walk through vendor brief.",
+    "agenda": "1. Vendor brief walkthrough\n2. Pushback items discussion\n3. Open action item updates",
+    "organizerId": "u4",
+    "participants": [
+      {
+        "userId": "u1",
+        "status": "accepted",
+        "respondedAt": "2026-04-02T09:00:00Z"
+      },
+      {
+        "userId": "u7",
+        "status": "pending"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-04-09",
+      "startTime": "14:00",
+      "endTime": "15:00"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-01T15:00:00Z",
+    "cycleId": "c1",
+    "meetingType": "VENDOR_PREP"
+  },
+  {
+    "meetingId": "m4",
+    "title": "Q4 QBR Follow-up — CoreSystems",
+    "description": "Follow-up on Q4 QBR action items for CoreSystems.",
+    "agenda": "1. Open action items review\n2. Issue resolution status\n3. Next steps and owners",
+    "organizerId": "u2",
+    "participants": [
+      {
+        "userId": "u1",
+        "status": "accepted",
+        "respondedAt": "2026-03-20T09:00:00Z"
+      },
+      {
+        "userId": "u3",
+        "status": "accepted",
+        "respondedAt": "2026-03-20T10:00:00Z"
+      },
+      {
+        "userId": "u4",
+        "status": "declined",
+        "respondedAt": "2026-03-21T09:00:00Z"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-03-28",
+      "startTime": "10:00",
+      "endTime": "11:00"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-03-19T08:00:00Z",
+    "cycleId": "c2",
+    "meetingType": "EGB_QBR"
+  },
+  {
+    "meetingId": "m5391af26",
+    "title": "Governance Review — Meridian IT",
+    "description": "Governance meeting for cycle c3",
+    "agenda": "1) Scorecard Review\n2) Actions\n3) Next Steps",
+    "organizerId": "u1",
+    "participants": [
+      {
+        "userId": "u2",
+        "status": "accepted",
+        "respondedAt": "2026-04-02T10:19:22.660590+00:00"
+      },
+      {
+        "userId": "u3",
+        "status": "pending"
+      },
+      {
+        "userId": "u4",
+        "status": "pending"
+      },
+      {
+        "userId": "u5",
+        "status": "pending"
+      },
+      {
+        "userId": "u6",
+        "status": "pending"
+      },
+      {
+        "userId": "u7",
+        "status": "pending"
+      },
+      {
+        "userId": "u8",
+        "status": "pending"
+      },
+      {
+        "userId": "u9",
+        "status": "pending"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-04-09",
+      "startTime": "09:00",
+      "endTime": "10:00"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-04-02T10:19:02.385020+00:00",
+    "cycleId": "c3",
+    "meetingType": "EGB_QBR"
+  }
+]

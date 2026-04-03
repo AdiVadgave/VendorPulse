@@ -22,8 +22,8 @@ export interface AlignmentFlag {
 
 export interface FaceOffPosition {
   position_number: number
-  shell_name: string
-  shell_role: string
+  client_name: string
+  client_role: string
   vendor_name: string
   vendor_role: string
 }

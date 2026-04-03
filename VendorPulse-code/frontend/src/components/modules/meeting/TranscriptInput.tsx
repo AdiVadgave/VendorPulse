@@ -11,19 +11,19 @@ interface Props {
 
 const DEMO_TRANSCRIPT = `Alex Thompson [10:05]: Can NovaTech provide root cause analysis for the February SLA breach within 5 business days?
 
-Raj Patel [10:12]: NovaTech disputes the SLA scoring for the February incident — the root cause was a Shell network outage, not a vendor failure.
+Raj Patel [10:12]: NovaTech disputes the SLA scoring for the February incident — the root cause was a Zensar network outage, not a vendor failure.
 
 Sarah Chen [10:20]: Let's schedule a joint incident review within 7 days to reconcile the timelines and determine SLA applicability. Agreed by all.
 
-Sarah Chen [10:28]: I want to note that Shell recognises NovaTech's proactive delivery improvement this quarter. Delivery Quality is up from Q4 — well done.
+Sarah Chen [10:28]: I want to note that Zensar recognises NovaTech's proactive delivery improvement this quarter. Delivery Quality is up from Q4 — well done.
 
 Priya Sharma [10:35]: What is NovaTech's timeline for the AI automation pilot Phase 2 go-live?
 
 Emma Davies [10:40]: Any AI pilot scope change requires a formal contract amendment — NovaTech cannot proceed without a signed SOW.
 
-Alex Thompson [10:45]: Action: NovaTech to submit written scope proposal for AI pilot Phase 2 by 15 April 2026. Shell Legal to review.
+Alex Thompson [10:45]: Action: NovaTech to submit written scope proposal for AI pilot Phase 2 by 15 April 2026. Zensar Legal to review.
 
-Emma Davies [10:52]: Decision: The pricing dispute is escalated to Shell Commercial team. Invoices at the 8% increase rate will be held pending resolution.
+Emma Davies [10:52]: Decision: The pricing dispute is escalated to Zensar Commercial team. Invoices at the 8% increase rate will be held pending resolution.
 
 Alex Thompson [10:58]: Action: I'll schedule the joint incident review for the February SLA event within the next 7 days.`
 

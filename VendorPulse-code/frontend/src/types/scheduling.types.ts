@@ -5,6 +5,7 @@ export type InviteStatus = 'ACCEPTED' | 'DECLINED' | 'PENDING'
 export interface CycleAttendee {
   attendee_id: string
   stakeholder_id: string
+  cycle_id?: string
   name: string
   email: string
   role: StakeholderRole
@@ -12,6 +13,7 @@ export interface CycleAttendee {
   is_key: boolean
   invite_status: InviteStatus
   availability_submitted: boolean
+  user_id?: string
   replaced_by?: string
   replaced_by_email?: string
   replacement_note?: string
@@ -34,7 +36,6 @@ export interface SlotProposal {
 
 export type SchedulingPhase =
   | 'attendee_refresh'
-  | 'refresh_dispatched'
   | 'slot_ranking'
   | 'invite_approval'
   | 'confirmation_tracking'

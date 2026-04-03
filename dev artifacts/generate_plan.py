@@ -1004,7 +1004,7 @@ def build_document():
     add_code_block(doc, """┌─────────────────────────────────────────────────────────┐
 │  Agent summary:  Attendee refresh form ready            │
 │  Preview:        [email/form content rendered here]     │
-│  Recipients:     Alex (alex@shell.com), Priya, Marcus   │
+│  Recipients:     Alex (alex@zensar.com), Priya, Marcus   │
 │  [Approve & Send]          [Edit]          [Cancel]     │
 └─────────────────────────────────────────────────────────┘""")
 

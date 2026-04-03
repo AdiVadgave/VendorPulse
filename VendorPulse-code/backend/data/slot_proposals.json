@@ -75,5 +75,282 @@
       "Raj Patel",
       "David Kim"
     ]
+  },
+  {
+    "slot_id": "sl_4b6b4642",
+    "cycle_id": "c_9e91621c",
+    "proposed_time": "2026-04-07T09:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 4,
+    "total_attendees": 4,
+    "conflict_count": 0,
+    "attending": [
+      "Alex Thompson",
+      "James O'Brien",
+      "Alex Thompson",
+      "James O'Brien"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_fc60dcb4",
+    "cycle_id": "c_9e91621c",
+    "proposed_time": "2026-04-09T15:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 4,
+    "total_attendees": 4,
+    "conflict_count": 0,
+    "attending": [
+      "Alex Thompson",
+      "James O'Brien",
+      "Alex Thompson",
+      "James O'Brien"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_ab3cb706",
+    "cycle_id": "c_9e91621c",
+    "proposed_time": "2026-04-10T14:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "attendance_count": 4,
+    "total_attendees": 4,
+    "conflict_count": 0,
+    "attending": [
+      "Alex Thompson",
+      "James O'Brien",
+      "Alex Thompson",
+      "James O'Brien"
+    ],
+    "conflicts": [],
+    "approved_by": "string",
+    "approved_at": "2026-04-03T09:29:25.324984+00:00"
+  },
+  {
+    "slot_id": "slot_3239ad18",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_d45bd184",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 90,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_9fbe3c5b",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 80,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_afbd89c5",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_a1ca96c9",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 90,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_efa8bb1c",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 80,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_f29a8e03",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "2025-04-07T04:00:00.0000000",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_338190d7",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "2025-04-07T08:00:00.0000000",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 90,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_c534b47d",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "2025-04-07T08:30:00.0000000",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 80,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_c9cec909",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "2025-04-07T04:00:00.0000000",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100,
+    "is_approved": true,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": [],
+    "approved_by": "chinmay",
+    "approved_at": "2026-04-03T10:55:43.629338+00:00"
+  },
+  {
+    "slot_id": "slot_eee8b3aa",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "2025-04-07T08:00:00.0000000",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 90,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_37c480a4",
+    "cycle_id": "c_08de2127",
+    "proposed_time": "2025-04-07T08:30:00.0000000",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 80,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "gaurav.shukla1@zensar.com",
+      "rituraj.patil@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
   }
 ]

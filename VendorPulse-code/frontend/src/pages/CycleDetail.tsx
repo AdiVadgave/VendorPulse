@@ -20,6 +20,7 @@ import {
   MOCK_SLOT_PROPOSALS,
   MOCK_ATTENDEES_RSVP,
 } from '@/mock/scheduling.mock'
+import { fetchAttendees } from '@/lib/schedulingApi'
 import {
   MOCK_SCORECARD_SUBMISSIONS,
   MOCK_COMPILED_SCORES,
@@ -73,7 +74,7 @@ import { cn } from '@/utils/cn'
 import type { TabKey, WorkflowState } from '@/utils/constants'
 import { WORKFLOW_STATES, TAB_LABELS, TAB_MIN_STATE_INDEX } from '@/utils/constants'
 import { useCycleStore } from '@/store/useCycleStore'
-import type { SchedulingPhase, CycleAttendee } from '@/types/scheduling.types'
+import type { SchedulingPhase, CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import type { StakeholderSubmission } from '@/types/scorecard.types'
 import type { ExtractedAction } from '@/types/alignment.types'
 import type { VendorBrief, PushbackItem, PushbackResponse } from '@/types/vendor-prep.types'
@@ -131,6 +132,7 @@ export default function CycleDetail() {
     isMockCycle ? MOCK_ATTENDEES_INITIAL : []
   )
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
+  const [apiSlots, setApiSlots] = useState<SlotProposal[]>([])
   const [teamsMeetingId, setTeamsMeetingId] = useState<string | null>(null)
 
   // --- Module B state ---
@@ -172,6 +174,16 @@ export default function CycleDetail() {
     setSearchParams({ tab: activeTab }, { replace: true })
   }, [activeTab, setSearchParams])
 
+  // Load real attendees from backend for API-created (non-mock) cycles
+  useEffect(() => {
+    if (isMockCycle || !cycleId) return
+    fetchAttendees(cycleId)
+      .then((attendees) => {
+        if (attendees.length > 0) setSchedulingAttendees(attendees)
+      })
+      .catch(() => {/* backend may be offline — keep empty list */})
+  }, [cycleId, isMockCycle])
+
   if (!cycle) {
     return (
       <div className="p-6">
@@ -201,7 +213,9 @@ export default function CycleDetail() {
     setActiveTab(tab)
   }
 
-  const selectedSlot = MOCK_SLOT_PROPOSALS.find((s) => s.slot_id === selectedSlotId) ?? MOCK_SLOT_PROPOSALS[0]
+  // Use real slots when available (API-created cycles); fall back to mock (demo cycles)
+  const activeSlots = apiSlots.length > 0 ? apiSlots : MOCK_SLOT_PROPOSALS
+  const selectedSlot = activeSlots.find((s) => s.slot_id === selectedSlotId) ?? activeSlots[0]
 
   // Module A: advance workflow state as scheduling progresses
   function advanceScheduling(next: SchedulingPhase) {
@@ -346,9 +360,11 @@ export default function CycleDetail() {
             cycle={cycle}
             schedulingPhase={schedulingPhase}
             attendees={schedulingAttendees}
+            slots={activeSlots}
             selectedSlot={selectedSlot}
             onPhaseChange={advanceScheduling}
             onAttendeesUpdated={setSchedulingAttendees}
+            onSlotsReceived={setApiSlots}
             onSlotSelected={setSelectedSlotId}
             teamsMeetingId={teamsMeetingId}
             onTeamsMeetingCreated={setTeamsMeetingId}
@@ -497,15 +513,18 @@ function OverviewTab({
 
 /* ── Scheduling Tab ───────────────────────────────────────── */
 function SchedulingTab({
-  cycle, schedulingPhase, attendees, selectedSlot, onPhaseChange, onAttendeesUpdated, onSlotSelected,
+  cycle, schedulingPhase, attendees, slots, selectedSlot, onPhaseChange,
+  onAttendeesUpdated, onSlotsReceived, onSlotSelected,
   teamsMeetingId, onTeamsMeetingCreated, isMockCycle, onScorecardProceed,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   schedulingPhase: SchedulingPhase
   attendees: CycleAttendee[]
-  selectedSlot: (typeof MOCK_SLOT_PROPOSALS)[0]
+  slots: SlotProposal[]
+  selectedSlot: SlotProposal
   onPhaseChange: (p: SchedulingPhase) => void
   onAttendeesUpdated: (a: CycleAttendee[]) => void
+  onSlotsReceived: (slots: SlotProposal[]) => void
   onSlotSelected: (id: string) => void
   teamsMeetingId: string | null
   onTeamsMeetingCreated: (id: string | null) => void
@@ -548,20 +567,23 @@ function SchedulingTab({
           attendees={attendees}
           onAttendeesChanged={onAttendeesUpdated}
           onDispatchComplete={() => {}}
-          onResponsesSimulated={(updated) => {
+          onResponsesSimulated={(updated, rankedSlots) => {
             onAttendeesUpdated(updated)
+            if (rankedSlots.length > 0) onSlotsReceived(rankedSlots)
             onPhaseChange('slot_ranking')
           }}
         />
       )}
       {schedulingPhase === 'slot_ranking' && (
         <SlotRankingPanel
-          slots={MOCK_SLOT_PROPOSALS}
+          cycleId={cycle.cycle_id}
+          slots={slots}
           onSlotApproved={(slotId) => { onSlotSelected(slotId); onPhaseChange('invite_approval') }}
         />
       )}
       {schedulingPhase === 'invite_approval' && (
         <InviteApprovalPanel
+          cycleId={cycle.cycle_id}
           slot={selectedSlot}
           attendees={attendees}
           vendorName={cycle.vendor_name}

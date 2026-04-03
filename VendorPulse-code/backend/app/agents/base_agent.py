@@ -154,51 +154,86 @@ class BaseAgent(ABC):
 
     def _tool_calling_loop(self, user_message: str) -> dict:
         """
-        Implements the Claude API tool-calling loop.
+        Implements the OpenAI / Azure OpenAI tool-calling loop.
 
-        Runs until Claude returns stop_reason='end_turn'.
-        Each tool_use block is dispatched to execute_tool().
+        Runs until the model returns finish_reason='stop' or max iterations reached.
+        Each tool_calls block is dispatched to execute_tool().
         """
-        messages: list[dict] = [{"role": "user", "content": user_message}]
         tools = self.get_tools()
         system = self.get_system_prompt()
+        messages: list[dict] = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_message},
+        ]
 
-        while True:
-            response = self._llm.call(system=system, messages=messages, tools=tools)
+        max_iterations = 10
+        for _ in range(max_iterations):
+            response = self._llm.call(messages=messages, tools=tools)
+            choice = response.choices[0]
 
-            if response.stop_reason == "end_turn":
-                return self._extract_final_result(response)
+            if choice.finish_reason in ("stop", "end_turn", None):
+                return self._extract_final_result(choice.message)
 
-            if response.stop_reason == "tool_use":
-                tool_results: list[dict] = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        tool_result = self.execute_tool(block.name, block.input)
-                        tool_results.append(
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": block.id,
-                                "content": tool_result,
-                            }
-                        )
-
-                messages.append({"role": "assistant", "content": response.content})
-                messages.append({"role": "user", "content": tool_results})
-
-    def _extract_final_result(self, response: Any) -> dict:
-        """Parse Claude's final text response as JSON, or wrap as raw output."""
-        for block in response.content:
-            if hasattr(block, "text"):
-                try:
-                    return json.loads(block.text)
-                except (json.JSONDecodeError, ValueError):
-                    return {
-                        "summary": block.text,
-                        "data": {"raw_output": block.text},
-                        "warnings": [],
-                        "next_actions": [],
-                        "requires_approval": False,
+            if choice.finish_reason == "tool_calls":
+                # Append the assistant message (with tool_calls) to history
+                tool_calls_payload = [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
                     }
+                    for tc in choice.message.tool_calls
+                ]
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": choice.message.content,
+                        "tool_calls": tool_calls_payload,
+                    }
+                )
+
+                # Execute each tool and append results
+                for tc in choice.message.tool_calls:
+                    tool_input = json.loads(tc.function.arguments)
+                    tool_result = self.execute_tool(tc.function.name, tool_input)
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": tool_result,
+                        }
+                    )
+            else:
+                # Unknown finish_reason (e.g. "length", "content_filter") — treat as done
+                return self._extract_final_result(choice.message)
+
+        # Max iterations reached — return whatever the last message said
+        last = messages[-1] if messages else {}
+        return {
+            "summary": "Agent completed after reaching max iterations.",
+            "data": {"last_tool_result": last.get("content", "")},
+            "warnings": ["Agent reached max iterations (10)."],
+            "next_actions": ["APPROVE_SLOT"],
+            "requires_approval": True,
+        }
+
+    def _extract_final_result(self, message: Any) -> dict:
+        """Parse GPT-4o's final text response as JSON, or wrap as raw output."""
+        text = message.content or ""
+        if text:
+            try:
+                return json.loads(text)
+            except (json.JSONDecodeError, ValueError):
+                return {
+                    "summary": text,
+                    "data": {"raw_output": text},
+                    "warnings": [],
+                    "next_actions": [],
+                    "requires_approval": False,
+                }
         return {
             "summary": "Agent completed with no text output.",
             "data": {},

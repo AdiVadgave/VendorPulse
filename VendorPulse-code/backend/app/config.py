@@ -32,10 +32,23 @@ class Settings(BaseSettings):
     scheduling_key_attendance_bonus: float = 10.0
     scheduling_top_n_slots: int = 3
 
-    # AI / LLM (stub for future use — not enabled in v1)
+    # AI / LLM — set ENABLE_LLM=true and fill in provider credentials in .env
     enable_llm: bool = False
-    anthropic_api_key: str = ""
-    llm_model: str = "claude-opus-4-6"
+    ai_provider: str = "azure"          # "azure" or "openai"
+
+    # Azure OpenAI
+    azure_openai_api_key: str = ""
+    azure_openai_endpoint: str = ""
+    azure_openai_deployment_name: str = ""
+    azure_openai_api_version: str = "2024-12-01-preview"
+
+    # Standard OpenAI (fallback)
+    openai_api_key: str = ""
+    llm_model: str = "gpt-4o"
+
+    # Microsoft Graph API
+    graph_access_token: str = ""
+    graph_meeting_duration_minutes: int = 30   # configurable: 30, 60, 90, etc.
 
 
 settings = Settings()

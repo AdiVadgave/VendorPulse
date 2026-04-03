@@ -252,6 +252,119 @@ def update_rsvp(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Scheduling Agent — autonomous run endpoint
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@router.post("/api/cycles/{cycleId}/scheduling/agent/run")
+def run_scheduling_agent(
+    cycleId: str,
+    message: str = Body(
+        default="Simulate availability responses then rank the best meeting slots for this cycle.",
+        embed=True,
+    ),
+    svc: SchedulingService = Depends(get_scheduling_service),
+    cycle_repo=Depends(get_cycle_repo),
+    agent_run_repo=Depends(get_agent_run_repo),
+):
+    """
+    Run the Scheduling Agent for a cycle.
+
+    When ENABLE_LLM=true: GPT-4o drives the full scheduling workflow.
+    When disabled: deterministic fallback — simulate responses + rank slots.
+
+    Always returns an AgentResponse with a 'slots' list in data so the
+    frontend can render slot proposals immediately.
+    """
+    from app.config import settings
+    from app.models.common import AgentResponse
+
+    _get_cycle_or_404(cycleId, cycle_repo)
+
+    if settings.enable_llm:
+        from app.dependencies import get_llm_service, get_scheduling_agent as _get_agent
+        agent = _get_agent(cycle_id=cycleId)
+        response = agent.run(user_message=message)
+        # Append current slot proposals to the response data so the frontend
+        # can display them without an extra round-trip
+        slots = svc.get_slot_proposals(cycleId)
+        response.data = {**(response.data or {}), "slots": slots}
+        return response
+
+    # ── Deterministic path (LLM disabled) ────────────────────────────────────
+    # Step 1: simulate availability responses
+    svc.simulate_responses(cycleId)
+
+    # Step 2: build RankSlotsRequest from current attendees
+    attendees = svc.get_attendees(cycleId)
+    if not attendees:
+        return AgentResponse(
+            status="failed",
+            agent="scheduling_agent",
+            summary="No attendees found. Add attendees before running the scheduling agent.",
+            data=None,
+            warnings=["No attendees in cycle."],
+            next_actions=["ADD_ATTENDEES"],
+            requires_approval=False,
+        )
+
+    from app.models.scheduling import RankSlotsRequest
+    from datetime import date, timedelta
+
+    # Pick organiser (VMO_COORDINATOR) and exec sponsor (EGB_CHAIR or INTERNAL_LEAD)
+    organiser = next(
+        (a for a in attendees if a.get("role") == "VMO_COORDINATOR"),
+        attendees[0],
+    )
+    exec_sponsor = next(
+        (a for a in attendees if a.get("role") in ("EGB_CHAIR", "INTERNAL_LEAD")),
+        organiser,
+    )
+
+    user_ids = [a["user_id"] for a in attendees if a.get("user_id")]
+    if not user_ids:
+        # Fallback: use attendee_ids if no user_ids are linked
+        user_ids = [a["attendee_id"] for a in attendees]
+
+    today = date.today()
+    rank_request = RankSlotsRequest(
+        cycle_id=cycleId,
+        attendee_user_ids=user_ids,
+        attendee_names={
+            a.get("user_id", a["attendee_id"]): a["name"] for a in attendees
+        },
+        attendee_key_flags={
+            a.get("user_id", a["attendee_id"]): a.get("is_key", False)
+            for a in attendees
+        },
+        organiser_id=organiser.get("user_id", organiser["attendee_id"]),
+        exec_sponsor_id=exec_sponsor.get("user_id", exec_sponsor["attendee_id"]),
+        date_range_start=(today + timedelta(days=1)).isoformat(),
+        date_range_end=(today + timedelta(days=14)).isoformat(),
+        duration_hours=1.0,
+    )
+
+    # Step 3: run slot ranking
+    rank_response = svc.rank_slots(rank_request)
+
+    # Step 4: fetch stored proposals to return to the frontend
+    slots = svc.get_slot_proposals(cycleId)
+
+    return AgentResponse(
+        status="success",
+        agent="scheduling_agent",
+        summary=(
+            f"Availability simulated for {len(attendees)} attendees. "
+            f"Ranked {len(slots)} slot proposals — select one to approve."
+        ),
+        data={"slots": slots},
+        warnings=rank_response.warnings if rank_response else [],
+        next_actions=["APPROVE_SLOT"],
+        requires_approval=True,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Agent runs — traceability log
 # ──────────────────────────────────────────────────────────────────────────────
 

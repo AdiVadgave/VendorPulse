@@ -8,29 +8,16 @@ import {
   MapPin,
   FileText,
   AlertCircle,
+  Globe,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
+import { apiFetch } from '@/lib/api'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
 
-// Maps VendorPulse attendee emails to Teams backend userIds
-const EMAIL_TO_TEAMS_ID: Record<string, string> = {
-  'alex.thompson@zensar.com':  'u1',
-  'sarah.chen@zensar.com':     'u2',
-  'priya.sharma@zensar.com':   'u3',
-  'marcus.williams@zensar.com':'u4',
-  'james.obrien@zensar.com':   'u5',
-  'emma.davies@zensar.com':    'u6',
-  'raj.patel@novatech.com':    'u7',
-  'lisa.wang@novatech.com':    'u8',
-  'david.kim@novatech.com':    'u9',
-}
-
-const TEAMS_API = 'http://localhost:3001/api'
-const ORGANIZER_ID = 'u1' // Alex Thompson / VMO Coordinator
-
 interface InviteApprovalPanelProps {
+  cycleId: string
   slot: SlotProposal
   attendees: CycleAttendee[]
   vendorName: string
@@ -40,6 +27,7 @@ interface InviteApprovalPanelProps {
 }
 
 export default function InviteApprovalPanel({
+  cycleId,
   slot,
   attendees,
   vendorName,
@@ -49,60 +37,41 @@ export default function InviteApprovalPanel({
 }: InviteApprovalPanelProps) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('awaiting_approval')
   const [isProcessing, setIsProcessing] = useState(false)
-  const [teamsError, setTeamsError] = useState<string | null>(null)
+  const [graphError, setGraphError] = useState<string | null>(null)
 
   const dateObj = new Date(slot.proposed_time)
-  const endTime = new Date(dateObj.getTime() + 2 * 60 * 60 * 1000)
+  const endTime = new Date(dateObj.getTime() + 0.5 * 60 * 60 * 1000)
 
   async function handleSend() {
     setIsProcessing(true)
     setAgentStatus('running')
-    setTeamsError(null)
+    setGraphError(null)
 
-    // Build participant list from attendees (excluding organizer)
-    const participantIds = attendees
-      .map((a) => EMAIL_TO_TEAMS_ID[a.email])
-      .filter((id): id is string => !!id && id !== ORGANIZER_ID)
-
-    // Remove duplicates
-    const uniqueParticipantIds = [...new Set(participantIds)]
-
-    let teamsMeetingId: string | null = null
+    let teamsMeetingUrl: string | null = null
 
     try {
-      const res = await fetch(`${TEAMS_API}/meetings`, {
+      const res = await apiFetch<{
+        event_id: string
+        teams_meeting_url: string
+        web_link: string
+      }>(`/api/cycles/${cycleId}/scheduling/graph/send-invite`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `EGB/QBR Governance Review — ${vendorName} ${quarter} ${year}`,
-          description: `Quarterly Business Review governance meeting for ${vendorName}.`,
-          agenda:
-            '1) Q Performance Review & Scorecard Discussion\n2) Key Issues, Concerns and Pushback Responses\n3) Commitments and Action Items Review\n4) Forward Planning & AOB',
-          organizerId: ORGANIZER_ID,
-          participantIds: uniqueParticipantIds.length > 0 ? uniqueParticipantIds : ['u2'],
-          timeSlot: {
-            date: format(dateObj, 'yyyy-MM-dd'),
-            startTime: format(dateObj, 'HH:mm'),
-            endTime: format(endTime, 'HH:mm'),
-          },
+          slot_id: slot.slot_id,
+          organiser_email: attendees[0]?.email || 'organiser@zensar.com',
         }),
       })
 
-      if (res.ok) {
-        const data = await res.json()
-        teamsMeetingId = data.meeting?.meetingId ?? null
-      } else {
-        const err = await res.json().catch(() => ({}))
-        setTeamsError(`Teams invite failed: ${err.error ?? res.statusText}`)
+      if (res) {
+        teamsMeetingUrl = res.teams_meeting_url ?? null
       }
-    } catch {
-      // Teams backend offline — continue without it
-      setTeamsError('Teams backend unavailable — invite sent locally only.')
+    } catch (err) {
+      setGraphError(err instanceof Error ? err.message : 'Failed to create Teams meeting')
     }
 
     setAgentStatus('complete')
     setIsProcessing(false)
-    onInviteSent(teamsMeetingId)
+    onInviteSent(teamsMeetingUrl)
   }
 
   return (
@@ -119,17 +88,17 @@ export default function InviteApprovalPanel({
                 Invite Approval
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Review and approve the calendar invite — it will be sent via Teams
+                Review and approve the calendar invite — it will be sent via Microsoft Teams
               </p>
             </div>
           </div>
           <AgentStatusBadge status={agentStatus} />
         </div>
 
-        {teamsError && (
+        {graphError && (
           <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
             <AlertCircle size={13} className="shrink-0 mt-0.5" />
-            {teamsError}
+            {graphError}
           </div>
         )}
       </div>
@@ -272,24 +241,41 @@ export default function InviteApprovalPanel({
 
       {/* Action buttons */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex items-center justify-between gap-4">
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          By approving, this invite will be sent to{' '}
-          <strong className="text-slate-800 dark:text-slate-200">
-            {attendees.length} attendees
-          </strong>{' '}
-          via <strong className="text-slate-800 dark:text-slate-200">Microsoft Teams</strong>.
-          RSVPs will be tracked automatically.
-        </p>
+        <div>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            By approving, this invite will be sent to{' '}
+            <strong className="text-slate-800 dark:text-slate-200">
+              {attendees.length} attendees
+            </strong>{' '}
+            via <strong className="text-slate-800 dark:text-slate-200">Microsoft Teams</strong>.
+            RSVPs will be tracked automatically.
+          </p>
+          {graphError && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {graphError}
+            </p>
+          )}
+        </div>
         <button
           onClick={handleSend}
           disabled={isProcessing}
           className={cn(
-            'flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0',
+            'flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0',
             isProcessing && 'opacity-60 cursor-not-allowed'
           )}
         >
-          <Send size={14} />
-          {isProcessing ? 'Sending via Teams...' : 'Approve & Send Invite'}
+          {isProcessing ? (
+            <>
+              <Send size={14} className="animate-pulse" />
+              Sending via Graph…
+            </>
+          ) : (
+            <>
+              <Globe size={14} />
+              Approve & Send Invite
+            </>
+          )}
         </button>
       </div>
     </div>

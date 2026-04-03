@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import meetings, scheduling, users
+from app.api.routes import graph_scheduling, meetings, scheduling, users
 from app.config import settings
 
 app = FastAPI(
@@ -43,6 +43,7 @@ app.add_middleware(
 app.include_router(users.router)
 app.include_router(meetings.router)
 app.include_router(scheduling.router)
+app.include_router(graph_scheduling.router)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

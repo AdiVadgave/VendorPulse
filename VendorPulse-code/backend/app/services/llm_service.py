@@ -1,14 +1,17 @@
 """
-LLM Service — Claude API wrapper.
+LLM Service — Azure OpenAI / OpenAI wrapper.
 
-Currently a stub: enable_llm defaults to False.
-To activate: set ENABLE_LLM=true and ANTHROPIC_API_KEY=sk-... in .env
+Configure in .env:
+  ENABLE_LLM=true
+  AI_PROVIDER=azure
+  AZURE_OPENAI_API_KEY=...
+  AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+  AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
+  AZURE_OPENAI_API_VERSION=2024-12-01-preview   (optional, has default)
 
-When enabled, agents switch from _deterministic_run() to the full
-Claude API tool-calling loop automatically — no other code changes needed.
-
-The interface mirrors the Anthropic Python SDK so upgrading to the latest
-client library is a one-line change.
+  # Or for standard OpenAI:
+  AI_PROVIDER=openai
+  OPENAI_API_KEY=sk-...
 """
 from __future__ import annotations
 
@@ -18,27 +21,35 @@ from app.config import settings
 
 
 class LLMService:
-    """
-    Thin wrapper around the Anthropic Claude API.
-
-    Not async (sync client) for now.
-    Switch to anthropic.AsyncAnthropic when migrating to full async FastAPI.
-    """
-
     def __init__(self) -> None:
         self._enabled = settings.enable_llm
         self._client: Any = None
+        self._model: str = ""
 
-        if self._enabled:
-            try:
-                import anthropic  # type: ignore[import]
+        if not self._enabled:
+            return
 
-                self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-            except ImportError:
-                raise RuntimeError(
-                    "LLM is enabled but the 'anthropic' package is not installed. "
-                    "Run: pip install anthropic"
+        try:
+            if settings.ai_provider == "azure":
+                from openai import AzureOpenAI  # type: ignore[import]
+
+                self._client = AzureOpenAI(
+                    api_key=settings.azure_openai_api_key,
+                    azure_endpoint=settings.azure_openai_endpoint,
+                    api_version=settings.azure_openai_api_version,
                 )
+                self._model = settings.azure_openai_deployment_name
+            else:
+                from openai import OpenAI  # type: ignore[import]
+
+                self._client = OpenAI(api_key=settings.openai_api_key)
+                self._model = settings.llm_model
+
+        except ImportError:
+            raise RuntimeError(
+                "LLM is enabled but the 'openai' package is not installed. "
+                "Run: pip install openai"
+            )
 
     @property
     def is_enabled(self) -> bool:
@@ -46,46 +57,38 @@ class LLMService:
 
     def call(
         self,
-        system: str,
         messages: list[dict],
         tools: list[dict],
         max_tokens: int = 4096,
     ) -> Any:
         """
-        Call the Claude API and return the raw response object.
-
-        Raises RuntimeError if LLM is not enabled.
-        Raises anthropic.APIStatusError on API errors (handled by BaseAgent).
+        Call the Chat Completions API with tool-calling support.
+        messages must include a system message as the first entry.
         """
         if not self.is_enabled:
             raise RuntimeError(
-                "LLM is not enabled. Set ENABLE_LLM=true and ANTHROPIC_API_KEY in .env"
+                "LLM is not enabled. Set ENABLE_LLM=true and provider credentials in .env"
             )
 
-        return self._client.messages.create(
-            model=settings.llm_model,
+        return self._client.chat.completions.create(
+            model=self._model,
             max_tokens=max_tokens,
-            system=system,
-            tools=tools,
             messages=messages,
+            tools=tools,
+            tool_choice="auto",
         )
 
     def call_simple(self, prompt: str, system: str = "", max_tokens: int = 1024) -> str:
-        """
-        Simple text-in, text-out call without tool definitions.
-        Useful for generating plain-text outputs (summaries, briefs).
-        """
+        """Simple text-in, text-out call without tools."""
         if not self.is_enabled:
             raise RuntimeError("LLM is not enabled.")
 
-        messages = [{"role": "user", "content": prompt}]
-        response = self._client.messages.create(
-            model=settings.llm_model,
+        response = self._client.chat.completions.create(
+            model=self._model,
             max_tokens=max_tokens,
-            system=system or "You are a helpful assistant.",
-            messages=messages,
+            messages=[
+                {"role": "system", "content": system or "You are a helpful assistant."},
+                {"role": "user", "content": prompt},
+            ],
         )
-        for block in response.content:
-            if hasattr(block, "text"):
-                return block.text
-        return ""
+        return response.choices[0].message.content or ""

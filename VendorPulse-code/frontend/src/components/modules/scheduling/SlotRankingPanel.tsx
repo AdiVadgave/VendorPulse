@@ -1,28 +1,37 @@
 import { useState } from 'react'
-import { Cpu, Info } from 'lucide-react'
+import { Cpu, Info, AlertCircle } from 'lucide-react'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import SlotCard from './SlotCard'
 import type { SlotProposal } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
+import { approveSlot } from '@/lib/schedulingApi'
 
 interface SlotRankingPanelProps {
+  cycleId: string
   slots: SlotProposal[]
   onSlotApproved: (slotId: string) => void
 }
 
 export default function SlotRankingPanel({
+  cycleId,
   slots,
   onSlotApproved,
 }: SlotRankingPanelProps) {
   const [agentStatus] = useState<AgentStatus>('complete')
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [processingSlotId, setProcessingSlotId] = useState<string | null>(null)
+  const [approveError, setApproveError] = useState<string | null>(null)
 
-  function handleApprove(slotId: string) {
-    setIsProcessing(true)
-    setTimeout(() => {
-      setIsProcessing(false)
+  async function handleApprove(slotId: string) {
+    setProcessingSlotId(slotId)
+    setApproveError(null)
+    try {
+      await approveSlot(cycleId, slotId)
       onSlotApproved(slotId)
-    }, 1000)
+    } catch (err) {
+      setApproveError(err instanceof Error ? err.message : 'Failed to approve slot')
+    } finally {
+      setProcessingSlotId(null)
+    }
   }
 
   return (
@@ -49,13 +58,20 @@ export default function SlotRankingPanel({
         <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-start gap-2">
           <Info size={14} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
           <p className="text-xs text-blue-700 dark:text-blue-400">
-            The scheduling agent has analysed availability for all 9 attendees
+            The scheduling agent has analysed availability for all {slots[0]?.total_attendees ?? '—'} attendees
             and ranked {slots.length} viable slots. Ranking uses hard constraints
             (organiser &amp; exec sponsor availability) and soft scores
             (attendance coverage, timezone suitability). Select a slot to
             generate a calendar invite draft.
           </p>
         </div>
+
+        {approveError && (
+          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-400 flex items-start gap-2">
+            <AlertCircle size={13} className="shrink-0 mt-0.5" />
+            {approveError}
+          </div>
+        )}
       </div>
 
       {/* Slot cards */}
@@ -66,7 +82,7 @@ export default function SlotRankingPanel({
             slot={slot}
             rank={idx + 1}
             onApprove={handleApprove}
-            isProcessing={isProcessing}
+            isProcessing={processingSlotId === slot.slot_id}
           />
         ))}
       </div>

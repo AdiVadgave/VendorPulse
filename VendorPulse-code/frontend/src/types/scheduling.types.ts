@@ -23,6 +23,8 @@ export interface SlotProposal {
   slot_id: string
   cycle_id: string
   proposed_time: string
+  proposed_time_zone?: string
+  duration_minutes?: number
   organiser_available: boolean
   exec_sponsor_available: boolean
   rank_score: number

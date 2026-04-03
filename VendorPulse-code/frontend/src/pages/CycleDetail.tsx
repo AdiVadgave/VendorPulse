@@ -20,6 +20,7 @@ import {
   MOCK_SLOT_PROPOSALS,
   MOCK_ATTENDEES_RSVP,
 } from '@/mock/scheduling.mock'
+import { fetchAttendees } from '@/lib/schedulingApi'
 import {
   MOCK_SCORECARD_SUBMISSIONS,
   MOCK_COMPILED_SCORES,
@@ -143,6 +144,7 @@ export default function CycleDetail() {
     isMockCycle ? MOCK_ATTENDEES_INITIAL : []
   )
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
+  const [apiSlots, setApiSlots] = useState<SlotProposal[]>([])
   const [teamsMeetingId, setTeamsMeetingId] = useState<string | null>(null)
   // Real slot proposals fetched from API for new (non-mock) cycles
   const [apiSlotProposals, setApiSlotProposals] = useState<typeof MOCK_SLOT_PROPOSALS>([])
@@ -425,6 +427,7 @@ export default function CycleDetail() {
             selectedSlot={selectedSlot}
             onPhaseChange={advanceScheduling}
             onAttendeesUpdated={setSchedulingAttendees}
+            onSlotsReceived={setApiSlots}
             onSlotSelected={setSelectedSlotId}
             teamsMeetingId={teamsMeetingId}
             onTeamsMeetingCreated={setTeamsMeetingId}
@@ -583,6 +586,7 @@ function SchedulingTab({
   selectedSlot: (typeof MOCK_SLOT_PROPOSALS)[0]
   onPhaseChange: (p: SchedulingPhase, attendees?: CycleAttendee[]) => void
   onAttendeesUpdated: (a: CycleAttendee[]) => void
+  onSlotsReceived: (slots: SlotProposal[]) => void
   onSlotSelected: (id: string) => void
   teamsMeetingId: string | null
   onTeamsMeetingCreated: (id: string | null) => void
@@ -625,7 +629,7 @@ function SchedulingTab({
           attendees={attendees}
           onAttendeesChanged={onAttendeesUpdated}
           onDispatchComplete={() => {}}
-          onResponsesSimulated={(updated) => {
+          onResponsesSimulated={(updated, rankedSlots) => {
             onAttendeesUpdated(updated)
             onPhaseChange('slot_ranking', updated)
           }}

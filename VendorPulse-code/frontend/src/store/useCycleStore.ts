@@ -20,6 +20,10 @@ interface CycleStore {
   advanceWorkflow: (cycleId: string, newState: WorkflowState) => void
   /** Add a newly API-created cycle to the store */
   addCycle: (cycle: GovernanceCycle) => void
+  /** Replace all cycles from backend list */
+  setCycles: (cycles: GovernanceCycle[]) => void
+  /** Remove a cycle by id */
+  removeCycle: (cycleId: string) => void
 }
 
 const initialWorkflowStates: Record<string, WorkflowState> = Object.fromEntries(

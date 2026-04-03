@@ -48,83 +48,102 @@ class SchedulingAgent(BaseAgent):
         return SCHEDULING_SYSTEM_PROMPT
 
     def get_tools(self) -> list[dict]:
+        """Return tools in OpenAI function-calling format."""
         return [
             {
-                "name": "get_attendee_list",
-                "description": "Return the current list of attendees for this governance cycle.",
-                "input_schema": {"type": "object", "properties": {}, "required": []},
-            },
-            {
-                "name": "simulate_responses",
-                "description": "Simulate all attendees submitting their availability (demo helper).",
-                "input_schema": {"type": "object", "properties": {}, "required": []},
-            },
-            {
-                "name": "rank_slots",
-                "description": (
-                    "Run the deterministic slot-ranking algorithm and return the top 3 proposals. "
-                    "Hard constraints: organiser and exec-sponsor must be available. "
-                    "Scoring: attendance % − conflict penalty + tz bonus."
-                ),
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "attendee_user_ids": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "User IDs to include",
-                        },
-                        "attendee_names": {
-                            "type": "object",
-                            "description": "userId → display name",
-                        },
-                        "attendee_key_flags": {
-                            "type": "object",
-                            "description": "userId → is_key",
-                        },
-                        "organiser_id": {"type": "string"},
-                        "exec_sponsor_id": {"type": "string"},
-                        "date_range_start": {"type": "string", "description": "YYYY-MM-DD"},
-                        "date_range_end": {"type": "string", "description": "YYYY-MM-DD"},
-                        "duration_hours": {"type": "number", "default": 1.0},
-                    },
-                    "required": [
-                        "attendee_user_ids",
-                        "organiser_id",
-                        "exec_sponsor_id",
-                        "date_range_start",
-                        "date_range_end",
-                    ],
+                "type": "function",
+                "function": {
+                    "name": "get_attendee_list",
+                    "description": "Return the current list of attendees for this governance cycle.",
+                    "parameters": {"type": "object", "properties": {}, "required": []},
                 },
             },
             {
-                "name": "approve_slot",
-                "description": "Approve a ranked slot proposal and generate a calendar invite draft.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "slot_id": {"type": "string"},
-                        "approved_by": {"type": "string", "description": "userId"},
-                    },
-                    "required": ["slot_id", "approved_by"],
+                "type": "function",
+                "function": {
+                    "name": "simulate_responses",
+                    "description": "Simulate all attendees submitting their availability (demo helper).",
+                    "parameters": {"type": "object", "properties": {}, "required": []},
                 },
             },
             {
-                "name": "send_invites",
-                "description": "Create the meeting record and send invites for an approved slot.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "slot_id": {"type": "string"},
-                        "organiser_id": {"type": "string"},
+                "type": "function",
+                "function": {
+                    "name": "rank_slots",
+                    "description": (
+                        "Run the deterministic slot-ranking algorithm and return the top 3 proposals. "
+                        "Hard constraints: organiser and exec-sponsor must be available. "
+                        "Scoring: attendance % − conflict penalty + tz bonus."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "attendee_user_ids": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "User IDs to include",
+                            },
+                            "attendee_names": {
+                                "type": "object",
+                                "description": "userId → display name",
+                            },
+                            "attendee_key_flags": {
+                                "type": "object",
+                                "description": "userId → is_key flag",
+                            },
+                            "organiser_id": {"type": "string", "description": "userId of meeting organiser (hard constraint)"},
+                            "exec_sponsor_id": {"type": "string", "description": "userId of exec sponsor (hard constraint)"},
+                            "date_range_start": {"type": "string", "description": "YYYY-MM-DD — first candidate day"},
+                            "date_range_end": {"type": "string", "description": "YYYY-MM-DD — last candidate day"},
+                            "duration_hours": {"type": "number", "description": "Meeting duration in hours"},
+                        },
+                        "required": [
+                            "attendee_user_ids",
+                            "organiser_id",
+                            "exec_sponsor_id",
+                            "date_range_start",
+                            "date_range_end",
+                        ],
                     },
-                    "required": ["slot_id", "organiser_id"],
                 },
             },
             {
-                "name": "get_rsvp_status",
-                "description": "Return the current RSVP summary for the cycle.",
-                "input_schema": {"type": "object", "properties": {}, "required": []},
+                "type": "function",
+                "function": {
+                    "name": "approve_slot",
+                    "description": "Approve a ranked slot proposal and generate a calendar invite draft.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "slot_id": {"type": "string"},
+                            "approved_by": {"type": "string", "description": "userId of the approver"},
+                        },
+                        "required": ["slot_id", "approved_by"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "send_invites",
+                    "description": "Create the meeting record and send invites for an approved slot.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "slot_id": {"type": "string"},
+                            "organiser_id": {"type": "string"},
+                        },
+                        "required": ["slot_id", "organiser_id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_rsvp_status",
+                    "description": "Return the current RSVP summary for the cycle.",
+                    "parameters": {"type": "object", "properties": {}, "required": []},
+                },
             },
         ]
 

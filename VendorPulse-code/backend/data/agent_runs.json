@@ -42,5 +42,16 @@
     "triggered_by": "USER",
     "error_message": null,
     "created_at": "2026-04-03T09:18:12.386994+00:00"
+  },
+  {
+    "run_id": "7b43c372-0b33-418e-84b5-6c935e482078",
+    "agent_name": "scheduling_agent",
+    "cycle_id": "c_2b39f578",
+    "input_payload": "{\"user_message\": \"Simulate availability responses then rank the best meeting slots for this cycle.\", \"context\": {}}",
+    "output_payload": "{\"status\": \"failed\", \"agent\": \"scheduling_agent\", \"summary\": \"Agent error: Error code: 500 - {'error': {'message': 'Service Unavailable', 'type': 'service_unavailable_error', 'param': None, 'code': None}}\", \"data\": null, \"warnings\": [], \"next_actions\": [\"RETRY\"], \"requires_approval\": false, \"run_id\": \"7b43c372-0b33-418e-84b5-6c935e482078\"}",
+    "status": "FAILED",
+    "triggered_by": "USER",
+    "error_message": "Error code: 500 - {'error': {'message': 'Service Unavailable', 'type': 'service_unavailable_error', 'param': None, 'code': None}}",
+    "created_at": "2026-04-03T14:01:16.220530+00:00"
   }
 ]

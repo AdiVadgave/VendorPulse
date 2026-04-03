@@ -32,9 +32,11 @@ from typing import Optional
 
 from app.core.workflow_engine import WorkflowStateError, WorkflowViolationError, workflow_engine
 from app.dependencies import (
+    get_attendee_repo,
     get_agent_run_repo,
     get_cycle_repo,
     get_scheduling_service,
+    get_slot_repo,
 )
 from app.models.scheduling import (
     ApproveSlotRequest,
@@ -100,6 +102,26 @@ def create_cycle(payload: CycleCreate, cycle_repo=Depends(get_cycle_repo)):
 @router.get("/api/cycles/{cycleId}")
 def get_cycle(cycleId: str, cycle_repo=Depends(get_cycle_repo)):
     return {"cycle": _get_cycle_or_404(cycleId, cycle_repo)}
+
+
+@router.delete("/api/cycles/{cycleId}")
+def delete_cycle(
+    cycleId: str,
+    cycle_repo=Depends(get_cycle_repo),
+    attendee_repo=Depends(get_attendee_repo),
+    slot_repo=Depends(get_slot_repo),
+):
+    _get_cycle_or_404(cycleId, cycle_repo)
+
+    removed_attendees = attendee_repo.delete_for_cycle(cycleId)
+    slot_repo.clear_for_cycle(cycleId)
+    cycle_repo.delete_by_id("cycle_id", cycleId)
+
+    return {
+        "message": f"Cycle '{cycleId}' deleted",
+        "cycle_id": cycleId,
+        "removed_attendees": removed_attendees,
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────────

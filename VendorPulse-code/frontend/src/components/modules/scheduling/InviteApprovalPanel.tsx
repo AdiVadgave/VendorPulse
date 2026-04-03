@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { format } from 'date-fns'
 import {
   CalendarCheck,
   Send,
@@ -13,6 +12,7 @@ import {
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import { apiFetch } from '@/lib/api'
+import { getPreferredOrganizerEmail } from '@/lib/schedulingApi'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
 
@@ -40,7 +40,45 @@ export default function InviteApprovalPanel({
   const [graphError, setGraphError] = useState<string | null>(null)
 
   const dateObj = new Date(slot.proposed_time)
-  const endTime = new Date(dateObj.getTime() + 0.5 * 60 * 60 * 1000)
+  const durationMinutes = Number((slot as unknown as { duration_minutes?: number }).duration_minutes ?? 60)
+  const endTime = new Date(dateObj.getTime() + durationMinutes * 60 * 1000)
+  const slotTimeZone = slot.proposed_time_zone ?? 'UTC'
+
+  function toDisplayZone(zone: string): string {
+    const normalized = zone.toUpperCase()
+    if (normalized === 'IST' || normalized.includes('INDIA')) return 'IST'
+    if (normalized === 'GMT' || normalized.includes('GMT')) return 'GMT'
+    return 'UTC'
+  }
+
+  function toIanaZone(zone: string): string {
+    const normalized = zone.toUpperCase()
+    if (normalized === 'IST' || normalized.includes('INDIA')) return 'Asia/Kolkata'
+    if (normalized === 'GMT' || normalized.includes('GMT')) return 'Etc/GMT'
+    return 'UTC'
+  }
+
+  const displayZone = toDisplayZone(slotTimeZone)
+  const ianaZone = toIanaZone(slotTimeZone)
+
+  function formatDateInZone(date: Date): string {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      timeZone: ianaZone,
+    })
+  }
+
+  function formatTimeInZone(date: Date): string {
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: ianaZone,
+    })
+  }
 
   async function handleSend() {
     setIsProcessing(true)
@@ -50,6 +88,7 @@ export default function InviteApprovalPanel({
     let teamsMeetingUrl: string | null = null
 
     try {
+      const organiserEmail = getPreferredOrganizerEmail(attendees) || 'organiser@zensar.com'
       const res = await apiFetch<{
         event_id: string
         teams_meeting_url: string
@@ -58,7 +97,7 @@ export default function InviteApprovalPanel({
         method: 'POST',
         body: JSON.stringify({
           slot_id: slot.slot_id,
-          organiser_email: attendees[0]?.email || 'organiser@zensar.com',
+          organiser_email: organiserEmail,
         }),
       })
 
@@ -115,7 +154,7 @@ export default function InviteApprovalPanel({
             <div>
               <p className="text-xs text-slate-500 dark:text-slate-400">Date</p>
               <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                {format(dateObj, 'EEEE, d MMMM yyyy')}
+                {formatDateInZone(dateObj)}
               </p>
             </div>
           </div>
@@ -125,7 +164,7 @@ export default function InviteApprovalPanel({
             <div>
               <p className="text-xs text-slate-500 dark:text-slate-400">Time</p>
               <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                {format(dateObj, 'h:mm a')} – {format(endTime, 'h:mm a')} GMT
+                {formatTimeInZone(dateObj)} – {formatTimeInZone(endTime)} {displayZone}
               </p>
             </div>
           </div>
@@ -211,11 +250,11 @@ export default function InviteApprovalPanel({
               <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 rounded-lg p-3 space-y-1 text-xs">
                 <p>
                   📅 <strong>Date:</strong>{' '}
-                  {format(dateObj, 'EEEE, d MMMM yyyy')}
+                  {formatDateInZone(dateObj)}
                 </p>
                 <p>
-                  🕙 <strong>Time:</strong> {format(dateObj, 'h:mm a')} –{' '}
-                  {format(endTime, 'h:mm a')} GMT
+                  🕙 <strong>Time:</strong> {formatTimeInZone(dateObj)} –{' '}
+                  {formatTimeInZone(endTime)} {displayZone}
                 </p>
                 <p>📍 <strong>Location:</strong> Conference Room B / Microsoft Teams</p>
               </div>

@@ -18,7 +18,7 @@ import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import { ROLE_LABELS } from '@/types/cycle.types'
 import type { StakeholderRole } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
-import { runSchedulingAgent } from '@/lib/schedulingApi'
+import { getPreferredOrganizerEmail, runSchedulingAgent } from '@/lib/schedulingApi'
 import { MOCK_SYSTEM_USERS, type SystemUser } from '@/mock/scheduling.mock'
 
 interface AttendeeRefreshPanelProps {
@@ -284,6 +284,12 @@ export default function AttendeeRefreshPanel({
   onAttendeesChanged,
   onResponsesSimulated,
 }: AttendeeRefreshPanelProps) {
+  const today = new Date()
+  const defaultStartDate = today.toISOString().split('T')[0]
+  const defaultEndDate = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split('T')[0]
+
   const [showAddForm, setShowAddForm] = useState(false)
   const [togglingKey, setTogglingKey] = useState<string | null>(null)
   const [isProceeding, setIsProceeding] = useState(false)
@@ -292,6 +298,10 @@ export default function AttendeeRefreshPanel({
   const [isGraphSearching, setIsGraphSearching] = useState(false)
   const [graphStatus, setGraphStatus] = useState<string>('')
   const [graphError, setGraphError] = useState<string | null>(null)
+  const [graphStartDate, setGraphStartDate] = useState(defaultStartDate)
+  const [graphEndDate, setGraphEndDate] = useState(defaultEndDate)
+  const [graphDurationHours, setGraphDurationHours] = useState(0.5)
+  const [graphTimeZone, setGraphTimeZone] = useState<'IST' | 'UTC' | 'GMT'>('IST')
 
   async function handleToggleKey(attendee: CycleAttendee) {
     setTogglingKey(attendee.attendee_id)
@@ -331,7 +341,13 @@ export default function AttendeeRefreshPanel({
     setProceedStatus('Running scheduling agent…')
     try {
       const result = await runSchedulingAgent(cycleId)
-      const slots = result.data?.slots ?? []
+      const slots = (result.data?.slots ?? []).map((slot) => {
+        const withDuration = slot as SlotProposal & { duration_minutes?: number }
+        return {
+          ...slot,
+          duration_minutes: withDuration.duration_minutes ?? 60,
+        }
+      })
       setProceedStatus(result.summary || 'Done')
       onResponsesSimulated(attendees, slots as SlotProposal[])
     } catch (err) {
@@ -347,31 +363,36 @@ export default function AttendeeRefreshPanel({
     setGraphError(null)
     setGraphStatus('Finding real calendar slots via Graph…')
     try {
-      // Calculate date range (next 2 weeks)
-      const today = new Date()
-      const startDate = today.toISOString().split('T')[0]
-      const endDate = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0]
-
       const attendeeEmails = attendees.map((a) => a.email)
+      const organiserEmail = getPreferredOrganizerEmail(attendees) || 'organiser@zensar.com'
 
       const result = await apiFetch<{ slot_proposals: SlotProposal[] }>(
         `/api/cycles/${cycleId}/scheduling/graph/find-times`,
         {
           method: 'POST',
           body: JSON.stringify({
-            organiser_email: attendees[0]?.email || 'organiser@zensar.com',
-            date_range_start: startDate,
-            date_range_end: endDate,
-            duration_hours: 0.5,
+            organiser_email: organiserEmail,
+            date_range_start: graphStartDate,
+            date_range_end: graphEndDate,
+            duration_hours: graphDurationHours,
             use_specific_attendees: attendeeEmails,
-            time_zone: 'UTC',
+            time_zone: graphTimeZone,
           }),
         }
       )
 
-      const slots = result.slot_proposals ?? []
+      const durationMinutes = Math.round(graphDurationHours * 60)
+      const slots = (result.slot_proposals ?? []).map((slot) => {
+        const withDuration = slot as SlotProposal & {
+          duration_minutes?: number
+          proposed_time_zone?: string
+        }
+        return {
+          ...slot,
+          duration_minutes: withDuration.duration_minutes ?? durationMinutes,
+          proposed_time_zone: withDuration.proposed_time_zone ?? graphTimeZone,
+        }
+      })
       setGraphStatus(`Found ${slots.length} real calendar slots`)
       onResponsesSimulated(attendees, slots)
     } catch (err) {
@@ -413,6 +434,54 @@ export default function AttendeeRefreshPanel({
 
         {/* Proceed button */}
         <div className="mt-4 space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
+                Start date
+                <input
+                  type="date"
+                  value={graphStartDate}
+                  onChange={(e) => setGraphStartDate(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
+                End date
+                <input
+                  type="date"
+                  value={graphEndDate}
+                  onChange={(e) => setGraphEndDate(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
+                Meeting duration
+                <select
+                  value={graphDurationHours}
+                  onChange={(e) => setGraphDurationHours(Number(e.target.value))}
+                  className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value={0.5}>30 minutes</option>
+                  <option value={1}>60 minutes</option>
+                  <option value={1.5}>90 minutes</option>
+                  <option value={2}>120 minutes</option>
+                </select>
+              </label>
+            </div>
+            <div className="max-w-55">
+              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
+                Scheduling timezone
+                <select
+                  value={graphTimeZone}
+                  onChange={(e) => setGraphTimeZone(e.target.value as 'IST' | 'UTC' | 'GMT')}
+                  className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="IST">IST</option>
+                  <option value="UTC">UTC</option>
+                  <option value="GMT">GMT</option>
+                </select>
+              </label>
+            </div>
+
           <div className="flex items-center gap-2">
             <button
               onClick={handleProceed}

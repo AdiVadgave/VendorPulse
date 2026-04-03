@@ -27,6 +27,16 @@ export async function fetchAttendees(cycleId: string): Promise<CycleAttendee[]> 
   return res.attendees ?? []
 }
 
+export function getPreferredOrganizerEmail(attendees: CycleAttendee[]): string | null {
+  const coordinator = attendees.find((attendee) => attendee.role === 'VMO_COORDINATOR')
+  if (coordinator?.email) return coordinator.email
+
+  const keyAttendee = attendees.find((attendee) => attendee.is_key)
+  if (keyAttendee?.email) return keyAttendee.email
+
+  return attendees[0]?.email ?? null
+}
+
 export async function approveAttendeeKey(
   cycleId: string,
   attendeeId: string,

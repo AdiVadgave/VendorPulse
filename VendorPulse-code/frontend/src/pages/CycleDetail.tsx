@@ -578,6 +578,7 @@ function SchedulingTab({
         <SlotRankingPanel
           cycleId={cycle.cycle_id}
           slots={slots}
+          onBackToAttendees={() => onPhaseChange('attendee_refresh')}
           onSlotApproved={(slotId) => { onSlotSelected(slotId); onPhaseChange('invite_approval') }}
         />
       )}

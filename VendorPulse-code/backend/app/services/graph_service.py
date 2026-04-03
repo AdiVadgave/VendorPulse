@@ -26,6 +26,12 @@ class GraphService:
 
     BASE_URL = "https://graph.microsoft.com/v1.0"
 
+    _TZ_ALIASES = {
+        "IST": "India Standard Time",
+        "UTC": "UTC",
+        "GMT": "GMT Standard Time",
+    }
+
     def __init__(self, access_token: str):
         """
         Initialize with a delegated or app-only access token.
@@ -90,6 +96,8 @@ class GraphService:
         except ValueError as e:
             return {"error": f"Invalid date format: {e}"}
 
+        graph_tz = self._TZ_ALIASES.get(time_zone.upper(), time_zone)
+
         # Build attendees list
         attendees = [
             {"emailAddress": {"address": email}, "type": "required"}
@@ -99,17 +107,18 @@ class GraphService:
         # Request body
         body = {
             "attendees": attendees,
+            "isOrganizerOptional": is_organizer_optional,
             "timeConstraint": {
                 "activityDomain": "work",
                 "timeSlots": [
                     {
                         "start": {
                             "dateTime": start_dt.strftime("%Y-%m-%dT09:00:00"),
-                            "timeZone": time_zone,
+                            "timeZone": graph_tz,
                         },
                         "end": {
                             "dateTime": end_dt.strftime("%Y-%m-%dT17:00:00"),
-                            "timeZone": time_zone,
+                            "timeZone": graph_tz,
                         },
                     }
                 ],
@@ -173,13 +182,21 @@ class GraphService:
         if not httpx:
             raise ImportError("httpx is required. Install with: pip install httpx")
 
+        graph_tz = self._TZ_ALIASES.get(time_zone.upper(), time_zone)
+
         # Parse start time and compute end time
         try:
             start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
         except ValueError as e:
             return {"error": f"Invalid datetime format: {e}"}
 
-        end_dt = start_dt + timedelta(hours=duration_hours)
+        # Graph expects local wall-clock time in dateTime with explicit timeZone.
+        if start_dt.tzinfo is not None and graph_tz == "UTC":
+            start_local = start_dt.astimezone(timezone.utc).replace(tzinfo=None)
+        else:
+            start_local = start_dt.replace(tzinfo=None) if start_dt.tzinfo is not None else start_dt
+
+        end_local = start_local + timedelta(hours=duration_hours)
 
         # Build attendees list
         attendees = [
@@ -194,12 +211,12 @@ class GraphService:
         body = {
             "subject": subject,
             "start": {
-                "dateTime": start_dt.isoformat(),
-                "timeZone": time_zone,
+                "dateTime": start_local.isoformat(timespec="seconds"),
+                "timeZone": graph_tz,
             },
             "end": {
-                "dateTime": end_dt.isoformat(),
-                "timeZone": time_zone,
+                "dateTime": end_local.isoformat(timespec="seconds"),
+                "timeZone": graph_tz,
             },
             "attendees": attendees,
             "isOnlineMeeting": is_online_meeting,

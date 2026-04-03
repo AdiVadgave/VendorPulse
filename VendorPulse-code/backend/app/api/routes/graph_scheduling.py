@@ -110,6 +110,12 @@ def find_meeting_times_graph(
     else:
         attendee_emails = [a.get("email") for a in attendees if a.get("email")]
 
+    # Ensure requested organiser is part of required attendees for availability checks.
+    organiser_email = payload.organiser_email.strip().lower()
+    attendee_emails = [e.strip().lower() for e in attendee_emails if e]
+    if organiser_email and organiser_email not in attendee_emails:
+        attendee_emails.append(organiser_email)
+
     if not attendee_emails:
         raise HTTPException(status_code=400, detail="No attendee emails found")
 
@@ -123,6 +129,7 @@ def find_meeting_times_graph(
             duration_hours=payload.duration_hours,
             time_zone=payload.time_zone,
             max_candidates=3,
+            is_organizer_optional=True,
         ))
     except Exception as e:
         import traceback
@@ -149,6 +156,8 @@ def find_meeting_times_graph(
             "slot_id": slot_id,
             "cycle_id": cycleId,
             "proposed_time": meeting_time_str,
+            "proposed_time_zone": start_info.get("timeZone") or payload.time_zone,
+            "duration_minutes": int(payload.duration_hours * 60),
             "organiser_available": True,  # Graph already checked
             "exec_sponsor_available": True,  # We'll assume yes for Graph results
             "rank_score": 100 - (idx * 10),  # Higher score for earlier suggestions
@@ -163,6 +172,12 @@ def find_meeting_times_graph(
 
         # Persist to slot_proposals.json using repository
         slot_repo.insert(slot_proposal)
+
+    # Align workflow with deterministic path: slot discovery means
+    # availability has effectively been collected for this cycle.
+    now = datetime.now(timezone.utc).isoformat()
+    if workflow_engine.can_transition(cycle.get("workflow_state", ""), "AVAILABILITY_COLLECTED"):
+        workflow_engine.advance(cycle, cycle_repo, now)
 
     return {
         "message": f"Found {len(slot_proposals)} real meeting slots via Graph",
@@ -224,14 +239,16 @@ def send_meeting_invite_graph(
     # Create event (synchronous wrapper)
     try:
         import asyncio
+        duration_minutes = slot.get("duration_minutes", 30)
+        duration_hours = float(duration_minutes) / 60.0
         result = asyncio.run(graph_service.create_event(
             subject=subject,
             attendee_emails=attendee_emails,
             start_time=slot.get("proposed_time"),
-            duration_hours=0.5,  # From user spec: "half hours or configurable"
+            duration_hours=duration_hours,
             organiser_email=payload.organiser_email,
             is_online_meeting=True,
-            time_zone="UTC",
+            time_zone=slot.get("proposed_time_zone") or "UTC",
         ))
     except Exception as e:
         import traceback

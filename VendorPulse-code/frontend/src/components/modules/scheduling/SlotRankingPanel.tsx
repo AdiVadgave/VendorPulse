@@ -6,20 +6,25 @@ import type { SlotProposal } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
 import { approveSlot } from '@/lib/schedulingApi'
 
+type TimeZoneView = 'IST' | 'UTC' | 'GMT'
+
 interface SlotRankingPanelProps {
   cycleId: string
   slots: SlotProposal[]
   onSlotApproved: (slotId: string) => void
+  onBackToAttendees: () => void
 }
 
 export default function SlotRankingPanel({
   cycleId,
   slots,
   onSlotApproved,
+  onBackToAttendees,
 }: SlotRankingPanelProps) {
   const [agentStatus] = useState<AgentStatus>('complete')
   const [processingSlotId, setProcessingSlotId] = useState<string | null>(null)
   const [approveError, setApproveError] = useState<string | null>(null)
+  const [timeZoneView, setTimeZoneView] = useState<TimeZoneView>('IST')
 
   async function handleApprove(slotId: string) {
     setProcessingSlotId(slotId)
@@ -55,6 +60,30 @@ export default function SlotRankingPanel({
           <AgentStatusBadge status={agentStatus} />
         </div>
 
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Need to change attendees before approving a slot? Go back and edit the list.
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={timeZoneView}
+              onChange={(e) => setTimeZoneView(e.target.value as TimeZoneView)}
+              className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="IST">IST</option>
+              <option value="UTC">UTC</option>
+              <option value="GMT">GMT</option>
+            </select>
+            <button
+              type="button"
+              onClick={onBackToAttendees}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              Back to Attendees
+            </button>
+          </div>
+        </div>
+
         <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-start gap-2">
           <Info size={14} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
           <p className="text-xs text-blue-700 dark:text-blue-400">
@@ -83,6 +112,7 @@ export default function SlotRankingPanel({
             rank={idx + 1}
             onApprove={handleApprove}
             isProcessing={processingSlotId === slot.slot_id}
+            timeZoneView={timeZoneView}
           />
         ))}
       </div>

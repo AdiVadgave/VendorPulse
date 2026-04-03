@@ -30,66 +30,6 @@
     "updated_at": "2026-04-02T10:19:02.445103+00:00"
   },
   {
-    "cycle_id": "c_53610a4b",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-02T15:41:43.446774+00:00",
-    "updated_at": "2026-04-02T15:41:43.446774+00:00"
-  },
-  {
-    "cycle_id": "c_4e1e51ec",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-02T15:49:07.314484+00:00",
-    "updated_at": "2026-04-02T15:49:07.314484+00:00"
-  },
-  {
-    "cycle_id": "c_84679ab8",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-02T15:50:20.400634+00:00",
-    "updated_at": "2026-04-02T15:50:20.400634+00:00"
-  },
-  {
-    "cycle_id": "c_b6ea21cd",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "ATTENDEE_REFRESH_SENT",
-    "created_at": "2026-04-02T15:57:18.525534+00:00",
-    "updated_at": "2026-04-02T15:57:59.540688+00:00"
-  },
-  {
-    "cycle_id": "c_6e2497b8",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "ATTENDEE_REFRESH_SENT",
-    "created_at": "2026-04-02T16:08:34.131790+00:00",
-    "updated_at": "2026-04-02T16:09:35.056894+00:00"
-  },
-  {
-    "cycle_id": "c_ad92560d",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-02T16:15:17.045226+00:00",
-    "updated_at": "2026-04-02T16:15:17.045226+00:00"
-  },
-  {
     "cycle_id": "c_746bba9a",
     "vendor_id": "v_custom",
     "vendor_name": "GGL",
@@ -120,56 +60,6 @@
     "updated_at": "2026-04-02T16:56:12.188041+00:00"
   },
   {
-    "cycle_id": "c_b98d113c",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-02T16:56:22.958737+00:00",
-    "updated_at": "2026-04-02T16:56:22.958737+00:00"
-  },
-  {
-    "cycle_id": "c_f124a87d",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-02T16:56:24.803308+00:00",
-    "updated_at": "2026-04-02T16:56:24.803308+00:00"
-  },
-  {
-    "cycle_id": "c_38b9dd65",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-02T16:56:25.650786+00:00",
-    "updated_at": "2026-04-02T16:56:25.650786+00:00"
-  },
-  {
-    "cycle_id": "c_e9790017",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-02T16:56:37.810049+00:00",
-    "updated_at": "2026-04-02T16:56:37.810049+00:00"
-  },
-  {
-    "cycle_id": "c_c23b19d1",
-    "vendor_id": "v_custom",
-    "vendor_name": "asdfsadf",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "ATTENDEE_REFRESH_SENT",
-    "created_at": "2026-04-02T17:00:27.946483+00:00",
-    "updated_at": "2026-04-02T17:00:43.419138+00:00"
-  },
-  {
     "cycle_id": "c_4dade648",
     "vendor_id": "v_custom",
     "vendor_name": "GGL",
@@ -178,46 +68,6 @@
     "workflow_state": "ATTENDEE_REFRESH_SENT",
     "created_at": "2026-04-03T04:12:09.270426+00:00",
     "updated_at": "2026-04-03T04:12:35.869357+00:00"
-  },
-  {
-    "cycle_id": "c_8ff251bc",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-03T04:15:46.493077+00:00",
-    "updated_at": "2026-04-03T04:15:46.493077+00:00"
-  },
-  {
-    "cycle_id": "c_f510cf25",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL2",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-03T04:15:50.455583+00:00",
-    "updated_at": "2026-04-03T04:15:50.455583+00:00"
-  },
-  {
-    "cycle_id": "c_7ee56331",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL2",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-03T04:15:51.280182+00:00",
-    "updated_at": "2026-04-03T04:15:51.280182+00:00"
-  },
-  {
-    "cycle_id": "c_37b5da3e",
-    "vendor_id": "v_custom",
-    "vendor_name": "GGL21",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-03T04:15:53.973349+00:00",
-    "updated_at": "2026-04-03T04:15:53.973349+00:00"
   },
   {
     "cycle_id": "c_24a43025",
@@ -240,16 +90,6 @@
     "updated_at": "2026-04-03T09:21:32.881680+00:00"
   },
   {
-    "cycle_id": "c_e56c14be",
-    "vendor_id": "v_custom",
-    "vendor_name": "tcs",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-03T10:17:33.619913+00:00",
-    "updated_at": "2026-04-03T10:17:33.619913+00:00"
-  },
-  {
     "cycle_id": "c_08de2127",
     "vendor_id": "1506",
     "vendor_name": "NVDIA",
@@ -268,5 +108,15 @@
     "workflow_state": "CYCLE_CREATED",
     "created_at": "2026-04-03T12:06:40.432874+00:00",
     "updated_at": "2026-04-03T12:06:40.432874+00:00"
+  },
+  {
+    "cycle_id": "c_db221556",
+    "vendor_id": "v_samsung",
+    "vendor_name": "Samsung",
+    "quarter": "Q2",
+    "year": 2026,
+    "workflow_state": "AVAILABILITY_COLLECTED",
+    "created_at": "2026-04-03T13:19:18.952875+00:00",
+    "updated_at": "2026-04-03T13:19:23.251020+00:00"
   }
 ]

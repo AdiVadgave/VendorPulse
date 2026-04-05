@@ -130,5 +130,286 @@
       "Sarah Chen"
     ],
     "conflicts": []
+  },
+  {
+    "slot_id": "sl_1513493d",
+    "cycle_id": "c_6ca793cf",
+    "proposed_time": "2026-04-04T11:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_83849dc4",
+    "cycle_id": "c_6ca793cf",
+    "proposed_time": "2026-04-04T12:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_c96032ff",
+    "cycle_id": "c_6ca793cf",
+    "proposed_time": "2026-04-04T13:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": [],
+    "approved_by": "u3",
+    "approved_at": "2026-04-03T10:01:59.655354+00:00"
+  },
+  {
+    "slot_id": "sl_a569abb9",
+    "cycle_id": "c_45914953",
+    "proposed_time": "2026-04-04T11:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": [],
+    "approved_by": "u3",
+    "approved_at": "2026-04-03T10:32:46.600901+00:00"
+  },
+  {
+    "slot_id": "sl_616ed3e5",
+    "cycle_id": "c_45914953",
+    "proposed_time": "2026-04-04T12:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_0fe0214d",
+    "cycle_id": "c_45914953",
+    "proposed_time": "2026-04-05T09:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_871fc0bb",
+    "cycle_id": "c_045fadcf",
+    "proposed_time": "2026-04-04T12:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 6,
+    "total_attendees": 6,
+    "conflict_count": 0,
+    "attending": [
+      "Alex Johnson",
+      "Sarah Chen",
+      "Priya Sharma",
+      "Lisa Wang",
+      "Anup Kesarwani",
+      "Emma Davies"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_5d93f470",
+    "cycle_id": "c_045fadcf",
+    "proposed_time": "2026-04-05T09:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 6,
+    "total_attendees": 6,
+    "conflict_count": 0,
+    "attending": [
+      "Alex Johnson",
+      "Sarah Chen",
+      "Priya Sharma",
+      "Lisa Wang",
+      "Anup Kesarwani",
+      "Emma Davies"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_da30b979",
+    "cycle_id": "c_045fadcf",
+    "proposed_time": "2026-04-05T10:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 6,
+    "total_attendees": 6,
+    "conflict_count": 0,
+    "attending": [
+      "Alex Johnson",
+      "Sarah Chen",
+      "Priya Sharma",
+      "Lisa Wang",
+      "Anup Kesarwani",
+      "Emma Davies"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_a71fa20b",
+    "cycle_id": "c_16345b2d",
+    "proposed_time": "2026-04-04T12:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": [],
+    "approved_by": "ua94a6471",
+    "approved_at": "2026-04-03T10:47:28.292407+00:00"
+  },
+  {
+    "slot_id": "sl_845dbcb8",
+    "cycle_id": "c_16345b2d",
+    "proposed_time": "2026-04-05T09:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_68a5731a",
+    "cycle_id": "c_16345b2d",
+    "proposed_time": "2026-04-05T10:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Priya Sharma",
+      "Sarah Chen"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_d8d5f76b",
+    "cycle_id": "c_6b823e82",
+    "proposed_time": "2026-04-04T12:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Anup Kesarwani",
+      "Sarah Chen"
+    ],
+    "conflicts": [],
+    "approved_by": "u3",
+    "approved_at": "2026-04-03T10:51:50.335568+00:00"
+  },
+  {
+    "slot_id": "sl_723db364",
+    "cycle_id": "c_6b823e82",
+    "proposed_time": "2026-04-05T09:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Anup Kesarwani",
+      "Sarah Chen"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_45ed320e",
+    "cycle_id": "c_6b823e82",
+    "proposed_time": "2026-04-05T10:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Priya Sharma",
+      "Anup Kesarwani",
+      "Sarah Chen"
+    ],
+    "conflicts": []
   }
 ]

@@ -8,6 +8,7 @@ interface SlotCardProps {
   rank: number
   onApprove: (slotId: string) => void
   isProcessing?: boolean
+  timeZoneView?: 'IST' | 'UTC' | 'GMT'
 }
 
 const RANK_CONFIG = [
@@ -39,9 +40,41 @@ export default function SlotCard({
   rank,
   onApprove,
   isProcessing = false,
+  timeZoneView = 'IST',
 }: SlotCardProps) {
   const cfg = RANK_CONFIG[rank - 1] ?? RANK_CONFIG[2]
   const dateObj = new Date(slot.proposed_time)
+  const durationMinutes = Number((slot as unknown as { duration_minutes?: number }).duration_minutes ?? 60)
+  const durationMs = durationMinutes * 60 * 1000
+  const endObj = new Date(dateObj.getTime() + durationMs)
+
+  const timeZoneMap: Record<'IST' | 'UTC' | 'GMT', string> = {
+    IST: 'Asia/Kolkata',
+    UTC: 'UTC',
+    GMT: 'Etc/GMT',
+  }
+
+  const zone = timeZoneMap[timeZoneView]
+
+  function formatDateInZone(date: Date): string {
+    return date.toLocaleDateString('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: zone,
+    })
+  }
+
+  function formatTimeInZone(date: Date): string {
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: zone,
+    })
+  }
+
   const attendancePct = Math.round(
     (slot.attendance_count / slot.total_attendees) * 100
   )
@@ -62,12 +95,10 @@ export default function SlotCard({
           </div>
           <div>
             <p className="font-semibold text-slate-900 dark:text-white">
-              {format(dateObj, 'EEE, d MMM yyyy')}
+              {formatDateInZone(dateObj)}
             </p>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {format(dateObj, 'h:mm a')} –{' '}
-              {format(new Date(dateObj.getTime() + 2 * 60 * 60 * 1000), 'h:mm a')}{' '}
-              GMT
+              {formatTimeInZone(dateObj)} – {formatTimeInZone(endObj)} {timeZoneView}
             </p>
           </div>
         </div>

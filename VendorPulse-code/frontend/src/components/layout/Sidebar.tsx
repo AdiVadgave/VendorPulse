@@ -8,7 +8,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useUIStore } from '@/store/useUIStore'
-import { MOCK_CYCLES } from '@/mock/cycles.mock'
+import { useCycleStore } from '@/store/useCycleStore'
 import { cn } from '@/utils/cn'
 import { WORKFLOW_STATE_LABELS } from '@/utils/constants'
 
@@ -59,6 +59,7 @@ function NavItem({ to, icon, label, collapsed, end }: NavItemProps) {
 
 export default function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
+  const cycles = useCycleStore((s) => s.cycles)
 
   return (
     <aside
@@ -114,7 +115,7 @@ export default function Sidebar() {
               Active Cycles
             </p>
             <div className="space-y-1">
-              {MOCK_CYCLES.map((cycle) => (
+              {cycles.map((cycle) => (
                 <NavLink
                   key={cycle.cycle_id}
                   to={`/cycles/${cycle.cycle_id}`}

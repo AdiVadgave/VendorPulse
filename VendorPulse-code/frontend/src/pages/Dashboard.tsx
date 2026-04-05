@@ -14,6 +14,7 @@ import {
   Minus,
   X,
   Loader2,
+  Trash2,
 } from 'lucide-react'
 import { WORKFLOW_STATE_LABELS, WORKFLOW_STATES } from '@/utils/constants'
 import type { WorkflowState } from '@/utils/constants'
@@ -252,8 +253,36 @@ function NewCycleModal({
 export default function Dashboard() {
   const navigate = useNavigate()
   const today = new Date()
-  const { cycles, addCycle } = useCycleStore()
+  const { cycles, addCycle, setCycles, removeCycle } = useCycleStore()
   const [showNewCycleModal, setShowNewCycleModal] = useState(false)
+  const [isLoadingCycles, setIsLoadingCycles] = useState(false)
+  const [loadingError, setLoadingError] = useState<string | null>(null)
+  const [deletingCycleId, setDeletingCycleId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    setIsLoadingCycles(true)
+    setLoadingError(null)
+    apiFetch<{ cycles: GovernanceCycle[] }>('/api/cycles')
+      .then((res) => {
+        if (!mounted) return
+        const sorted = [...(res.cycles ?? [])].sort((a, b) =>
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        )
+        setCycles(sorted)
+      })
+      .catch((err) => {
+        if (!mounted) return
+        setLoadingError(err instanceof Error ? err.message : 'Failed to load cycles from backend')
+      })
+      .finally(() => {
+        if (mounted) setIsLoadingCycles(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [setCycles])
 
   // Load all cycles from the backend on mount so API-created cycles survive page refresh
   useEffect(() => {
@@ -276,6 +305,21 @@ export default function Dashboard() {
     addCycle(cycle)
     setShowNewCycleModal(false)
     navigate(`/cycles/${cycle.cycle_id}?tab=scheduling`)
+  }
+
+  async function handleDeleteCycle(cycleId: string) {
+    const ok = window.confirm('Delete this cycle and related attendee/slot data?')
+    if (!ok) return
+
+    setDeletingCycleId(cycleId)
+    try {
+      await apiFetch(`/api/cycles/${cycleId}`, { method: 'DELETE' })
+      removeCycle(cycleId)
+    } catch (err) {
+      setLoadingError(err instanceof Error ? err.message : 'Failed to delete cycle')
+    } finally {
+      setDeletingCycleId(null)
+    }
   }
 
   return (
@@ -328,6 +372,13 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {loadingError && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
+          <AlertCircle size={13} className="shrink-0 mt-0.5" />
+          {loadingError}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Active cycles */}
         <div className="lg:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -344,6 +395,18 @@ export default function Dashboard() {
           </div>
 
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {isLoadingCycles && (
+              <div className="px-5 py-8 text-sm text-slate-500 dark:text-slate-400">
+                Loading cycles from backend...
+              </div>
+            )}
+
+            {!isLoadingCycles && cycles.length === 0 && (
+              <div className="px-5 py-8 text-sm text-slate-500 dark:text-slate-400">
+                No cycles found in backend data.
+              </div>
+            )}
+
             {cycles.map((cycle) => {
               const badge = STATE_BADGE[cycle.workflow_state]
               const stateIdx = getStateIndex(cycle.workflow_state as WorkflowState)
@@ -370,6 +433,25 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteCycle(cycle.cycle_id)
+                        }}
+                        disabled={deletingCycleId === cycle.cycle_id}
+                        className={cn(
+                          'w-7 h-7 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center transition-colors',
+                          deletingCycleId === cycle.cycle_id && 'opacity-60 cursor-not-allowed'
+                        )}
+                        title="Delete cycle"
+                      >
+                        {deletingCycleId === cycle.cycle_id ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={13} />
+                        )}
+                      </button>
                       {trend && (
                         <div className="flex items-center gap-1 text-xs">
                           {trend.icon}

@@ -687,5 +687,44 @@
     "invite_status": "PENDING",
     "availability_submitted": false,
     "user_id": "u2"
+  },
+  {
+    "attendee_id": "att_13b2b6db",
+    "cycle_id": "c_dc4584e7",
+    "stakeholder_id": "s_1775400587053",
+    "name": "Anup Kesarwani",
+    "email": "Anup@zensar.com",
+    "role": "VMO_COORDINATOR",
+    "organisation": "Vice President",
+    "is_key": true,
+    "invite_status": "PENDING",
+    "availability_submitted": true,
+    "user_id": "ua94a6471"
+  },
+  {
+    "attendee_id": "att_562ea991",
+    "cycle_id": "c_dc4584e7",
+    "stakeholder_id": "s_1775400604188",
+    "name": "Alex Johnson",
+    "email": "alex@zensar.com",
+    "role": "VMO_COORDINATOR",
+    "organisation": "VMO Coordinator",
+    "is_key": false,
+    "invite_status": "PENDING",
+    "availability_submitted": true,
+    "user_id": "u1"
+  },
+  {
+    "attendee_id": "att_6a86462e",
+    "cycle_id": "c_dc4584e7",
+    "stakeholder_id": "s_1775400610957",
+    "name": "Sarah Chen",
+    "email": "sarah.chen@zensar.com",
+    "role": "VMO_COORDINATOR",
+    "organisation": "EGB Chair",
+    "is_key": false,
+    "invite_status": "PENDING",
+    "availability_submitted": true,
+    "user_id": "u2"
   }
 ]

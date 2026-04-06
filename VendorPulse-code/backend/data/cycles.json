@@ -388,5 +388,15 @@
     "workflow_state": "AVAILABILITY_COLLECTED",
     "created_at": "2026-04-03T10:51:05.422831+00:00",
     "updated_at": "2026-04-03T10:51:43.934809+00:00"
+  },
+  {
+    "cycle_id": "c_dc4584e7",
+    "vendor_id": "v_custom",
+    "vendor_name": "Test12",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "AVAILABILITY_COLLECTED",
+    "created_at": "2026-04-05T14:49:10.322680+00:00",
+    "updated_at": "2026-04-05T14:50:14.101356+00:00"
   }
 ]

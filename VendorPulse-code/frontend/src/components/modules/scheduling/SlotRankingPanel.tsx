@@ -4,9 +4,6 @@ import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import SlotCard from './SlotCard'
 import type { SlotProposal } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
-import { approveSlot } from '@/lib/schedulingApi'
-
-type TimeZoneView = 'IST' | 'UTC' | 'GMT'
 
 interface SlotRankingPanelProps {
   cycleId: string
@@ -17,29 +14,25 @@ interface SlotRankingPanelProps {
 }
 
 export default function SlotRankingPanel({
-  cycleId,
   slots,
   attendeeCount,
   onSlotApproved,
-  onBackToAttendees,
 }: SlotRankingPanelProps) {
   const [agentStatus] = useState<AgentStatus>('complete')
-  const [processingSlotId, setProcessingSlotId] = useState<string | null>(null)
-  const [approveError, setApproveError] = useState<string | null>(null)
-  const [timeZoneView, setTimeZoneView] = useState<TimeZoneView>('IST')
+  const [isProcessing, setIsProcessing] = useState(false)
 
   // Derive totals from actual API data
   const totalAttendees = attendeeCount ?? slots[0]?.total_attendees ?? 0
-
   function handleApprove(slotId: string) {
     setIsProcessing(true)
-    setTimeout(() => {
+    try {
+      // Simulate approval - replace with actual API call
+      setTimeout(() => {
+        setIsProcessing(false)
+        onSlotApproved(slotId)
+      }, 500)
+    } catch {
       setIsProcessing(false)
-      onSlotApproved(slotId)
-    } catch (err) {
-      setApproveError(err instanceof Error ? err.message : 'Failed to approve slot')
-    } finally {
-      setProcessingSlotId(null)
     }
   }
 
@@ -88,9 +81,7 @@ export default function SlotRankingPanel({
             </p>
           </div>
         )}
-      </div>
-
-      {/* Slot cards */}
+      </div>      {/* Slot cards */}
       {slots.length > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           {slots.map((slot, idx) => (

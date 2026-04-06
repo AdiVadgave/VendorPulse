@@ -1,82 +1,5 @@
 [
   {
-    "slot_id": "sl_7dd84651",
-    "cycle_id": "c3",
-    "proposed_time": "2026-04-09T09:00:00Z",
-    "organiser_available": true,
-    "exec_sponsor_available": true,
-    "rank_score": 30.6,
-    "is_approved": true,
-    "attendance_count": 5,
-    "total_attendees": 9,
-    "conflict_count": 4,
-    "attending": [
-      "Alex Johnson",
-      "Sarah Chen",
-      "Marcus Chen",
-      "Emma Davies",
-      "Lisa Wang"
-    ],
-    "conflicts": [
-      "Priya Sharma",
-      "James O Brien",
-      "Raj Patel",
-      "David Kim"
-    ],
-    "approved_by": "u1",
-    "approved_at": "2026-04-02T10:19:01.946746+00:00"
-  },
-  {
-    "slot_id": "sl_e1496e7a",
-    "cycle_id": "c3",
-    "proposed_time": "2026-04-14T09:00:00Z",
-    "organiser_available": true,
-    "exec_sponsor_available": true,
-    "rank_score": 30.6,
-    "is_approved": false,
-    "attendance_count": 5,
-    "total_attendees": 9,
-    "conflict_count": 4,
-    "attending": [
-      "Alex Johnson",
-      "Sarah Chen",
-      "Marcus Chen",
-      "Emma Davies",
-      "Raj Patel"
-    ],
-    "conflicts": [
-      "Priya Sharma",
-      "James O Brien",
-      "Lisa Wang",
-      "David Kim"
-    ]
-  },
-  {
-    "slot_id": "sl_0c856071",
-    "cycle_id": "c3",
-    "proposed_time": "2026-04-08T10:00:00Z",
-    "organiser_available": true,
-    "exec_sponsor_available": true,
-    "rank_score": 9.4,
-    "is_approved": false,
-    "attendance_count": 4,
-    "total_attendees": 9,
-    "conflict_count": 5,
-    "attending": [
-      "Alex Johnson",
-      "Sarah Chen",
-      "Emma Davies",
-      "Lisa Wang"
-    ],
-    "conflicts": [
-      "Priya Sharma",
-      "Marcus Chen",
-      "James O Brien",
-      "Raj Patel",
-      "David Kim"
-    ]
-  },
-  {
     "slot_id": "sl_031c6303",
     "cycle_id": "c_c068740e",
     "proposed_time": "2026-04-04T09:00:00Z",
@@ -409,6 +332,138 @@
       "Priya Sharma",
       "Anup Kesarwani",
       "Sarah Chen"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_b306c1fb",
+    "cycle_id": "c_dc4584e7",
+    "proposed_time": "2026-04-06T09:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Alex Johnson",
+      "Sarah Chen"
+    ],
+    "conflicts": [],
+    "approved_by": "ua94a6471",
+    "approved_at": "2026-04-05T14:53:36.863107+00:00"
+  },
+  {
+    "slot_id": "sl_0140f220",
+    "cycle_id": "c_dc4584e7",
+    "proposed_time": "2026-04-06T10:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Alex Johnson",
+      "Sarah Chen"
+    ],
+    "conflicts": [],
+    "approved_by": "ua94a6471",
+    "approved_at": "2026-04-05T14:50:30.906615+00:00"
+  },
+  {
+    "slot_id": "sl_c14792c2",
+    "cycle_id": "c_dc4584e7",
+    "proposed_time": "2026-04-06T11:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Alex Johnson",
+      "Sarah Chen"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_2980cf35",
+    "cycle_id": "c3",
+    "proposed_time": "2026-04-06T09:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "attendance_count": 9,
+    "total_attendees": 9,
+    "conflict_count": 0,
+    "attending": [
+      "Alex Johnson",
+      "Sarah Chen",
+      "Priya Sharma",
+      "Marcus Chen",
+      "James O'Brien",
+      "Emma Davies",
+      "Raj Patel",
+      "Lisa Wang",
+      "David Kim"
+    ],
+    "conflicts": [],
+    "approved_by": "u1",
+    "approved_at": "2026-04-05T14:58:20.235153+00:00"
+  },
+  {
+    "slot_id": "sl_58fe2b48",
+    "cycle_id": "c3",
+    "proposed_time": "2026-04-06T10:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 9,
+    "total_attendees": 9,
+    "conflict_count": 0,
+    "attending": [
+      "Alex Johnson",
+      "Sarah Chen",
+      "Priya Sharma",
+      "Marcus Chen",
+      "James O'Brien",
+      "Emma Davies",
+      "Raj Patel",
+      "Lisa Wang",
+      "David Kim"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "sl_cbb60b49",
+    "cycle_id": "c3",
+    "proposed_time": "2026-04-06T11:00:00Z",
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 9,
+    "total_attendees": 9,
+    "conflict_count": 0,
+    "attending": [
+      "Alex Johnson",
+      "Sarah Chen",
+      "Priya Sharma",
+      "Marcus Chen",
+      "James O'Brien",
+      "Emma Davies",
+      "Raj Patel",
+      "Lisa Wang",
+      "David Kim"
     ],
     "conflicts": []
   }

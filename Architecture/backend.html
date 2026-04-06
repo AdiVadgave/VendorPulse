@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+  body { background: #f8fafc; padding: 24px; }
+  h1 { text-align: center; font-size: 20px; color: #1e293b; margin-bottom: 4px; }
+  .subtitle { text-align: center; font-size: 13px; color: #64748b; margin-bottom: 20px; }
+  .layer { border-radius: 6px; border: 2px solid; margin-bottom: 10px; padding: 10px 12px; }
+  .layer-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; text-align: center; }  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; }
+  .box { border-radius: 5px; border: 1.5px solid; padding: 7px 10px; font-size: 12px; font-weight: 600; text-align: center; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; max-width: 100%; }
+  .box .sub { font-size: 10px; font-weight: 400; color: #475569; margin-top: 2px; text-align: center; line-height: 1.5; }
+  .arrow { text-align: center; font-size: 18px; color: #94a3b8; margin: 2px 0; line-height: 1; }
+  .tag { display: inline-block; font-size: 10px; border-radius: 3px; padding: 1px 5px; margin-top: 3px; font-weight: 600; }
+  code { font-size: 11px; background: #f1f5f9; padding: 1px 4px; border-radius: 3px; }
+
+  .l-entry   { border-color: #f97316; background: #fff7ed; }
+  .l-entry .layer-title { color: #9a3412; }
+  .l-routes  { border-color: #8b5cf6; background: #f5f3ff; }
+  .l-routes .layer-title { color: #6d28d9; }
+  .l-wf      { border-color: #ef4444; background: #fef2f2; }
+  .l-wf .layer-title { color: #991b1b; }
+  .l-orch    { border-color: #06b6d4; background: #ecfeff; }
+  .l-orch .layer-title { color: #0e7490; }
+  .l-agents  { border-color: #22c55e; background: #f0fdf4; }
+  .l-agents .layer-title { color: #15803d; }
+  .l-svc     { border-color: #f59e0b; background: #fffbeb; }
+  .l-svc .layer-title { color: #92400e; }
+  .l-data    { border-color: #0ea5e9; background: #f0f9ff; }
+  .l-data .layer-title { color: #0369a1; }
+
+  .b-orange  { background: #ffedd5; border-color: #f97316; color: #9a3412; }
+  .b-purple  { background: #ede9fe; border-color: #8b5cf6; color: #5b21b6; }
+  .b-red     { background: #fee2e2; border-color: #ef4444; color: #991b1b; }
+  .b-cyan    { background: #cffafe; border-color: #06b6d4; color: #0e7490; }
+  .b-green   { background: #dcfce7; border-color: #22c55e; color: #166534; }
+  .b-amber   { background: #fef3c7; border-color: #f59e0b; color: #78350f; }
+  .b-sky     { background: #e0f2fe; border-color: #0ea5e9; color: #075985; }
+  .b-gray    { background: #f1f5f9; border-color: #94a3b8; color: #334155; }
+  .b-blue    { background: #dbeafe; border-color: #3b82f6; color: #1e40af; }
+  .b-teal    { background: #ccfbf1; border-color: #14b8a6; color: #115e59; }
+  /* Workflow states strip */
+  .wf-states { display: flex; align-items: center; gap: 0; flex-wrap: wrap; margin-top: 6px; justify-content: center; }
+  .wf-state  { background: #fee2e2; border: 1.5px solid #ef4444; color: #991b1b; font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
+  .wf-arrow  { color: #ef4444; font-size: 14px; padding: 0 3px; }
+
+  /* Orchestrator details */
+  .orch-inner { display: flex; gap: 10px; margin-top: 6px; }
+  .orch-box { flex: 1; border-radius: 5px; border: 1.5px solid #06b6d4; background: #cffafe; padding: 8px 10px; font-size: 12px; color: #0e7490; }
+  .orch-box .ot { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+  .orch-box ul { padding-left: 14px; line-height: 1.8; font-size: 11px; }
+  /* Agents grid */
+  .agents-grid { display: grid; grid-template-columns: repeat(7, minmax(140px, 1fr)); gap: 8px; align-items: start; }
+  .ag-box { border-radius: 5px; border: 1.5px solid; padding: 8px 6px; font-size: 11px; text-align: center; }
+  .ag-title { font-weight: 700; font-size: 12px; margin-bottom: 4px; text-align: center; }
+  .ag-tag { font-size: 10px; border-radius: 3px; padding: 1px 5px; margin-bottom: 5px; display: inline-block; font-weight: 600; }
+  .ag-llm  { background: #dcfce7; border-color: #22c55e; color: #166534; }
+  .ag-det  { background: #dbeafe; border-color: #3b82f6; color: #1e40af; }
+  .ag-base { background: #f1f5f9; border-color: #64748b; color: #334155; }
+  .ag-box ul { padding-left: 12px; color: #374151; line-height: 1.7; text-align: left; }
+
+  /* Contract box */
+  .contract { background: #cffafe; border: 2px solid #06b6d4; border-radius: 5px; padding: 8px 14px; font-size: 12px; color: #0e7490; margin-top: 8px; }
+  .contract strong { font-size: 13px; }
+
+  .bottom-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  /* Mock services */
+  .mock-grid { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 6px; margin-top: 6px; }
+
+  /* Responsive fallbacks */
+  @media (max-width: 1200px) {
+    .agents-grid { grid-template-columns: repeat(4, minmax(160px, 1fr)); }
+    .mock-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+  }
+  @media (max-width: 760px) {
+    .agents-grid, .mock-grid, .orch-inner { grid-template-columns: 1fr; display: flex; flex-direction: column; }
+    body { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>VendorPulse — Backend Architecture</h1>
+<p class="subtitle">FastAPI (Python 3.11) + Anthropic Claude API + SQLite + SQLAlchemy + Alembic</p>
+
+<!-- LAYER 1: ENTRY -->
+<div class="layer l-entry">
+  <div class="layer-title">Layer 1 — Entry Point &amp; Configuration</div>
+  <div class="row">
+    <div class="box b-orange">main.py<div class="sub">FastAPI app instance<br>CORS middleware<br>Router registration</div></div>
+    <div class="box b-orange">core/config.py<div class="sub">Env vars<br>ANTHROPIC_API_KEY<br>DB path / settings</div></div>
+    <div class="box b-orange">core/database.py<div class="sub">SQLAlchemy async engine<br>Session factory<br>get_db() dependency</div></div>
+    <div class="box b-blue" style="flex:2">← React SPA (Frontend Client)<div class="sub">REST HTTP / JSON over VITE_API_BASE_URL<br>All responses follow AgentResponse contract</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 2: ROUTES -->
+<div class="layer l-routes">
+  <div class="layer-title">Layer 2 — API Routes Layer (app/api/routes/)</div>
+  <div class="row">
+    <div class="box b-purple">cycles.py<div class="sub">POST /api/cycles<br>GET /api/cycles<br>GET /api/cycles/{id}</div></div>
+    <div class="box b-purple">scheduling.py<div class="sub">start · simulate-responses<br>slots · approve-slot</div></div>
+    <div class="box b-purple">scorecard.py<div class="sub">send-request · submit<br>compile · compiled</div></div>
+    <div class="box b-purple">alignment.py<div class="sub">changes · flags<br>extract-actions</div></div>
+    <div class="box b-purple">vendor_prep.py<div class="sub">generate-brief<br>pushback · responses</div></div>
+    <div class="box b-purple">meeting.py<div class="sub">capture · generate-minutes<br>minutes</div></div>
+    <div class="box b-purple">analytics.py<div class="sub">trends · recurring-issues<br>leadership-brief · agent-runs</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 3: WORKFLOW ENGINE -->
+<div class="layer l-wf">
+  <div class="layer-title">Layer 3 — Workflow Engine — State Machine (core/workflow_engine.py) — Deterministic Only, No LLM</div>
+  <div class="wf-states">
+    <span class="wf-state">CYCLE_CREATED</span><span class="wf-arrow">→</span>
+    <span class="wf-state">ATTENDEE_REFRESH_SENT</span><span class="wf-arrow">→</span>
+    <span class="wf-state">AVAILABILITY_COLLECTED</span><span class="wf-arrow">→</span>
+    <span class="wf-state">MEETING_SCHEDULED</span><span class="wf-arrow">→</span>
+    <span class="wf-state">SCORECARD_REQUEST_SENT</span><span class="wf-arrow">→</span>
+    <span class="wf-state">SCORECARD_COLLECTION</span><span class="wf-arrow">→</span>
+    <span class="wf-state">SCORECARD_COMPILED</span><span class="wf-arrow">→</span>
+    <span class="wf-state">INTERNAL_ALIGNMENT</span><span class="wf-arrow">→</span>
+    <span class="wf-state">VENDOR_PREP</span><span class="wf-arrow">→</span>
+    <span class="wf-state">MEETING_IN_PROGRESS</span><span class="wf-arrow">→</span>
+    <span class="wf-state">POST_MEETING_COMPLETE</span><span class="wf-arrow">→</span>
+    <span class="wf-state">ARCHIVED</span>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <div class="box b-red" style="flex:1">can_transition(from_state, to_state)<div class="sub">Validates if transition is allowed</div></div>
+    <div class="box b-red" style="flex:1">transition(cycle_id, to_state)<div class="sub">Executes state move + updates DB</div></div>
+    <div class="box b-gray" style="flex:2">Enforcement Rules<div class="sub">Cannot send vendor brief before SCORECARD_COMPILED · Cannot generate minutes before notes exist · Cannot ARCHIVE without approved action items</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 4: ORCHESTRATOR -->
+<div class="layer l-orch">
+  <div class="layer-title">Layer 4 — Orchestrator Layer (agents/orchestrator.py) — Routes every request to the correct Agent</div>
+  <div class="orch-inner">
+    <div class="orch-box" style="flex:1">
+      <div class="ot">AgentOrchestrator</div>
+      <ul>
+        <li>resolve_agent(module, action) → selects correct agent class</li>
+        <li>run_agent(cycle_id, module, context) → executes agent</li>
+        <li>validate_workflow_state() → checks preconditions before run</li>
+        <li>log_to_agent_runs() → persists every execution to DB</li>
+        <li>handle_approval_gate() → holds output if requires_approval = true</li>
+      </ul>
+    </div>
+    <div class="orch-box" style="flex:2">
+      <div class="ot">Standard AgentResponse Contract (all agents return this exact shape)</div>
+      <div style="background:#f0fdfa;border:1px solid #06b6d4;border-radius:4px;padding:8px;font-family:monospace;font-size:11px;color:#134e4a;margin-top:4px;line-height:1.8">
+        {<br>
+        &nbsp;&nbsp;"status": "success | failed | partial | pending_approval",<br>
+        &nbsp;&nbsp;"agent": "scheduling_agent",<br>
+        &nbsp;&nbsp;"summary": "Attendee refresh form generated for 9 stakeholders.",<br>
+        &nbsp;&nbsp;"data": { ... },<br>
+        &nbsp;&nbsp;"warnings": ["3 stakeholders have not responded"],<br>
+        &nbsp;&nbsp;"next_actions": ["APPROVE_INVITE", "SEND_REMINDER"],<br>
+        &nbsp;&nbsp;"requires_approval": true,<br>
+        &nbsp;&nbsp;"run_id": "uuid"<br>
+        }
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 5: AGENTS -->
+<div class="layer l-agents">
+  <div class="layer-title">Layer 5 — Agent Layer (agents/) — Each agent: system prompt + tool definitions + structured JSON output</div>
+  <div class="agents-grid">
+    <div class="ag-box ag-base">
+      <div class="ag-title">base_agent.py</div>
+      <span class="ag-tag" style="background:#f1f5f9;border:1px solid #94a3b8;color:#334155">Base Class</span>
+      <ul>
+        <li>__init__(db, cycle_id)</li>
+        <li>run(action, context)</li>
+        <li>_get_tools()</li>
+        <li>_call_claude()</li>
+        <li>_execute_tools()</li>
+        <li>log_run()</li>
+      </ul>
+    </div>
+    <div class="ag-box ag-det">
+      <div class="ag-title">scheduling_agent</div>
+      <span class="ag-tag ag-det">Deterministic</span>
+      <ul>
+        <li>Attendee refresh</li>
+        <li>Slot ranking algo</li>
+        <li>Hard: organiser + exec</li>
+        <li>Soft: majority vote</li>
+        <li>Invite draft</li>
+        <li>Nudge non-responders</li>
+      </ul>
+    </div>
+    <div class="ag-box ag-det">
+      <div class="ag-title">scorecard_agent</div>
+      <span class="ag-tag ag-det">Deterministic</span>
+      <ul>
+        <li>Dispatch requests</li>
+        <li>Validate: range 1–5</li>
+        <li>Outlier: 1.5σ flag</li>
+        <li>Comment required @1 or 5</li>
+        <li>Compile averages</li>
+        <li>Reminder escalation</li>
+      </ul>
+    </div>
+    <div class="ag-box ag-llm">
+      <div class="ag-title">alignment_agent</div>
+      <span class="ag-tag ag-llm">LLM: summary</span>
+      <ul>
+        <li>Score diff engine (det.)</li>
+        <li>Delta ≥ 1 → highlight</li>
+        <li>Spread ≥ 1.5 → flag</li>
+        <li>Claude: change summary</li>
+        <li>Claude: action extraction</li>
+        <li>Face-off model update</li>
+      </ul>
+    </div>
+    <div class="ag-box ag-llm">
+      <div class="ag-title">vendor_prep_agent</div>
+      <span class="ag-tag ag-llm">LLM: brief + drafts</span>
+      <ul>
+        <li>Fetch scorecard data</li>
+        <li>Claude: vendor brief</li>
+        <li>Pushback categorisation</li>
+        <li>Claude: 3 response options</li>
+        <li>Factual / Neutral / Escalation</li>
+        <li>Unresolved item tracker</li>
+      </ul>
+    </div>
+    <div class="ag-box ag-llm">
+      <div class="ag-title">meeting_agent</div>
+      <span class="ag-tag ag-llm">LLM: minutes</span>
+      <ul>
+        <li>Live note capture</li>
+        <li>Transcript parsing</li>
+        <li>Claude: meeting minutes</li>
+        <li>Exec summary (2–3 lines)</li>
+        <li>Action item extraction</li>
+        <li>Merge with C + D actions</li>
+      </ul>
+    </div>
+    <div class="ag-box ag-llm">
+      <div class="ag-title">memory_agent</div>
+      <span class="ag-tag ag-llm">LLM: brief</span>
+      <ul>
+        <li>Trend aggregation (det.)</li>
+        <li>Recurring issue detect. (det.)</li>
+        <li>occurrences ≥ 2 → alert</li>
+        <li>Claude: leadership brief</li>
+        <li>Trajectory: ↑ ↔ ↓</li>
+        <li>Recommended focus areas</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 6: SERVICES -->
+<div class="layer l-svc">
+  <div class="layer-title">Layer 6 — Services Layer (app/services/)</div>
+  <div class="row" style="margin-bottom:8px">
+    <div class="box b-amber">llm_service.py<div class="sub">Anthropic Claude API wrapper<br>Tool-call pattern<br>Retry + error handling</div></div>
+    <div class="box b-amber">analytics_service.py<div class="sub">Trend aggregation<br>Cross-cycle score queries<br>Radar / line / bar data prep</div></div>
+    <div class="box b-amber">validation_service.py<div class="sub">score &lt; 1 or &gt; 5 → ERROR<br>score = 1 or 5, no comment → ERROR<br>|score − avg| &gt; 1.5σ → WARNING</div></div>
+    <div class="box b-amber">utils/<div class="sub">prompts.py · slot_ranking.py<br>score_diff.py · text_parsing.py</div></div>
+  </div>
+  <div class="mock-grid">
+    <div class="box b-orange" style="min-width:0">calendar.py<div class="sub">get_availability()<br>Fixture schedule data</div></div>
+    <div class="box b-orange" style="min-width:0">email.py<div class="sub">outbox table<br>send() → html_preview</div></div>
+    <div class="box b-orange" style="min-width:0">forms.py<div class="sub">Modal-based forms<br>Pre-seeded responses</div></div>
+    <div class="box b-orange" style="min-width:0">notifications.py<div class="sub">Writes to notifications table<br>send_reminder() per level</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 7: DATA -->
+<div class="layer l-data">
+  <div class="layer-title">Layer 7 — Data Layer</div>
+  <div class="row">
+    <div class="box b-sky" style="flex:2">SQLite (vendorpulse.db) — SQLAlchemy 2.0 Async ORM<div class="sub">vendors · governance_cycles · stakeholders · cycle_attendees · scorecards · meetings · meeting_notes · action_items · issues · face_off_model · notifications · agent_runs · slot_proposals</div></div>
+    <div class="box b-sky">Pydantic v2 Schemas<div class="sub">Request / Response validation<br>All routes typed<br>Matches TS types in frontend</div></div>
+    <div class="box b-red">Anthropic Claude API<div class="sub">claude-sonnet-4-20250514<br>Tool-calling pattern<br>JSON structured output</div></div>
+  </div>
+</div>
+
+</body>
+</html>

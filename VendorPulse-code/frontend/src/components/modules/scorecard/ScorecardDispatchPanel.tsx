@@ -132,7 +132,7 @@ export default function ScorecardDispatchPanel({ vendorName, recipientCount, onD
       </div>
 
       {/* Validation rules info */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+      {/* <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
         <div className="flex items-center gap-2 mb-3">
           <AlertTriangle size={15} className="text-slate-400" />
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -163,7 +163,7 @@ export default function ScorecardDispatchPanel({ vendorName, recipientCount, onD
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
 
       {showApproval && (
         <ApprovalPanel

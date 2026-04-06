@@ -72,7 +72,7 @@ export default function SlotRankingPanel({
       </div>
 
       {/* Algorithm explainer */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+      {/* <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
         <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
           Ranking Algorithm
         </h4>
@@ -90,7 +90,7 @@ export default function SlotRankingPanel({
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
     </div>
   )
 }

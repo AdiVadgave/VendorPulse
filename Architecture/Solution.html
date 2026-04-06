@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+  body { background: #f8fafc; padding: 24px; }
+  h1 { text-align: center; font-size: 20px; color: #1e293b; margin-bottom: 4px; }
+  .subtitle { text-align: center; font-size: 13px; color: #64748b; margin-bottom: 20px; }
+  .layer { border-radius: 6px; border: 2px solid; margin-bottom: 10px; padding: 10px 12px; }
+  .layer-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; text-align: center; }
+  .row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }  .box { border-radius: 5px; border: 1.5px solid; padding: 8px 10px; font-size: 12px; font-weight: 600; text-align: center; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 56px; max-width: 100%; }
+  .box .sub { font-size: 10px; font-weight: 400; color: #475569; line-height: 1.5; text-align: center; }
+  .arrow { text-align: center; font-size: 18px; color: #94a3b8; margin: 2px 0; line-height: 1; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 700; border-radius: 3px; padding: 1px 6px; margin-top: 3px; }
+
+  /* Layer themes */
+  .l-actors  { border-color: #3b82f6; background: #eff6ff; }
+  .l-actors .layer-title { color: #1d4ed8; }
+  .l-ui      { border-color: #8b5cf6; background: #f5f3ff; }
+  .l-ui .layer-title { color: #6d28d9; }
+  .l-workflow { border-color: #ef4444; background: #fef2f2; }
+  .l-workflow .layer-title { color: #991b1b; }
+  .l-modules { border-color: #22c55e; background: #f0fdf4; }
+  .l-modules .layer-title { color: #15803d; }
+  .l-orch    { border-color: #06b6d4; background: #ecfeff; }
+  .l-orch .layer-title { color: #0e7490; }
+  .l-agents  { border-color: #10b981; background: #f0fdf4; }
+  .l-agents .layer-title { color: #065f46; }
+  .l-intel   { border-color: #f59e0b; background: #fffbeb; }
+  .l-intel .layer-title { color: #92400e; }
+  .l-data    { border-color: #0ea5e9; background: #f0f9ff; }
+  .l-data .layer-title { color: #0369a1; }
+  .l-ext     { border-color: #a855f7; background: #faf5ff; }
+  .l-ext .layer-title { color: #7e22ce; }
+  .l-govern  { border-color: #64748b; background: #f1f5f9; }
+  .l-govern .layer-title { color: #334155; }
+
+  /* Box colors */
+  .b-blue    { background: #dbeafe; border-color: #3b82f6; color: #1e40af; }
+  .b-indigo  { background: #e0e7ff; border-color: #6366f1; color: #3730a3; }
+  .b-purple  { background: #ede9fe; border-color: #8b5cf6; color: #5b21b6; }
+  .b-red     { background: #fee2e2; border-color: #ef4444; color: #991b1b; }
+  .b-green   { background: #dcfce7; border-color: #22c55e; color: #166534; }
+  .b-teal    { background: #ccfbf1; border-color: #14b8a6; color: #115e59; }
+  .b-cyan    { background: #cffafe; border-color: #06b6d4; color: #0e7490; }
+  .b-amber   { background: #fef3c7; border-color: #f59e0b; color: #78350f; }
+  .b-orange  { background: #ffedd5; border-color: #f97316; color: #9a3412; }
+  .b-sky     { background: #e0f2fe; border-color: #0ea5e9; color: #075985; }
+  .b-violet  { background: #ede9fe; border-color: #a855f7; color: #6b21a8; }
+  .b-slate   { background: #f1f5f9; border-color: #64748b; color: #334155; }
+  .b-pink    { background: #fce7f3; border-color: #ec4899; color: #9d174d; }
+  .b-lime    { background: #f7fee7; border-color: #84cc16; color: #365314; }
+  /* Module grid */
+  .mod-grid { display: grid; grid-template-columns: repeat(6, minmax(160px, 1fr)); gap: 8px; align-items: start; }
+  .mod-box { border-radius: 5px; border: 1.5px solid #22c55e; background: #dcfce7; padding: 8px 7px; font-size: 11px; }
+  .mod-title { font-weight: 700; font-size: 12px; color: #166534; margin-bottom: 3px; text-align: center; }
+  .mod-sub { font-size: 10px; color: #047857; background: #bbf7d0; border-radius: 3px; padding: 1px 5px; display: inline-block; margin-bottom: 5px; font-weight: 600; }
+  .mod-box ul { padding-left: 14px; color: #374151; line-height: 1.7; margin-top: 4px; }
+  /* Agent grid */
+  .ag-grid { display: grid; grid-template-columns: repeat(6, minmax(160px, 1fr)); gap: 8px; align-items: start; }
+  .ag-box { border-radius: 5px; padding: 8px 7px; font-size: 11px; border: 1.5px solid; }
+  .ag-title { font-weight: 700; font-size: 12px; margin-bottom: 3px; text-align: center; }
+  .ag-llm  { background: #dcfce7; border-color: #22c55e; color: #166534; }
+  .ag-det  { background: #dbeafe; border-color: #3b82f6; color: #1e40af; }
+  .ag-tag  { font-size: 10px; font-weight: 600; border-radius: 3px; padding: 1px 5px; display: inline-block; margin-bottom: 4px; }
+  .ag-box ul { padding-left: 14px; line-height: 1.7; margin-top: 4px; }
+  /* Workflow strip */
+  .wf-states { display: flex; align-items: center; gap: 0; flex-wrap: wrap; margin: 6px 0; justify-content: center; }
+  .wf-state { background: #fee2e2; border: 1.5px solid #ef4444; color: #991b1b; font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 4px; white-space: nowrap; }
+  .wf-arr { color: #ef4444; font-size: 13px; padding: 0 2px; }  /* Intelligence layer */
+  .intel-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 8px; align-items: stretch; }
+  /* Data grid */
+  .data-grid { display: grid; grid-template-columns: repeat(5, minmax(180px, 1fr)); gap: 8px; align-items: stretch; }
+  /* External grid */
+  .ext-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 8px; align-items: stretch; }
+
+  /* Governance footer */
+  .gov-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 8px; align-items: stretch; }
+  .divider { height: 2px; background: linear-gradient(to right, #e2e8f0, #94a3b8, #e2e8f0); margin: 4px 0 8px 0; border-radius: 2px; }
+
+  /* Responsive fallbacks */
+  @media (max-width: 1200px) {
+    .mod-grid, .ag-grid { grid-template-columns: repeat(3, minmax(200px, 1fr)); }
+    .data-grid { grid-template-columns: repeat(3, minmax(200px, 1fr)); }
+  }
+  @media (max-width: 760px) {
+    .mod-grid, .ag-grid, .intel-grid, .data-grid, .ext-grid, .gov-grid { grid-template-columns: 1fr; }
+    body { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>VendorPulse — Solution Architecture</h1>
+<p class="subtitle">Agentic AI Platform for Shell EGB / QBR Governance Cycle Automation · Zensar Technologies</p>
+
+<!-- LAYER 1: ACTORS -->
+<div class="layer l-actors">
+  <div class="layer-title">Layer 1 — Actors & Personas</div>
+
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 2: UI PLATFORM -->
+<div class="layer l-ui">
+  <div class="layer-title">Layer 2 — VendorPulse Platform UI (React SPA)</div>
+  <div class="row">
+    <div class="box b-purple">Dashboard<div class="sub">Active cycles overview<br>Start New Cycle CTA<br>Vendor quick access</div></div>
+    <div class="box b-purple" style="flex:4">Cycle Workspace (Tabbed)<div class="sub">Overview · Scheduling (A) · Scorecard (B) · Alignment (C) · Vendor Prep (D) · Meeting (E) · Actions<br>Workflow Progress Bar always visible · Tab locked to workflow_state · ApprovalPanel before every send</div></div>
+    <div class="box b-purple">Analytics Dashboard<div class="sub">Module F<br>Trend charts<br>Leadership brief</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 3: WORKFLOW ENGINE -->
+<div class="layer l-workflow">
+  <div class="layer-title">Layer 3 — Governance Workflow Engine — State Machine (Deterministic · No LLM)</div>
+  <div class="wf-states">
+    <span class="wf-state">CYCLE_CREATED</span><span class="wf-arr">→</span>
+    <span class="wf-state">ATTENDEE_REFRESH_SENT</span><span class="wf-arr">→</span>
+    <span class="wf-state">AVAILABILITY_COLLECTED</span><span class="wf-arr">→</span>
+    <span class="wf-state">MEETING_SCHEDULED</span><span class="wf-arr">→</span>
+    <span class="wf-state">SCORECARD_REQUEST_SENT</span><span class="wf-arr">→</span>
+    <span class="wf-state">SCORECARD_COLLECTION</span><span class="wf-arr">→</span>
+    <span class="wf-state">SCORECARD_COMPILED</span><span class="wf-arr">→</span>
+    <span class="wf-state">INTERNAL_ALIGNMENT</span><span class="wf-arr">→</span>
+    <span class="wf-state">VENDOR_PREP</span><span class="wf-arr">→</span>
+    <span class="wf-state">MEETING_IN_PROGRESS</span><span class="wf-arr">→</span>
+    <span class="wf-state">POST_MEETING_COMPLETE</span><span class="wf-arr">→</span>
+    <span class="wf-state">ARCHIVED</span>
+  </div>
+  <div class="row" style="margin-top:6px">
+    <div class="box b-red" style="flex:1">Forward-only transitions<div class="sub">can_transition() enforced before every agent run</div></div>
+    <div class="box b-red" style="flex:1">Prerequisite checks<div class="sub">Cannot brief vendor before scorecard compiled<br>Cannot generate minutes before notes exist</div></div>
+    <div class="box b-slate" style="flex:2">Human-in-the-loop gates<div class="sub">Every AI-generated "send" action pauses at ApprovalPanel → Coordinator approves → then dispatched via Mock Service</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 4: MODULES -->
+<div class="layer l-modules">
+  <div class="layer-title">Layer 4 — Six Governance Modules (A – F)</div>
+  <div class="mod-grid">
+    <div class="mod-box">
+      <div class="mod-title">Module A</div>
+      <div class="mod-sub">Scheduling</div>
+      <ul>
+        <li>Attendee list refresh</li>
+        <li>Availability check</li>
+        <li>Slot ranking (hard/soft)</li>
+        <li>Invite generation</li>
+        <li>RSVP confirmation tracking</li>
+        <li>Auto-nudge non-responders</li>
+      </ul>
+    </div>
+    <div class="mod-box">
+      <div class="mod-title">Module B</div>
+      <div class="mod-sub">Scorecard</div>
+      <ul>
+        <li>Scorecard dispatch</li>
+        <li>Reminder escalation T-5/T-2/T</li>
+        <li>Validation: range + comments</li>
+        <li>Outlier detection (1.5σ)</li>
+        <li>Compilation + averaging</li>
+        <li>Compiled scorecard table</li>
+      </ul>
+    </div>
+    <div class="mod-box">
+      <div class="mod-title">Module C</div>
+      <div class="mod-sub">Alignment</div>
+      <ul>
+        <li>Score diff vs prior cycle</li>
+        <li>Alignment flag (spread ≥1.5)</li>
+        <li>AI: change summary</li>
+        <li>Notes → action extraction</li>
+        <li>Face-off model editor</li>
+        <li>Action log (shared)</li>
+      </ul>
+    </div>
+    <div class="mod-box">
+      <div class="mod-title">Module D</div>
+      <div class="mod-sub">Vendor Prep</div>
+      <ul>
+        <li>AI: vendor brief generation</li>
+        <li>Pushback input form</li>
+        <li>AI: 3 response options</li>
+        <li>Factual / Neutral / Escalation</li>
+        <li>Unresolved item tracker</li>
+        <li>Legal flag → escalate</li>
+      </ul>
+    </div>
+    <div class="mod-box">
+      <div class="mod-title">Module E</div>
+      <div class="mod-sub">Meeting</div>
+      <ul>
+        <li>Pre-meeting trend brief</li>
+        <li>Live note capture (5 types)</li>
+        <li>Transcript paste + parse</li>
+        <li>AI: meeting minutes</li>
+        <li>AI: action extraction</li>
+        <li>Merged action log</li>
+      </ul>
+    </div>
+    <div class="mod-box">
+      <div class="mod-title">Module F</div>
+      <div class="mod-sub">Analytics</div>
+      <ul>
+        <li>4-cycle historical store</li>
+        <li>Trend line chart</li>
+        <li>Radar: current vs prior</li>
+        <li>Cross-vendor bar chart</li>
+        <li>Recurring issue alerts (≥2 cycles)</li>
+        <li>AI: leadership brief</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 5: ORCHESTRATOR -->
+<div class="layer l-orch">
+  <div class="layer-title">Layer 5 — Agent Orchestrator — Routes every module action to the correct agent · Enforces AgentResponse contract</div>
+  <div class="row">
+    <div class="box b-cyan" style="flex:2">AgentOrchestrator<div class="sub">resolve_agent(module, action) · validate_workflow_state() · run_agent(cycle_id, context)<br>handle_approval_gate() · log_to_agent_runs() · return AgentResponse</div></div>
+    <div class="box b-cyan" style="flex:3">AgentResponse Contract<div class="sub">{ status · agent · summary · data · warnings · next_actions · requires_approval · run_id }<br>All agents return this exact shape — frontend never parses raw AI text</div></div>
+    <div class="box b-red">Audit Trail<div class="sub">agent_runs table<br>Every execution logged<br>input + output + status</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 6: AGENTS -->
+<div class="layer l-agents">
+  <div class="layer-title">Layer 6 — AI Agent Layer — Each agent: system prompt + tool definitions + structured JSON output</div>
+  <div class="ag-grid">
+    <div class="ag-box ag-det">
+      <div class="ag-title">Scheduling Agent</div>
+      <span class="ag-tag" style="background:#dbeafe;color:#1e40af;border:1px solid #3b82f6">Deterministic</span>
+      <ul>
+        <li>Slot ranking algorithm</li>
+        <li>Hard: organiser + exec</li>
+        <li>Soft: majority vote</li>
+        <li>Invite draft generation</li>
+      </ul>
+    </div>
+    <div class="ag-box ag-det">
+      <div class="ag-title">Scorecard Agent</div>
+      <span class="ag-tag" style="background:#dbeafe;color:#1e40af;border:1px solid #3b82f6">Deterministic</span>
+      <ul>
+        <li>Validation rules engine</li>
+        <li>Outlier: std deviation</li>
+        <li>Averaging + compilation</li>
+        <li>Reminder orchestration</li>
+      </ul>
+    </div>
+    <div class="ag-box ag-llm">
+      <div class="ag-title">Alignment Agent</div>
+      <span class="ag-tag" style="background:#dcfce7;color:#166534;border:1px solid #22c55e">LLM: summary</span>
+      <ul>
+        <li>Score diff (deterministic)</li>
+        <li>Spread flag (deterministic)</li>
+        <li>Claude: change summary</li>
+        <li>Claude: action extraction</li>
+      </ul>
+    </div>
+    <div class="ag-box ag-llm">
+      <div class="ag-title">Vendor Prep Agent</div>
+      <span class="ag-tag" style="background:#dcfce7;color:#166534;border:1px solid #22c55e">LLM: brief + drafts</span>
+      <ul>
+        <li>Claude: vendor brief</li>
+        <li>Claude: 3 response options</li>
+        <li>Pushback categorisation</li>
+        <li>Legal flag (deterministic)</li>
+      </ul>
+    </div>
+    <div class="ag-box ag-llm">
+      <div class="ag-title">Meeting Agent</div>
+      <span class="ag-tag" style="background:#dcfce7;color:#166534;border:1px solid #22c55e">LLM: minutes</span>
+      <ul>
+        <li>Transcript parsing</li>
+        <li>Claude: meeting minutes</li>
+        <li>Claude: action extraction</li>
+        <li>Merge C + D actions</li>
+      </ul>
+    </div>
+    <div class="ag-box ag-llm">
+      <div class="ag-title">Memory Agent</div>
+      <span class="ag-tag" style="background:#dcfce7;color:#166534;border:1px solid #22c55e">LLM: brief</span>
+      <ul>
+        <li>Trend aggregation (det.)</li>
+        <li>Recurring issues (det.)</li>
+        <li>Claude: leadership brief</li>
+        <li>Trajectory: ↑ ↔ ↓</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 7: INTELLIGENCE -->
+<div class="layer l-intel">
+  <div class="layer-title">Layer 7 — Intelligence & Processing Services</div>
+  <div class="intel-grid">
+    <div class="box b-amber">Anthropic Claude API<div class="sub">claude-sonnet-4-20250514<br>Tool-calling pattern<br>Structured JSON output<br>Retry + error handling</div></div>
+    <div class="box b-amber">LLM Service<div class="sub">Claude API wrapper<br>Prompt templates (prompts.py)<br>Tool execution loop<br>Output parsing</div></div>
+    <div class="box b-amber">Validation Service<div class="sub">score out of range → ERROR<br>extreme score no comment → ERROR<br>|score − avg| &gt; 1.5σ → WARNING<br>Pure deterministic rules</div></div>
+    <div class="box b-amber">Analytics Service<div class="sub">Trend data aggregation<br>Score diff engine (score_diff.py)<br>Slot ranking (slot_ranking.py)<br>Action item parser (text_parsing.py)</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- LAYER 8: DATA -->
+<div class="layer l-data">
+  <div class="layer-title">Layer 8 — Data & Storage Layer</div>
+  <div class="data-grid">
+    <div>
+  
+    </div>
+    <div class="box b-sky">SQLite DB<div class="sub">vendorpulse.db<br>SQLAlchemy 2.0 async<br>Pydantic v2 schemas<br>Alembic migrations</div></div>
+
+    <div class="box b-sky">Governance Tables<div class="sub">vendors · governance_cycles<br>stakeholders · cycle_attendees<br>scorecards · meetings<br>meeting_notes · action_items</div></div>
+
+    <div class="box b-lime">Repositories (DB Access)<div class="sub">One repo per domain entity<br>Async queries<br>Clean separation from routes<br>Testable in isolation</div></div>
+  </div>
+</div>
+
+
+
+
+</body>
+</html>

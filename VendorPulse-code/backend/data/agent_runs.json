@@ -53,5 +53,16 @@
     "triggered_by": "USER",
     "error_message": "Error code: 500 - {'error': {'message': 'Service Unavailable', 'type': 'service_unavailable_error', 'param': None, 'code': None}}",
     "created_at": "2026-04-03T14:01:16.220530+00:00"
+  },
+  {
+    "run_id": "27abe06a-faec-4d4b-847d-6bfa1b7a6515",
+    "agent_name": "scheduling_agent",
+    "cycle_id": "c_6f3a0271",
+    "input_payload": "{\"user_message\": \"Simulate availability responses then rank the best meeting slots for this cycle.\", \"context\": {}}",
+    "output_payload": "{\"status\": \"failed\", \"agent\": \"scheduling_agent\", \"summary\": \"Agent error: Error code: 500 - {'error': {'message': 'The server had an error while processing your request. Sorry about that!', 'type': 'server_error', 'param': None, 'code': None}}\", \"data\": null, \"warnings\": [], \"next_actions\": [\"RETRY\"], \"requires_approval\": false, \"run_id\": \"27abe06a-faec-4d4b-847d-6bfa1b7a6515\"}",
+    "status": "FAILED",
+    "triggered_by": "USER",
+    "error_message": "Error code: 500 - {'error': {'message': 'The server had an error while processing your request. Sorry about that!', 'type': 'server_error', 'param': None, 'code': None}}",
+    "created_at": "2026-04-06T12:16:30.178018+00:00"
   }
 ]

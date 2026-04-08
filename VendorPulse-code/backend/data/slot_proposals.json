@@ -658,5 +658,300 @@
       "aditya.vadgave@zensar.com"
     ],
     "conflicts": []
+  },
+  {
+    "slot_id": "slot_efc440cc",
+    "cycle_id": "c_4f1c37ed",
+    "proposed_time": "2026-04-08T09:00:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "kanishk.punekar@zensar.com",
+      "aditya.vadgave@zensar.com",
+      "chinmay.kotkar@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_8b1180a9",
+    "cycle_id": "c_4f1c37ed",
+    "proposed_time": "2026-04-08T09:30:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 90,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "kanishk.punekar@zensar.com",
+      "aditya.vadgave@zensar.com",
+      "chinmay.kotkar@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_c33e75fe",
+    "cycle_id": "c_4f1c37ed",
+    "proposed_time": "2026-04-08T10:00:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 80,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "kanishk.punekar@zensar.com",
+      "aditya.vadgave@zensar.com",
+      "chinmay.kotkar@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_2436288f",
+    "cycle_id": "c_4f1c37ed",
+    "proposed_time": "2026-04-08T09:00:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "kanishk.punekar@zensar.com",
+      "aditya.vadgave@zensar.com",
+      "chinmay.kotkar@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_c0d0d6ad",
+    "cycle_id": "c_4f1c37ed",
+    "proposed_time": "2026-04-08T09:30:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 90,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "kanishk.punekar@zensar.com",
+      "aditya.vadgave@zensar.com",
+      "chinmay.kotkar@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_0b325024",
+    "cycle_id": "c_4f1c37ed",
+    "proposed_time": "2026-04-08T10:00:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 80,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "kanishk.punekar@zensar.com",
+      "aditya.vadgave@zensar.com",
+      "chinmay.kotkar@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_58ffcf96",
+    "cycle_id": "c_2d629f53",
+    "proposed_time": "2026-04-07T04:00:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 120,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "anup.kesarwani@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_8c908936",
+    "cycle_id": "c_2d629f53",
+    "proposed_time": "2026-04-07T07:30:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 120,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 90,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "anup.kesarwani@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_3b47dbc9",
+    "cycle_id": "c_2d629f53",
+    "proposed_time": "2026-04-07T09:30:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 120,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 80,
+    "is_approved": true,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "anup.kesarwani@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": [],
+    "approved_by": "coordinator",
+    "approved_at": "2026-04-07T09:35:49.555944+00:00"
+  },
+  {
+    "slot_id": "slot_638ac094",
+    "cycle_id": "c_2d629f53",
+    "proposed_time": "2026-04-07T04:00:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "anup.kesarwani@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_7718a16b",
+    "cycle_id": "c_2d629f53",
+    "proposed_time": "2026-04-07T04:30:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 90,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "anup.kesarwani@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_3ef3442d",
+    "cycle_id": "c_2d629f53",
+    "proposed_time": "2026-04-07T05:00:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 80,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "anup.kesarwani@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_e7a01f35",
+    "cycle_id": "c_2d629f53",
+    "proposed_time": "2026-04-08T04:00:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 120,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "anup.kesarwani@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_ab146bc2",
+    "cycle_id": "c_2d629f53",
+    "proposed_time": "2026-04-08T06:30:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 120,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 90,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "anup.kesarwani@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_9a0713fa",
+    "cycle_id": "c_2d629f53",
+    "proposed_time": "2026-04-08T08:30:00.0000000",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 120,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 80,
+    "is_approved": true,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "anup.kesarwani@zensar.com",
+      "aditya.vadgave@zensar.com"
+    ],
+    "conflicts": [],
+    "approved_by": "coordinator",
+    "approved_at": "2026-04-07T09:38:01.258561+00:00"
   }
 ]

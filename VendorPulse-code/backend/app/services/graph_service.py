@@ -32,6 +32,26 @@ class GraphService:
         "GMT": "GMT Standard Time",
     }
 
+    @staticmethod
+    def _build_graph_error(status_code: int, result: dict | None, fallback: str = "Unknown error") -> dict:
+        """Normalize Graph error payload so routes can map status and detail safely."""
+        error_obj = (result or {}).get("error") if isinstance(result, dict) else None
+        detail = fallback
+        code = None
+
+        if isinstance(error_obj, dict):
+            detail = error_obj.get("message") or fallback
+            code = error_obj.get("code")
+
+        payload = {
+            "error": f"Graph API error: {status_code}",
+            "status_code": status_code,
+            "detail": detail,
+        }
+        if code:
+            payload["code"] = code
+        return payload
+
     def __init__(self, access_token: str):
         """
         Initialize with a delegated or app-only access token.
@@ -42,9 +62,14 @@ class GraphService:
         if not access_token:
             raise ValueError("GRAPH_ACCESS_TOKEN is required but not set in .env")
         
-        self.access_token = access_token
+        # Accept raw JWT or "Bearer <token>" to make .env usage resilient.
+        normalized_token = access_token.strip()
+        if normalized_token.lower().startswith("bearer "):
+            normalized_token = normalized_token[7:].strip()
+
+        self.access_token = normalized_token
         self.headers = {
-            "Authorization": f"Bearer {access_token}",
+            "Authorization": f"Bearer {normalized_token}",
             "Content-Type": "application/json",
         }
 
@@ -140,10 +165,7 @@ class GraphService:
                 result = response.json()
                 
                 if response.status_code != 200:
-                    return {
-                        "error": f"Graph API error: {response.status_code}",
-                        "detail": result.get("error", {}).get("message", "Unknown error"),
-                    }
+                    return self._build_graph_error(response.status_code, result)
                 
                 return result
         except Exception as e:
@@ -237,10 +259,7 @@ class GraphService:
                 result = response.json()
                 
                 if response.status_code not in (200, 201):
-                    return {
-                        "error": f"Graph API error: {response.status_code}",
-                        "detail": result.get("error", {}).get("message", "Unknown error"),
-                    }
+                    return self._build_graph_error(response.status_code, result)
                 
                 return {
                     "id": result.get("id"),

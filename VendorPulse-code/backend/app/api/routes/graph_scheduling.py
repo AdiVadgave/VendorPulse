@@ -14,7 +14,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 
-from app.config import settings
+from app.config import Settings, settings
 from app.core.workflow_engine import WorkflowStateError, WorkflowViolationError, workflow_engine
 from app.dependencies import get_cycle_repo, get_attendee_repo, get_slot_repo
 from app.services.graph_service import GraphService
@@ -63,6 +63,23 @@ def _get_cycle_or_404(cycle_id: str, cycle_repo):
     return cycle
 
 
+def _get_graph_access_token() -> str:
+    """
+    Read Graph token from .env at request time.
+
+    This avoids stale in-memory tokens when GRAPH_ACCESS_TOKEN is updated
+    while the server process is still running.
+    """
+    fresh_settings = Settings()
+    token = fresh_settings.graph_access_token or settings.graph_access_token
+    token = token.strip() if token else ""
+
+    if token.lower().startswith("bearer "):
+        token = token[7:].strip()
+
+    return token
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Routes
 # ──────────────────────────────────────────────────────────────────────────────
@@ -90,14 +107,15 @@ def find_meeting_times_graph(
     except WorkflowStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
 
-    # Initialize Graph service
-    if not settings.graph_access_token:
+    # Initialize Graph service using latest token from .env.
+    graph_access_token = _get_graph_access_token()
+    if not graph_access_token:
         raise HTTPException(
             status_code=500,
             detail="GRAPH_ACCESS_TOKEN is not set in .env",
         )
 
-    graph_service = GraphService(settings.graph_access_token)
+    graph_service = GraphService(graph_access_token)
 
     # Get attendees
     attendees = attendee_repo.get_for_cycle(cycleId)
@@ -138,7 +156,23 @@ def find_meeting_times_graph(
 
     # Check for API errors
     if "error" in result:
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        status_code = int(result.get("status_code") or 400)
+        code = result.get("code")
+        detail = result.get("detail")
+        message = result.get("error")
+
+        if status_code == 401:
+            guidance = (
+                "Graph token is invalid or expired. Refresh GRAPH_ACCESS_TOKEN in backend/.env "
+                "from Graph Explorer (with Calendars.ReadWrite delegated permission)."
+            )
+            full_detail = f"{message}. {detail}. {guidance}" if detail else f"{message}. {guidance}"
+        else:
+            code_suffix = f" (code: {code})" if code else ""
+            detail_suffix = f" - {detail}" if detail else ""
+            full_detail = f"{message}{code_suffix}{detail_suffix}"
+
+        raise HTTPException(status_code=status_code, detail=full_detail)
 
     # Transform Graph response to SlotProposal
     suggestions = result.get("meetingTimeSuggestions", [])
@@ -208,14 +242,15 @@ def send_meeting_invite_graph(
     except WorkflowStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
 
-    # Initialize Graph service
-    if not settings.graph_access_token:
+    # Initialize Graph service using latest token from .env.
+    graph_access_token = _get_graph_access_token()
+    if not graph_access_token:
         raise HTTPException(
             status_code=500,
             detail="GRAPH_ACCESS_TOKEN is not set in .env",
         )
 
-    graph_service = GraphService(settings.graph_access_token)
+    graph_service = GraphService(graph_access_token)
 
     # Fetch the slot
     slot = slot_repo.get_by_slot_id(payload.slot_id)
@@ -257,7 +292,23 @@ def send_meeting_invite_graph(
 
     # Check for API errors
     if "error" in result:
-        raise HTTPException(status_code=400, detail=result.get("error"))
+        status_code = int(result.get("status_code") or 400)
+        code = result.get("code")
+        detail = result.get("detail")
+        message = result.get("error")
+
+        if status_code == 401:
+            guidance = (
+                "Graph token is invalid or expired. Refresh GRAPH_ACCESS_TOKEN in backend/.env "
+                "from Graph Explorer (with Calendars.ReadWrite delegated permission)."
+            )
+            full_detail = f"{message}. {detail}. {guidance}" if detail else f"{message}. {guidance}"
+        else:
+            code_suffix = f" (code: {code})" if code else ""
+            detail_suffix = f" - {detail}" if detail else ""
+            full_detail = f"{message}{code_suffix}{detail_suffix}"
+
+        raise HTTPException(status_code=status_code, detail=full_detail)
 
     return {
         "message": "Teams meeting created and invites sent",

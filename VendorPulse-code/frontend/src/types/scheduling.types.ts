@@ -30,6 +30,7 @@ export interface SlotProposal {
   conflict_count: number
   attending: string[]
   conflicts: string[]
+  moveable_conflicts: string[]  // subset of conflicts whose blocking meeting can be rescheduled
 }
 
 export type SchedulingPhase =

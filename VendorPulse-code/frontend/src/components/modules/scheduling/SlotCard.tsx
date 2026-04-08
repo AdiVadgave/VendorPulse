@@ -1,5 +1,5 @@
 import { format } from 'date-fns'
-import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck } from 'lucide-react'
+import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, AlertTriangle } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { SlotProposal } from '@/types/scheduling.types'
 
@@ -176,14 +176,25 @@ export default function SlotCard({
               </span>
             </div>
             <div className="flex flex-wrap gap-1">
-              {slot.conflicts.map((name) => (
-                <span
-                  key={name}
-                  className="px-2 py-0.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded text-xs"
-                >
-                  {name}
-                </span>
-              ))}
+              {slot.conflicts.map((name) => {
+                const isMoveable = slot.moveable_conflicts.includes(name)
+                return (
+                  <span
+                    key={name}
+                    title={isMoveable ? 'Blocking meeting can be rescheduled' : undefined}
+                    className={cn(
+                      'flex items-center gap-1 px-2 py-0.5 rounded text-xs',
+                      isMoveable
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+                    )}
+                  >
+                    {isMoveable && <AlertTriangle size={10} />}
+                    {name}
+                    {isMoveable && <span className="text-blue-400 dark:text-blue-500"> · moveable</span>}
+                  </span>
+                )
+              })}
             </div>
           </div>
         )}

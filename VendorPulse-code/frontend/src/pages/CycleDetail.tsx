@@ -98,13 +98,14 @@ function getInitialSchedulingPhase(state: string): SchedulingPhase {
 }
 
 const SCHEDULING_STEPS: { key: SchedulingPhase; label: string }[] = [
-  { key: 'attendee_refresh', label: 'Attendee Refresh' },
-  { key: 'slot_ranking', label: 'Slot Ranking' },
-  { key: 'invite_approval', label: 'Invite Approval' },
+  { key: 'attendee_refresh',      label: 'Attendee Refresh' },
+  { key: 'refresh_dispatched',    label: 'Responses Collected' },
+  { key: 'slot_ranking',          label: 'Slot Ranking' },
+  { key: 'invite_approval',       label: 'Invite Approval' },
   { key: 'confirmation_tracking', label: 'Confirmation' },
 ]
 const PHASE_ORDER: SchedulingPhase[] = [
-  'attendee_refresh', 'slot_ranking', 'invite_approval', 'confirmation_tracking',
+  'attendee_refresh', 'refresh_dispatched', 'slot_ranking', 'invite_approval', 'confirmation_tracking',
 ]
 
 export default function CycleDetail() {
@@ -520,11 +521,12 @@ function SchedulingTab({
           })}
         </div>
       </div>
-      {schedulingPhase === 'attendee_refresh' && (
+      {(schedulingPhase === 'attendee_refresh' || schedulingPhase === 'refresh_dispatched') && (
         <AttendeeRefreshPanel
           attendees={attendees}
-          simulatedAttendees={MOCK_ATTENDEES_AFTER_RESPONSES}
-          onDispatchComplete={() => {}}
+          phase={schedulingPhase}
+          simulatedAttendees={[]}
+          onDispatchComplete={() => onPhaseChange('refresh_dispatched')}
           onResponsesSimulated={(updated) => { onAttendeesUpdated(updated); onPhaseChange('slot_ranking') }}
         />
       )}

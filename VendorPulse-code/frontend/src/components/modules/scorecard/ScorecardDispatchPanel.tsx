@@ -187,7 +187,7 @@ export default function ScorecardDispatchPanel({ vendorName, recipientCount, onD
                   scores of 1 or 5.
                 </p>
                 <p className="font-medium text-slate-700 dark:text-slate-300">
-                  Deadline: 22 March 2026 (T−0 escalation applies)
+                  Deadline: 12 April 2026 (T−0 escalation applies)
                 </p>
                 <ul className="list-disc pl-4 space-y-0.5">
                   {['Delivery Quality', 'SLA Compliance', 'Innovation', 'Communication', 'Value for Money'].map((c) => (

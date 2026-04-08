@@ -133,7 +133,7 @@ export const MOCK_SLOT_PROPOSALS: SlotProposal[] = [
   {
     slot_id: 'sl1',
     cycle_id: 'c1',
-    proposed_time: '2026-03-28T10:00:00Z',
+    proposed_time: '2026-04-09T10:00:00Z',
     organiser_available: true,
     exec_sponsor_available: true,
     rank_score: 92,
@@ -152,11 +152,12 @@ export const MOCK_SLOT_PROPOSALS: SlotProposal[] = [
       'Lisa Wang',
     ],
     conflicts: ['David Kim'],
+    moveable_conflicts: ['David Kim'],   // David Kim has a recurring stand-up that can be moved
   },
   {
     slot_id: 'sl2',
     cycle_id: 'c1',
-    proposed_time: '2026-03-29T14:00:00Z',
+    proposed_time: '2026-04-09T14:00:00Z',
     organiser_available: true,
     exec_sponsor_available: true,
     rank_score: 78,
@@ -174,11 +175,12 @@ export const MOCK_SLOT_PROPOSALS: SlotProposal[] = [
       'Lisa Wang',
     ],
     conflicts: ['Priya Sharma', 'David Kim'],
+    moveable_conflicts: ['David Kim'],   // Priya Sharma has an external client call — not moveable
   },
   {
     slot_id: 'sl3',
     cycle_id: 'c1',
-    proposed_time: '2026-04-01T11:00:00Z',
+    proposed_time: '2026-04-10T11:00:00Z',
     organiser_available: true,
     exec_sponsor_available: true,
     rank_score: 71,
@@ -196,6 +198,7 @@ export const MOCK_SLOT_PROPOSALS: SlotProposal[] = [
       'Lisa Wang',
     ],
     conflicts: ['Emma Davies', 'David Kim'],
+    moveable_conflicts: ['Emma Davies', 'David Kim'],  // both have internal meetings that can flex
   },
 ]
 

@@ -36,6 +36,7 @@ class CycleAttendeeCreate(BaseModel):
 class CycleAttendeeUpdate(BaseModel):
     invite_status: Optional[InviteStatus] = None
     availability_submitted: Optional[bool] = None
+    is_key: Optional[bool] = None
     replaced_by: Optional[str] = None
     replaced_by_email: Optional[str] = None
     replacement_note: Optional[str] = None

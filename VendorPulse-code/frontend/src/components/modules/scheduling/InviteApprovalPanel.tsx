@@ -12,12 +12,16 @@ import {
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import { apiFetch } from '@/lib/api'
-import { getPreferredOrganizerEmail } from '@/lib/schedulingApi'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
 
+const TEAMS_API = 'http://localhost:3001/api'
+// Organizer is the first VMO_COORDINATOR in the attendees list; fall back to u1
+const DEFAULT_ORGANIZER_ID = 'u1'
+
 interface InviteApprovalPanelProps {
   cycleId: string
+  slotId: string | null
   slot: SlotProposal
   attendees: CycleAttendee[]
   vendorName: string
@@ -28,6 +32,7 @@ interface InviteApprovalPanelProps {
 
 export default function InviteApprovalPanel({
   cycleId,
+  slotId,
   slot,
   attendees,
   vendorName,
@@ -83,10 +88,42 @@ export default function InviteApprovalPanel({
   async function handleSend() {
     setIsProcessing(true)
     setAgentStatus('running')
-    setGraphError(null)
+    setTeamsError(null)
 
-    let teamsMeetingUrl: string | null = null
+    // Organizer = VMO_COORDINATOR attendee, or first attendee with a user_id
+    const organizer = attendees.find((a) => a.role === 'VMO_COORDINATOR' && a.user_id)
+      ?? attendees.find((a) => a.user_id)
+    const organizerId = organizer?.user_id ?? DEFAULT_ORGANIZER_ID
 
+    // Participants = ALL selected attendees with a user_id (including organizer for Teams)
+    const allUserIds = [...new Set(attendees.map((a) => a.user_id).filter((id): id is string => !!id))]
+    // Teams participantIds excludes organizer (Teams adds them as organizer)
+    const participantIds = allUserIds.filter((id) => id !== organizerId)
+
+    const timeSlot = {
+      date: format(dateObj, 'yyyy-MM-dd'),
+      startTime: format(dateObj, 'HH:mm'),
+      endTime: format(endTime, 'HH:mm'),
+    }
+
+    // Step 1: Persist meeting in VendorPulse backend
+    if (slotId && cycleId) {
+      try {
+        await apiFetch(
+          `/api/cycles/${cycleId}/scheduling/send-invites`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ organiser_id: organizerId, slot_id: slotId }),
+          }
+        )
+      } catch {
+        // Non-critical — VP may not have a persisted slot (e.g. workflow state mismatch)
+      }
+    }
+
+    // Step 2: Always create meeting in Teams backend so invites appear in Teams UI
+    // This is the authoritative Teams meetingId used for RSVP polling
+    let teamsMeetingId: string | null = null
     try {
       const organiserEmail = getPreferredOrganizerEmail(attendees) || 'organiser@zensar.com'
       const res = await apiFetch<{
@@ -96,21 +133,30 @@ export default function InviteApprovalPanel({
       }>(`/api/cycles/${cycleId}/scheduling/graph/send-invite`, {
         method: 'POST',
         body: JSON.stringify({
-          slot_id: slot.slot_id,
-          organiser_email: organiserEmail,
+          title: `EGB/QBR Governance Review — ${vendorName} ${quarter} ${year}`,
+          description: `Quarterly Business Review governance meeting for ${vendorName}.`,
+          agenda:
+            '1) Q Performance Review & Scorecard Discussion\n2) Key Issues, Concerns and Pushback Responses\n3) Commitments and Action Items Review\n4) Forward Planning & AOB',
+          organizerId,
+          participantIds: participantIds.length > 0 ? participantIds : allUserIds,
+          timeSlot,
         }),
       })
-
-      if (res) {
-        teamsMeetingUrl = res.teams_meeting_url ?? null
+      if (res.ok) {
+        const data = await res.json()
+        teamsMeetingId = data.meeting?.meetingId ?? null
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setTeamsError(`Teams invite failed: ${err.detail ?? err.error ?? res.statusText}`)
       }
-    } catch (err) {
-      setGraphError(err instanceof Error ? err.message : 'Failed to create Teams meeting')
+    } catch {
+      setTeamsError('Teams backend unavailable — invite saved to VendorPulse only. RSVP sync will not work.')
     }
 
     setAgentStatus('complete')
     setIsProcessing(false)
-    onInviteSent(teamsMeetingUrl)
+    // Pass the real Teams meetingId (used for RSVP polling in ConfirmationTracker)
+    onInviteSent(teamsMeetingId)
   }
 
   return (

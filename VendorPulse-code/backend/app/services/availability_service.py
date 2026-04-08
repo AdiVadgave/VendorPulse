@@ -1,7 +1,19 @@
 """
 Availability & conflict-detection service.
 
-Pure deterministic logic — no LLM calls.
+Slot model (updated):
+  Users no longer declare explicit availability windows. Instead, ALL
+  business-hour slots (09:00–17:00) are treated as available by default.
+  Only BOOKED slots (meetings already scheduled) block a user.
+
+  A user is available for [start, end] on <date> when:
+    1. [start, end] falls within business hours.
+    2. No entry in user.booked_slots overlaps [start, end] on <date>.
+
+Legacy "availability" windows (if still present in the JSON) are ignored by
+this service so that a simple data migration (add booked_slots: []) is all
+that is required — no destructive changes to existing records.
+
 Future AI hook: pass structured conflict data to an LLM to suggest alternatives.
 
 When a TeamsBackendClient is injected (use_teams_backend=True) availability
@@ -12,6 +24,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from app.config import settings
 from app.repositories.user_repository import UserRepository
 
 
@@ -26,25 +39,40 @@ def _slots_overlap(s1: str, e1: str, s2: str, e2: str) -> bool:
     return not (_to_minutes(e1) <= _to_minutes(s2) or _to_minutes(e2) <= _to_minutes(s1))
 
 
-def _slot_covers(avail_start: str, avail_end: str, req_start: str, req_end: str) -> bool:
-    """True when the availability window completely covers the requested window."""
-    return _to_minutes(avail_start) <= _to_minutes(req_start) and _to_minutes(avail_end) >= _to_minutes(req_end)
+def _within_business_hours(start_time: str, end_time: str) -> bool:
+    """True when the entire [start, end] window is within business hours."""
+    biz_start = f"{settings.scheduling_business_start_hour:02d}:00"
+    biz_end = f"{settings.scheduling_business_end_hour:02d}:00"
+    return (
+        _to_minutes(biz_start) <= _to_minutes(start_time)
+        and _to_minutes(end_time) <= _to_minutes(biz_end)
+    )
 
 
 class AvailabilityService:
     def __init__(self, user_repo: UserRepository, teams_client=None) -> None:
         self._user_repo = user_repo
         self._teams = teams_client  # optional TeamsBackendClient
+        self._user_cache: dict[str, dict | None] = {}
 
-    def _get_user_availability(self, user_id: str) -> list[dict]:
-        """Fetch availability from Teams backend if configured, else local repo."""
+    def _get_user(self, user_id: str) -> dict | None:
+        """Fetch user record from Teams backend if configured, else local repo.
+
+        Results are cached for the lifetime of this service instance so that
+        slot-ranking loops (which check the same users hundreds of times) do
+        not issue a separate HTTP request per slot.
+        """
+        if user_id in self._user_cache:
+            return self._user_cache[user_id]
         if self._teams is not None:
-            return self._teams.get_user_availability(user_id)
-        user = self._user_repo.get_by_user_id(user_id)
-        return user.get("availability", []) if user else []
+            user = self._teams.get_user(user_id)
+        else:
+            user = self._user_repo.get_by_user_id(user_id)
+        self._user_cache[user_id] = user
+        return user
 
     # ------------------------------------------------------------------
-    # Core availability checks
+    # Core availability check (booked-slots model)
     # ------------------------------------------------------------------
 
     def is_user_available(
@@ -55,41 +83,75 @@ class AvailabilityService:
         end_time: str,
     ) -> bool:
         """
-        Return True if the user has an availability window that covers
-        [start_time, end_time] on *date*.
-        """
-        availability = self._get_user_availability(user_id)
-        return self._check_availability(availability, date, start_time, end_time)
+        Return True if the user is free for [start_time, end_time] on *date*.
 
-    def _check_availability(
-        self,
-        availability: list[dict],
-        date: str,
-        start_time: str,
-        end_time: str,
-    ) -> bool:
-        day_entry = next((a for a in availability if a.get("date") == date), None)
-        if day_entry is None:
+        Rule: available = within business hours AND not booked at that time.
+        """
+        # Business-hours check
+        if not _within_business_hours(start_time, end_time):
             return False
-        for slot_str in day_entry.get("slots", []):
-            if "-" not in slot_str:
-                continue
-            parts = slot_str.split("-")
-            if len(parts) != 2:
-                continue
-            s_start, s_end = parts
-            if _slot_covers(s_start.strip(), s_end.strip(), start_time, end_time):
-                return True
-        return False
+
+        user = self._get_user(user_id)
+        if user is None:
+            return False
+
+        # booked_slots model: blocked if any booking overlaps the requested window
+        booked = user.get("booked_slots", [])
+        day_entry = next((b for b in booked if b.get("date") == date), None)
+        if day_entry:
+            for slot_str in day_entry.get("slots", []):
+                if "-" not in slot_str:
+                    continue
+                parts = slot_str.split("-", 1)
+                if len(parts) != 2:
+                    continue
+                b_start, b_end = parts[0].strip(), parts[1].strip()
+                if _slots_overlap(b_start, b_end, start_time, end_time):
+                    return False
+
+        return True
 
     def get_free_slots_for_user(self, user_id: str, date: str) -> list[str]:
-        """Return all declared availability slots for a user on a date."""
-        availability = self._get_user_availability(user_id)
-        day_entry = next((a for a in availability if a.get("date") == date), None)
-        return day_entry.get("slots", []) if day_entry else []
+        """
+        Return all 1-hour business-hour slots that are not booked for a user on *date*.
+        Slots are returned as 'HH:MM-HH:MM' strings.
+        """
+        user = self._get_user(user_id)
+        if user is None:
+            return []
+
+        booked = user.get("booked_slots", [])
+        day_booked = next((b for b in booked if b.get("date") == date), None)
+        booked_slots = day_booked.get("slots", []) if day_booked else []
+
+        free: list[str] = []
+        biz_start = settings.scheduling_business_start_hour
+        biz_end = settings.scheduling_business_end_hour
+
+        h = biz_start
+        while h < biz_end:
+            slot_start = f"{h:02d}:00"
+            slot_end = f"{h + 1:02d}:00"
+            # Check not booked
+            blocked = False
+            for slot_str in booked_slots:
+                if "-" not in slot_str:
+                    continue
+                parts = slot_str.split("-", 1)
+                if len(parts) != 2:
+                    continue
+                b_start, b_end = parts[0].strip(), parts[1].strip()
+                if _slots_overlap(b_start, b_end, slot_start, slot_end):
+                    blocked = True
+                    break
+            if not blocked:
+                free.append(f"{slot_start}-{slot_end}")
+            h += 1
+
+        return free
 
     # ------------------------------------------------------------------
-    # Double-booking detection
+    # Double-booking detection (used by MeetingService)
     # ------------------------------------------------------------------
 
     def has_conflict(

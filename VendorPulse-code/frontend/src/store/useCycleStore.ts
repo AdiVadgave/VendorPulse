@@ -55,26 +55,12 @@ export const useCycleStore = create<CycleStore>()((set, get) => ({
     })),
 
   addCycle: (cycle) =>
-    set((s) => ({
-      cycles: [cycle, ...s.cycles],
-      workflowStates: { ...s.workflowStates, [cycle.cycle_id]: cycle.workflow_state },
-    })),
-
-  setCycles: (cycles) =>
-    set(() => ({
-      cycles,
-      workflowStates: Object.fromEntries(
-        cycles.map((cycle) => [cycle.cycle_id, cycle.workflow_state])
-      ) as Record<string, WorkflowState>,
-    })),
-
-  removeCycle: (cycleId) =>
     set((s) => {
-      const nextStates = { ...s.workflowStates }
-      delete nextStates[cycleId]
+      // Idempotent: if already in store, just update workflow state
+      const exists = s.cycles.some((c) => c.cycle_id === cycle.cycle_id)
       return {
-        cycles: s.cycles.filter((cycle) => cycle.cycle_id !== cycleId),
-        workflowStates: nextStates,
+        cycles: exists ? s.cycles : [cycle, ...s.cycles],
+        workflowStates: { ...s.workflowStates, [cycle.cycle_id]: cycle.workflow_state },
       }
     }),
 }))

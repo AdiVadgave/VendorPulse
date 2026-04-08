@@ -193,7 +193,7 @@ export default function TeamsTopBar({ activeUser, users, setActiveUser }) {
           {showMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl z-50 overflow-hidden border border-gray-100">
+              <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl z-50 border border-gray-100 overflow-hidden flex flex-col">
                 {/* Current user hero */}
                 <div className="bg-[#6264A7] px-4 py-4">
                   <div className="flex items-center gap-3">
@@ -213,24 +213,26 @@ export default function TeamsTopBar({ activeUser, users, setActiveUser }) {
                 </div>
 
                 {/* Switch to */}
-                <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+                <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 shrink-0">
                   <p className="text-xs font-semibold text-[#616161] uppercase tracking-wider">Switch Account</p>
                 </div>
-                {users.filter(u => u.userId !== activeUser?.userId).map(user => (
-                  <button
-                    key={user.userId}
-                    onClick={() => { setActiveUser(user); setShowMenu(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F5F5FF] transition-colors text-left"
-                  >
-                    <div className="w-8 h-8 bg-[#6264A7] rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">
-                      {user.avatar}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-[#242424]">{user.name}</p>
-                      <p className="text-xs text-[#616161]">{user.role}</p>
-                    </div>
-                  </button>
-                ))}
+                <div className="overflow-y-auto max-h-64">
+                  {users.filter(u => u.userId !== activeUser?.userId).map(user => (
+                    <button
+                      key={user.userId}
+                      onClick={() => { setActiveUser(user); setShowMenu(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F5F5FF] transition-colors text-left"
+                    >
+                      <div className="w-8 h-8 bg-[#6264A7] rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">
+                        {user.avatar}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-[#242424]">{user.name}</p>
+                        <p className="text-xs text-[#616161]">{user.role}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </>
           )}

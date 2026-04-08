@@ -17,7 +17,9 @@ GET  /api/users/{userId}/meetings       Get user's meetings
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import settings
 from app.dependencies import get_meeting_repo, get_teams_client, get_user_service
@@ -27,12 +29,47 @@ from app.services.user_service import UserService
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
+def _normalize_user(u: dict) -> dict:
+    """
+    Ensure the user dict exposes both userId and user_id so the frontend
+    can use either field.  Also derives an 'organisation' field from role
+    when one isn't already present.
+    """
+    out = dict(u)
+    # Normalise ID field
+    if "userId" in out and "user_id" not in out:
+        out["user_id"] = out["userId"]
+    elif "user_id" in out and "userId" not in out:
+        out["userId"] = out["user_id"]
+    # Derive organisation from role when absent
+    if "organisation" not in out or not out.get("organisation"):
+        out["organisation"] = out.get("role", "")
+    return out
+
+
 @router.get("")
-def list_users(svc: UserService = Depends(get_user_service)):
+def list_users(
+    search: Optional[str] = Query(default=None, description="Filter by name, email or organisation"),
+    svc: UserService = Depends(get_user_service),
+):
     if settings.use_teams_backend:
-        teams = get_teams_client()
-        return {"users": teams.get_users()}
-    return {"users": svc.list_users()}
+        users = get_teams_client().get_users()
+    else:
+        users = svc.list_users()
+
+    users = [_normalize_user(u) for u in users]
+
+    if search:
+        q = search.strip().lower()
+        users = [
+            u for u in users
+            if q in u.get("name", "").lower()
+            or q in u.get("email", "").lower()
+            or q in u.get("organisation", "").lower()
+            or q in u.get("role", "").lower()
+        ]
+
+    return {"users": users}
 
 
 @router.post("", status_code=201)
@@ -61,11 +98,11 @@ def get_user(userId: str, svc: UserService = Depends(get_user_service)):
         user = get_teams_client().get_user(userId)
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
-        return {"user": user}
+        return {"user": _normalize_user(user)}
     user = svc.get_user(userId)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"user": user}
+    return {"user": _normalize_user(user)}
 
 
 @router.put("/{userId}")

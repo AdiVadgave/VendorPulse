@@ -56,12 +56,23 @@ function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel
       setShowDropdown(false)
       return
     }
-    apiFetch<SystemUser[]>(`/api/users`, { params: { search: q } })
-      .then((data) => {
-        setResults(data.filter((u) => !existingAttendeeIds.includes(u.user_id)))
+    apiFetch<{ users: Array<{ userId?: string; user_id?: string; name: string; email: string; role?: string; organisation?: string }> }>(
+      `/api/users`,
+      { params: { search: q } }
+    )
+      .then(({ users }) => {
+        // Normalize API response to SystemUser shape
+        const mapped: SystemUser[] = users.map((u) => ({
+          user_id: u.user_id ?? u.userId ?? '',
+          name: u.name,
+          email: u.email,
+          organisation: u.organisation ?? u.role ?? '',
+        }))
+        setResults(mapped.filter((u) => u.user_id && !existingAttendeeIds.includes(u.user_id)))
         setShowDropdown(true)
       })
       .catch(() => {
+        // API unavailable — fall back to mock data filtered locally
         const filtered = MOCK_SYSTEM_USERS.filter(
           (u) =>
             !existingAttendeeIds.includes(u.user_id) &&

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
@@ -283,6 +283,16 @@ export default function Dashboard() {
       mounted = false
     }
   }, [setCycles])
+
+  // Load all cycles from the backend on mount so API-created cycles survive page refresh
+  useEffect(() => {
+    apiFetch<{ cycles: GovernanceCycle[] }>('/api/cycles')
+      .then(({ cycles: remote }) => {
+        remote.forEach((c) => addCycle(c))
+      })
+      .catch(() => {/* backend offline — fall back to store/mock data */})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const stats = [
     { label: 'Active Cycles', value: cycles.length, icon: <Layers size={18} />, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/30' },

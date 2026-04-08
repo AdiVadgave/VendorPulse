@@ -9,9 +9,10 @@ export interface SystemUser {
 }
 
 export const MOCK_SYSTEM_USERS: SystemUser[] = [
-  { user_id: 'u16', name: 'Anup Kesarwani',   email: 'anup.kesarwani@zensar.com',    organisation: 'Zensar VMO' },
-  { user_id: 'u17', name: 'Kanishk Punekar',   email: 'kanishk.punekar@zensar.com',    organisation: 'Zensar IDT' },
+  { user_id: 'u16', name: 'Anup Kesarwani',   email: 'anup.kesarwani@zensar.com',    organisation: 'Shell VMO' },
+  { user_id: 'u17', name: 'Kanishk Punekar',   email: 'kanishk.punekar@zensar.com',    organisation: 'Zensar VMO' },
   { user_id: 'u18', name: 'Aditya Vadgave',    email: 'aditya.vadgave@zensar.com',     organisation: 'Zensar VMO' },
+  { user_id: 'u19', name: 'Vivek Kulkarni',       email: 'v.kulkarni3@zensar.com',        organisation: "Zensar's Vice President" },
   { user_id: 'u1', name: 'Alex Thompson',   email: 'alex.thompson@zensar.com',    organisation: 'Zensar VMO' },
   { user_id: 'u2', name: 'Sarah Chen',      email: 'sarah.chen@zensar.com',       organisation: 'Zensar IDT' },
   { user_id: 'u3', name: 'Priya Sharma',    email: 'priya.sharma@zensar.com',     organisation: 'Zensar IDT' },

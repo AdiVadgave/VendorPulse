@@ -77,9 +77,9 @@
     ]
   },
   {
-    "slot_id": "slot_f0f13ffe",
-    "cycle_id": "c_2d8b406b",
-    "proposed_time": "2026-04-08T15:00:00.0000000",
+    "slot_id": "slot_1f9684aa",
+    "cycle_id": "c_fa483f2f",
+    "proposed_time": "2026-04-13T15:00:00.0000000",
     "proposed_time_zone": "UTC",
     "duration_minutes": 30,
     "organiser_available": true,
@@ -95,12 +95,12 @@
     ],
     "conflicts": [],
     "approved_by": "coordinator",
-    "approved_at": "2026-04-08T08:59:32.417260+00:00"
+    "approved_at": "2026-04-08T11:52:45.860485+00:00"
   },
   {
-    "slot_id": "slot_915ccc92",
-    "cycle_id": "c_2d8b406b",
-    "proposed_time": "2026-04-08T15:30:00.0000000",
+    "slot_id": "slot_c8428864",
+    "cycle_id": "c_fa483f2f",
+    "proposed_time": "2026-04-13T15:30:00.0000000",
     "proposed_time_zone": "UTC",
     "duration_minutes": 30,
     "organiser_available": true,
@@ -117,9 +117,9 @@
     "conflicts": []
   },
   {
-    "slot_id": "slot_df231fdf",
-    "cycle_id": "c_2d8b406b",
-    "proposed_time": "2026-04-08T16:00:00.0000000",
+    "slot_id": "slot_86087523",
+    "cycle_id": "c_fa483f2f",
+    "proposed_time": "2026-04-13T16:00:00.0000000",
     "proposed_time_zone": "UTC",
     "duration_minutes": 30,
     "organiser_available": true,
@@ -136,59 +136,64 @@
     "conflicts": []
   },
   {
-    "slot_id": "slot_ab843671",
-    "cycle_id": "c_11cb5725",
-    "proposed_time": "2026-04-08T15:00:00.0000000",
+    "slot_id": "slot_474c1e09",
+    "cycle_id": "c_44ce9222",
+    "proposed_time": "2026-04-20T15:00:00.0000000",
     "proposed_time_zone": "UTC",
     "duration_minutes": 30,
     "organiser_available": true,
     "exec_sponsor_available": true,
     "rank_score": 100,
-    "is_approved": false,
-    "attendance_count": 2,
-    "total_attendees": 2,
+    "is_approved": true,
+    "attendance_count": 3,
+    "total_attendees": 3,
     "conflict_count": 0,
     "attending": [
       "anup.kesarwani@zensar.com",
-      "kanishk.punekar@zensar.com"
+      "kanishk.punekar@zensar.com",
+      "v.kulkarni3@zensar.com"
     ],
-    "conflicts": []
+    "conflicts": [],
+    "approved_by": "coordinator",
+    "approved_at": "2026-04-08T12:20:49.457016+00:00"
   },
   {
-    "slot_id": "slot_3ac52444",
-    "cycle_id": "c_11cb5725",
-    "proposed_time": "2026-04-08T15:30:00.0000000",
+    "slot_id": "slot_90b31898",
+    "cycle_id": "c_44ce9222",
+    "proposed_time": "2026-04-20T15:30:00.0000000",
     "proposed_time_zone": "UTC",
     "duration_minutes": 30,
     "organiser_available": true,
     "exec_sponsor_available": true,
     "rank_score": 90,
     "is_approved": false,
-    "attendance_count": 2,
-    "total_attendees": 2,
+    "attendance_count": 3,
+    "total_attendees": 3,
     "conflict_count": 0,
     "attending": [
       "anup.kesarwani@zensar.com",
-      "kanishk.punekar@zensar.com"
+      "kanishk.punekar@zensar.com",
+      "v.kulkarni3@zensar.com"
     ],
     "conflicts": []
   },
   {
-    "slot_id": "slot_f4c91e06",
-    "cycle_id": "c_11cb5725",
-    "proposed_time": "2026-04-08T16:00:00.0000000",
+    "slot_id": "slot_e6b4c36f",
+    "cycle_id": "c_44ce9222",
+    "proposed_time": "2026-04-20T16:00:00.0000000",
     "proposed_time_zone": "UTC",
     "duration_minutes": 30,
     "organiser_available": true,
     "exec_sponsor_available": true,
     "rank_score": 80,
     "is_approved": false,
-    "attendance_count": 2,
-    "total_attendees": 2,
+    "attendance_count": 3,
+    "total_attendees": 3,
     "conflict_count": 0,
     "attending": [
       "anup.kesarwani@zensar.com",
-      "kanishk.punekar@zensar.com"
+      "kanishk.punekar@zensar.com",
+      "v.kulkarni3@zensar.com"
     ],
     "conflicts": []
   }

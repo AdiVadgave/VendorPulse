@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { format } from 'date-fns'
 import {
   CheckCircle2,
@@ -8,32 +8,17 @@ import {
   CalendarCheck,
   Key,
   ArrowRight,
-  RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { CycleAttendee, InviteStatus, SlotProposal } from '@/types/scheduling.types'
 import { ROLE_LABELS } from '@/types/cycle.types'
 
-const TEAMS_API = 'http://localhost:3001/api'
-
-// Maps VendorPulse attendee emails to Teams backend userIds
-const EMAIL_TO_TEAMS_ID: Record<string, string> = {
-  'alex.thompson@zensar.com':   'u1',
-  'sarah.chen@zensar.com':      'u2',
-  'priya.sharma@zensar.com':    'u3',
-  'marcus.williams@zensar.com': 'u4',
-  'james.obrien@zensar.com':    'u5',
-  'emma.davies@zensar.com':     'u6',
-  'raj.patel@novatech.com':     'u7',
-  'lisa.wang@novatech.com':     'u8',
-  'david.kim@novatech.com':     'u9',
-}
+// Replaced Mock Teams integration
 
 interface ConfirmationTrackerProps {
   attendees: CycleAttendee[]
   slot: SlotProposal
-  teamsMeetingId: string | null
   onProceed?: () => void
 }
 
@@ -59,75 +44,25 @@ const STATUS_CONFIG: Record<
 }
 
 export default function ConfirmationTracker({
-  attendees: initialAttendees,
+  attendees,
   slot,
-  teamsMeetingId,
   onProceed,
 }: ConfirmationTrackerProps) {
-  const [attendees, setAttendees] = useState<CycleAttendee[]>(initialAttendees)
   const [nudgeSent, setNudgeSent] = useState<Set<string>>(new Set())
   const [nudgingId, setNudgingId] = useState<string | null>(null)
-  const [lastPolled, setLastPolled] = useState<Date | null>(null)
-
   const dateObj = new Date(slot.proposed_time)
   const accepted = attendees.filter((a) => a.invite_status === 'ACCEPTED')
   const declined = attendees.filter((a) => a.invite_status === 'DECLINED')
   const pending   = attendees.filter((a) => a.invite_status === 'PENDING')
   const allResponded = pending.length === 0
 
-  // Poll Teams backend every 5 seconds for RSVP status updates
-  useEffect(() => {
-    if (!teamsMeetingId) return
 
-    async function fetchRsvps() {
-      try {
-        const res = await fetch(`${TEAMS_API}/meetings/${teamsMeetingId}`)
-        if (!res.ok) return
-        const data = await res.json()
-        const participants: { userId: string; status: string }[] = data.meeting?.participants ?? []
-
-        setAttendees((prev) =>
-          prev.map((a) => {
-            const teamsId = EMAIL_TO_TEAMS_ID[a.email]
-            if (!teamsId) return a
-            const p = participants.find((x) => x.userId === teamsId)
-            if (!p) return a
-            const mapped: InviteStatus =
-              p.status === 'accepted' ? 'ACCEPTED'
-              : p.status === 'declined' ? 'DECLINED'
-              : 'PENDING'
-            return { ...a, invite_status: mapped }
-          })
-        )
-        setLastPolled(new Date())
-      } catch {
-        // Teams backend offline — keep showing current state
-      }
-    }
-
-    fetchRsvps()
-    const interval = setInterval(fetchRsvps, 5000)
-    return () => clearInterval(interval)
-  }, [teamsMeetingId])
 
   async function sendNudge(attendee: CycleAttendee) {
     setNudgingId(attendee.attendee_id)
 
-    const teamsId = EMAIL_TO_TEAMS_ID[attendee.email]
-    if (teamsId && teamsMeetingId) {
-      try {
-        await fetch(`${TEAMS_API}/meetings/${teamsMeetingId}/nudge`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: teamsId,
-            message: `Reminder: Please respond to the meeting invite for the governance review on ${format(dateObj, 'd MMMM yyyy')}.`,
-          }),
-        })
-      } catch {
-        // Nudge stored locally if Teams offline
-      }
-    }
+    // Simulate network delay for UI
+    await new Promise(resolve => setTimeout(resolve, 800))
 
     setNudgeSent((prev) => new Set([...prev, attendee.attendee_id]))
     setNudgingId(null)
@@ -149,22 +84,6 @@ export default function ConfirmationTracker({
               {format(dateObj, 'EEEE, d MMMM yyyy')} at{' '}
               {format(dateObj, 'h:mm a')} GMT · Conference Room B / Teams
             </p>
-            {teamsMeetingId && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-1 flex items-center gap-1">
-                <RefreshCw size={10} className="animate-spin" />
-                Live sync active — RSVP status updating from Teams every 5 seconds
-                {lastPolled && (
-                  <span className="ml-1 text-emerald-500 dark:text-emerald-600">
-                    · last updated {format(lastPolled, 'HH:mm:ss')}
-                  </span>
-                )}
-              </p>
-            )}
-            {!teamsMeetingId && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                Teams backend unavailable — statuses are local only
-              </p>
-            )}
           </div>
           <AgentStatusBadge status="complete" label="Invite Sent" />
         </div>

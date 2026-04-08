@@ -55,7 +55,6 @@ def health():
         "version": "1.0.0",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "llm_enabled": settings.enable_llm,
-        "teams_backend_enabled": settings.use_teams_backend,
         "endpoints": {
             "users": "GET|POST /api/users",
             "userDetail": "GET|PUT /api/users/{userId}",

@@ -19,10 +19,6 @@ class Settings(BaseSettings):
     # Data storage — JSON files (swap path to SQLite DB later)
     data_dir: Path = Path(__file__).parent.parent / "data"
 
-    # Teams-backend integration (optional — set USE_TEAMS_BACKEND=true to proxy)
-    use_teams_backend: bool = False
-    teams_backend_url: str = "http://localhost:3001"
-
     # Scheduling algorithm constants
     scheduling_business_start_hour: int = 9   # 09:00
     scheduling_business_end_hour: int = 17    # 17:00

@@ -3,10 +3,6 @@ Availability & conflict-detection service.
 
 Pure deterministic logic — no LLM calls.
 Future AI hook: pass structured conflict data to an LLM to suggest alternatives.
-
-When a TeamsBackendClient is injected (use_teams_backend=True) availability
-data is read from the Teams backend instead of the local users.json so that
-there is one authoritative source.
 """
 from __future__ import annotations
 
@@ -32,14 +28,11 @@ def _slot_covers(avail_start: str, avail_end: str, req_start: str, req_end: str)
 
 
 class AvailabilityService:
-    def __init__(self, user_repo: UserRepository, teams_client=None) -> None:
+    def __init__(self, user_repo: UserRepository) -> None:
         self._user_repo = user_repo
-        self._teams = teams_client  # optional TeamsBackendClient
 
     def _get_user_availability(self, user_id: str) -> list[dict]:
-        """Fetch availability from Teams backend if configured, else local repo."""
-        if self._teams is not None:
-            return self._teams.get_user_availability(user_id)
+        """Fetch availability from local repo."""
         user = self._user_repo.get_by_user_id(user_id)
         return user.get("availability", []) if user else []
 

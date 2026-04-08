@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from app.clients.teams_client import TeamsBackendClient
+
 from app.config import settings
 from app.repositories.agent_run_repository import AgentRunRepository
 from app.repositories.attendee_repository import AttendeeRepository
@@ -72,7 +72,6 @@ def get_user_service() -> UserService:
 def get_availability_service() -> AvailabilityService:
     return AvailabilityService(
         user_repo=get_user_repo(),
-        teams_client=get_teams_client() if settings.use_teams_backend else None,
     )
 
 
@@ -80,9 +79,7 @@ def get_slot_ranking_service() -> SlotRankingService:
     return SlotRankingService(get_availability_service())
 
 
-@lru_cache(maxsize=None)
-def get_teams_client() -> TeamsBackendClient:
-    return TeamsBackendClient(base_url=settings.teams_backend_url)
+
 
 
 def get_meeting_service() -> MeetingService:
@@ -90,7 +87,6 @@ def get_meeting_service() -> MeetingService:
         meeting_repo=get_meeting_repo(),
         user_repo=get_user_repo(),
         availability_svc=get_availability_service(),
-        teams_client=get_teams_client() if settings.use_teams_backend else None,
     )
 
 

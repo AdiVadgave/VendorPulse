@@ -133,7 +133,6 @@ export default function CycleDetail() {
   )
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
   const [apiSlots, setApiSlots] = useState<SlotProposal[]>([])
-  const [teamsMeetingId, setTeamsMeetingId] = useState<string | null>(null)
 
   // --- Module B state ---
   const [scorecardDispatched, setScorecardDispatched] = useState(false)
@@ -366,8 +365,6 @@ export default function CycleDetail() {
             onAttendeesUpdated={setSchedulingAttendees}
             onSlotsReceived={setApiSlots}
             onSlotSelected={setSelectedSlotId}
-            teamsMeetingId={teamsMeetingId}
-            onTeamsMeetingCreated={setTeamsMeetingId}
             isMockCycle={isMockCycle}
             onScorecardProceed={() => {
               advanceWorkflow(cycle!.cycle_id, 'SCORECARD_REQUEST_SENT')
@@ -515,7 +512,7 @@ function OverviewTab({
 function SchedulingTab({
   cycle, schedulingPhase, attendees, slots, selectedSlot, onPhaseChange,
   onAttendeesUpdated, onSlotsReceived, onSlotSelected,
-  teamsMeetingId, onTeamsMeetingCreated, isMockCycle, onScorecardProceed,
+  isMockCycle, onScorecardProceed,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   schedulingPhase: SchedulingPhase
@@ -526,8 +523,6 @@ function SchedulingTab({
   onAttendeesUpdated: (a: CycleAttendee[]) => void
   onSlotsReceived: (slots: SlotProposal[]) => void
   onSlotSelected: (id: string) => void
-  teamsMeetingId: string | null
-  onTeamsMeetingCreated: (id: string | null) => void
   isMockCycle: boolean
   onScorecardProceed: () => void
 }) {
@@ -590,9 +585,9 @@ function SchedulingTab({
           vendorName={cycle.vendor_name}
           quarter={cycle.quarter}
           year={cycle.year}
-          onInviteSent={(meetingId) => {
-            onTeamsMeetingCreated(meetingId)
-            // For mock cycles seed pre-built RSVP data; for new cycles keep attendees as-is (Teams will update them)
+          onInviteSent={() => {
+            // Meeting URL returned from Graph can be logged or used, but skipped here to simplify UI
+            // For mock cycles seed pre-built RSVP data; for new cycles keep attendees as-is
             if (isMockCycle) {
               onAttendeesUpdated(MOCK_ATTENDEES_RSVP)
             }
@@ -604,7 +599,6 @@ function SchedulingTab({
         <ConfirmationTracker
           attendees={attendees.length > 0 ? attendees : MOCK_ATTENDEES_RSVP}
           slot={selectedSlot}
-          teamsMeetingId={teamsMeetingId}
           onProceed={onScorecardProceed}
         />
       )}

@@ -55,8 +55,6 @@ Common settings:
 
 - `HOST` (default `0.0.0.0`)
 - `PORT` (default `8000`)
-- `USE_TEAMS_BACKEND` (default `false`) — when enabled, some calls may proxy to the mock Teams backend
-- `TEAMS_BACKEND_URL` (default `http://localhost:3001`)
 
 ## Data storage
 
@@ -105,29 +103,5 @@ Agent runs:
 - `GET /api/agent-runs`
 - `GET /api/agent-runs/{runId}`
 
-## Optional: run the mock Teams backend
 
-If you want to run the mock Teams backend (separate folder) so the VendorPulse backend can proxy to it when `USE_TEAMS_BACKEND=true`:
-
-1) In a second terminal, open `VendorPulse-code\teams-backend`.
-
-2) Create + activate venv and install:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-3) Run it:
-
-```powershell
-python app.py
-```
-
-Then create a `.env` in `VendorPulse-code\backend` with:
-
-```text
-USE_TEAMS_BACKEND=true
-TEAMS_BACKEND_URL=http://localhost:3001
-```
+# End of README.md

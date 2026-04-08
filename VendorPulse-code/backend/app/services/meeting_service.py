@@ -18,10 +18,6 @@ from app.models.meeting import MeetingCreate, MeetingUpdate
 from app.repositories.meeting_repository import MeetingRepository
 from app.repositories.user_repository import UserRepository
 from app.services.availability_service import AvailabilityService
-
-if TYPE_CHECKING:
-    from app.clients.teams_client import TeamsBackendClient
-
 logger = logging.getLogger(__name__)
 
 
@@ -31,12 +27,10 @@ class MeetingService:
         meeting_repo: MeetingRepository,
         user_repo: UserRepository,
         availability_svc: AvailabilityService,
-        teams_client: Optional["TeamsBackendClient"] = None,
     ) -> None:
         self._meetings = meeting_repo
         self._users = user_repo
         self._avail = availability_svc
-        self._teams = teams_client
 
     # ------------------------------------------------------------------
     # Read
@@ -113,37 +107,6 @@ class MeetingService:
             "meetingType": payload.meetingType,
         }
         stored = self._meetings.insert(meeting)
-
-        # Mirror the meeting to Teams backend so it appears in Teams frontend
-        if self._teams is not None:
-            teams_meeting = self._teams.create_meeting(
-                title=payload.title,
-                description=payload.description or "",
-                agenda=payload.agenda or "",
-                organiser_id=payload.organizerId,
-                participant_ids=payload.participantIds,
-                date=ts.date,
-                start_time=ts.startTime,
-                end_time=ts.endTime,
-            )
-            if teams_meeting:
-                # Store the Teams meetingId reference so we can link back later
-                self._meetings.update_by_id(
-                    "meetingId",
-                    stored["meetingId"],
-                    {"teamsMeetingId": teams_meeting.get("meetingId")},
-                )
-                stored["teamsMeetingId"] = teams_meeting.get("meetingId")
-                logger.info(
-                    "Meeting %s mirrored to Teams as %s",
-                    stored["meetingId"],
-                    teams_meeting.get("meetingId"),
-                )
-            else:
-                logger.warning(
-                    "Meeting %s created locally but Teams backend mirror failed", stored["meetingId"]
-                )
-
         return stored, warnings
 
     # ------------------------------------------------------------------

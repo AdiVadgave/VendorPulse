@@ -74,3 +74,5 @@ Desktop.ini
 
 # --- Project-specific ---
 /dev artifacts/.ipynb_checkpoints/
+VendorPulse-code/backend/data/cycles.json
+VendorPulse-code/backend/data/slot_proposals.json

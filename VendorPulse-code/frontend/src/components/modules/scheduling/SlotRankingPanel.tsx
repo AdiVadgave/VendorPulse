@@ -123,26 +123,7 @@ export default function SlotRankingPanel({
         ))}
       </div>
 
-      {/* Algorithm explainer */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-        <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
-          Ranking Algorithm
-        </h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-          {[
-            { label: 'Organiser available', type: 'Hard constraint', color: 'text-red-600 dark:text-red-400' },
-            { label: 'Exec Sponsor available', type: 'Hard constraint', color: 'text-red-600 dark:text-red-400' },
-            { label: 'Max group attendance', type: 'Soft score', color: 'text-blue-600 dark:text-blue-400' },
-            { label: 'Conflict count', type: '−10 per conflict', color: 'text-amber-600 dark:text-amber-400' },
-            { label: 'Timezone suitability', type: '+5 bonus', color: 'text-emerald-600 dark:text-emerald-400' },
-          ].map((rule) => (
-            <div key={rule.label} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2.5">
-              <p className="font-medium text-slate-700 dark:text-slate-300">{rule.label}</p>
-              <p className={rule.color}>{rule.type}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      
     </div>
   )
 }

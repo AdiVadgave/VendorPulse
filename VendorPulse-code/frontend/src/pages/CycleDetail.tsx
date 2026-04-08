@@ -22,14 +22,22 @@ import {
 } from '@/mock/scheduling.mock'
 import { fetchAttendees } from '@/lib/schedulingApi'
 import {
-  MOCK_SCORECARD_SUBMISSIONS,
-  MOCK_COMPILED_SCORES,
+  deriveScorecardAttendees,
+  getInitialSubmissions,
+  getVendorEntries,
+  getStakeholderEntries,
+  compileScores,
 } from '@/mock/scorecard.mock'
+import type { ScorecardAttendee } from '@/mock/scorecard.mock'
+import type { ScorecardEntry, CompiledCategoryScore } from '@/types/scorecard.types'
 import {
   MOCK_SCORE_DELTAS,
   MOCK_ALIGNMENT_FLAGS,
   MOCK_FACE_OFF,
   MOCK_ALIGNMENT_ACTIONS,
+  buildCategoryComparisons,
+  generateAlignmentInsights,
+  buildAlignmentFlags,
 } from '@/mock/alignment.mock'
 import {
   MOCK_PUSHBACK_ITEMS,
@@ -56,7 +64,9 @@ import CompiledScorecardTable from '@/components/modules/scorecard/CompiledScore
 
 import ChangeHighlightsPanel from '@/components/modules/alignment/ChangeHighlightsPanel'
 import AlignmentFlagsPanel from '@/components/modules/alignment/AlignmentFlagsPanel'
+import ScoreComparisonPanel from '@/components/modules/alignment/ScoreComparisonPanel'
 import FaceOffModelEditor from '@/components/modules/alignment/FaceOffModelEditor'
+import ScheduleAlignmentMeeting from '@/components/modules/alignment/ScheduleAlignmentMeeting'
 import NotesInputPanel from '@/components/modules/alignment/NotesInputPanel'
 
 import VendorBriefPanel from '@/components/modules/vendor-prep/VendorBriefPanel'
@@ -142,17 +152,35 @@ export default function CycleDetail() {
   // --- Module B state ---
   const [scorecardDispatched, setScorecardDispatched] = useState(false)
   const [submissionsSimulated, setSubmissionsSimulated] = useState(false)
-  const [submissions] = useState<StakeholderSubmission[]>(MOCK_SCORECARD_SUBMISSIONS)
+  const [scorecardEntries, setScorecardEntries] = useState<ScorecardEntry[]>([])
+  const [compiledScores, setCompiledScores] = useState<CompiledCategoryScore[] | null>(null)
+
+  // Derive the 2 key scorecard attendees from the cycle's actual attendee list
+  const scorecardAttendees = cycle
+    ? deriveScorecardAttendees(schedulingAttendees, cycle.vendor_name)
+    : { vendor: null, stakeholder: null }
+  const scorecardAttendeeList = [scorecardAttendees.vendor, scorecardAttendees.stakeholder].filter(Boolean) as ScorecardAttendee[]
+  const [submissions, setSubmissions] = useState<StakeholderSubmission[]>(() =>
+    getInitialSubmissions(scorecardAttendeeList)
+  )
+
+  // Re-sync scorecard submissions when scheduling attendees change (e.g. loaded from API)
+  useEffect(() => {
+    if (!scorecardDispatched && scorecardAttendeeList.length > 0) {
+      setSubmissions(getInitialSubmissions(scorecardAttendeeList))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedulingAttendees])
 
   // --- Module C state ---
   const [alignmentActions, setAlignmentActions] = useState<ExtractedAction[]>(MOCK_ALIGNMENT_ACTIONS)
 
   const WHAT_CHANGED_BULLETS = [
-    'Innovation score increased by 1.0 points to 4.0 — strongest performing category this cycle.',
-    'Delivery Quality improved by +0.83 points — consistent delivery progress from Q4 2025.',
-    'Communication score dipped slightly by −0.33 points — escalation handling noted as a concern.',
-    'SLA Compliance improved by +0.67 points despite the February incident dispute.',
-    'Internal alignment flag raised: Innovation spread of 3 points between stakeholders — resolve before vendor call.',
+    'Performance improved by +0.90 points to 3.90 — strongest improvement this cycle, driven by delivery quality and SLA adherence.',
+    'Commercial category up +0.50 points — billing accuracy and contract compliance both performing well.',
+    'Risk & Compliance edged up +0.34 points — security posture improving but patch management remains a discussion point.',
+    'Relationship dipped −0.37 points to 4.13 — communication effectiveness gap between Stakeholder (3) and Vendor (4) needs alignment.',
+    'Key flag: Delivery Timeliness, Pricing Competitiveness, and Communication show 1+ point gaps between Stakeholder and Vendor scores.',
   ]
 
   // --- Module D state ---
@@ -243,11 +271,7 @@ export default function CycleDetail() {
     }
   }
 
-  // Module B: advance to SCORECARD_COMPILED when submissions are simulated
-  function handleSimulateSubmissions() {
-    setSubmissionsSimulated(true)
-    advanceWorkflow(cycle!.cycle_id, 'SCORECARD_COMPILED')
-  }
+  // Module B: workflow advance handled via onCompiled callback in ScorecardTab
 
   function handlePushbackAdd(item: Omit<PushbackItem, 'pushback_id' | 'cycle_id' | 'created_at'>) {
     const newItem: PushbackItem = {
@@ -396,8 +420,20 @@ export default function CycleDetail() {
             dispatched={scorecardDispatched}
             onDispatched={() => setScorecardDispatched(true)}
             submissions={submissions}
-            simulated={submissionsSimulated}
-            onSimulate={handleSimulateSubmissions}
+            onSubmissionUpdate={setSubmissions}
+            onEntriesReceived={setScorecardEntries}
+            compiledScores={compiledScores}
+            onCompiled={(scores: CompiledCategoryScore[]) => {
+              setCompiledScores(scores)
+              // Check if both attendees have submitted (2 scores per parameter)
+              const submitterCount = scores[0]?.parameters[0]?.scores.length ?? 0
+              if (submitterCount >= 2) {
+                setSubmissionsSimulated(true)
+                advanceWorkflow(cycle!.cycle_id, 'SCORECARD_COMPILED')
+              }
+            }}
+            cycleId={cycle.cycle_id}
+            scorecardAttendees={scorecardAttendees}
           />
         )}
 
@@ -406,6 +442,7 @@ export default function CycleDetail() {
             cycle={cycle}
             whatChangedBullets={WHAT_CHANGED_BULLETS}
             actions={alignmentActions}
+            compiledScores={compiledScores}
             onActionsExtracted={(extracted) => {
               setAlignmentActions(extracted)
               setAllActions((prev) => {
@@ -649,31 +686,51 @@ function SchedulingTab({
 
 /* ── Scorecard Tab ────────────────────────────────────────── */
 function ScorecardTab({
-  cycle, dispatched, onDispatched, submissions, simulated, onSimulate,
+  cycle, dispatched, onDispatched, submissions, onSubmissionUpdate,
+  onEntriesReceived, compiledScores, onCompiled, cycleId, scorecardAttendees,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   dispatched: boolean
   onDispatched: () => void
   submissions: StakeholderSubmission[]
-  simulated: boolean
-  onSimulate: () => void
+  onSubmissionUpdate: (s: StakeholderSubmission[]) => void
+  onEntriesReceived: (e: ScorecardEntry[]) => void
+  compiledScores: CompiledCategoryScore[] | null
+  onCompiled: (scores: CompiledCategoryScore[]) => void
+  cycleId: string
+  scorecardAttendees: { vendor: ScorecardAttendee | null; stakeholder: ScorecardAttendee | null }
 }) {
+  const allSubmitted = submissions.every((s) => s.status === 'SUBMITTED')
+  const attendeeList = [scorecardAttendees.vendor, scorecardAttendees.stakeholder].filter(Boolean) as ScorecardAttendee[]
+
+  // Bind attendees into the entry-builder functions so SubmissionTracker doesn't need to know
+  const boundGetVendorEntries = (cid: string, ts: string) =>
+    scorecardAttendees.vendor ? getVendorEntries(scorecardAttendees.vendor, cid, ts) : []
+  const boundGetStakeholderEntries = (cid: string, ts: string) =>
+    scorecardAttendees.stakeholder ? getStakeholderEntries(scorecardAttendees.stakeholder, cid, ts) : []
+
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <ScorecardDispatchPanel
         vendorName={cycle.vendor_name}
-        recipientCount={8}
+        attendees={attendeeList}
         onDispatched={onDispatched}
       />
-      {(dispatched || simulated) && (
+      {dispatched && (
         <SubmissionTracker
           submissions={submissions}
-          onSimulate={onSimulate}
-          simulated={simulated}
+          onSubmissionUpdate={onSubmissionUpdate}
+          onEntriesReceived={onEntriesReceived}
+          onCompiled={onCompiled}
+          getVendorEntries={boundGetVendorEntries}
+          getStakeholderEntries={boundGetStakeholderEntries}
+          compileScores={compileScores}
+          cycleId={cycleId}
+          simulated={allSubmitted}
         />
       )}
-      {simulated && (
-        <CompiledScorecardTable scores={MOCK_COMPILED_SCORES} />
+      {compiledScores && compiledScores.length > 0 && (
+        <CompiledScorecardTable scores={compiledScores} />
       )}
     </div>
   )
@@ -681,21 +738,35 @@ function ScorecardTab({
 
 /* ── Alignment Tab ────────────────────────────────────────── */
 function AlignmentTab({
-  cycle, whatChangedBullets, actions, onActionsExtracted,
+  cycle, whatChangedBullets, actions, onActionsExtracted, compiledScores,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   whatChangedBullets: string[]
   actions: ExtractedAction[]
   onActionsExtracted: (a: ExtractedAction[]) => void
+  compiledScores: CompiledCategoryScore[] | null
 }) {
+  // Build dynamic comparisons & insights from compiled scorecard data
+  const comparisons = compiledScores ? buildCategoryComparisons(compiledScores) : []
+  const dynamicFlags = compiledScores ? buildAlignmentFlags(compiledScores) : []
+  const insights = generateAlignmentInsights(comparisons, MOCK_SCORE_DELTAS)
+
+  // Use dynamic flags if compiled scores are available, otherwise fall back to mock
+  const flags = dynamicFlags.length > 0 ? dynamicFlags : MOCK_ALIGNMENT_FLAGS
+
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <ChangeHighlightsPanel
         deltas={MOCK_SCORE_DELTAS}
         whatChangedBullets={whatChangedBullets}
+        insights={insights.length > 0 ? insights : undefined}
       />
-      <AlignmentFlagsPanel flags={MOCK_ALIGNMENT_FLAGS} />
+      {comparisons.length > 0 && (
+        <ScoreComparisonPanel comparisons={comparisons} />
+      )}
+      <AlignmentFlagsPanel flags={flags} />
       <FaceOffModelEditor positions={MOCK_FACE_OFF} />
+      <ScheduleAlignmentMeeting />
       <NotesInputPanel onActionsExtracted={onActionsExtracted} />
       {actions.length > 0 && (
         <ActionLog

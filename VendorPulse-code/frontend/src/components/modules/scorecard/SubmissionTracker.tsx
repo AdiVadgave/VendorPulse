@@ -1,12 +1,18 @@
-import { useState } from 'react'
-import { CheckCircle2, Clock, XCircle, AlertTriangle, RefreshCw, Play } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { CheckCircle2, Clock, XCircle, RefreshCw, AlertTriangle, Loader2, Bell, Mail, Send } from 'lucide-react'
 import { format } from 'date-fns'
-import type { StakeholderSubmission } from '@/types/scorecard.types'
+import type { StakeholderSubmission, ScorecardEntry, CompiledCategoryScore } from '@/types/scorecard.types'
 import { cn } from '@/utils/cn'
 
 interface Props {
   submissions: StakeholderSubmission[]
-  onSimulate: () => void
+  onSubmissionUpdate: (updated: StakeholderSubmission[]) => void
+  onEntriesReceived: (entries: ScorecardEntry[]) => void
+  onCompiled: (scores: CompiledCategoryScore[]) => void
+  getVendorEntries: (cycleId: string, ts: string) => ScorecardEntry[]
+  getStakeholderEntries: (cycleId: string, ts: string) => ScorecardEntry[]
+  compileScores: (entries: ScorecardEntry[]) => CompiledCategoryScore[]
+  cycleId: string
   simulated: boolean
 }
 
@@ -17,8 +23,24 @@ const STATUS_CONFIG = {
   CORRECTED: { label: 'Corrected', icon: <RefreshCw size={13} />, classes: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' },
 }
 
-export default function SubmissionTracker({ submissions, onSimulate, simulated }: Props) {
+export default function SubmissionTracker({
+  submissions,
+  onSubmissionUpdate,
+  onEntriesReceived,
+  onCompiled,
+  getVendorEntries,
+  getStakeholderEntries,
+  compileScores,
+  cycleId,
+  simulated,
+}: Props) {
   const [filter, setFilter] = useState<'ALL' | 'SUBMITTED' | 'PENDING' | 'INVALID'>('ALL')
+  const [isCollecting, setIsCollecting] = useState(false)
+  const [countdown, setCountdown] = useState(10)
+  const [reminderLogs, setReminderLogs] = useState<{ time: string; message: string; icon: 'bell' | 'mail' | 'send' }[]>([])
+  const allEntriesRef = useRef<ScorecardEntry[]>([])
+  const submissionsRef = useRef(submissions)
+  submissionsRef.current = submissions
 
   const counts = {
     SUBMITTED: submissions.filter((s) => s.status === 'SUBMITTED').length,
@@ -28,6 +50,111 @@ export default function SubmissionTracker({ submissions, onSimulate, simulated }
   }
 
   const filtered = filter === 'ALL' ? submissions : submissions.filter((s) => s.status === filter)
+
+  // Auto-start collection on mount — handles StrictMode double-mount
+  useEffect(() => {
+    if (simulated) return
+
+    const timers: ReturnType<typeof setTimeout>[] = []
+    setIsCollecting(true)
+    setCountdown(10)
+    setReminderLogs([])
+    allEntriesRef.current = []
+
+    // Countdown timer
+    let remaining = 10
+    const countdownInterval = setInterval(() => {
+      remaining -= 1
+      setCountdown(remaining)
+      if (remaining <= 0) clearInterval(countdownInterval)
+    }, 1000)
+    timers.push(countdownInterval as unknown as ReturnType<typeof setTimeout>)
+
+    // Reminder simulation logs
+    timers.push(setTimeout(() => {
+      setReminderLogs((prev) => [...prev, {
+        time: new Date().toLocaleTimeString(),
+        message: 'Reminder email sent to Raj Patel (Vendor Representative)',
+        icon: 'mail',
+      }])
+    }, 1500))
+
+    timers.push(setTimeout(() => {
+      setReminderLogs((prev) => [...prev, {
+        time: new Date().toLocaleTimeString(),
+        message: 'Push notification sent to Alex Johnson (Stakeholder)',
+        icon: 'bell',
+      }])
+    }, 3000))
+
+    timers.push(setTimeout(() => {
+      setReminderLogs((prev) => [...prev, {
+        time: new Date().toLocaleTimeString(),
+        message: 'Follow-up reminder dispatched to all pending reviewers',
+        icon: 'send',
+      }])
+    }, 4500))
+
+    // After 5 seconds: Vendor (Raj Patel) submits
+    timers.push(setTimeout(() => {
+      const vendorTs = new Date().toISOString()
+      const vendorEntries = getVendorEntries(cycleId, vendorTs)
+      allEntriesRef.current = [...vendorEntries]
+
+      const updated = submissionsRef.current.map((s, i) =>
+        i === 0 ? { ...s, status: 'SUBMITTED' as const, submitted_at: vendorTs } : s
+      )
+      onSubmissionUpdate(updated)
+      onEntriesReceived([...allEntriesRef.current])
+
+      const compiled = compileScores(allEntriesRef.current)
+      onCompiled(compiled)
+
+      setReminderLogs((prev) => [...prev, {
+        time: new Date().toLocaleTimeString(),
+        message: 'Scorecard received from Raj Patel — data collected ✓',
+        icon: 'mail',
+      }])
+    }, 5000))
+
+    timers.push(setTimeout(() => {
+      setReminderLogs((prev) => [...prev, {
+        time: new Date().toLocaleTimeString(),
+        message: 'Final reminder sent to Alex Johnson — awaiting response',
+        icon: 'bell',
+      }])
+    }, 7000))
+
+    // After 10 seconds: Stakeholder (Alex Johnson) submits
+    timers.push(setTimeout(() => {
+      const stakeTs = new Date().toISOString()
+      const stakeEntries = getStakeholderEntries(cycleId, stakeTs)
+      allEntriesRef.current = [...allEntriesRef.current, ...stakeEntries]
+
+      const updated = submissionsRef.current.map((s) => ({
+        ...s,
+        status: 'SUBMITTED' as const,
+        submitted_at: s.submitted_at || stakeTs,
+      }))
+      onSubmissionUpdate(updated)
+      onEntriesReceived([...allEntriesRef.current])
+
+      const compiled = compileScores(allEntriesRef.current)
+      onCompiled(compiled)
+      setIsCollecting(false)
+
+      setReminderLogs((prev) => [...prev, {
+        time: new Date().toLocaleTimeString(),
+        message: 'Scorecard received from Alex Johnson — all submissions collected ✓',
+        icon: 'send',
+      }])
+    }, 10000))
+
+    return () => {
+      timers.forEach(clearTimeout)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simulated])
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -40,14 +167,19 @@ export default function SubmissionTracker({ submissions, onSimulate, simulated }
             {counts.SUBMITTED} of {submissions.length} submitted
           </p>
         </div>
-        {!simulated && (
-          <button
-            onClick={onSimulate}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium rounded-lg transition-colors"
-          >
-            <Play size={12} />
-            Simulate Submissions
-          </button>
+        {isCollecting && (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 text-xs font-medium rounded-lg">
+              <Loader2 size={12} className="animate-spin" />
+              Auto-collecting in {countdown}s...
+            </div>
+          </div>
+        )}
+        {!isCollecting && simulated && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-medium rounded-lg">
+            <CheckCircle2 size={12} />
+            All responses collected
+          </div>
         )}
       </div>
 
@@ -119,6 +251,8 @@ export default function SubmissionTracker({ submissions, onSimulate, simulated }
           </p>
         </div>
       )}
+
+      
     </div>
   )
 }

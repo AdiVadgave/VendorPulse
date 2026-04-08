@@ -5,6 +5,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 InviteStatus = Literal["PENDING", "ACCEPTED", "DECLINED"]
+AttendanceConfirmationStatus = Literal["PENDING", "CONFIRMED", "REPLACED", "DECLINED"]
 StakeholderRole = Literal[
     "VMO_COORDINATOR",
     "INTERNAL_LEAD",
@@ -39,6 +40,10 @@ class CycleAttendeeUpdate(BaseModel):
     replaced_by: Optional[str] = None
     replaced_by_email: Optional[str] = None
     replacement_note: Optional[str] = None
+    # Attendance confirmation fields
+    confirmation_status: Optional[AttendanceConfirmationStatus] = None
+    confirmation_note: Optional[str] = None
+    is_key: Optional[bool] = None
 
 
 class CycleAttendee(BaseModel):
@@ -58,6 +63,8 @@ class CycleAttendee(BaseModel):
     replaced_by: Optional[str] = None
     replaced_by_email: Optional[str] = None
     replacement_note: Optional[str] = None
+    confirmation_status: Optional[AttendanceConfirmationStatus] = "PENDING"
+    confirmation_note: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

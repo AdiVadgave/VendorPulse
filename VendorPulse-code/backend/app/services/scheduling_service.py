@@ -119,6 +119,71 @@ class SchedulingService:
         return self._attendees.delete_by_id("attendee_id", attendee_id)
 
     # ──────────────────────────────────────────────────────────────────
+    # Step 1b — Attendance confirmation (new governance cycle gate)
+    # ──────────────────────────────────────────────────────────────────
+
+    def send_attendance_outreach(self, cycle_id: str) -> AgentResponse:
+        """
+        Mark outreach as sent to all attendees from the previous cycle.
+        In production this would dispatch emails or form links to each attendee
+        asking them to confirm: still on team? replacement? anyone new to invite?
+
+        # AI_HOOK: LLM could personalise the outreach message per attendee role.
+        """
+        attendees = self._attendees.get_for_cycle(cycle_id)
+        # Mark all as outreach-sent (PENDING confirmation_status means waiting for reply)
+        for att in attendees:
+            if att.get("confirmation_status") is None:
+                self._attendees.update_by_id(
+                    "attendee_id", att["attendee_id"], {"confirmation_status": "PENDING"}
+                )
+        return AgentResponse(
+            status="success",
+            agent=self.AGENT_NAME,
+            summary=f"Attendance outreach sent to {len(attendees)} attendee(s).",
+            data={"cycle_id": cycle_id, "outreach_count": len(attendees)},
+            next_actions=["AWAIT_ATTENDANCE_CONFIRMATION"],
+        )
+
+    def simulate_attendance_confirmation(self, cycle_id: str) -> AgentResponse:
+        """
+        Simulate attendance confirmation responses (demo helper).
+        ~60% CONFIRMED, ~25% REPLACED with dummy replacement info, rest CONFIRMED.
+
+        # AI_HOOK: LLM could flag attendees who've historically been slow to respond
+        and pre-emptively suggest likely replacements.
+        """
+        attendees = self._attendees.get_for_cycle(cycle_id)
+        total = len(attendees)
+        updated: list[dict] = []
+
+        for idx, att in enumerate(attendees):
+            if idx < int(total * 0.6):
+                patch = {"confirmation_status": "CONFIRMED"}
+            elif idx < int(total * 0.85):
+                first = att["name"].split()[0]
+                domain = att["email"].split("@")[-1] if "@" in att["email"] else "company.com"
+                patch = {
+                    "confirmation_status": "REPLACED",
+                    "replaced_by": f"Replacement for {first}",
+                    "replaced_by_email": f"replacement.{att['email'].split('@')[0]}@{domain}",
+                    "replacement_note": "Nominated by outgoing attendee (simulated)",
+                }
+            else:
+                patch = {"confirmation_status": "CONFIRMED"}
+
+            self._attendees.update_by_id("attendee_id", att["attendee_id"], patch)
+            updated.append({**att, **patch})
+
+        return AgentResponse(
+            status="success",
+            agent=self.AGENT_NAME,
+            summary=f"Attendance confirmation simulated for {total} attendee(s).",
+            data={"cycle_id": cycle_id, "attendees": updated},
+            next_actions=["REVIEW_ATTENDANCE_CONFIRMATION"],
+        )
+
+    # ──────────────────────────────────────────────────────────────────
     # Step 2 — Simulate attendee refresh responses (demo helper)
     # ──────────────────────────────────────────────────────────────────
 

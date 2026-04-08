@@ -44,6 +44,7 @@ import { MOCK_ALL_ACTIONS } from '@/mock/analytics.mock'
 
 import WorkflowProgressBar from '@/components/shared/WorkflowProgressBar'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
+import AttendanceConfirmationPanel from '@/components/modules/scheduling/AttendanceConfirmationPanel'
 import AttendeeRefreshPanel from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import SlotRankingPanel from '@/components/modules/scheduling/SlotRankingPanel'
 import InviteApprovalPanel from '@/components/modules/scheduling/InviteApprovalPanel'
@@ -94,17 +95,19 @@ function getInitialSchedulingPhase(state: string): SchedulingPhase {
   const idx = WORKFLOW_STATES.indexOf(state as never)
   if (idx >= WORKFLOW_STATES.indexOf('MEETING_SCHEDULED')) return 'confirmation_tracking'
   if (idx >= WORKFLOW_STATES.indexOf('AVAILABILITY_COLLECTED')) return 'slot_ranking'
-  return 'attendee_refresh'
+  if (idx >= WORKFLOW_STATES.indexOf('ATTENDEE_REFRESH_SENT')) return 'attendee_refresh'
+  return 'attendance_confirmation'
 }
 
 const SCHEDULING_STEPS: { key: SchedulingPhase; label: string }[] = [
+  { key: 'attendance_confirmation', label: 'Attendance' },
   { key: 'attendee_refresh', label: 'Attendees' },
   { key: 'slot_ranking', label: 'Slot Ranking' },
   { key: 'invite_approval', label: 'Invite Approval' },
   { key: 'confirmation_tracking', label: 'Confirmation' },
 ]
 const PHASE_ORDER: SchedulingPhase[] = [
-  'attendee_refresh', 'slot_ranking', 'invite_approval', 'confirmation_tracking',
+  'attendance_confirmation', 'attendee_refresh', 'slot_ranking', 'invite_approval', 'confirmation_tracking',
 ]
 
 export default function CycleDetail() {
@@ -219,8 +222,11 @@ export default function CycleDetail() {
   // Module A: advance workflow state as scheduling progresses
   function advanceScheduling(next: SchedulingPhase) {
     setSchedulingPhase(next)
+    if (next === 'attendee_refresh') {
+      // Attendance confirmation complete — mark ATTENDEE_REFRESH_SENT
+      advanceWorkflow(cycle!.cycle_id, 'ATTENDEE_REFRESH_SENT')
+    }
     if (next === 'slot_ranking') {
-      // Skip ATTENDEE_REFRESH_SENT — go straight to AVAILABILITY_COLLECTED
       advanceWorkflow(cycle!.cycle_id, 'AVAILABILITY_COLLECTED')
     }
     if (next === 'confirmation_tracking') {
@@ -556,6 +562,17 @@ function SchedulingTab({
           })}
         </div>
       </div>
+      {schedulingPhase === 'attendance_confirmation' && (
+        <AttendanceConfirmationPanel
+          cycleId={cycle.cycle_id}
+          attendees={attendees}
+          onAttendeesChanged={onAttendeesUpdated}
+          onConfirmationComplete={(confirmed) => {
+            onAttendeesUpdated(confirmed)
+            onPhaseChange('attendee_refresh')
+          }}
+        />
+      )}
       {schedulingPhase === 'attendee_refresh' && (
         <AttendeeRefreshPanel
           cycleId={cycle.cycle_id}

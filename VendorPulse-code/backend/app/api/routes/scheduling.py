@@ -182,6 +182,34 @@ def remove_attendee(
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+@router.post("/api/cycles/{cycleId}/scheduling/attendance-outreach")
+def send_attendance_outreach(
+    cycleId: str,
+    svc: SchedulingService = Depends(get_scheduling_service),
+    cycle_repo=Depends(get_cycle_repo),
+):
+    """
+    Trigger outreach to all attendees from the last cycle to confirm attendance.
+    In production this would send emails/forms; here it marks outreach as sent.
+    """
+    _get_cycle_or_404(cycleId, cycle_repo)
+    return svc.send_attendance_outreach(cycleId)
+
+
+@router.post("/api/cycles/{cycleId}/scheduling/simulate-attendance-confirmation")
+def simulate_attendance_confirmation(
+    cycleId: str,
+    svc: SchedulingService = Depends(get_scheduling_service),
+    cycle_repo=Depends(get_cycle_repo),
+):
+    """
+    Simulate attendance confirmation responses from all attendees (demo helper).
+    Marks ~60% as CONFIRMED, ~25% as REPLACED, rest as CONFIRMED.
+    """
+    _get_cycle_or_404(cycleId, cycle_repo)
+    return svc.simulate_attendance_confirmation(cycleId)
+
+
 @router.post("/api/cycles/{cycleId}/scheduling/simulate-responses")
 def simulate_responses(
     cycleId: str,

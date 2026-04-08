@@ -2,6 +2,8 @@ import type { StakeholderRole } from './cycle.types'
 
 export type InviteStatus = 'ACCEPTED' | 'DECLINED' | 'PENDING'
 
+export type AttendanceConfirmationStatus = 'PENDING' | 'CONFIRMED' | 'REPLACED' | 'DECLINED'
+
 export interface CycleAttendee {
   attendee_id: string
   stakeholder_id: string
@@ -17,6 +19,9 @@ export interface CycleAttendee {
   replaced_by?: string
   replaced_by_email?: string
   replacement_note?: string
+  // Attendance confirmation fields
+  confirmation_status?: AttendanceConfirmationStatus
+  confirmation_note?: string
 }
 
 export interface SlotProposal {
@@ -37,6 +42,7 @@ export interface SlotProposal {
 }
 
 export type SchedulingPhase =
+  | 'attendance_confirmation'
   | 'attendee_refresh'
   | 'slot_ranking'
   | 'invite_approval'

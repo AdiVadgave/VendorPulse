@@ -98,5 +98,15 @@
     "workflow_state": "CYCLE_CREATED",
     "created_at": "2026-04-08T06:08:16.203980+00:00",
     "updated_at": "2026-04-08T06:08:16.203980+00:00"
+  },
+  {
+    "cycle_id": "c_6c240df6",
+    "vendor_id": "v1",
+    "vendor_name": "NovaTech Services",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "CYCLE_CREATED",
+    "created_at": "2026-04-08T06:13:00.133579+00:00",
+    "updated_at": "2026-04-08T06:13:00.133579+00:00"
   }
 ]

@@ -11,6 +11,7 @@ GET  /api/users/{userId}/meetings       Get user's meetings
 """
 from __future__ import annotations
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import settings
@@ -22,8 +23,18 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 
 
 @router.get("")
-def list_users(svc: UserService = Depends(get_user_service)):
-    return {"users": svc.list_users()}
+def list_users(search: Optional[str] = None, svc: UserService = Depends(get_user_service)):
+    users = svc.list_users(search)
+    # Return as an array of SystemUsers for the frontend search
+    return [
+        {
+            "user_id": u["userId"],
+            "name": u["name"],
+            "email": u["email"],
+            "organisation": u.get("organisation", ""),
+        }
+        for u in users
+    ]
 
 
 @router.post("", status_code=201)

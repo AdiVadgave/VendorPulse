@@ -135,7 +135,9 @@ export default function CycleDetail() {
     isMockCycle ? MOCK_ATTENDEES_INITIAL : []
   )
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
-  const [apiSlots, setApiSlots] = useState<SlotProposal[]>([])
+  const [selectedSlotTimeZone, setSelectedSlotTimeZone] = useState<'IST' | 'UTC' | 'GMT'>('IST')
+  // Null means "no slot search has been run yet". An empty array means "searched, but found none".
+  const [apiSlots, setApiSlots] = useState<SlotProposal[] | null>(null)
 
   // --- Module B state ---
   const [scorecardDispatched, setScorecardDispatched] = useState(false)
@@ -215,9 +217,16 @@ export default function CycleDetail() {
     setActiveTab(tab)
   }
 
-  // Use real slots when available (API-created cycles); fall back to mock (demo cycles)
-  const activeSlots = apiSlots.length > 0 ? apiSlots : MOCK_SLOT_PROPOSALS
-  const selectedSlot = activeSlots.find((s) => s.slot_id === selectedSlotId) ?? activeSlots[0]
+  // Use mock slots only for mock cycles *before* any search has run.
+  // After a search runs, never fall back to mock slots (prevents showing default attendees).
+  const activeSlots: SlotProposal[] = isMockCycle
+    ? (apiSlots ?? MOCK_SLOT_PROPOSALS)
+    : (apiSlots ?? [])
+
+  const selectedSlot: SlotProposal | null =
+    activeSlots.find((s) => s.slot_id === selectedSlotId) ??
+    activeSlots[0] ??
+    null
 
   // Module A: advance workflow state as scheduling progresses
   function advanceScheduling(next: SchedulingPhase) {
@@ -367,10 +376,12 @@ export default function CycleDetail() {
             attendees={schedulingAttendees}
             slots={activeSlots}
             selectedSlot={selectedSlot}
+            selectedSlotTimeZone={selectedSlotTimeZone}
             onPhaseChange={advanceScheduling}
             onAttendeesUpdated={setSchedulingAttendees}
             onSlotsReceived={setApiSlots}
             onSlotSelected={setSelectedSlotId}
+            onSlotTimeZoneSelected={setSelectedSlotTimeZone}
             isMockCycle={isMockCycle}
             onScorecardProceed={() => {
               advanceWorkflow(cycle!.cycle_id, 'SCORECARD_REQUEST_SENT')
@@ -518,17 +529,20 @@ function OverviewTab({
 function SchedulingTab({
   cycle, schedulingPhase, attendees, slots, selectedSlot, onPhaseChange,
   onAttendeesUpdated, onSlotsReceived, onSlotSelected,
+  selectedSlotTimeZone, onSlotTimeZoneSelected,
   isMockCycle, onScorecardProceed,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   schedulingPhase: SchedulingPhase
   attendees: CycleAttendee[]
   slots: SlotProposal[]
-  selectedSlot: SlotProposal
+  selectedSlot: SlotProposal | null
+  selectedSlotTimeZone: 'IST' | 'UTC' | 'GMT'
   onPhaseChange: (p: SchedulingPhase) => void
   onAttendeesUpdated: (a: CycleAttendee[]) => void
   onSlotsReceived: (slots: SlotProposal[]) => void
   onSlotSelected: (id: string) => void
+  onSlotTimeZoneSelected: (tz: 'IST' | 'UTC' | 'GMT') => void
   isMockCycle: boolean
   onScorecardProceed: () => void
 }) {
@@ -581,7 +595,7 @@ function SchedulingTab({
           onDispatchComplete={() => {}}
           onResponsesSimulated={(updated, rankedSlots) => {
             onAttendeesUpdated(updated)
-            if (rankedSlots.length > 0) onSlotsReceived(rankedSlots)
+            onSlotsReceived(rankedSlots)
             onPhaseChange('slot_ranking')
           }}
         />
@@ -591,33 +605,43 @@ function SchedulingTab({
           cycleId={cycle.cycle_id}
           slots={slots}
           onBackToAttendees={() => onPhaseChange('attendee_refresh')}
-          onSlotApproved={(slotId) => { onSlotSelected(slotId); onPhaseChange('invite_approval') }}
-        />
-      )}
-      {schedulingPhase === 'invite_approval' && (
-        <InviteApprovalPanel
-          cycleId={cycle.cycle_id}
-          slot={selectedSlot}
-          attendees={attendees}
-          vendorName={cycle.vendor_name}
-          quarter={cycle.quarter}
-          year={cycle.year}
-          onInviteSent={() => {
-            // Meeting URL returned from Graph can be logged or used, but skipped here to simplify UI
-            // For mock cycles seed pre-built RSVP data; for new cycles keep attendees as-is
-            if (isMockCycle) {
-              onAttendeesUpdated(MOCK_ATTENDEES_RSVP)
-            }
-            onPhaseChange('confirmation_tracking')
+          onSlotApproved={(slotId, tz) => {
+            onSlotSelected(slotId)
+            onSlotTimeZoneSelected(tz)
+            onPhaseChange('invite_approval')
           }}
         />
       )}
+      {schedulingPhase === 'invite_approval' && (
+        selectedSlot ? (
+          <InviteApprovalPanel
+            cycleId={cycle.cycle_id}
+            slot={selectedSlot}
+            attendees={attendees}
+            vendorName={cycle.vendor_name}
+            quarter={cycle.quarter}
+            year={cycle.year}
+            timeZoneOverride={selectedSlotTimeZone}
+            onInviteSent={() => {
+              // Meeting URL returned from Graph can be logged or used, but skipped here to simplify UI
+              // For mock cycles seed pre-built RSVP data; for new cycles keep attendees as-is
+              if (isMockCycle) {
+                onAttendeesUpdated(MOCK_ATTENDEES_RSVP)
+              }
+              onPhaseChange('confirmation_tracking')
+            }}
+          />
+        ) : null
+      )}
       {schedulingPhase === 'confirmation_tracking' && (
-        <ConfirmationTracker
-          attendees={attendees.length > 0 ? attendees : MOCK_ATTENDEES_RSVP}
-          slot={selectedSlot}
-          onProceed={onScorecardProceed}
-        />
+        selectedSlot ? (
+          <ConfirmationTracker
+            attendees={attendees.length > 0 ? attendees : MOCK_ATTENDEES_RSVP}
+            slot={selectedSlot}
+            timeZoneOverride={selectedSlotTimeZone}
+            onProceed={onScorecardProceed}
+          />
+        ) : null
       )}
     </div>
   )

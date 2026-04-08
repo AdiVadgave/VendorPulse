@@ -31,6 +31,7 @@ from app.repositories.slot_repository import SlotRepository
 from app.repositories.user_repository import UserRepository
 from app.services.availability_service import AvailabilityService
 from app.services.meeting_service import MeetingService
+from app.services.graph_service import GraphService
 from app.services.slot_ranking_service import SlotRankingService
 
 
@@ -61,8 +62,110 @@ class SchedulingService:
     # Step 1 — Attendee management
     # ──────────────────────────────────────────────────────────────────
 
-    def get_attendees(self, cycle_id: str) -> list[dict]:
-        return self._attendees.get_for_cycle(cycle_id)
+    def get_attendees(self, cycle_id: str, *, seed_from_previous: bool = False) -> list[dict]:
+        """
+        Get attendees for a cycle.
+
+        If `seed_from_previous=True` and the cycle is new (CYCLE_CREATED) and has no
+        attendees, attempt to import them from the previous cycle for the same vendor.
+        """
+        current_attendees = self._attendees.get_for_cycle(cycle_id)
+        if current_attendees:
+            return current_attendees
+
+        if not seed_from_previous:
+            return []
+
+        # Brand new cycle? Try to seed from the previous cycle for the same vendor.
+        cycle = self._cycles.get_by_cycle_id(cycle_id)
+        if not cycle or cycle.get("workflow_state") != "CYCLE_CREATED":
+            return []
+
+        vendor_id = cycle.get("vendor_id")
+        if not vendor_id:
+            return []
+
+        def _parse_dt(value: str) -> Optional[datetime]:
+            if not value:
+                return None
+            try:
+                # Handle both RFC3339 'Z' and Python-style '+00:00'
+                if value.endswith("Z"):
+                    value = value[:-1] + "+00:00"
+                return datetime.fromisoformat(value)
+            except Exception:
+                return None
+
+        # Find previous cycles for this vendor
+        all_vendor_cycles = self._cycles.get_by_vendor(vendor_id)
+
+        current_created_at = cycle.get("created_at", "")
+        current_dt = _parse_dt(current_created_at)
+
+        # Prefer a timestamp-based comparison; fall back to lexicographic ISO compare.
+        def _is_before_current(other: dict) -> bool:
+            if other.get("cycle_id") == cycle_id:
+                return False
+            other_created_at = other.get("created_at", "")
+            other_dt = _parse_dt(other_created_at)
+            if current_dt and other_dt:
+                return other_dt < current_dt
+            return other_created_at < current_created_at
+
+        previous_cycles = [c for c in all_vendor_cycles if _is_before_current(c)]
+        if not previous_cycles:
+            return []
+
+        # Sort most recent → oldest. Use parsed datetime when possible.
+        def _sort_key(c: dict):
+            dt = _parse_dt(c.get("created_at", ""))
+            return (dt is not None, dt or datetime.min, c.get("created_at", ""))
+
+        previous_cycles.sort(key=_sort_key, reverse=True)
+
+        # Walk back until we find the most recent cycle that *actually* has attendees.
+        # This avoids false "no attendees" when the immediately previous cycle was created
+        # but never had attendees added.
+        prev_attendee_records: list[dict] = []
+        for prev in previous_cycles:
+            prev_attendee_records = self._attendees.get_for_cycle(prev["cycle_id"])
+            if prev_attendee_records:
+                break
+        if not prev_attendee_records:
+            return []
+
+        # Seed current cycle with these attendees.
+        # Filter out people who were replaced in that previous cycle.
+        new_attendees = []
+        for old in prev_attendee_records:
+            if old.get("replaced_by"):
+                continue
+
+            new_record = {
+                "attendee_id": f"att_{uuid.uuid4().hex[:8]}",
+                "cycle_id": cycle_id,
+                "stakeholder_id": old.get("stakeholder_id"),
+                "name": old.get("name"),
+                "email": old.get("email"),
+                "role": old.get("role"),
+                "organisation": old.get("organisation"),
+                "is_key": old.get("is_key"),
+                "invite_status": "PENDING",
+                "availability_submitted": False,
+                "user_id": old.get("user_id"),
+                "confirmation_status": "PENDING",
+            }
+            self._attendees.insert(new_record)
+            new_attendees.append(new_record)
+
+        # Treat auto-seeded attendees as a completed attendee refresh step.
+        # This keeps the workflow consistent with the manual POST /attendees path
+        # and avoids blocking subsequent actions (e.g., Graph slot finding).
+        now = datetime.now(timezone.utc).isoformat()
+        if cycle and workflow_engine.can_transition(cycle.get("workflow_state", ""), "ATTENDEE_REFRESH_SENT"):
+            workflow_engine.advance(cycle, self._cycles, now)
+
+        return new_attendees
 
     def add_attendees(self, cycle_id: str, attendees: list[CycleAttendeeCreate]) -> AgentResponse:
         """
@@ -122,28 +225,195 @@ class SchedulingService:
     # Step 1b — Attendance confirmation (new governance cycle gate)
     # ──────────────────────────────────────────────────────────────────
 
-    def send_attendance_outreach(self, cycle_id: str) -> AgentResponse:
-        """
-        Mark outreach as sent to all attendees from the previous cycle.
-        In production this would dispatch emails or form links to each attendee
-        asking them to confirm: still on team? replacement? anyone new to invite?
+    def send_attendance_outreach(
+        self,
+        cycle_id: str,
+        graph_service: Optional[GraphService] = None,
+    ) -> AgentResponse:
+        """Send attendance outreach to each attendee (draft → send when Graph is available).
 
-        # AI_HOOK: LLM could personalise the outreach message per attendee role.
+        If `graph_service` is not provided, this falls back to demo behaviour and only
+        ensures `confirmation_status` is set to PENDING.
+
+        Stores reply-tracking fields on each attendee record when Graph is used:
+          - outreach_message_id
+          - outreach_conversation_id
+          - outreach_sent_at
         """
         attendees = self._attendees.get_for_cycle(cycle_id)
-        # Mark all as outreach-sent (PENDING confirmation_status means waiting for reply)
+
+        # Always ensure confirmation_status exists so the UI can track confirmations.
         for att in attendees:
             if att.get("confirmation_status") is None:
                 self._attendees.update_by_id(
-                    "attendee_id", att["attendee_id"], {"confirmation_status": "PENDING"}
+                    "attendee_id",
+                    att["attendee_id"],
+                    {"confirmation_status": "PENDING"},
                 )
+
+        if graph_service is None:
+            return AgentResponse(
+                status="success",
+                agent=self.AGENT_NAME,
+                summary=f"Attendance outreach marked as sent for {len(attendees)} attendee(s) (demo mode).",
+                data={"cycle_id": cycle_id, "outreach_count": len(attendees), "mode": "demo"},
+                next_actions=["AWAIT_ATTENDANCE_CONFIRMATION"],
+            )
+
+        cycle = self._cycles.get_by_cycle_id(cycle_id) or {}
+        vendor_name = cycle.get("vendor_name") or "Vendor"
+        quarter = cycle.get("quarter") or ""
+        year = cycle.get("year") or ""
+
+        subject = f"Attendance Confirmation — {vendor_name} {quarter} {year}".strip()
+        body = (
+            "Hello,\n\n"
+            "Please confirm whether you are still part of the team for the upcoming governance cycle.\n"
+            "If you are not attending, please reply with who will replace you (name + email).\n"
+            "If someone new should be invited, please include them as well.\n\n"
+            "Thanks.\n"
+        )
+
+        import asyncio
+
+        async def _send_for_attendee(att: dict) -> dict:
+            # Idempotent: if we already have a conversationId + message id, don't re-send.
+            if att.get("outreach_conversation_id") and att.get("outreach_message_id"):
+                return {
+                    "attendee_id": att.get("attendee_id"),
+                    "email": att.get("email"),
+                    "status": "skipped",
+                    "message": "Outreach already sent",
+                    "message_id": att.get("outreach_message_id"),
+                    "conversation_id": att.get("outreach_conversation_id"),
+                }
+
+            email = (att.get("email") or "").strip()
+            if not email:
+                return {
+                    "attendee_id": att.get("attendee_id"),
+                    "status": "failed",
+                    "message": "Attendee has no email address",
+                }
+
+            draft = await graph_service.create_draft_message(
+                subject=subject,
+                content=body,
+                to_recipients=[email],
+                content_type="Text",
+            )
+            if "error" in draft:
+                code = draft.get("code") if isinstance(draft, dict) else None
+                code_suffix = f" (code: {code})" if code else ""
+                return {
+                    "attendee_id": att.get("attendee_id"),
+                    "email": email,
+                    "status": "failed",
+                    "message": f"{draft.get('detail') or draft.get('error')}{code_suffix}",
+                }
+
+            message_id = draft.get("id")
+            conversation_id = draft.get("conversationId")
+            if not message_id:
+                return {
+                    "attendee_id": att.get("attendee_id"),
+                    "email": email,
+                    "status": "failed",
+                    "message": "Draft created but message id missing",
+                }
+
+            sent = await graph_service.send_draft_message(message_id)
+            if "error" in sent:
+                code = sent.get("code") if isinstance(sent, dict) else None
+                code_suffix = f" (code: {code})" if code else ""
+                return {
+                    "attendee_id": att.get("attendee_id"),
+                    "email": email,
+                    "status": "failed",
+                    "message": f"{sent.get('detail') or sent.get('error')}{code_suffix}",
+                    "message_id": message_id,
+                    "conversation_id": conversation_id,
+                }
+
+            now = datetime.now(timezone.utc).isoformat()
+            self._attendees.update_by_id(
+                "attendee_id",
+                att["attendee_id"],
+                {
+                    "outreach_message_id": message_id,
+                    "outreach_conversation_id": conversation_id,
+                    "outreach_sent_at": now,
+                },
+            )
+
+            return {
+                "attendee_id": att.get("attendee_id"),
+                "email": email,
+                "status": "sent",
+                "message_id": message_id,
+                "conversation_id": conversation_id,
+            }
+
+        async def _run_all() -> list[dict]:
+            out: list[dict] = []
+            for att in attendees:
+                out.append(await _send_for_attendee(att))
+            return out
+
+        results = asyncio.run(_run_all())
+
+        sent_count = sum(1 for r in results if r.get("status") == "sent")
+        failed = [r for r in results if r.get("status") == "failed"]
+        skipped_count = sum(1 for r in results if r.get("status") == "skipped")
+
+        warnings: list[str] = []
+        if failed:
+            warnings.append(
+                f"{len(failed)} outreach email(s) failed — ensure GRAPH_ACCESS_TOKEN is a delegated /me token with Mail.ReadWrite + Mail.Send (and Mail.Read for reply query)."
+            )
+
+        status = "success" if not failed else ("partial" if sent_count > 0 else "failed")
+        summary = (
+            f"Attendance outreach processed for {len(attendees)} attendee(s): "
+            f"{sent_count} sent, {skipped_count} skipped, {len(failed)} failed."
+        )
+
         return AgentResponse(
-            status="success",
+            status=status,
             agent=self.AGENT_NAME,
-            summary=f"Attendance outreach sent to {len(attendees)} attendee(s).",
-            data={"cycle_id": cycle_id, "outreach_count": len(attendees)},
+            summary=summary,
+            data={
+                "cycle_id": cycle_id,
+                "mode": "graph",
+                "results": results,
+            },
+            warnings=warnings,
             next_actions=["AWAIT_ATTENDANCE_CONFIRMATION"],
         )
+
+    async def get_attendance_outreach_messages(
+        self,
+        cycle_id: str,
+        graph_service: GraphService,
+    ) -> dict:
+        """Query mailbox messages (original + replies) for stored conversationIds."""
+        attendees = self._attendees.get_for_cycle(cycle_id)
+        conversation_ids = [
+            a.get("outreach_conversation_id")
+            for a in attendees
+            if a.get("outreach_conversation_id")
+        ]
+        unique_conversation_ids = list(dict.fromkeys(conversation_ids))
+
+        conversations: dict[str, dict] = {}
+        for conv_id in unique_conversation_ids:
+            conversations[conv_id] = await graph_service.query_messages_by_conversation_id(conv_id)
+
+        return {
+            "cycle_id": cycle_id,
+            "conversation_ids": unique_conversation_ids,
+            "conversations": conversations,
+        }
 
     def simulate_attendance_confirmation(self, cycle_id: str) -> AgentResponse:
         """
@@ -271,7 +541,13 @@ class SchedulingService:
     # Step 4 — Approve a slot
     # ──────────────────────────────────────────────────────────────────
 
-    def approve_slot(self, cycle_id: str, slot_id: str, approved_by: str) -> AgentResponse:
+    def approve_slot(
+        self,
+        cycle_id: str,
+        slot_id: str,
+        approved_by: str,
+        time_zone: Optional[str] = None,
+    ) -> AgentResponse:
         """
         Mark a slot as approved and create a draft calendar invite.
 
@@ -293,7 +569,7 @@ class SchedulingService:
             )
 
         approved_at = datetime.now(timezone.utc).isoformat()
-        updated_slot = self._slots.approve(slot_id, approved_by, approved_at)
+        updated_slot = self._slots.approve(slot_id, approved_by, approved_at, time_zone=time_zone)
 
         # Build draft invite details
         proposed_dt = slot.get("proposed_time", "")
@@ -449,9 +725,14 @@ class SchedulingService:
                 "total": len(attendees),
             },
             warnings=warnings,
-            next_actions=["SEND_REMINDER"] if pending else [],
+            next_actions=["FOLLOW_UP_PENDING"],
         )
 
     def update_rsvp(self, cycle_id: str, attendee_id: str, status: str) -> Optional[dict]:
-        """Update the RSVP status of one attendee (accept/decline)."""
+        """Update the RSVP status of one attendee (ACCEPTED/DECLINED/PENDING)."""
+        attendee = self._attendees.get_by_attendee_id(attendee_id)
+        if attendee is None:
+            return None
+        if attendee.get("cycle_id") != cycle_id:
+            return None
         return self._attendees.update_invite_status(attendee_id, status.upper())

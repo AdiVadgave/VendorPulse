@@ -26,11 +26,21 @@ class SlotRepository(BaseRepository):
             None,
         )
 
-    def approve(self, slot_id: str, approved_by: str, approved_at: str) -> Optional[dict]:
+    def approve(
+        self,
+        slot_id: str,
+        approved_by: str,
+        approved_at: str,
+        time_zone: Optional[str] = None,
+    ) -> Optional[dict]:
+        updates: dict = {"is_approved": True, "approved_by": approved_by, "approved_at": approved_at}
+        if time_zone:
+            # Persist as proposed_time_zone so both UI and Graph invite creation can use it.
+            updates["proposed_time_zone"] = time_zone
         return self.update_by_id(
             "slot_id",
             slot_id,
-            {"is_approved": True, "approved_by": approved_by, "approved_at": approved_at},
+            updates,
         )
 
     def clear_for_cycle(self, cycle_id: str) -> None:

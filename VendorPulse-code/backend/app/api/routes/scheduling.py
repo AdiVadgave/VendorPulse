@@ -27,6 +27,10 @@ Other endpoints:
 """
 from __future__ import annotations
 
+import base64
+import json
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Body, Depends, HTTPException
 from typing import Optional
 
@@ -46,8 +50,43 @@ from app.models.scheduling import (
     RankSlotsRequest,
 )
 from app.services.scheduling_service import SchedulingService
+from app.services.graph_service import GraphService
+from app.config import Settings, settings
 
 router = APIRouter(tags=["scheduling"])
+
+
+def _decode_jwt_payload_without_verification(token: str) -> dict | None:
+    """Decode JWT payload without verifying signature (diagnostics only)."""
+    if not token:
+        return None
+    parts = token.split(".")
+    if len(parts) < 2:
+        return None
+
+    payload_b64 = parts[1]
+    padding = "=" * (-len(payload_b64) % 4)
+    try:
+        payload_bytes = base64.urlsafe_b64decode(payload_b64 + padding)
+        return json.loads(payload_bytes.decode("utf-8"))
+    except Exception:
+        return None
+
+
+def _get_delegated_scopes_from_token(token: str) -> list[str]:
+    claims = _decode_jwt_payload_without_verification(token) or {}
+    scp = claims.get("scp") or ""
+    return [s for s in str(scp).split(" ") if s]
+
+
+def _get_graph_access_token() -> str:
+    """Read Graph token from .env at request time to avoid stale in-memory tokens."""
+    fresh_settings = Settings()
+    token = fresh_settings.graph_access_token or settings.graph_access_token
+    token = token.strip() if token else ""
+    if token.lower().startswith("bearer "):
+        token = token[7:].strip()
+    return token
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -134,7 +173,8 @@ def get_attendees(
     cycleId: str,
     svc: SchedulingService = Depends(get_scheduling_service),
 ):
-    return {"attendees": svc.get_attendees(cycleId)}
+    # Important: do NOT auto-seed attendees by default.
+    return {"attendees": svc.get_attendees(cycleId, seed_from_previous=False)}
 
 
 @router.post("/api/cycles/{cycleId}/attendees", status_code=201)
@@ -155,7 +195,7 @@ def update_attendee(
     payload: CycleAttendeeUpdate,
     svc: SchedulingService = Depends(get_scheduling_service),
 ):
-    attendees = svc.get_attendees(cycleId)
+    attendees = svc.get_attendees(cycleId, seed_from_previous=False)
     if not any(a["attendee_id"] == attendeeId for a in attendees):
         raise HTTPException(status_code=404, detail="Attendee not found in this cycle")
     updated = svc.update_attendee(attendeeId, payload)
@@ -170,7 +210,7 @@ def remove_attendee(
     attendeeId: str,
     svc: SchedulingService = Depends(get_scheduling_service),
 ):
-    attendees = svc.get_attendees(cycleId)
+    attendees = svc.get_attendees(cycleId, seed_from_previous=False)
     if not any(a["attendee_id"] == attendeeId for a in attendees):
         raise HTTPException(status_code=404, detail="Attendee not found in this cycle")
     if not svc.remove_attendee(attendeeId):
@@ -193,7 +233,54 @@ def send_attendance_outreach(
     In production this would send emails/forms; here it marks outreach as sent.
     """
     _get_cycle_or_404(cycleId, cycle_repo)
-    return svc.send_attendance_outreach(cycleId)
+
+    # Ensure attendees are loaded (may auto-seed from previous cycle)
+    svc.get_attendees(cycleId, seed_from_previous=True)
+
+    graph_access_token = _get_graph_access_token()
+    if not graph_access_token:
+        raise HTTPException(
+            status_code=500,
+            detail="GRAPH_ACCESS_TOKEN is not set in backend/.env (required for sending outreach emails via Microsoft Graph)",
+        )
+
+    scopes = _get_delegated_scopes_from_token(graph_access_token)
+    if scopes and "Mail.Send" not in scopes:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "GRAPH_ACCESS_TOKEN is missing the delegated scope 'Mail.Send'. "
+                "Re-authenticate and request 'Mail.Send' (keep 'Mail.ReadWrite' as well)."
+            ),
+        )
+
+    graph_service = GraphService(graph_access_token)
+    return svc.send_attendance_outreach(cycleId, graph_service=graph_service)
+
+
+@router.get("/api/cycles/{cycleId}/scheduling/attendance-outreach/messages")
+def get_attendance_outreach_messages(
+    cycleId: str,
+    svc: SchedulingService = Depends(get_scheduling_service),
+    cycle_repo=Depends(get_cycle_repo),
+):
+    """Query messages (original + replies) for each attendee conversationId."""
+    _get_cycle_or_404(cycleId, cycle_repo)
+
+    graph_access_token = _get_graph_access_token()
+    if not graph_access_token:
+        raise HTTPException(
+            status_code=500,
+            detail="GRAPH_ACCESS_TOKEN is not set in .env",
+        )
+
+    graph_service = GraphService(graph_access_token)
+    try:
+        import asyncio
+
+        return asyncio.run(svc.get_attendance_outreach_messages(cycleId, graph_service=graph_service))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to query outreach messages: {str(exc)}")
 
 
 @router.post("/api/cycles/{cycleId}/scheduling/simulate-attendance-confirmation")
@@ -253,7 +340,7 @@ def approve_slot(
     # Require at least AVAILABILITY_COLLECTED before approving a slot
     cycle = _get_cycle_or_404(cycleId, cycle_repo)
     _check_workflow_state(cycle, "AVAILABILITY_COLLECTED")
-    return svc.approve_slot(cycleId, slotId, payload.approved_by)
+    return svc.approve_slot(cycleId, slotId, payload.approved_by, time_zone=payload.time_zone)
 
 
 @router.post("/api/cycles/{cycleId}/scheduling/send-invites")
@@ -346,7 +433,7 @@ def run_scheduling_agent(
     svc.simulate_responses(cycleId)
 
     # Step 2: build RankSlotsRequest from current attendees
-    attendees = svc.get_attendees(cycleId)
+    attendees = svc.get_attendees(cycleId, seed_from_previous=False)
     if not attendees:
         return AgentResponse(
             status="failed",

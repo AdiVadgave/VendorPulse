@@ -8,6 +8,9 @@ Endpoints:
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -22,6 +25,11 @@ from app.utils.demo_attendees import get_attendee_name
 from pydantic import BaseModel, Field
 
 router = APIRouter(tags=["graph-scheduling"])
+
+# Use uvicorn's logger so messages show up with the default FastAPI/Uvicorn log config.
+logger = logging.getLogger("uvicorn.error")
+logger.setLevel(logging.INFO)
+logger.propagate = True
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -41,6 +49,7 @@ class FindTimesRequest(BaseModel):
         description="If provided, only these attendees. Otherwise all cycle attendees."
     )
     time_zone: str = Field("UTC", description="Timezone for meeting")
+    debug: bool = Field(False, description="Include debug summary and log Graph response (sanitized)")
 
 
 class SendInviteRequest(BaseModel):
@@ -78,6 +87,67 @@ def _get_graph_access_token() -> str:
         token = token[7:].strip()
 
     return token
+
+
+def _decode_jwt_without_verification(token: str) -> dict | None:
+    """Decode JWT payload without verifying signature (diagnostics only)."""
+    if not token:
+        return None
+    parts = token.split(".")
+    if len(parts) < 2:
+        return None
+
+    payload_b64 = parts[1]
+    padding = "=" * (-len(payload_b64) % 4)
+    try:
+        payload_bytes = base64.urlsafe_b64decode(payload_b64 + padding)
+        return json.loads(payload_bytes.decode("utf-8"))
+    except Exception:
+        return None
+
+
+@router.get("/api/graph/token-info")
+def graph_token_info():
+    """Return non-sensitive info about the configured Graph access token.
+
+    Helps debug errors like ErrorAccessDenied by showing whether the token is
+    delegated (scp) vs app-only (roles) and which scopes are present.
+    """
+    token = _get_graph_access_token()
+    if not token:
+        return {"token_present": False}
+
+    claims = _decode_jwt_without_verification(token) or {}
+
+    scp = claims.get("scp") or ""
+    scopes = [s for s in str(scp).split(" ") if s]
+    roles = claims.get("roles") or []
+
+    exp = claims.get("exp")
+    now = int(datetime.now(timezone.utc).timestamp())
+    expires_in_seconds = int(exp - now) if isinstance(exp, int) else None
+
+    is_delegated = bool(scopes)
+    is_app_only = bool(roles) and not is_delegated
+
+    return {
+        "token_present": True,
+        "token_type": "delegated" if is_delegated else ("app_only" if is_app_only else "unknown"),
+        "aud": claims.get("aud"),
+        "tid": claims.get("tid"),
+        "app_id": claims.get("appid"),
+        "user": claims.get("preferred_username") or claims.get("upn"),
+        "expires_in_seconds": expires_in_seconds,
+        "scopes": scopes,
+        "roles": roles,
+        "mail_send_present": "Mail.Send" in scopes,
+        "mail_read_present": ("Mail.Read" in scopes) or ("Mail.ReadWrite" in scopes),
+        "mail_readwrite_present": "Mail.ReadWrite" in scopes,
+        "notes": [
+            "This endpoint does not validate the token signature.",
+            "For /me/messages draft+send you need a delegated token with Mail.ReadWrite + Mail.Send.",
+        ],
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -128,14 +198,25 @@ def find_meeting_times_graph(
     else:
         attendee_emails = [a.get("email") for a in attendees if a.get("email")]
 
-    # Ensure requested organiser is part of required attendees for availability checks.
+    # Normalize emails. Note: Graph /me is the organiser for findMeetingTimes;
+    # do not inject organiser_email into the attendee list.
     organiser_email = payload.organiser_email.strip().lower()
     attendee_emails = [e.strip().lower() for e in attendee_emails if e]
-    if organiser_email and organiser_email not in attendee_emails:
-        attendee_emails.append(organiser_email)
 
     if not attendee_emails:
         raise HTTPException(status_code=400, detail="No attendee emails found")
+
+    logger.info(
+        "Graph find-times request: cycle=%s organiser=%s attendees=%s start=%s end=%s duration_hours=%s tz=%s debug=%s",
+        cycleId,
+        payload.organiser_email,
+        [e for e in attendee_emails if e],
+        payload.date_range_start,
+        payload.date_range_end,
+        payload.duration_hours,
+        payload.time_zone,
+        payload.debug,
+    )
 
     # Call Graph findMeetingTimes (synchronous wrapper)
     try:
@@ -146,8 +227,12 @@ def find_meeting_times_graph(
             date_range_end=payload.date_range_end,
             duration_hours=payload.duration_hours,
             time_zone=payload.time_zone,
-            max_candidates=3,
+            max_candidates=10,
+            # Important: /me is the organiser for this call. If the token user is not the same
+            # as the organiser selected in the UI, treating organiser availability as a hard
+            # constraint can lead to 0 suggestions even when attendees are free.
             is_organizer_optional=True,
+            require_all_attendees=True,
         ))
     except Exception as e:
         import traceback
@@ -178,34 +263,145 @@ def find_meeting_times_graph(
     suggestions = result.get("meetingTimeSuggestions", [])
     slot_proposals = []
 
+    graph_http_meta = (result.get("_http") if isinstance(result, dict) else None) or {}
+    logger.info(
+        "Graph find-times response: cycle=%s suggestions=%s status=%s request_id=%s",
+        cycleId,
+        len(suggestions) if isinstance(suggestions, list) else 0,
+        graph_http_meta.get("status_code"),
+        graph_http_meta.get("request_id"),
+    )
+
+    def _to_display_tz(value: str) -> str:
+        v = (value or "").strip()
+        up = v.upper()
+        if up in ("IST", "UTC", "GMT"):
+            return up
+        if "INDIA" in up:
+            return "IST"
+        if "GMT" in up:
+            return "GMT"
+        return "UTC"
+
+    def _to_iana_zone(value: str) -> str:
+        v = (value or "").strip()
+        up = v.upper()
+        if up == "IST" or "INDIA" in up:
+            return "Asia/Kolkata"
+        if up == "UTC":
+            return "UTC"
+        if up == "GMT" or "GMT" in up:
+            # Use a stable offset zone for display/UTC conversion.
+            return "Etc/GMT"
+        return "UTC"
+
+    def _local_to_utc_iso(local_dt_str: str, source_tz: str) -> str:
+        """Convert Graph local wall-clock (no offset) to UTC ISO string with 'Z'."""
+        if not local_dt_str:
+            return ""
+        # Graph often returns fractional seconds with 7 digits (e.g. ".0000000")
+        # which Python's fromisoformat does not accept.
+        normalized = str(local_dt_str).strip()
+        if "." in normalized:
+            normalized = normalized.split(".", 1)[0]
+        try:
+            naive = datetime.fromisoformat(normalized)
+        except Exception:
+            return local_dt_str
+
+        try:
+            from zoneinfo import ZoneInfo
+
+            tz = ZoneInfo(_to_iana_zone(source_tz))
+            aware = naive.replace(tzinfo=tz)
+            utc_dt = aware.astimezone(timezone.utc)
+            return utc_dt.replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
+        except Exception:
+            # If zone conversion isn't available, keep the original local string.
+            return local_dt_str
+
+    # Persist — clear old proposals first so the UI doesn't mix stale results.
+    slot_repo.clear_for_cycle(cycleId)
+
+    filtered_conflicts = 0
+    processed = 0
     for idx, suggestion in enumerate(suggestions):
+        processed += 1
         # Graph returns time in meetingTimeSlot.start.dateTime
         meeting_slot = suggestion.get("meetingTimeSlot", {})
         start_info = meeting_slot.get("start", {})
-        meeting_time_str = start_info.get("dateTime", "")
+
+        local_start_str = start_info.get("dateTime", "")
+        graph_tz = start_info.get("timeZone") or payload.time_zone
+        display_tz = _to_display_tz(payload.time_zone or graph_tz)
+        proposed_time = _local_to_utc_iso(local_start_str, graph_tz)
+
+        # Compute attendee availability from Graph response
+        availability = suggestion.get("attendeeAvailability", []) or []
+        availability_by_email: dict[str, str] = {}
+        for item in availability:
+            attendee = (item or {}).get("attendee") or {}
+            email_obj = (attendee.get("emailAddress") or {})
+            email = (email_obj.get("address") or "").strip().lower()
+            status = (item or {}).get("availability") or "unknown"
+            if email:
+                availability_by_email[email] = str(status).lower()
+
+        attending_names: list[str] = []
+        conflict_names: list[str] = []
+
+        def _is_free(status: str) -> bool:
+            s = (status or "").strip().lower()
+            # Graph returns: free | tentative | busy | oof | workingElsewhere | unknown
+            # We want strict scheduling: ONLY 'free' is considered available.
+            return s == "free"
+
+        for email in attendee_emails:
+            e = (email or "").strip().lower()
+            status = availability_by_email.get(e, "unknown")
+            name = get_attendee_name(e) or e
+            if _is_free(status):
+                attending_names.append(name)
+            else:
+                conflict_names.append(name)
+
+        # We only want slots that accommodate everyone in the attendee list.
+        # Organiser availability is enforced by Graph when isOrganizerOptional=False.
+        organiser_available = True
+        if conflict_names:
+            filtered_conflicts += 1
+            continue
+
+        confidence = str(suggestion.get("confidenceLevel") or suggestion.get("confidence") or "low").lower()
+        base_score = 100.0 if confidence == "high" else 80.0 if confidence == "medium" else 60.0
+        # Prefer higher attendance, then higher confidence; penalize conflicts heavily.
+        computed_score = max(0.0, min(100.0, base_score - (len(conflict_names) * 25.0)))
 
         # Build SlotProposal
         slot_id = f"slot_{uuid.uuid4().hex[:8]}"
         slot_proposal = {
             "slot_id": slot_id,
             "cycle_id": cycleId,
-            "proposed_time": meeting_time_str,
-            "proposed_time_zone": start_info.get("timeZone") or payload.time_zone,
+            "proposed_time": proposed_time,
+            "proposed_time_zone": display_tz,
             "duration_minutes": int(payload.duration_hours * 60),
-            "organiser_available": True,  # Graph already checked
-            "exec_sponsor_available": True,  # We'll assume yes for Graph results
-            "rank_score": 100 - (idx * 10),  # Higher score for earlier suggestions
+            "organiser_available": organiser_available,
+            "exec_sponsor_available": True,
+            "rank_score": computed_score,
             "is_approved": False,
-            "attendance_count": len(attendee_emails),
+            "attendance_count": len(attending_names),
             "total_attendees": len(attendee_emails),
-            "conflict_count": 0,  # Graph has already resolved conflicts
-            "attending": attendee_emails,
-            "conflicts": [],
+            "conflict_count": len(conflict_names),
+            "attending": attending_names,
+            "conflicts": conflict_names,
         }
         slot_proposals.append(slot_proposal)
 
         # Persist to slot_proposals.json using repository
         slot_repo.insert(slot_proposal)
+
+    # Best-first ordering for UI consistency
+    slot_proposals.sort(key=lambda s: (-float(s.get("rank_score") or 0), s.get("proposed_time") or ""))
 
     # Align workflow with deterministic path: slot discovery means
     # availability has effectively been collected for this cycle.
@@ -213,11 +409,80 @@ def find_meeting_times_graph(
     if workflow_engine.can_transition(cycle.get("workflow_state", ""), "AVAILABILITY_COLLECTED"):
         workflow_engine.advance(cycle, cycle_repo, now)
 
-    return {
+    response_payload = {
         "message": f"Found {len(slot_proposals)} real meeting slots via Graph",
         "slot_proposals": slot_proposals,
         "attendee_count": len(attendee_emails),
+        "attendee_emails_used": attendee_emails,
+        "organiser_email_used": organiser_email,
+        "graph_summary": {
+            "suggestions_received": len(suggestions) if isinstance(suggestions, list) else 0,
+            "suggestions_processed": processed,
+            "suggestions_filtered_conflicts": filtered_conflicts,
+            "slots_returned": len(slot_proposals),
+            "graph_http": graph_http_meta,
+        },
     }
+
+    logger.info(
+        "Graph find-times final: cycle=%s slots_returned=%s filtered_conflicts=%s",
+        cycleId,
+        len(slot_proposals),
+        filtered_conflicts,
+    )
+
+    if payload.debug:
+        try:
+            me_profile = asyncio.run(graph_service.get_me_profile())
+        except Exception as exc:
+            me_profile = {"error": f"Failed to fetch /me profile: {str(exc)}"}
+
+        # Provide a small, sanitized preview to help debug 0-slot scenarios.
+        preview = []
+        if isinstance(suggestions, list):
+            for s in suggestions[:3]:
+                mt = (s or {}).get("meetingTimeSlot") or {}
+                st = (mt.get("start") or {})
+                avail = (s or {}).get("attendeeAvailability") or []
+                preview.append(
+                    {
+                        "start": {
+                            "dateTime": st.get("dateTime"),
+                            "timeZone": st.get("timeZone"),
+                        },
+                        "confidence": (s or {}).get("confidenceLevel") or (s or {}).get("confidence"),
+                        "attendeeAvailability": avail,
+                        "suggestionReason": (s or {}).get("suggestionReason"),
+                    }
+                )
+
+        response_payload["graph_debug"] = {
+            "me_profile": {
+                "displayName": (me_profile or {}).get("displayName"),
+                "mail": (me_profile or {}).get("mail"),
+                "userPrincipalName": (me_profile or {}).get("userPrincipalName"),
+                "_http": (me_profile or {}).get("_http"),
+                "error": (me_profile or {}).get("error") or (me_profile or {}).get("detail"),
+            },
+            "suggestions_preview": preview,
+            "raw_keys": list(result.keys()) if isinstance(result, dict) else None,
+        }
+
+        # Log the same preview so it is visible in server logs.
+        logger.info(
+            "Graph find-times debug: cycle=%s me=%s preview=%s",
+            cycleId,
+            {
+                "displayName": (me_profile or {}).get("displayName"),
+                "mail": (me_profile or {}).get("mail"),
+                "userPrincipalName": (me_profile or {}).get("userPrincipalName"),
+                "_http": (me_profile or {}).get("_http"),
+                "error": (me_profile or {}).get("error") or (me_profile or {}).get("detail"),
+            },
+            preview,
+        )
+
+    return response_payload
 
 
 @router.post("/api/cycles/{cycleId}/scheduling/graph/send-invite")

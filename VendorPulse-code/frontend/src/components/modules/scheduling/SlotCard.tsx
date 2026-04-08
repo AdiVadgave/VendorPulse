@@ -1,5 +1,4 @@
-import { format } from 'date-fns'
-import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck } from 'lucide-react'
+﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { SlotProposal } from '@/types/scheduling.types'
 
@@ -98,7 +97,7 @@ export default function SlotCard({
               {formatDateInZone(dateObj)}
             </p>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {formatTimeInZone(dateObj)} – {formatTimeInZone(endObj)} {timeZoneView}
+              {formatTimeInZone(dateObj)} - {formatTimeInZone(endObj)} {timeZoneView}
             </p>
           </div>
         </div>
@@ -111,7 +110,7 @@ export default function SlotCard({
             )}
           >
             {cfg.icon}
-            #{rank} — {cfg.label}
+            #{rank} - {cfg.label}
           </span>
         </div>
       </div>

@@ -79,11 +79,14 @@ export async function fetchSlots(cycleId: string): Promise<SlotProposal[]> {
 export async function approveSlot(
   cycleId: string,
   slotId: string,
-  approvedBy = 'coordinator'
+  approvedBy = 'coordinator',
+  timeZone?: 'IST' | 'UTC' | 'GMT'
 ): Promise<AgentRunResponse> {
+  const payload: Record<string, unknown> = { approved_by: approvedBy }
+  if (timeZone) payload.time_zone = timeZone
   return apiFetch<AgentRunResponse>(
     `/api/cycles/${cycleId}/scheduling/slots/${slotId}/approve`,
-    { method: 'PUT', body: JSON.stringify({ approved_by: approvedBy }) }
+    { method: 'PUT', body: JSON.stringify(payload) }
   )
 }
 

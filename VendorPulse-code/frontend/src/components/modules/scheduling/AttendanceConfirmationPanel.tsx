@@ -151,6 +151,7 @@ export default function AttendanceConfirmationPanel({
   const [isSimulating, setIsSimulating] = useState(false)
   const [isSendingOutreach, setIsSendingOutreach] = useState(false)
   const [outreachSent, setOutreachSent] = useState(false)
+  const [outreachError, setOutreachError] = useState<string | null>(null)
   const [simError, setSimError] = useState<string | null>(null)
 
   // Derive statuses — default to PENDING if not set
@@ -216,15 +217,36 @@ export default function AttendanceConfirmationPanel({
 
   async function handleSendOutreach() {
     setIsSendingOutreach(true)
+    setOutreachError(null)
     try {
       // Call backend to trigger outreach emails/forms
-      await apiFetch(`/api/cycles/${cycleId}/scheduling/attendance-outreach`, {
+      const res = await apiFetch<{
+        status?: 'success' | 'failed' | 'partial' | 'pending_approval'
+        summary?: string
+        warnings?: string[]
+        data?: { mode?: string }
+      }>(`/api/cycles/${cycleId}/scheduling/attendance-outreach`, {
         method: 'POST',
       })
-    } catch {
-      // Mock fallback — outreach is simulated
-    } finally {
+      if (res?.status && res.status !== 'success') {
+        const warningText = (res.warnings ?? []).join(' ')
+        const results = (res.data as any)?.results as Array<any> | undefined
+        const firstFailure = results?.find((r) => r?.status === 'failed')
+        const detail = firstFailure?.message ? String(firstFailure.message) : ''
+        throw new Error(
+          [res.summary ?? 'Outreach failed.', detail, warningText].filter(Boolean).join(' ')
+        )
+      }
+
+      if (res?.data?.mode === 'demo') {
+        throw new Error('Outreach ran in demo mode (no email sent).')
+      }
+
       setOutreachSent(true)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to send outreach.'
+      setOutreachError(msg)
+    } finally {
       setIsSendingOutreach(false)
     }
   }
@@ -360,6 +382,13 @@ export default function AttendanceConfirmationPanel({
             <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
               <AlertCircle size={12} />
               {simError}
+            </p>
+          )}
+
+          {outreachError && (
+            <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {outreachError}
             </p>
           )}
         </div>

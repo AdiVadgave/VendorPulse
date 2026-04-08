@@ -23,6 +23,7 @@ interface InviteApprovalPanelProps {
   vendorName: string
   quarter: string
   year: number
+  timeZoneOverride?: 'IST' | 'UTC' | 'GMT'
   onInviteSent: (teamsMeetingId: string | null) => void
 }
 
@@ -33,6 +34,7 @@ export default function InviteApprovalPanel({
   vendorName,
   quarter,
   year,
+  timeZoneOverride,
   onInviteSent,
 }: InviteApprovalPanelProps) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('awaiting_approval')
@@ -42,7 +44,7 @@ export default function InviteApprovalPanel({
   const dateObj = new Date(slot.proposed_time)
   const durationMinutes = Number((slot as unknown as { duration_minutes?: number }).duration_minutes ?? 60)
   const endTime = new Date(dateObj.getTime() + durationMinutes * 60 * 1000)
-  const slotTimeZone = slot.proposed_time_zone ?? 'UTC'
+  const slotTimeZone = timeZoneOverride ?? slot.proposed_time_zone ?? 'UTC'
 
   function toDisplayZone(zone: string): string {
     const normalized = zone.toUpperCase()

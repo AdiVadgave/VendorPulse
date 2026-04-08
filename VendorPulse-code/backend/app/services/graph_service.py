@@ -83,6 +83,7 @@ class GraphService:
         min_time_between_meetings: int = 0,
         max_candidates: int = 3,
         is_organizer_optional: bool = False,
+        require_all_attendees: bool = True,
     ) -> dict:
         """
         Call POST me/findMeetingTimes to find common availability.
@@ -150,7 +151,8 @@ class GraphService:
             },
             "meetingDuration": f"PT{int(duration_hours * 60)}M",  # Convert to minutes
             "returnSuggestionReasons": True,
-            "minimumAttendeePercentage": 100 if not is_organizer_optional else 50,
+            # Keep attendee requirement strict even if organiser is optional.
+            "minimumAttendeePercentage": 100 if require_all_attendees else (100 if not is_organizer_optional else 50),
             "maxCandidates": max_candidates,
         }
 
@@ -163,6 +165,21 @@ class GraphService:
                     timeout=30.0,
                 )
                 result = response.json()
+
+                # Attach non-sensitive HTTP diagnostics to help debug empty slot results.
+                # Do NOT include Authorization header or full diagnostic blobs.
+                try:
+                    request_id = response.headers.get("request-id")
+                except Exception:
+                    request_id = None
+                if isinstance(result, dict):
+                    result.setdefault(
+                        "_http",
+                        {
+                            "status_code": response.status_code,
+                            "request_id": request_id,
+                        },
+                    )
                 
                 if response.status_code != 200:
                     return self._build_graph_error(response.status_code, result)
@@ -206,6 +223,27 @@ class GraphService:
 
         graph_tz = self._TZ_ALIASES.get(time_zone.upper(), time_zone)
 
+        # For converting an absolute datetime (with tzinfo) into a Graph local wall-clock,
+        # we need an IANA timezone. Graph uses Windows timezone IDs in the payload.
+        # This mapping is intentionally small — extend when new UI timezone options are added.
+        try:
+            from zoneinfo import ZoneInfo  # Python 3.9+
+        except Exception:  # pragma: no cover
+            ZoneInfo = None  # type: ignore
+
+        def _to_zoneinfo(graph_time_zone: str):
+            if ZoneInfo is None:
+                return None
+            iana = {
+                "India Standard Time": "Asia/Kolkata",
+                "UTC": "UTC",
+                "GMT Standard Time": "Europe/London",
+            }.get(graph_time_zone, graph_time_zone)
+            try:
+                return ZoneInfo(iana)
+            except Exception:
+                return None
+
         # Parse start time and compute end time
         try:
             start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
@@ -213,10 +251,21 @@ class GraphService:
             return {"error": f"Invalid datetime format: {e}"}
 
         # Graph expects local wall-clock time in dateTime with explicit timeZone.
-        if start_dt.tzinfo is not None and graph_tz == "UTC":
-            start_local = start_dt.astimezone(timezone.utc).replace(tzinfo=None)
+        # If the input has tzinfo (e.g. "...Z"), convert it into the requested timezone
+        # *before* stripping tzinfo so the absolute instant stays the same.
+        if start_dt.tzinfo is not None:
+            if graph_tz == "UTC":
+                start_local = start_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            else:
+                tzinfo_target = _to_zoneinfo(graph_tz)
+                if tzinfo_target is not None:
+                    start_local = start_dt.astimezone(tzinfo_target).replace(tzinfo=None)
+                else:
+                    # Fall back to treating the provided wall-clock time as already local.
+                    start_local = start_dt.replace(tzinfo=None)
         else:
-            start_local = start_dt.replace(tzinfo=None) if start_dt.tzinfo is not None else start_dt
+            # Naive datetime is assumed to already be in the provided timezone.
+            start_local = start_dt
 
         end_local = start_local + timedelta(hours=duration_hours)
 
@@ -270,6 +319,44 @@ class GraphService:
         except Exception as e:
             return {"error": f"Request failed: {str(e)}"}
 
+    async def get_me_profile(self) -> dict:
+        """Fetch /me profile (debug helper).
+
+        Returns a dict with keys like: id, displayName, mail, userPrincipalName.
+        Attaches a non-sensitive _http block (status_code, request_id).
+        """
+        if not httpx:
+            raise ImportError("httpx is required. Install with: pip install httpx")
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/me",
+                    headers=self.headers,
+                    timeout=30.0,
+                )
+                result = response.json()
+                try:
+                    request_id = response.headers.get("request-id")
+                except Exception:
+                    request_id = None
+
+                if isinstance(result, dict):
+                    result.setdefault(
+                        "_http",
+                        {
+                            "status_code": response.status_code,
+                            "request_id": request_id,
+                        },
+                    )
+
+                if response.status_code != 200:
+                    return self._build_graph_error(response.status_code, result)
+
+                return result
+        except Exception as e:
+            return {"error": f"Request failed: {str(e)}"}
+
     async def lookup_user(self, email: str) -> dict | None:
         """
         Look up user by email address.
@@ -299,3 +386,141 @@ class GraphService:
                     return None
         except Exception as e:
             return None
+
+    # ──────────────────────────────────────────────────────────────────
+    # Mail (reply tracking via conversationId)
+    # ──────────────────────────────────────────────────────────────────
+
+    async def create_draft_message(
+        self,
+        subject: str,
+        content: str,
+        to_recipients: list[str],
+        content_type: str = "Text",
+    ) -> dict:
+        """
+        Create a draft email under /me/messages.
+
+        Returns at minimum:
+          {"id": "...", "conversationId": "..."}
+        """
+        if not httpx:
+            raise ImportError("httpx is required. Install with: pip install httpx")
+
+        recipients = [r.strip() for r in to_recipients if r and r.strip()]
+        if not recipients:
+            return {"error": "No to_recipients provided"}
+
+        body = {
+            "subject": subject,
+            "body": {"contentType": content_type, "content": content},
+            "toRecipients": [
+                {"emailAddress": {"address": addr}} for addr in recipients
+            ],
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.BASE_URL}/me/messages",
+                    json=body,
+                    headers=self.headers,
+                    timeout=30.0,
+                )
+                result = response.json() if response.content else {}
+
+                if response.status_code not in (200, 201):
+                    return self._build_graph_error(
+                        response.status_code,
+                        result,
+                        fallback="Failed to create message draft",
+                    )
+
+                return {
+                    "id": result.get("id"),
+                    "conversationId": result.get("conversationId"),
+                }
+        except Exception as exc:
+            return {"error": f"Request failed: {str(exc)}"}
+
+    async def send_draft_message(self, message_id: str) -> dict:
+        """Send a previously created draft email."""
+        if not httpx:
+            raise ImportError("httpx is required. Install with: pip install httpx")
+
+        if not message_id:
+            return {"error": "message_id is required"}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.BASE_URL}/me/messages/{message_id}/send",
+                    headers=self.headers,
+                    timeout=30.0,
+                )
+
+                if response.status_code not in (200, 202, 204):
+                    result = response.json() if response.content else {}
+                    return self._build_graph_error(
+                        response.status_code,
+                        result,
+                        fallback="Failed to send message",
+                    )
+
+                return {"status": "sent", "id": message_id}
+        except Exception as exc:
+            return {"error": f"Request failed: {str(exc)}"}
+
+    async def query_messages_by_conversation_id(
+        self,
+        conversation_id: str,
+        select_fields: Optional[list[str]] = None,
+        top: int = 50,
+    ) -> dict:
+        """
+        Query messages in the mailbox by conversationId.
+
+        GET /me/messages?$filter=conversationId eq '{conversationId}'
+        """
+        if not httpx:
+            raise ImportError("httpx is required. Install with: pip install httpx")
+
+        if not conversation_id:
+            return {"error": "conversation_id is required"}
+
+        if select_fields is None:
+            select_fields = [
+                "id",
+                "subject",
+                "from",
+                "receivedDateTime",
+                "conversationId",
+                "bodyPreview",
+            ]
+
+        params = {
+            "$filter": f"conversationId eq '{conversation_id}'",
+            "$top": str(int(top)),
+            "$select": ",".join(select_fields),
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/me/messages",
+                    params=params,
+                    headers=self.headers,
+                    timeout=30.0,
+                )
+                result = response.json() if response.content else {}
+
+                if response.status_code != 200:
+                    return self._build_graph_error(
+                        response.status_code,
+                        result,
+                        fallback="Failed to query messages",
+                    )
+
+                return result
+        except Exception as exc:
+            return {"error": f"Request failed: {str(exc)}"}

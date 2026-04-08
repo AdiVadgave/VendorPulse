@@ -30,73 +30,23 @@
     "updated_at": "2026-04-02T10:19:02.445103+00:00"
   },
   {
-    "cycle_id": "c_746bba9a",
+    "cycle_id": "c_2d8b406b",
     "vendor_id": "v_custom",
-    "vendor_name": "GGL",
+    "vendor_name": "Amazon",
     "quarter": "Q1",
     "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-02T16:15:22.177437+00:00",
-    "updated_at": "2026-04-02T16:15:22.177437+00:00"
-  },
-  {
-    "cycle_id": "c_17896622",
-    "vendor_id": "v1",
-    "vendor_name": "NovaTech Services",
-    "quarter": "Q3",
-    "year": 2026,
     "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-08T05:21:08.345273+00:00",
-    "updated_at": "2026-04-08T05:21:20.970473+00:00"
+    "created_at": "2026-04-08T08:57:54.868006+00:00",
+    "updated_at": "2026-04-08T08:59:05.123994+00:00"
   },
   {
-    "cycle_id": "c_81f60201",
+    "cycle_id": "c_11cb5725",
     "vendor_id": "v1",
     "vendor_name": "NovaTech Services",
     "quarter": "Q1",
     "year": 2026,
     "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-08T05:40:12.295833+00:00",
-    "updated_at": "2026-04-08T05:40:23.403866+00:00"
-  },
-  {
-    "cycle_id": "c_79ebc9d9",
-    "vendor_id": "v_custom",
-    "vendor_name": "ABCDEF",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-08T06:07:12.766541+00:00",
-    "updated_at": "2026-04-08T06:07:12.766541+00:00"
-  },
-  {
-    "cycle_id": "c_3679a643",
-    "vendor_id": "v1",
-    "vendor_name": "NovaTech Services",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-08T06:07:27.273746+00:00",
-    "updated_at": "2026-04-08T06:07:27.273746+00:00"
-  },
-  {
-    "cycle_id": "c_acd5c473",
-    "vendor_id": "v1",
-    "vendor_name": "NovaTech Services",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-08T06:07:48.107116+00:00",
-    "updated_at": "2026-04-08T06:07:48.107116+00:00"
-  },
-  {
-    "cycle_id": "c_eb21578f",
-    "vendor_id": "v1",
-    "vendor_name": "NovaTech Services",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-08T06:08:16.203980+00:00",
-    "updated_at": "2026-04-08T06:08:16.203980+00:00"
+    "created_at": "2026-04-08T10:04:11.323654+00:00",
+    "updated_at": "2026-04-08T10:04:44.177990+00:00"
   }
 ]

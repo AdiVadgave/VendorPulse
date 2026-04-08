@@ -1,40 +1,85 @@
-export type ScorecardCategory =
-  | 'DELIVERY_QUALITY'
-  | 'SLA_COMPLIANCE'
-  | 'INNOVATION'
-  | 'COMMUNICATION'
-  | 'VALUE_FOR_MONEY'
+/* ── Scorecard Category & Parameter Definitions ─────────────── */
 
-export const CATEGORY_LABELS: Record<ScorecardCategory, string> = {
-  DELIVERY_QUALITY: 'Delivery Quality',
-  SLA_COMPLIANCE: 'SLA Compliance',
-  INNOVATION: 'Innovation',
-  COMMUNICATION: 'Communication',
-  VALUE_FOR_MONEY: 'Value for Money',
+export type ScorecardCategoryKey =
+  | 'RISK_COMPLIANCE'
+  | 'PERFORMANCE'
+  | 'COMMERCIAL'
+  | 'RELATIONSHIP'
+
+export interface ScorecardParameter {
+  key: string
+  label: string
 }
 
-export const SCORECARD_CATEGORIES: ScorecardCategory[] = [
-  'DELIVERY_QUALITY',
-  'SLA_COMPLIANCE',
-  'INNOVATION',
-  'COMMUNICATION',
-  'VALUE_FOR_MONEY',
+export interface ScorecardCategoryDef {
+  key: ScorecardCategoryKey
+  label: string
+  parameters: ScorecardParameter[]
+}
+
+export const SCORECARD_STRUCTURE: ScorecardCategoryDef[] = [
+  {
+    key: 'RISK_COMPLIANCE',
+    label: 'Risk & Compliance',
+    parameters: [
+      { key: 'RELEASE_PATCH_MGMT', label: 'Release & Patch Management' },
+      { key: 'SECURITY_RISK_MGMT', label: 'Security & Risk Management' },
+      { key: 'AUDIT_COMPLIANCE', label: 'Audit & Compliance Adherence' },
+    ],
+  },
+  {
+    key: 'PERFORMANCE',
+    label: 'Performance',
+    parameters: [
+      { key: 'DELIVERY_TIMELINESS', label: 'Delivery Timeliness' },
+      { key: 'QUALITY_OF_DELIVERY', label: 'Quality of Delivery' },
+      { key: 'RESOURCE_CAPABILITY', label: 'Resource Capability' },
+      { key: 'SLA_ADHERENCE', label: 'SLA Adherence' },
+      { key: 'OPERATIONAL_EFFICIENCY', label: 'Operational Efficiency' },
+    ],
+  },
+  {
+    key: 'COMMERCIAL',
+    label: 'Commercial',
+    parameters: [
+      { key: 'PRICING_COMPETITIVENESS', label: 'Pricing Competitiveness' },
+      { key: 'CONTRACT_COMPLIANCE', label: 'Contract Compliance' },
+      { key: 'COST_CONTROL', label: 'Cost Control' },
+      { key: 'BILLING_ACCURACY', label: 'Billing Accuracy' },
+    ],
+  },
+  {
+    key: 'RELATIONSHIP',
+    label: 'Relationship',
+    parameters: [
+      { key: 'COMMUNICATION_EFFECTIVENESS', label: 'Communication Effectiveness' },
+      { key: 'STAKEHOLDER_ENGAGEMENT', label: 'Stakeholder Engagement' },
+      { key: 'RESPONSIVENESS', label: 'Responsiveness' },
+      { key: 'COLLABORATION_ALIGNMENT', label: 'Collaboration & Alignment' },
+    ],
+  },
 ]
 
-export type SubmissionStatus = 'PENDING' | 'SUBMITTED' | 'INVALID' | 'CORRECTED'
-
-export interface ScorecardEntry {
-  scorecard_id: string
-  cycle_id: string
-  stakeholder_id: string
-  stakeholder_name: string
-  category: ScorecardCategory
-  score: number
-  comment: string
-  is_valid: boolean
-  validation_flags: string[]
-  submitted_at: string | null
+export const CATEGORY_LABELS: Record<ScorecardCategoryKey, string> = {
+  RISK_COMPLIANCE: 'Risk & Compliance',
+  PERFORMANCE: 'Performance',
+  COMMERCIAL: 'Commercial',
+  RELATIONSHIP: 'Relationship',
 }
+
+// Backward-compatible aliases used by analytics/alignment modules
+export type ScorecardCategory = ScorecardCategoryKey
+export const SCORECARD_CATEGORIES: ScorecardCategoryKey[] = [
+  'RISK_COMPLIANCE', 'PERFORMANCE', 'COMMERCIAL', 'RELATIONSHIP',
+]
+
+export const ALL_PARAMETERS = SCORECARD_STRUCTURE.flatMap((cat) =>
+  cat.parameters.map((p) => ({ ...p, category: cat.key }))
+)
+
+/* ── Submission Tracking ────────────────────────────────────── */
+
+export type SubmissionStatus = 'PENDING' | 'SUBMITTED' | 'INVALID' | 'CORRECTED'
 
 export interface StakeholderSubmission {
   stakeholder_id: string
@@ -47,11 +92,34 @@ export interface StakeholderSubmission {
   last_reminder: string | null
 }
 
-export interface CompiledScore {
-  category: ScorecardCategory
+/* ── Individual Scorecard Entry (per parameter per stakeholder) */
+
+export interface ScorecardEntry {
+  scorecard_id: string
+  cycle_id: string
+  stakeholder_id: string
+  stakeholder_name: string
+  parameter_key: string
+  category: ScorecardCategoryKey
+  score: number
+  comment: string
+  is_valid: boolean
+  validation_flags: string[]
+  submitted_at: string | null
+}
+
+/* ── Compiled Results ───────────────────────────────────────── */
+
+export interface ParameterScore {
+  parameter_key: string
+  parameter_label: string
   scores: { stakeholder_id: string; stakeholder_name: string; score: number; is_outlier: boolean }[]
   average: number
-  std_dev: number
-  min: number
-  max: number
+}
+
+export interface CompiledCategoryScore {
+  category: ScorecardCategoryKey
+  category_label: string
+  parameters: ParameterScore[]
+  category_average: number
 }

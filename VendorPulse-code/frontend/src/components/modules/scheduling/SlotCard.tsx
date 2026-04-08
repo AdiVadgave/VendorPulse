@@ -16,7 +16,7 @@ const RANK_CONFIG = [
     badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
     border: 'border-amber-200 dark:border-amber-800/60',
     ring: 'ring-2 ring-amber-300/50 dark:ring-amber-800/50',
-    label: 'Top Recommendation',
+    label: '1st Choice',
     icon: <Trophy size={12} />,
   },
   {

@@ -84,6 +84,7 @@ class GraphService:
         max_candidates: int = 3,
         is_organizer_optional: bool = False,
         require_all_attendees: bool = True,
+        activity_domain: str = "unrestricted",
     ) -> dict:
         """
         Call POST me/findMeetingTimes to find common availability.
@@ -135,7 +136,8 @@ class GraphService:
             "attendees": attendees,
             "isOrganizerOptional": is_organizer_optional,
             "timeConstraint": {
-                "activityDomain": "work",
+                # 'work' can be overly restrictive when mailbox working hours are not configured.
+                "activityDomain": activity_domain,
                 "timeSlots": [
                     {
                         "start": {
@@ -294,7 +296,7 @@ class GraphService:
             "onlineMeetingProvider": "teamsForBusiness" if is_online_meeting else None,
             "isReminderOn": True,
             "reminderMinutesBeforeStart": 15,
-            "ResponseRequested": True,
+            "responseRequested": True,
         }
 
         try:

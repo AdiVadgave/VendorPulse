@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import graph_scheduling, meetings, scheduling, users
+from app.api.routes import google_auth, graph_scheduling, meetings, scheduling, scorecard, users
 from app.config import settings
 
 app = FastAPI(
@@ -33,7 +33,7 @@ app = FastAPI(
 # Allow all origins during development. Restrict in production.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*" , "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,6 +44,8 @@ app.include_router(users.router)
 app.include_router(meetings.router)
 app.include_router(scheduling.router)
 app.include_router(graph_scheduling.router)
+app.include_router(google_auth.router)
+app.include_router(scorecard.router)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
@@ -63,6 +65,11 @@ def health():
             "meetings": "GET|POST /api/meetings",
             "meetingDetail": "GET|PUT|DELETE /api/meetings/{meetingId}",
             "meetingRespond": "PUT /api/meetings/{meetingId}/respond",
+            "googleAuth": "GET /auth/google",
+            "googleAuthStatus": "GET /auth/google/status",
+            "scorecardDispatch": "POST /api/scorecard/dispatch",
+            "scorecardPoll": "POST /api/scorecard/poll",
+            "scorecardResponses": "GET /api/scorecard/responses/{cycleId}",
             "cycles": "GET|POST /api/cycles",
             "cycleDetail": "GET /api/cycles/{cycleId}",
             "attendees": "GET|POST /api/cycles/{cycleId}/attendees",

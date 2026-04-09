@@ -804,6 +804,9 @@ function ScorecardTab({
     <div className="max-w-5xl mx-auto space-y-5">
       <ScorecardDispatchPanel
         vendorName={cycle.vendor_name}
+        cycleId={cycleId}
+        quarter={cycle.quarter}
+        year={cycle.year}
         attendees={attendeeList}
         onDispatched={onDispatched}
       />

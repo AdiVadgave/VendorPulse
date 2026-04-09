@@ -6,16 +6,17 @@ export interface SystemUser {
   name: string
   email: string
   organisation: string
+  gmail?: string
 }
 
 export const MOCK_SYSTEM_USERS: SystemUser[] = [
-  { user_id: 'u16', name: 'Anup Kesarwani',   email: 'anup.kesarwani@zensar.com',    organisation: 'Shell VMO' },
-  { user_id: 'u17', name: 'Kanishk Punekar',   email: 'kanishk.punekar@zensar.com',    organisation: 'Zensar VMO' },
-  { user_id: 'u18', name: 'Aditya Vadgave',    email: 'aditya.vadgave@zensar.com',     organisation: 'Zensar VMO' },
-  { user_id: 'u19', name: 'Vivek Kulkarni',       email: 'v.kulkarni3@zensar.com',        organisation: "Zensar's Vice President" },
-  { user_id: 'u1', name: 'Alex Thompson',   email: 'alex.thompson@zensar.com',    organisation: 'Zensar VMO' },
-  { user_id: 'u2', name: 'Sarah Chen',      email: 'sarah.chen@zensar.com',       organisation: 'Zensar IDT' },
-  { user_id: 'u3', name: 'Priya Sharma',    email: 'priya.sharma@zensar.com',     organisation: 'Zensar IDT' },
+  { user_id: 'u16', name: 'Anup Kesarwani',   email: 'anup.kesarwani@zensar.com',    organisation: 'Shell VMO' , gmail:"anupkesarwani3537@gmail.com" },
+  { user_id: 'u17', name: 'Kanishk Punekar',   email: 'kanishk.punekar@zensar.com',    organisation: 'Zensar VMO' , gmail:"kanishkpunekar54@gmail.com" },
+  { user_id: 'u18', name: 'Aditya Vadgave',    email: 'aditya.vadgave@zensar.com',     organisation: 'Zensar VMO' , gmail:"adivadgave16@gmail.com" },
+  { user_id: 'u19', name: 'Vivek Kulkarni',       email: 'v.kulkarni3@zensar.com',        organisation: "Zensar's Vice President" , gmail:"vivekkulkarni@gmail.com" },
+  { user_id: 'u1', name: 'Alex Thompson',   email: 'alex.thompson@zensar.com',    organisation: 'Zensar VMO' , gmail:"alexthompson@gmail.com" },
+  { user_id: 'u2', name: 'Sarah Chen',      email: 'sarah.chen@zensar.com',       organisation: 'Zensar IDT' , gmail:"sarahchen@gmail.com" },
+  { user_id: 'u3', name: 'Priya Sharma',    email: 'priya.sharma@zensar.com',     organisation: 'Zensar IDT' , gmail:"priyasharma@gmail.com" },
   { user_id: 'u4', name: 'Marcus Williams', email: 'marcus.williams@zensar.com',  organisation: 'Zensar VMO' },
   { user_id: 'u5', name: "James O'Brien",   email: 'james.obrien@zensar.com',     organisation: 'Zensar IDT' },
   { user_id: 'u6', name: 'Emma Davies',     email: 'emma.davies@zensar.com',      organisation: 'Zensar VMO' },

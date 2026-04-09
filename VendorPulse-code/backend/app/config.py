@@ -46,5 +46,18 @@ class Settings(BaseSettings):
     graph_access_token: str = ""
     graph_meeting_duration_minutes: int = 30   # configurable: 30, 60, 90, etc.
 
+    # Google OAuth2 (Gmail + Forms)
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_project_id: str = ""
+    google_redirect_uri: str = "http://localhost:8000/auth/callback"
+    google_form_id: str = ""
+    google_form_url: str = "https://forms.gle/zeMdJ8uvFkryFDTr6"
+
+   
+
+    # Scorecard polling
+    scorecard_poll_interval_seconds: int = 90
+
 
 settings = Settings()

@@ -19,6 +19,11 @@ export interface AgentRunResponse {
   run_id?: string
 }
 
+export interface GraphTokenInfo {
+  token_present: boolean
+  user?: string
+}
+
 // ── Cycles ───────────────────────────────────────────────────────────────────
 
 export async function fetchCycle(cycleId: string): Promise<GovernanceCycle | null> {
@@ -91,24 +96,6 @@ export async function approveAttendeeKey(
   return res.attendee
 }
 
-// ── Agent run — autonomous scheduling ────────────────────────────────────────
-
-/**
- * Runs the Scheduling Agent for the given cycle.
- * When ENABLE_LLM=true: GPT-4o drives simulate → rank autonomously.
- * When disabled: deterministic fallback runs the same steps.
- * Returns ranked slot proposals in response.data.slots.
- */
-export async function runSchedulingAgent(
-  cycleId: string,
-  message = 'Simulate availability responses then rank the best meeting slots for this cycle.'
-): Promise<AgentRunResponse> {
-  return apiFetch<AgentRunResponse>(
-    `/api/cycles/${cycleId}/scheduling/agent/run`,
-    { method: 'POST', body: JSON.stringify({ message }) }
-  )
-}
-
 // ── Slot proposals ───────────────────────────────────────────────────────────
 
 export async function fetchSlots(cycleId: string): Promise<SlotProposal[]> {
@@ -129,22 +116,6 @@ export async function approveSlot(
   return apiFetch<AgentRunResponse>(
     `/api/cycles/${cycleId}/scheduling/slots/${slotId}/approve`,
     { method: 'PUT', body: JSON.stringify(payload) }
-  )
-}
-
-// ── Send invites ─────────────────────────────────────────────────────────────
-
-export async function sendInvites(
-  cycleId: string,
-  slotId: string,
-  organiserId: string
-): Promise<AgentRunResponse> {
-  return apiFetch<AgentRunResponse>(
-    `/api/cycles/${cycleId}/scheduling/send-invites`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ slot_id: slotId, organiser_id: organiserId }),
-    }
   )
 }
 

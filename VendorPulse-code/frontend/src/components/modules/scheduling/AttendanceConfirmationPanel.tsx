@@ -257,31 +257,11 @@ export default function AttendanceConfirmationPanel({
     setIsSimulating(true)
     setSimError(null)
     try {
-      // Try backend simulation
-      await apiFetch(`/api/cycles/${cycleId}/scheduling/simulate-attendance-confirmation`, {
-        method: 'POST',
-      })
-    } catch {
-      // Fallback: simulate locally
+      throw new Error('Simulation is disabled in Graph-only mode. Use real outreach responses.')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Simulation is disabled in Graph-only mode.'
+      setSimError(msg)
     } finally {
-      // Simulate responses: mark first 60% as CONFIRMED, remaining as varied
-      const updated = attendees.map((a, idx) => {
-        const total = attendees.length
-        if (idx < Math.ceil(total * 0.6)) {
-          return { ...a, confirmation_status: 'CONFIRMED' as AttendanceConfirmationStatus }
-        } else if (idx < Math.ceil(total * 0.85)) {
-          return {
-            ...a,
-            confirmation_status: 'REPLACED' as AttendanceConfirmationStatus,
-            replaced_by: `Replacement for ${a.name.split(' ')[0]}`,
-            replaced_by_email: `replacement.${a.email.split('@')[0]}@${a.email.split('@')[1]}`,
-            replacement_note: 'Nominated by outgoing attendee',
-          }
-        } else {
-          return { ...a, confirmation_status: 'CONFIRMED' as AttendanceConfirmationStatus }
-        }
-      })
-      onAttendeesChanged(updated)
       setIsSimulating(false)
     }
   }

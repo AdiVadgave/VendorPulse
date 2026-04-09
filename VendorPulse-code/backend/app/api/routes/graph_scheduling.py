@@ -11,8 +11,10 @@ import asyncio
 import base64
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
+from collections import Counter, defaultdict
 from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -46,7 +48,7 @@ class FindTimesRequest(BaseModel):
     duration_hours: float = Field(0.5, description="Meeting duration (0.5 for 30 min, 1.0 for 1 hour)")
     use_specific_attendees: Optional[list[str]] = Field(
         None,
-        description="If provided, only these attendees. Otherwise all cycle attendees."
+        description="Deprecated in Graph-only mode. Must match cycle attendees when provided."
     )
     time_zone: str = Field("UTC", description="Timezone for meeting")
     debug: bool = Field(False, description="Include debug summary and log Graph response (sanitized)")
@@ -104,6 +106,19 @@ def _decode_jwt_without_verification(token: str) -> dict | None:
         return json.loads(payload_bytes.decode("utf-8"))
     except Exception:
         return None
+
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _is_valid_email(value: str) -> bool:
+    return bool(_EMAIL_RE.match((value or "").strip()))
+
+
+def _token_owner_email(token: str) -> str:
+    claims = _decode_jwt_without_verification(token) or {}
+    owner = claims.get("preferred_username") or claims.get("upn") or claims.get("email") or ""
+    return str(owner).strip().lower()
 
 
 @router.get("/api/graph/token-info")
@@ -192,16 +207,44 @@ def find_meeting_times_graph(
     if not attendees:
         raise HTTPException(status_code=400, detail="No attendees found for this cycle")
 
-    # Build attendee email list
-    if payload.use_specific_attendees:
-        attendee_emails = payload.use_specific_attendees
-    else:
-        attendee_emails = [a.get("email") for a in attendees if a.get("email")]
+    # Build attendee email list from cycle attendees only.
+    attendee_emails = [a.get("email") for a in attendees if a.get("email")]
 
     # Normalize emails. Note: Graph /me is the organiser for findMeetingTimes;
     # do not inject organiser_email into the attendee list.
     organiser_email = payload.organiser_email.strip().lower()
+    token_owner = _token_owner_email(graph_access_token)
+    if not token_owner:
+        raise HTTPException(
+            status_code=401,
+            detail="Could not determine token owner identity from GRAPH_ACCESS_TOKEN claims",
+        )
+    if organiser_email != token_owner:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Organiser must match token owner in dev mode. "
+                f"Provided organiser='{organiser_email}', token owner='{token_owner}'."
+            ),
+        )
+
     attendee_emails = [e.strip().lower() for e in attendee_emails if e]
+
+    if payload.use_specific_attendees:
+        requested = sorted(e.strip().lower() for e in payload.use_specific_attendees if e)
+        canonical = sorted(attendee_emails)
+        if requested != canonical:
+            raise HTTPException(
+                status_code=400,
+                detail="use_specific_attendees is not allowed to differ from cycle attendees in Graph-only mode",
+            )
+
+    invalid = [e for e in attendee_emails if not _is_valid_email(e)]
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid attendee email(s): {invalid}",
+        )
 
     if not attendee_emails:
         raise HTTPException(status_code=400, detail="No attendee emails found")
@@ -228,11 +271,10 @@ def find_meeting_times_graph(
             duration_hours=payload.duration_hours,
             time_zone=payload.time_zone,
             max_candidates=10,
-            # Important: /me is the organiser for this call. If the token user is not the same
-            # as the organiser selected in the UI, treating organiser availability as a hard
-            # constraint can lead to 0 suggestions even when attendees are free.
-            is_organizer_optional=True,
+            # In dev mode, token owner is always organiser and must be enforced.
+            is_organizer_optional=False,
             require_all_attendees=True,
+            activity_domain="work",
         ))
     except Exception as e:
         import traceback
@@ -261,7 +303,9 @@ def find_meeting_times_graph(
 
     # Transform Graph response to SlotProposal
     suggestions = result.get("meetingTimeSuggestions", [])
+    empty_suggestions_reason = result.get("emptySuggestionsReason") if isinstance(result, dict) else None
     slot_proposals = []
+    blocker_counts: dict[str, Counter] = defaultdict(Counter)
 
     graph_http_meta = (result.get("_http") if isinstance(result, dict) else None) or {}
     logger.info(
@@ -291,9 +335,18 @@ def find_meeting_times_graph(
         if up == "UTC":
             return "UTC"
         if up == "GMT" or "GMT" in up:
-            # Use a stable offset zone for display/UTC conversion.
-            return "Etc/GMT"
+            return "Europe/London"
         return "UTC"
+
+    def _fixed_offset_minutes(value: str) -> int:
+        """Fallback offsets when zoneinfo data is unavailable."""
+        up = (value or "").strip().upper()
+        if up == "IST" or "INDIA" in up:
+            return 330
+        # Treat GMT as zero offset for deterministic fallback.
+        if up == "GMT" or "GMT" in up:
+            return 0
+        return 0
 
     def _local_to_utc_iso(local_dt_str: str, source_tz: str) -> str:
         """Convert Graph local wall-clock (no offset) to UTC ISO string with 'Z'."""
@@ -317,8 +370,41 @@ def find_meeting_times_graph(
             utc_dt = aware.astimezone(timezone.utc)
             return utc_dt.replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
         except Exception:
-            # If zone conversion isn't available, keep the original local string.
+            # Fallback conversion using fixed offsets for known zones.
+            minutes = _fixed_offset_minutes(source_tz)
+            utc_naive = naive - timedelta(minutes=minutes)
+            return utc_naive.isoformat(timespec="seconds") + "Z"
+
+    def _to_requested_tz_iso(local_dt_str: str, source_tz: str, requested_tz: str) -> str:
+        """Convert Graph local wall-clock value to requested timezone ISO (debug helper)."""
+        if not local_dt_str:
+            return ""
+        normalized = str(local_dt_str).strip()
+        if "." in normalized:
+            normalized = normalized.split(".", 1)[0]
+        try:
+            naive = datetime.fromisoformat(normalized)
+        except Exception:
             return local_dt_str
+
+        try:
+            from zoneinfo import ZoneInfo
+
+            source = ZoneInfo(_to_iana_zone(source_tz))
+            target = ZoneInfo(_to_iana_zone(requested_tz))
+            aware = naive.replace(tzinfo=source)
+            local = aware.astimezone(target)
+            return local.isoformat(timespec="seconds")
+        except Exception:
+            src_mins = _fixed_offset_minutes(source_tz)
+            dst_mins = _fixed_offset_minutes(requested_tz)
+            utc_naive = naive - timedelta(minutes=src_mins)
+            local_naive = utc_naive + timedelta(minutes=dst_mins)
+            sign = "+" if dst_mins >= 0 else "-"
+            abs_mins = abs(dst_mins)
+            hh = abs_mins // 60
+            mm = abs_mins % 60
+            return f"{local_naive.isoformat(timespec='seconds')}{sign}{hh:02d}:{mm:02d}"
 
     # Persist — clear old proposals first so the UI doesn't mix stale results.
     slot_repo.clear_for_cycle(cycleId)
@@ -348,13 +434,17 @@ def find_meeting_times_graph(
                 availability_by_email[email] = str(status).lower()
 
         attending_names: list[str] = []
+        tentative_names: list[str] = []
         conflict_names: list[str] = []
 
         def _is_free(status: str) -> bool:
             s = (status or "").strip().lower()
             # Graph returns: free | tentative | busy | oof | workingElsewhere | unknown
-            # We want strict scheduling: ONLY 'free' is considered available.
             return s == "free"
+
+        def _is_tentative(status: str) -> bool:
+            s = (status or "").strip().lower()
+            return s == "tentative"
 
         for email in attendee_emails:
             e = (email or "").strip().lower()
@@ -362,10 +452,14 @@ def find_meeting_times_graph(
             name = get_attendee_name(e) or e
             if _is_free(status):
                 attending_names.append(name)
+            elif _is_tentative(status):
+                tentative_names.append(name)
             else:
                 conflict_names.append(name)
+                blocker_counts[e][status] += 1
 
-        # We only want slots that accommodate everyone in the attendee list.
+        # Hard conflicts still remove the slot. Tentative attendees remain eligible,
+        # but they are ranked below fully free attendees.
         # Organiser availability is enforced by Graph when isOrganizerOptional=False.
         organiser_available = True
         if conflict_names:
@@ -374,8 +468,10 @@ def find_meeting_times_graph(
 
         confidence = str(suggestion.get("confidenceLevel") or suggestion.get("confidence") or "low").lower()
         base_score = 100.0 if confidence == "high" else 80.0 if confidence == "medium" else 60.0
-        # Prefer higher attendance, then higher confidence; penalize conflicts heavily.
-        computed_score = max(0.0, min(100.0, base_score - (len(conflict_names) * 25.0)))
+        tentative_penalty = len(tentative_names) * 15.0
+        # Prefer higher attendance, then higher confidence; penalize tentatives so
+        # completely free slots sort above tentative ones.
+        computed_score = max(0.0, min(100.0, base_score - tentative_penalty))
 
         # Build SlotProposal
         slot_id = f"slot_{uuid.uuid4().hex[:8]}"
@@ -389,10 +485,11 @@ def find_meeting_times_graph(
             "exec_sponsor_available": True,
             "rank_score": computed_score,
             "is_approved": False,
-            "attendance_count": len(attending_names),
+            "attendance_count": len(attending_names) + len(tentative_names),
             "total_attendees": len(attendee_emails),
             "conflict_count": len(conflict_names),
             "attending": attending_names,
+            "tentative": tentative_names,
             "conflicts": conflict_names,
         }
         slot_proposals.append(slot_proposal)
@@ -403,6 +500,27 @@ def find_meeting_times_graph(
     # Best-first ordering for UI consistency
     slot_proposals.sort(key=lambda s: (-float(s.get("rank_score") or 0), s.get("proposed_time") or ""))
 
+    no_slots_reason = empty_suggestions_reason or ""
+    if not slot_proposals:
+        if len(suggestions) > 0 and blocker_counts:
+            blocker_bits: list[str] = []
+            ranked_blockers = sorted(
+                blocker_counts.items(),
+                key=lambda item: (-sum(item[1].values()), item[0]),
+            )
+            for email, counts in ranked_blockers[:3]:
+                status_counts = ", ".join(
+                    f"{status} x{count}"
+                    for status, count in counts.most_common()
+                )
+                blocker_bits.append(f"{email} was {status_counts}")
+            no_slots_reason = (
+                "No common meeting slots because one or more attendees were not free in every Graph suggestion: "
+                + "; ".join(blocker_bits)
+            )
+        elif not no_slots_reason:
+            no_slots_reason = "Graph returned no suggestions in the selected window."
+
     # Align workflow with deterministic path: slot discovery means
     # availability has effectively been collected for this cycle.
     now = datetime.now(timezone.utc).isoformat()
@@ -410,13 +528,22 @@ def find_meeting_times_graph(
         workflow_engine.advance(cycle, cycle_repo, now)
 
     response_payload = {
-        "message": f"Found {len(slot_proposals)} real meeting slots via Graph",
+        "message": (
+            f"Found {len(slot_proposals)} real meeting slots via Graph"
+            if len(slot_proposals) > 0
+            else (
+                "No common meeting slots found via Graph"
+                + (f": {no_slots_reason}" if no_slots_reason else "")
+            )
+        ),
         "slot_proposals": slot_proposals,
         "attendee_count": len(attendee_emails),
         "attendee_emails_used": attendee_emails,
         "organiser_email_used": organiser_email,
         "graph_summary": {
             "suggestions_received": len(suggestions) if isinstance(suggestions, list) else 0,
+            "empty_suggestions_reason": empty_suggestions_reason,
+            "no_slots_reason": no_slots_reason,
             "suggestions_processed": processed,
             "suggestions_filtered_conflicts": filtered_conflicts,
             "slots_returned": len(slot_proposals),
@@ -449,6 +576,12 @@ def find_meeting_times_graph(
                         "start": {
                             "dateTime": st.get("dateTime"),
                             "timeZone": st.get("timeZone"),
+                            "requestedTimeZoneDateTime": _to_requested_tz_iso(
+                                st.get("dateTime"),
+                                st.get("timeZone") or payload.time_zone,
+                                payload.time_zone,
+                            ),
+                            "requestedTimeZone": payload.time_zone,
                         },
                         "confidence": (s or {}).get("confidenceLevel") or (s or {}).get("confidence"),
                         "attendeeAvailability": avail,
@@ -466,6 +599,8 @@ def find_meeting_times_graph(
             },
             "suggestions_preview": preview,
             "raw_keys": list(result.keys()) if isinstance(result, dict) else None,
+            "empty_suggestions_reason": empty_suggestions_reason,
+            "no_slots_reason": no_slots_reason,
         }
 
         # Log the same preview so it is visible in server logs.
@@ -517,6 +652,22 @@ def send_meeting_invite_graph(
 
     graph_service = GraphService(graph_access_token)
 
+    token_owner = _token_owner_email(graph_access_token)
+    organiser_email = payload.organiser_email.strip().lower()
+    if not token_owner:
+        raise HTTPException(
+            status_code=401,
+            detail="Could not determine token owner identity from GRAPH_ACCESS_TOKEN claims",
+        )
+    if organiser_email != token_owner:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Organiser must match token owner in dev mode. "
+                f"Provided organiser='{organiser_email}', token owner='{token_owner}'."
+            ),
+        )
+
     # Fetch the slot
     slot = slot_repo.get_by_slot_id(payload.slot_id)
 
@@ -529,6 +680,13 @@ def send_meeting_invite_graph(
     # Get attendees
     attendees = attendee_repo.get_for_cycle(cycleId)
     attendee_emails = [a.get("email") for a in attendees if a.get("email")]
+
+    invalid = [e for e in attendee_emails if not _is_valid_email(str(e))]
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid attendee email(s): {invalid}",
+        )
 
     if not attendee_emails:
         raise HTTPException(status_code=400, detail="No attendee emails found")
@@ -546,7 +704,7 @@ def send_meeting_invite_graph(
             attendee_emails=attendee_emails,
             start_time=slot.get("proposed_time"),
             duration_hours=duration_hours,
-            organiser_email=payload.organiser_email,
+            organiser_email=organiser_email,
             is_online_meeting=True,
             time_zone=slot.get("proposed_time_zone") or "UTC",
         ))
@@ -574,6 +732,10 @@ def send_meeting_invite_graph(
             full_detail = f"{message}{code_suffix}{detail_suffix}"
 
         raise HTTPException(status_code=status_code, detail=full_detail)
+
+    now = datetime.now(timezone.utc).isoformat()
+    if workflow_engine.can_transition(cycle.get("workflow_state", ""), "MEETING_SCHEDULED"):
+        workflow_engine.transition_to(cycle, "MEETING_SCHEDULED", cycle_repo, now)
 
     return {
         "message": "Teams meeting created and invites sent",

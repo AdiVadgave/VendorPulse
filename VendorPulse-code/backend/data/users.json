@@ -521,5 +521,15 @@
     "avatar": "AV",
     "createdAt": "",
     "availability": []
+  },
+  {
+    "userId": "u20",
+    "name": "abhishek Biyani",
+    "email": "abhishek.biyani@zensar.com",
+    "role": "VENDOR_MANAGER",
+    "organisation": "Derivco VMO",
+    "avatar": "AB",
+    "createdAt": "",
+    "availability": []
   }
 ]

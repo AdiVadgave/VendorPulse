@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { format } from 'date-fns'
 import {
   CheckCircle2,
   XCircle,
@@ -19,6 +18,7 @@ import { ROLE_LABELS } from '@/types/cycle.types'
 interface ConfirmationTrackerProps {
   attendees: CycleAttendee[]
   slot: SlotProposal
+  timeZoneOverride?: 'IST' | 'UTC' | 'GMT'
   onProceed?: () => void
 }
 
@@ -46,11 +46,38 @@ const STATUS_CONFIG: Record<
 export default function ConfirmationTracker({
   attendees,
   slot,
+  timeZoneOverride,
   onProceed,
 }: ConfirmationTrackerProps) {
   const [nudgeSent, setNudgeSent] = useState<Set<string>>(new Set())
   const [nudgingId, setNudgingId] = useState<string | null>(null)
   const dateObj = new Date(slot.proposed_time)
+
+  const slotTimeZone = timeZoneOverride ?? slot.proposed_time_zone ?? 'UTC'
+  const displayZone = slotTimeZone.toUpperCase().includes('IST') ? 'IST'
+    : slotTimeZone.toUpperCase().includes('GMT') ? 'GMT'
+      : 'UTC'
+
+  const ianaZone = displayZone === 'IST'
+    ? 'Asia/Kolkata'
+    : displayZone === 'GMT'
+      ? 'Etc/GMT'
+      : 'UTC'
+
+  const displayDate = dateObj.toLocaleDateString('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: ianaZone,
+  })
+
+  const displayTime = dateObj.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: ianaZone,
+  })
   const accepted = attendees.filter((a) => a.invite_status === 'ACCEPTED')
   const declined = attendees.filter((a) => a.invite_status === 'DECLINED')
   const pending   = attendees.filter((a) => a.invite_status === 'PENDING')
@@ -81,8 +108,7 @@ export default function ConfirmationTracker({
               Meeting Scheduled — Invites Sent via Teams
             </h3>
             <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
-              {format(dateObj, 'EEEE, d MMMM yyyy')} at{' '}
-              {format(dateObj, 'h:mm a')} GMT · Conference Room B / Teams
+              {displayDate} at {displayTime} {displayZone} · Conference Room B / Teams
             </p>
           </div>
           <AgentStatusBadge status="complete" label="Invite Sent" />

@@ -117,6 +117,7 @@ class SchedulingAgent(BaseAgent):
                         "properties": {
                             "slot_id": {"type": "string"},
                             "approved_by": {"type": "string", "description": "userId of the approver"},
+                            "time_zone": {"type": "string", "description": "Optional timezone to use for the approved slot (e.g. IST, UTC, GMT)"},
                         },
                         "required": ["slot_id", "approved_by"],
                     },
@@ -169,7 +170,10 @@ class SchedulingAgent(BaseAgent):
 
         if tool_name == "approve_slot":
             result = self._svc.approve_slot(
-                self.cycle_id, tool_input["slot_id"], tool_input["approved_by"]
+                self.cycle_id,
+                tool_input["slot_id"],
+                tool_input["approved_by"],
+                time_zone=tool_input.get("time_zone"),
             )
             return json.dumps(result.model_dump())
 

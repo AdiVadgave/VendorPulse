@@ -10,7 +10,7 @@ import {
 import { useUIStore } from '@/store/useUIStore'
 import { useCycleStore } from '@/store/useCycleStore'
 import { cn } from '@/utils/cn'
-import { WORKFLOW_STATE_LABELS } from '@/utils/constants'
+import { WORKFLOW_STATE_LABELS, getDefaultTabFromState } from '@/utils/constants'
 
 const STATE_DOT_COLORS: Record<string, string> = {
   CYCLE_CREATED: 'bg-slate-400',
@@ -60,6 +60,8 @@ function NavItem({ to, icon, label, collapsed, end }: NavItemProps) {
 export default function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
   const cycles = useCycleStore((s) => s.cycles)
+  const getWorkflowState = useCycleStore((s) => s.getWorkflowState)
+  const lastTabs = useCycleStore((s) => s.lastTabs)
 
   return (
     <aside
@@ -116,9 +118,13 @@ export default function Sidebar() {
             </p>
             <div className="space-y-1">
               {cycles.map((cycle) => (
+                (() => {
+                  const effectiveState = getWorkflowState(cycle.cycle_id)
+                  const tab = lastTabs[cycle.cycle_id] ?? getDefaultTabFromState(effectiveState)
+                  return (
                 <NavLink
                   key={cycle.cycle_id}
-                  to={`/cycles/${cycle.cycle_id}`}
+                  to={`/cycles/${cycle.cycle_id}?tab=${tab}`}
                   className={({ isActive }) =>
                     cn(
                       'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors duration-150',
@@ -137,15 +143,17 @@ export default function Sidebar() {
                       <span
                         className={cn(
                           'w-1.5 h-1.5 rounded-full shrink-0',
-                          STATE_DOT_COLORS[cycle.workflow_state] ?? 'bg-slate-400'
+                          STATE_DOT_COLORS[effectiveState] ?? 'bg-slate-400'
                         )}
                       />
                       <p className="text-xs text-slate-500 dark:text-slate-500 truncate">
-                        {WORKFLOW_STATE_LABELS[cycle.workflow_state]}
+                        {WORKFLOW_STATE_LABELS[effectiveState]}
                       </p>
                     </div>
                   </div>
                 </NavLink>
+                  )
+                })()
               ))}
             </div>
           </div>

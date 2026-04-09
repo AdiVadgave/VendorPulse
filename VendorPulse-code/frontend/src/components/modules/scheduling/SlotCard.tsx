@@ -1,5 +1,4 @@
-import { format } from 'date-fns'
-import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck } from 'lucide-react'
+﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { SlotProposal } from '@/types/scheduling.types'
 
@@ -51,7 +50,7 @@ export default function SlotCard({
   const timeZoneMap: Record<'IST' | 'UTC' | 'GMT', string> = {
     IST: 'Asia/Kolkata',
     UTC: 'UTC',
-    GMT: 'Etc/GMT',
+    GMT: 'Europe/London',
   }
 
   const zone = timeZoneMap[timeZoneView]
@@ -98,7 +97,10 @@ export default function SlotCard({
               {formatDateInZone(dateObj)}
             </p>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {formatTimeInZone(dateObj)} – {formatTimeInZone(endObj)} {timeZoneView}
+              {formatTimeInZone(dateObj)} - {formatTimeInZone(endObj)} {timeZoneView}
+            </p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+              Displayed in {timeZoneView} (converted from Graph UTC values)
             </p>
           </div>
         </div>
@@ -111,7 +113,7 @@ export default function SlotCard({
             )}
           >
             {cfg.icon}
-            #{rank} — {cfg.label}
+            #{rank} - {cfg.label}
           </span>
         </div>
       </div>
@@ -197,6 +199,27 @@ export default function SlotCard({
             ))}
           </div>
         </div>
+
+        {(slot.tentative?.length ?? 0) > 0 && (
+          <div>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Clock size={12} className="text-slate-400" />
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Tentative
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {slot.tentative!.map((name) => (
+                <span
+                  key={name}
+                  className="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded text-xs"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {slot.conflicts.length > 0 && (
           <div>

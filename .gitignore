@@ -11,6 +11,10 @@ Desktop.ini
 **/claude/
 .claude/
 
+/google sheet
+Backend/google sheet/*
+client_secret.json
+
 # VS Code
 .vscode/*
 !.vscode/extensions.json

@@ -4,17 +4,16 @@ import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
 import { SCORECARD_STRUCTURE } from '@/types/scorecard.types'
-import type { ScorecardAttendee } from '@/mock/scorecard.mock'
 import { checkGoogleAuth, dispatchScorecardEmails } from '@/lib/scorecardApi'
 import type { DispatchResponse } from '@/lib/scorecardApi'
-import { MOCK_SYSTEM_USERS } from '@/mock/scheduling.mock'
+import type { CycleAttendee } from '@/types/scheduling.types'
 
 interface Props {
   vendorName: string
   cycleId: string
   quarter: string
   year: number
-  attendees: ScorecardAttendee[]
+  attendees: CycleAttendee[]
   onDispatched: () => void
 }
 
@@ -36,11 +35,13 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   const [dispatchResult, setDispatchResult] = useState<DispatchResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Only key attendees get scorecard emails
+  const keyAttendees = attendees.filter((a) => a.is_key)
+
   async function handleGenerate() {
     setError(null)
     setAgentStatus('running')
 
-    // Check Google auth status first
     const authStatus = await checkGoogleAuth()
     setGoogleConnected(authStatus.authenticated)
 
@@ -49,7 +50,6 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
       return
     }
 
-    // Show approval panel with email preview
     setTimeout(() => {
       setAgentStatus('awaiting_approval')
       setShowApproval(true)
@@ -62,17 +62,11 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
     setError(null)
 
     try {
-      // Build attendee list with Gmail addresses
-      const emailAttendees = attendees.map((a) => {
-        // Try to find their Gmail from the system users list
-        const systemUser = MOCK_SYSTEM_USERS.find(
-          (u) => u.name === a.stakeholder_name || u.email === a.stakeholder_name
-        )
-        return {
-          name: a.stakeholder_name,
-          email: systemUser?.gmail || systemUser?.email || `${a.stakeholder_name.toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
-        }
-      })
+      // Use gmail from attendee record; fall back to corporate email
+      const emailAttendees = keyAttendees.map((a) => ({
+        name: a.name,
+        email: a.gmail || a.email,
+      }))
 
       const result = await dispatchScorecardEmails({
         cycle_id: cycleId,
@@ -115,7 +109,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
 
         <div className="grid grid-cols-3 gap-3 mb-4">
           {[
-            { label: 'Recipients', value: attendees.length, icon: <Send size={14} /> },
+            { label: 'Key Recipients', value: keyAttendees.length, icon: <Send size={14} /> },
             { label: 'Categories', value: SCORECARD_STRUCTURE.length, icon: <ClipboardList size={14} /> },
             { label: 'Reminder Tiers', value: 3, icon: <Bell size={14} /> },
           ].map((s) => (
@@ -156,15 +150,32 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
         {/* Key Attendees */}
         <div className="mb-4">
           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
-            Key Attendees
+            Key Attendees (Scorecard Recipients)
           </p>
           <div className="space-y-1.5">
-            {attendees.map((r) => (
-              <div key={r.stakeholder_id} className="flex items-center justify-between text-sm py-1.5 px-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                <span className="text-slate-700 dark:text-slate-300">{r.stakeholder_name}</span>
-                <span className="text-xs text-slate-400 dark:text-slate-500">{r.organisation} &middot; {r.role.replace(/_/g, ' ')}</span>
+            {keyAttendees.map((a) => (
+              <div key={a.attendee_id} className="flex items-center justify-between text-sm py-1.5 px-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                <div>
+                  <span className="text-slate-700 dark:text-slate-300">{a.name}</span>
+                  <span className="ml-2 text-xs text-slate-400">({a.gmail || a.email})</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                    a.type === 'Vendor'
+                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
+                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                  }`}>
+                    {a.type}
+                  </span>
+                  <span className="text-xs text-slate-400 dark:text-slate-500">{a.role.replace(/_/g, ' ')}</span>
+                </div>
               </div>
             ))}
+            {keyAttendees.length === 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 py-2">
+                No key attendees marked. Mark attendees as &quot;Key&quot; in the scheduling tab first.
+              </p>
+            )}
           </div>
         </div>
 
@@ -231,16 +242,16 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
         {!dispatched ? (
           <button
             onClick={handleGenerate}
-            disabled={agentStatus === 'running' || agentStatus === 'awaiting_approval'}
+            disabled={agentStatus === 'running' || agentStatus === 'awaiting_approval' || keyAttendees.length === 0}
             className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Send size={14} />
-            {agentStatus === 'running' ? 'Preparing dispatch...' : 'Generate & Review Scorecard Request'}
+            {agentStatus === 'running' ? 'Preparing dispatch...' : `Send Scorecard to ${keyAttendees.length} Key Attendees`}
           </button>
         ) : (
           <div className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-700 dark:text-emerald-400 text-sm font-medium">
             <Send size={14} />
-            Scorecard requests dispatched to {attendees.length} attendees via Gmail
+            Scorecard requests dispatched to {keyAttendees.length} key attendees via Gmail
           </div>
         )}
       </div>
@@ -272,8 +283,8 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
       {showApproval && (
         <ApprovalPanel
           title="Dispatch Scorecard Request via Gmail"
-          summary={`Send scorecard request email to ${attendees.length} key attendees for ${vendorName} QBR cycle. Emails will be sent from your connected Gmail account.`}
-          recipients={attendees.map((r) => r.stakeholder_name)}
+          summary={`Send scorecard request email to ${keyAttendees.length} key attendees for ${vendorName} QBR cycle. Emails will be sent from your connected Gmail account.`}
+          recipients={keyAttendees.map((a) => `${a.name} (${a.gmail || a.email})`)}
           warnings={[
             'Emails will be sent via your personal Gmail account',
             'Each email includes the Google Form link with Cycle ID',
@@ -293,28 +304,10 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
                 <p>
                   Please complete your scorecard input by rating each parameter on a 1–5 scale.
                 </p>
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded p-2 my-2">
-                  <p className="text-xs text-slate-500 font-medium mb-1">Google Form Link:</p>
-                  <p className="text-xs text-indigo-600 dark:text-indigo-400 break-all">
-                    https://forms.gle/zeMdJ8uvFkryFDTr6
-                  </p>
-                </div>
                 <div className="bg-amber-50 dark:bg-amber-900/20 rounded p-2">
                   <p className="text-xs text-amber-700 dark:text-amber-400">
                     <strong>Important:</strong> Enter Cycle ID <code className="bg-white dark:bg-slate-800 px-1 rounded">{cycleId}</code> in the form.
                   </p>
-                </div>
-                <div className="space-y-1 mt-2">
-                  {SCORECARD_STRUCTURE.map((cat) => (
-                    <div key={cat.key}>
-                      <p className="font-medium text-slate-700 dark:text-slate-300">{cat.label}</p>
-                      <ul className="list-disc pl-4 space-y-0.5">
-                        {cat.parameters.map((p) => (
-                          <li key={p.key}>{p.label}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
                 </div>
               </div>
             </div>

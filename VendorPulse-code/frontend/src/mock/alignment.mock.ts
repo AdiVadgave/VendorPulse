@@ -139,9 +139,11 @@ export function buildCategoryComparisons(
     const catDef = SCORECARD_STRUCTURE.find((s) => s.key === cat.category)
 
     const parameters = cat.parameters.map((param) => {
-      // Expect 2 scores: first = vendor, second = stakeholder (per scorecard submission order)
-      const vendorScore = param.scores[0]?.score ?? 0
-      const stakeholderScore = param.scores[1]?.score ?? 0
+      // Scores array: internal stakeholder first, vendor second
+      const internalScore = param.scores.find((s) => s.stakeholder_id === 'internal')
+      const vendorScoreEntry = param.scores.find((s) => s.stakeholder_id === 'vendor')
+      const stakeholderScore = internalScore?.score ?? (param.scores[0]?.score ?? 0)
+      const vendorScore = vendorScoreEntry?.score ?? (param.scores[1]?.score ?? 0)
       const diff = Math.abs(stakeholderScore - vendorScore)
 
       return {
@@ -260,8 +262,10 @@ export function buildAlignmentFlags(
   for (const cat of compiledScores) {
     for (const param of cat.parameters) {
       if (param.scores.length < 2) continue
-      const vendorScore = param.scores[0]?.score ?? 0
-      const stakeholderScore = param.scores[1]?.score ?? 0
+      const internalEntry = param.scores.find((s) => s.stakeholder_id === 'internal')
+      const vendorEntry = param.scores.find((s) => s.stakeholder_id === 'vendor')
+      const stakeholderScore = internalEntry?.score ?? (param.scores[0]?.score ?? 0)
+      const vendorScore = vendorEntry?.score ?? (param.scores[1]?.score ?? 0)
       const spread = Math.abs(vendorScore - stakeholderScore)
 
       if (spread >= 1) {

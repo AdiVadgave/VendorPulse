@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 InviteStatus = Literal["PENDING", "ACCEPTED", "DECLINED"]
 AttendanceConfirmationStatus = Literal["PENDING", "CONFIRMED", "REPLACED", "DECLINED"]
+AttendeeType = Literal["Internal Stakeholder", "Vendor"]
 StakeholderRole = Literal[
     "VMO_COORDINATOR",
     "INTERNAL_LEAD",
@@ -25,8 +26,10 @@ class CycleAttendeeCreate(BaseModel):
     stakeholder_id: str
     name: str
     email: str
+    gmail: Optional[str] = Field(default="", description="Gmail address for scorecard dispatch")
     role: StakeholderRole
     organisation: str
+    type: AttendeeType = Field(default="Internal Stakeholder", description="Internal Stakeholder or Vendor")
     is_key: bool = False
     user_id: Optional[str] = Field(
         default=None,
@@ -44,6 +47,8 @@ class CycleAttendeeUpdate(BaseModel):
     confirmation_status: Optional[AttendanceConfirmationStatus] = None
     confirmation_note: Optional[str] = None
     is_key: Optional[bool] = None
+    type: Optional[AttendeeType] = None
+    gmail: Optional[str] = None
 
 
 class CycleAttendee(BaseModel):
@@ -54,8 +59,10 @@ class CycleAttendee(BaseModel):
     stakeholder_id: str
     name: str
     email: str
+    gmail: str = ""
     role: StakeholderRole
     organisation: str
+    type: AttendeeType = "Internal Stakeholder"
     is_key: bool = False
     invite_status: InviteStatus = "PENDING"
     availability_submitted: bool = False

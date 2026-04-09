@@ -110,3 +110,17 @@ export async function getCycleResponses(
 ): Promise<CycleResponsesResult> {
   return apiFetch<CycleResponsesResult>(`/api/scorecard/responses/${cycleId}`)
 }
+
+/** Get real submission tracker for a cycle */
+export async function getSubmissionTracker(
+  cycleId: string
+): Promise<import('@/types/scorecard.types').SubmissionTrackerData> {
+  return apiFetch(`/api/scorecard/submissions/${cycleId}`)
+}
+
+/** Get compiled scorecard (Internal vs Vendor 2-column) for a cycle */
+export async function getCompiledScorecard(
+  cycleId: string
+): Promise<import('@/types/scorecard.types').CompiledScorecard> {
+  return apiFetch(`/api/scorecard/compiled/${cycleId}`)
+}

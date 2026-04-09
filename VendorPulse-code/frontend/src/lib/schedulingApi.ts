@@ -137,3 +137,20 @@ export async function fetchRsvpStatus(cycleId: string) {
     `/api/cycles/${cycleId}/scheduling/rsvp`
   )
 }
+
+// ── Users ───────────────────────────────────────────────────────────────────
+
+export interface SystemUser {
+  user_id: string
+  name: string
+  email: string
+  gmail: string
+  organisation: string
+  role: string
+  avatar: string
+}
+
+export async function fetchSystemUsers(search?: string): Promise<SystemUser[]> {
+  const params = search ? `?search=${encodeURIComponent(search)}` : ''
+  return apiFetch<SystemUser[]>(`/api/users${params}`)
+}

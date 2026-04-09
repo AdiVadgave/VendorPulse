@@ -47,6 +47,11 @@ QUESTION_MAP: dict[str, str] = {
     "stakeholder engagement": "STAKEHOLDER_ENGAGEMENT",
     "responsiveness": "RESPONSIVENESS",
     "collaboration": "COLLABORATION_ALIGNMENT",
+    "comments on risk": "comment_RISK_COMPLIANCE",
+    "comments on performance": "comment_PERFORMANCE",
+    "comments on commercial": "comment_COMMERCIAL",
+    "comments on relationship": "comment_RELATIONSHIP",
+    "key recommendations": "key_recommendations",
 }
 
 

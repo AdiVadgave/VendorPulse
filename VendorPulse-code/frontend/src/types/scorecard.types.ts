@@ -123,3 +123,56 @@ export interface CompiledCategoryScore {
   parameters: ParameterScore[]
   category_average: number
 }
+
+/* ── 2-Column Compiled Scorecard (Internal vs Vendor) ──────── */
+
+export interface CompiledParameter {
+  parameter_key: string
+  parameter_label: string
+  internal_avg: number | null
+  vendor_avg: number | null
+  internal_count: number
+  vendor_count: number
+}
+
+export interface CompiledCategory {
+  category: ScorecardCategoryKey
+  category_label: string
+  internal_avg: number | null
+  vendor_avg: number | null
+  parameters: CompiledParameter[]
+}
+
+export interface CompiledScorecard {
+  cycle_id: string
+  internal_respondents: number
+  vendor_respondents: number
+  overall_internal_avg: number | null
+  overall_vendor_avg: number | null
+  categories: CompiledCategory[]
+  comments: Record<string, { internal: string[]; vendor: string[] }>
+  key_recommendations: string[]
+}
+
+/* ── Submission Tracker ────────────────────────────────────── */
+
+export interface SubmissionTrackerEntry {
+  attendee_id: string
+  name: string
+  email: string
+  gmail: string
+  type: 'Internal Stakeholder' | 'Vendor'
+  role: string
+  organisation: string
+  submitted: boolean
+  submitted_at: string | null
+  response_id: string | null
+}
+
+export interface SubmissionTrackerData {
+  cycle_id: string
+  total_key_attendees: number
+  submitted: number
+  pending: number
+  tracker: SubmissionTrackerEntry[]
+}

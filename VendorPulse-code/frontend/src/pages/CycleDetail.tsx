@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import {
   CalendarClock,
@@ -21,15 +21,9 @@ import {
   MOCK_ATTENDEES_RSVP,
 } from '@/mock/scheduling.mock'
 import { completeAttendanceConfirmation, fetchAttendeesSeeded, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
-import {
-  deriveScorecardAttendees,
-  getInitialSubmissions,
-  getVendorEntries,
-  getStakeholderEntries,
-  compileScores,
-} from '@/mock/scorecard.mock'
-import type { ScorecardAttendee } from '@/mock/scorecard.mock'
-import type { ScorecardEntry, CompiledCategoryScore } from '@/types/scorecard.types'
+import { getCompiledScorecard } from '@/lib/scorecardApi'
+import { compiledScorecardToLegacy } from '@/mock/scorecard.mock'
+import type { CompiledCategoryScore, CompiledScorecard } from '@/types/scorecard.types'
 import {
   MOCK_SCORE_DELTAS,
   MOCK_ALIGNMENT_FLAGS,
@@ -86,7 +80,7 @@ import type { TabKey, WorkflowState } from '@/utils/constants'
 import { WORKFLOW_STATES, TAB_KEYS, TAB_LABELS, TAB_MIN_STATE_INDEX, getDefaultTabFromState } from '@/utils/constants'
 import { useCycleStore } from '@/store/useCycleStore'
 import type { SchedulingPhase, CycleAttendee, SlotProposal } from '@/types/scheduling.types'
-import type { StakeholderSubmission } from '@/types/scorecard.types'
+// scorecard types imported via CompiledCategoryScore and CompiledScorecard above
 import type { ExtractedAction } from '@/types/alignment.types'
 import type { VendorBrief, PushbackItem, PushbackResponse } from '@/types/vendor-prep.types'
 import type { MeetingNote } from '@/types/meeting.types'
@@ -184,25 +178,8 @@ export default function CycleDetail() {
   // --- Module B state ---
   const [scorecardDispatched, setScorecardDispatched] = useState(false)
   const [, setSubmissionsSimulated] = useState(false)
-  const [, setScorecardEntries] = useState<ScorecardEntry[]>([])
   const [compiledScores, setCompiledScores] = useState<CompiledCategoryScore[] | null>(null)
-
-  // Derive the 2 key scorecard attendees from the cycle's actual attendee list
-  const scorecardAttendees = cycle
-    ? deriveScorecardAttendees(schedulingAttendees, cycle.vendor_name)
-    : { vendor: null, stakeholder: null }
-  const scorecardAttendeeList = [scorecardAttendees.vendor, scorecardAttendees.stakeholder].filter(Boolean) as ScorecardAttendee[]
-  const [submissions, setSubmissions] = useState<StakeholderSubmission[]>(() =>
-    getInitialSubmissions(scorecardAttendeeList)
-  )
-
-  // Re-sync scorecard submissions when scheduling attendees change (e.g. loaded from API)
-  useEffect(() => {
-    if (!scorecardDispatched && scorecardAttendeeList.length > 0) {
-      setSubmissions(getInitialSubmissions(scorecardAttendeeList))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schedulingAttendees])
+  const [compiledScorecard, setCompiledScorecard] = useState<CompiledScorecard | null>(null)
 
   // --- Module C state ---
   const [alignmentActions, setAlignmentActions] = useState<ExtractedAction[]>(MOCK_ALIGNMENT_ACTIONS)
@@ -498,21 +475,18 @@ export default function CycleDetail() {
             cycle={cycle}
             dispatched={scorecardDispatched}
             onDispatched={() => setScorecardDispatched(true)}
-            submissions={submissions}
-            onSubmissionUpdate={setSubmissions}
-            onEntriesReceived={setScorecardEntries}
-            compiledScores={compiledScores}
-            onCompiled={(scores: CompiledCategoryScore[]) => {
-              setCompiledScores(scores)
-              // Check if both attendees have submitted (2 scores per parameter)
-              const submitterCount = scores[0]?.parameters[0]?.scores.length ?? 0
-              if (submitterCount >= 2) {
+            compiledScorecard={compiledScorecard}
+            onCompiledFetched={(cs: CompiledScorecard) => {
+              setCompiledScorecard(cs)
+              const legacy = compiledScorecardToLegacy(cs)
+              setCompiledScores(legacy)
+              if (cs.internal_respondents > 0 && cs.vendor_respondents > 0) {
                 setSubmissionsSimulated(true)
                 advanceWorkflow(cycle!.cycle_id, 'SCORECARD_COMPILED')
               }
             }}
             cycleId={cycle.cycle_id}
-            scorecardAttendees={scorecardAttendees}
+            attendees={schedulingAttendees}
           />
         )}
 
@@ -539,10 +513,10 @@ export default function CycleDetail() {
           <VendorPrepTab
             cycle={cycle}
             vendorBrief={vendorBrief}
+            compiledScorecard={compiledScorecard}
             onBriefGenerated={setVendorBrief}
             onBriefApproved={() => {
               setBriefApproved(true)
-              // Module D: advance to VENDOR_PREP when brief is approved
               advanceWorkflow(cycle!.cycle_id, 'VENDOR_PREP')
             }}
             pushbackItems={pushbackItems}
@@ -777,28 +751,42 @@ function SchedulingTab({
 
 /* ── Scorecard Tab ────────────────────────────────────────── */
 function ScorecardTab({
-  cycle, dispatched, onDispatched, submissions, onSubmissionUpdate,
-  onEntriesReceived, compiledScores, onCompiled, cycleId, scorecardAttendees,
+  cycle, dispatched, onDispatched, compiledScorecard, onCompiledFetched, cycleId, attendees,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   dispatched: boolean
   onDispatched: () => void
-  submissions: StakeholderSubmission[]
-  onSubmissionUpdate: (s: StakeholderSubmission[]) => void
-  onEntriesReceived: (e: ScorecardEntry[]) => void
-  compiledScores: CompiledCategoryScore[] | null
-  onCompiled: (scores: CompiledCategoryScore[]) => void
+  compiledScorecard: CompiledScorecard | null
+  onCompiledFetched: (cs: CompiledScorecard) => void
   cycleId: string
-  scorecardAttendees: { vendor: ScorecardAttendee | null; stakeholder: ScorecardAttendee | null }
+  attendees: CycleAttendee[]
 }) {
-  const allSubmitted = submissions.every((s) => s.status === 'SUBMITTED')
-  const attendeeList = [scorecardAttendees.vendor, scorecardAttendees.stakeholder].filter(Boolean) as ScorecardAttendee[]
+  const [autoFetched, setAutoFetched] = useState(false)
 
-  // Bind attendees into the entry-builder functions so SubmissionTracker doesn't need to know
-  const boundGetVendorEntries = (cid: string, ts: string) =>
-    scorecardAttendees.vendor ? getVendorEntries(scorecardAttendees.vendor, cid, ts) : []
-  const boundGetStakeholderEntries = (cid: string, ts: string) =>
-    scorecardAttendees.stakeholder ? getStakeholderEntries(scorecardAttendees.stakeholder, cid, ts) : []
+  // Auto-fetch compiled scorecard when dispatched and not yet fetched
+  useEffect(() => {
+    if (!dispatched || autoFetched) return
+    const fetchCompiled = async () => {
+      try {
+        const cs = await getCompiledScorecard(cycleId)
+        if (cs.internal_respondents > 0 || cs.vendor_respondents > 0) {
+          onCompiledFetched(cs)
+        }
+      } catch { /* backend may not be ready */ }
+      setAutoFetched(true)
+    }
+    fetchCompiled()
+  }, [dispatched, autoFetched, cycleId, onCompiledFetched])
+
+  // Refresh compiled scorecard when submission tracker updates
+  const handleSubmissionsUpdated = useCallback(async () => {
+    try {
+      const cs = await getCompiledScorecard(cycleId)
+      if (cs.internal_respondents > 0 || cs.vendor_respondents > 0) {
+        onCompiledFetched(cs)
+      }
+    } catch { /* ignore */ }
+  }, [cycleId, onCompiledFetched])
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -807,24 +795,17 @@ function ScorecardTab({
         cycleId={cycleId}
         quarter={cycle.quarter}
         year={cycle.year}
-        attendees={attendeeList}
+        attendees={attendees}
         onDispatched={onDispatched}
       />
       {dispatched && (
         <SubmissionTracker
-          submissions={submissions}
-          onSubmissionUpdate={onSubmissionUpdate}
-          onEntriesReceived={onEntriesReceived}
-          onCompiled={onCompiled}
-          getVendorEntries={boundGetVendorEntries}
-          getStakeholderEntries={boundGetStakeholderEntries}
-          compileScores={compileScores}
           cycleId={cycleId}
-          simulated={allSubmitted}
+          onSubmissionsUpdated={handleSubmissionsUpdated}
         />
       )}
-      {compiledScores && compiledScores.length > 0 && (
-        <CompiledScorecardTable scores={compiledScores} />
+      {compiledScorecard && (compiledScorecard.internal_respondents > 0 || compiledScorecard.vendor_respondents > 0) && (
+        <CompiledScorecardTable scorecard={compiledScorecard} />
       )}
     </div>
   )
@@ -873,11 +854,12 @@ function AlignmentTab({
 
 /* ── Vendor Prep Tab ──────────────────────────────────────── */
 function VendorPrepTab({
-  cycle, vendorBrief, onBriefGenerated, onBriefApproved,
+  cycle, vendorBrief, compiledScorecard, onBriefGenerated, onBriefApproved,
   pushbackItems, pushbackResponses, onPushbackAdd, onGenerateResponses, onSelectResponse, onPushbackStatusChange,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   vendorBrief: VendorBrief | null
+  compiledScorecard?: CompiledScorecard | null
   onBriefGenerated: (b: VendorBrief) => void
   onBriefApproved: () => void
   pushbackItems: PushbackItem[]
@@ -892,6 +874,7 @@ function VendorPrepTab({
       <VendorBriefPanel
         vendorName={cycle.vendor_name}
         brief={vendorBrief}
+        compiledScorecard={compiledScorecard}
         onBriefGenerated={onBriefGenerated}
         onBriefApproved={onBriefApproved}
       />

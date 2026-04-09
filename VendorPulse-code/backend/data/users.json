@@ -3,533 +3,180 @@
     "userId": "u1",
     "name": "Alex Thompson",
     "email": "alex.thompson@zensar.com",
+    "gmail": "alexthompson@gmail.com",
     "role": "VMO_COORDINATOR",
     "organisation": "Zensar VMO",
-    "avatar": "AT",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": [
-      {
-        "date": "2026-04-07",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-08",
-        "slots": [
-          "10:00-11:00",
-          "13:00-14:00"
-        ]
-      },
-      {
-        "date": "2026-04-09",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00",
-          "15:00-16:00"
-        ]
-      },
-      {
-        "date": "2026-04-10",
-        "slots": [
-          "10:00-11:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-14",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00",
-          "16:00-17:00"
-        ]
-      }
-    ]
+    "avatar": "AT"
   },
   {
     "userId": "u2",
     "name": "Sarah Chen",
     "email": "sarah.chen@zensar.com",
+    "gmail": "sarahchen@gmail.com",
     "role": "EGB_CHAIR",
     "organisation": "Zensar IDT",
-    "avatar": "SC",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": [
-      {
-        "date": "2026-04-07",
-        "slots": [
-          "11:00-12:00",
-          "15:00-16:00"
-        ]
-      },
-      {
-        "date": "2026-04-08",
-        "slots": [
-          "10:00-11:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-09",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00",
-          "16:00-17:00"
-        ]
-      },
-      {
-        "date": "2026-04-10",
-        "slots": [
-          "10:00-11:00",
-          "13:00-14:00"
-        ]
-      },
-      {
-        "date": "2026-04-14",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00",
-          "14:00-15:00"
-        ]
-      }
-    ]
+    "avatar": "SC"
   },
   {
     "userId": "u3",
     "name": "Priya Sharma",
     "email": "priya.sharma@zensar.com",
+    "gmail": "priyasharma@gmail.com",
     "role": "INTERNAL_LEAD",
     "organisation": "Zensar IDT",
-    "avatar": "PS",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": [
-      {
-        "date": "2026-04-07",
-        "slots": [
-          "10:00-11:00",
-          "13:00-14:00",
-          "15:00-16:00"
-        ]
-      },
-      {
-        "date": "2026-04-08",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-09",
-        "slots": [
-          "10:00-11:00",
-          "13:00-14:00"
-        ]
-      },
-      {
-        "date": "2026-04-10",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00",
-          "15:00-16:00"
-        ]
-      },
-      {
-        "date": "2026-04-14",
-        "slots": [
-          "10:00-11:00",
-          "14:00-15:00"
-        ]
-      }
-    ]
+    "avatar": "PS"
   },
   {
     "userId": "u4",
     "name": "Marcus Williams",
     "email": "marcus.williams@zensar.com",
+    "gmail": "",
     "role": "VENDOR_MANAGER",
     "organisation": "Zensar VMO",
-    "avatar": "MW",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": [
-      {
-        "date": "2026-04-07",
-        "slots": [
-          "09:00-10:00",
-          "14:00-15:00",
-          "16:00-17:00"
-        ]
-      },
-      {
-        "date": "2026-04-08",
-        "slots": [
-          "11:00-12:00",
-          "13:00-14:00",
-          "15:00-16:00"
-        ]
-      },
-      {
-        "date": "2026-04-09",
-        "slots": [
-          "09:00-10:00",
-          "10:00-11:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-10",
-        "slots": [
-          "10:00-11:00",
-          "11:00-12:00"
-        ]
-      },
-      {
-        "date": "2026-04-14",
-        "slots": [
-          "09:00-10:00",
-          "13:00-14:00",
-          "15:00-16:00"
-        ]
-      }
-    ]
+    "avatar": "MW"
   },
   {
     "userId": "u5",
     "name": "James O'Brien",
     "email": "james.obrien@zensar.com",
+    "gmail": "",
     "role": "TECHNICAL_LEAD",
     "organisation": "Zensar IDT",
-    "avatar": "JO",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": [
-      {
-        "date": "2026-04-07",
-        "slots": [
-          "09:00-10:00",
-          "10:00-11:00",
-          "13:00-14:00"
-        ]
-      },
-      {
-        "date": "2026-04-08",
-        "slots": [
-          "09:00-10:00",
-          "14:00-15:00",
-          "16:00-17:00"
-        ]
-      },
-      {
-        "date": "2026-04-09",
-        "slots": [
-          "10:00-11:00",
-          "13:00-14:00",
-          "15:00-16:00"
-        ]
-      },
-      {
-        "date": "2026-04-10",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-14",
-        "slots": [
-          "10:00-11:00",
-          "13:00-14:00"
-        ]
-      }
-    ]
+    "avatar": "JO"
   },
   {
     "userId": "u6",
     "name": "Emma Davies",
     "email": "emma.davies@zensar.com",
+    "gmail": "",
     "role": "COMMERCIAL_LEAD",
     "organisation": "Zensar VMO",
-    "avatar": "ED",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": [
-      {
-        "date": "2026-04-07",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00"
-        ]
-      },
-      {
-        "date": "2026-04-08",
-        "slots": [
-          "10:00-11:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-09",
-        "slots": [
-          "09:00-10:00",
-          "15:00-16:00"
-        ]
-      },
-      {
-        "date": "2026-04-10",
-        "slots": [
-          "11:00-12:00",
-          "13:00-14:00"
-        ]
-      },
-      {
-        "date": "2026-04-14",
-        "slots": [
-          "09:00-10:00",
-          "14:00-15:00"
-        ]
-      }
-    ]
+    "avatar": "ED"
   },
   {
     "userId": "u7",
     "name": "Raj Patel",
     "email": "raj.patel@novatech.com",
+    "gmail": "",
     "role": "VENDOR_MANAGER",
     "organisation": "NovaTech Services",
-    "avatar": "RP",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": [
-      {
-        "date": "2026-04-07",
-        "slots": [
-          "10:00-11:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-08",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00"
-        ]
-      },
-      {
-        "date": "2026-04-09",
-        "slots": [
-          "11:00-12:00",
-          "15:00-16:00"
-        ]
-      },
-      {
-        "date": "2026-04-10",
-        "slots": [
-          "10:00-11:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-14",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00"
-        ]
-      }
-    ]
+    "avatar": "RP"
   },
   {
     "userId": "u8",
     "name": "Lisa Wang",
     "email": "lisa.wang@novatech.com",
+    "gmail": "",
     "role": "TECHNICAL_LEAD",
     "organisation": "NovaTech Services",
-    "avatar": "LW",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": [
-      {
-        "date": "2026-04-07",
-        "slots": [
-          "09:00-10:00",
-          "13:00-14:00"
-        ]
-      },
-      {
-        "date": "2026-04-08",
-        "slots": [
-          "10:00-11:00",
-          "15:00-16:00"
-        ]
-      },
-      {
-        "date": "2026-04-09",
-        "slots": [
-          "09:00-10:00",
-          "11:00-12:00"
-        ]
-      },
-      {
-        "date": "2026-04-10",
-        "slots": [
-          "11:00-12:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-14",
-        "slots": [
-          "10:00-11:00",
-          "15:00-16:00"
-        ]
-      }
-    ]
+    "avatar": "LW"
   },
   {
     "userId": "u9",
     "name": "David Kim",
     "email": "david.kim@novatech.com",
+    "gmail": "",
     "role": "COMMERCIAL_LEAD",
     "organisation": "NovaTech Services",
-    "avatar": "DK",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": [
-      {
-        "date": "2026-04-08",
-        "slots": [
-          "09:00-10:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-09",
-        "slots": [
-          "10:00-11:00",
-          "14:00-15:00"
-        ]
-      },
-      {
-        "date": "2026-04-10",
-        "slots": [
-          "09:00-10:00",
-          "15:00-16:00"
-        ]
-      },
-      {
-        "date": "2026-04-14",
-        "slots": [
-          "11:00-12:00",
-          "13:00-14:00"
-        ]
-      }
-    ]
+    "avatar": "DK"
   },
   {
     "userId": "u10",
     "name": "Tom Baker",
     "email": "tom.baker@zensar.com",
+    "gmail": "",
     "role": "VENDOR_MANAGER",
     "organisation": "Zensar VMO",
-    "avatar": "TB",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": []
+    "avatar": "TB"
   },
   {
     "userId": "u11",
     "name": "Nina Okafor",
     "email": "nina.okafor@coresystems.com",
+    "gmail": "",
     "role": "Member",
     "organisation": "CoreSystems Ltd",
-    "avatar": "NO",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": []
+    "avatar": "NO"
   },
   {
     "userId": "u12",
     "name": "Liam Nguyen",
     "email": "liam.nguyen@meridianit.com",
+    "gmail": "",
     "role": "Member",
     "organisation": "Meridian IT",
-    "avatar": "LN",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": []
+    "avatar": "LN"
   },
   {
     "userId": "u13",
     "name": "Sophie Hart",
     "email": "sophie.hart@zensar.com",
+    "gmail": "",
     "role": "INTERNAL_LEAD",
     "organisation": "Zensar IDT",
-    "avatar": "SH",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": []
+    "avatar": "SH"
   },
   {
     "userId": "u14",
     "name": "Carlos Rivera",
     "email": "carlos.rivera@novatech.com",
+    "gmail": "",
     "role": "Member",
     "organisation": "NovaTech Services",
-    "avatar": "CR",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": []
+    "avatar": "CR"
   },
   {
     "userId": "u15",
     "name": "Aisha Malik",
     "email": "aisha.malik@coresystems.com",
+    "gmail": "",
     "role": "Member",
     "organisation": "CoreSystems Ltd",
-    "avatar": "AM",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": []
+    "avatar": "AM"
   },
   {
     "userId": "u16",
     "name": "Anup Kesarwani",
     "email": "anup.kesarwani@zensar.com",
+    "gmail": "anupkesarwani3537@gmail.com",
     "role": "INTERNAL_LEAD",
     "organisation": "Zensar VMO",
-    "avatar": "AK",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": []
+    "avatar": "AK"
   },
   {
     "userId": "u17",
     "name": "Kanishk Punekar",
     "email": "kanishk.punekar@zensar.com",
+    "gmail": "kanishkpunekar54@gmail.com",
     "role": "TECHNICAL_LEAD",
     "organisation": "Zensar IDT",
-    "avatar": "KP",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": []
+    "avatar": "KP"
   },
   {
     "userId": "u18",
     "name": "Aditya Vadgave",
     "email": "aditya.vadgave@zensar.com",
+    "gmail": "adivadgave16@gmail.com",
     "role": "VENDOR_MANAGER",
     "organisation": "Zensar VMO",
-    "avatar": "AV",
-    "createdAt": "2026-01-01T08:00:00Z",
-    "availability": []
+    "avatar": "AV"
   },
   {
     "userId": "u19",
-    "name": "chinmay kotkar",
-    "email": "chinmay.kotkar@derivco.co.im",
+    "name": "Vivek Kulkarni",
+    "email": "v.kulkarni3@zensar.com",
+    "gmail": "vivekkulkarni@gmail.com",
     "role": "VENDOR_MANAGER",
-    "organisation": "Derivco VMO",
-    "avatar": "AV",
-    "createdAt": "",
-    "availability": []
+    "organisation": "Zensar VMO",
+    "avatar": "VK"
   },
   {
     "userId": "u20",
     "name": "abhishek Biyani",
     "email": "abhishek.biyani@zensar.com",
+    "gmail": "",
     "role": "VENDOR_MANAGER",
     "organisation": "Derivco VMO",
-    "avatar": "AB",
-    "createdAt": "",
-    "availability": []
+    "avatar": "AB"
   }
 ]

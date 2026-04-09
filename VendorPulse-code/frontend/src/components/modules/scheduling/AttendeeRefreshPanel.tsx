@@ -18,7 +18,7 @@ import { ROLE_LABELS } from '@/types/cycle.types'
 import type { StakeholderRole } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
 import { getPreferredOrganizerEmail, getTokenOwnerOrganizerEmail } from '@/lib/schedulingApi'
-import { MOCK_SYSTEM_USERS, type SystemUser } from '@/mock/scheduling.mock'
+import type { SystemUser } from '@/lib/schedulingApi'
 
 interface AttendeeRefreshPanelProps {
   cycleId: string
@@ -44,6 +44,7 @@ function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel
   const [showDropdown, setShowDropdown] = useState(false)
   const [selected, setSelected] = useState<SystemUser | null>(null)
   const [role, setRole] = useState<StakeholderRole>('VMO_COORDINATOR')
+  const [attendeeType, setAttendeeType] = useState<'Internal Stakeholder' | 'Vendor'>('Internal Stakeholder')
   const [isKey, setIsKey] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,15 +63,8 @@ function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel
         setShowDropdown(true)
       })
       .catch(() => {
-        const filtered = MOCK_SYSTEM_USERS.filter(
-          (u) =>
-            !existingAttendeeIds.includes(u.user_id) &&
-            (u.name.toLowerCase().includes(q) ||
-              u.email.toLowerCase().includes(q) ||
-              u.organisation.toLowerCase().includes(q))
-        )
-        setResults(filtered)
-        setShowDropdown(true)
+        setResults([])
+        setShowDropdown(false)
       })
   }, [query, existingAttendeeIds])
 
@@ -116,8 +110,10 @@ function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel
               stakeholder_id: `s_${Date.now()}`,
               name: selected.name,
               email: selected.email,
+              gmail: selected.gmail || '',
               role,
               organisation: selected.organisation,
+              type: attendeeType,
               is_key: isKey,
               user_id: selected.user_id,
             },
@@ -137,8 +133,10 @@ function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel
         stakeholder_id: `s_${Date.now()}`,
         name: selected.name,
         email: selected.email,
+        gmail: selected.gmail || '',
         role,
         organisation: selected.organisation,
+        type: attendeeType,
         is_key: isKey,
         invite_status: 'PENDING',
         availability_submitted: false,
@@ -228,6 +226,17 @@ function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel
               ))}
             </select>
           </div>
+          <div className="space-y-1">
+            <label className="text-xs text-slate-600 dark:text-slate-400">Type *</label>
+            <select
+              value={attendeeType}
+              onChange={(e) => setAttendeeType(e.target.value as 'Internal Stakeholder' | 'Vendor')}
+              className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="Internal Stakeholder">Internal Stakeholder</option>
+              <option value="Vendor">Vendor</option>
+            </select>
+          </div>
           <div className="flex items-end pb-1.5">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -293,6 +302,7 @@ export default function AttendeeRefreshPanel({
 
   const [showAddForm, setShowAddForm] = useState(false)
   const [togglingKey, setTogglingKey] = useState<string | null>(null)
+  const [togglingType, setTogglingType] = useState<string | null>(null)
   const [isGraphSearching, setIsGraphSearching] = useState(false)
   const [graphStatus, setGraphStatus] = useState<string>('')
   const [graphError, setGraphError] = useState<string | null>(null)
@@ -325,6 +335,33 @@ export default function AttendeeRefreshPanel({
       )
     } finally {
       setTogglingKey(null)
+    }
+  }
+
+  async function handleToggleType(attendee: CycleAttendee) {
+    const newType = attendee.type === 'Vendor' ? 'Internal Stakeholder' : 'Vendor'
+    setTogglingType(attendee.attendee_id)
+    try {
+      const updated = await apiFetch<{ attendee: CycleAttendee }>(
+        `/api/cycles/${cycleId}/attendees/${attendee.attendee_id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ type: newType }),
+        }
+      )
+      onAttendeesChanged(
+        attendees.map((a) =>
+          a.attendee_id === attendee.attendee_id ? { ...a, ...updated.attendee } : a
+        )
+      )
+    } catch {
+      onAttendeesChanged(
+        attendees.map((a) =>
+          a.attendee_id === attendee.attendee_id ? { ...a, type: newType as CycleAttendee['type'] } : a
+        )
+      )
+    } finally {
+      setTogglingType(null)
     }
   }
 
@@ -575,6 +612,7 @@ export default function AttendeeRefreshPanel({
                   <th className="text-left px-5 py-2.5 font-medium">Name</th>
                   <th className="text-left px-4 py-2.5 font-medium">Role</th>
                   <th className="text-left px-4 py-2.5 font-medium">Organisation</th>
+                  <th className="text-left px-4 py-2.5 font-medium">Type</th>
                   <th className="text-left px-4 py-2.5 font-medium">Key</th>
                 </tr>
               </thead>
@@ -594,6 +632,25 @@ export default function AttendeeRefreshPanel({
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
                       {a.organisation}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleToggleType(a)}
+                        disabled={togglingType === a.attendee_id}
+                        title={`Switch to ${a.type === 'Vendor' ? 'Internal Stakeholder' : 'Vendor'}`}
+                        className={cn(
+                          'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors',
+                          a.type === 'Vendor'
+                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/50'
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50',
+                          togglingType === a.attendee_id && 'opacity-50 cursor-not-allowed'
+                        )}
+                      >
+                        {togglingType === a.attendee_id ? (
+                          <Loader2 size={11} className="animate-spin" />
+                        ) : null}
+                        {a.type === 'Vendor' ? 'Vendor' : 'Internal'}
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <button

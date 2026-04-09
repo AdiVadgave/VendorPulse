@@ -1,42 +1,22 @@
 [
   {
-    "cycle_id": "c1",
+    "cycle_id": "c_94b73728",
+    "vendor_id": "v_custom",
+    "vendor_name": "zensar",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "AVAILABILITY_COLLECTED",
+    "created_at": "2026-04-09T09:37:16.495109+00:00",
+    "updated_at": "2026-04-09T09:37:50.607181+00:00"
+  },
+  {
+    "cycle_id": "c_a0edf5d5",
     "vendor_id": "v1",
     "vendor_name": "NovaTech Services",
     "quarter": "Q1",
     "year": 2026,
-    "workflow_state": "POST_MEETING_COMPLETE",
-    "created_at": "2026-03-01T09:00:00Z",
-    "updated_at": "2026-03-28T11:30:00Z"
-  },
-  {
-    "cycle_id": "c2",
-    "vendor_id": "v2",
-    "vendor_name": "CoreSystems Ltd",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "SCORECARD_COMPILED",
-    "created_at": "2026-03-02T10:00:00Z",
-    "updated_at": "2026-03-18T11:00:00Z"
-  },
-  {
-    "cycle_id": "c3",
-    "vendor_id": "v3",
-    "vendor_name": "Meridian IT",
-    "quarter": "Q1",
-    "year": 2026,
     "workflow_state": "MEETING_SCHEDULED",
-    "created_at": "2026-03-10T08:00:00Z",
-    "updated_at": "2026-04-02T10:19:02.445103+00:00"
-  },
-  {
-    "cycle_id": "c_44ce9222",
-    "vendor_id": "v_custom",
-    "vendor_name": "Zensar",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-08T12:15:59.832240+00:00",
-    "updated_at": "2026-04-08T12:18:41.999832+00:00"
+    "created_at": "2026-04-09T09:40:33.384637+00:00",
+    "updated_at": "2026-04-09T09:48:38.835022+00:00"
   }
 ]

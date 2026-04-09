@@ -1,144 +1,5 @@
 [
   {
-    "slot_id": "sl_7dd84651",
-    "cycle_id": "c3",
-    "proposed_time": "2026-04-09T09:00:00Z",
-    "organiser_available": true,
-    "exec_sponsor_available": true,
-    "rank_score": 30.6,
-    "is_approved": true,
-    "attendance_count": 5,
-    "total_attendees": 9,
-    "conflict_count": 4,
-    "attending": [
-      "Alex Johnson",
-      "Sarah Chen",
-      "Marcus Chen",
-      "Emma Davies",
-      "Lisa Wang"
-    ],
-    "conflicts": [
-      "Priya Sharma",
-      "James O B3rien",
-      "Raj Patel",
-      "David Kim"
-    ],
-    "approved_by": "u1",
-    "approved_at": "2026-04-02T10:19:01.946746+00:00"
-  },
-  {
-    "slot_id": "sl_e1496e7a",
-    "cycle_id": "c3",
-    "proposed_time": "2026-04-14T09:00:00Z",
-    "organiser_available": true,
-    "exec_sponsor_available": true,
-    "rank_score": 30.6,
-    "is_approved": false,
-    "attendance_count": 5,
-    "total_attendees": 9,
-    "conflict_count": 4,
-    "attending": [
-      "Alex Johnson",
-      "Sarah Chen",
-      "Marcus Chen",
-      "Emma Davies",
-      "Raj Patel"
-    ],
-    "conflicts": [
-      "Priya Sharma",
-      "James O Brien",
-      "Lisa Wang",
-      "David Kim"
-    ]
-  },
-  {
-    "slot_id": "sl_0c856071",
-    "cycle_id": "c3",
-    "proposed_time": "2026-04-08T10:00:00Z",
-    "organiser_available": true,
-    "exec_sponsor_available": true,
-    "rank_score": 9.4,
-    "is_approved": false,
-    "attendance_count": 4,
-    "total_attendees": 9,
-    "conflict_count": 5,
-    "attending": [
-      "Alex Johnson",
-      "Sarah Chen",
-      "Emma Davies",
-      "Lisa Wang"
-    ],
-    "conflicts": [
-      "Priya Sharma",
-      "Marcus Chen",
-      "James O Brien",
-      "Raj Patel",
-      "David Kim"
-    ]
-  },
-  {
-    "slot_id": "slot_474c1e09",
-    "cycle_id": "c_44ce9222",
-    "proposed_time": "2026-04-20T15:00:00.0000000",
-    "proposed_time_zone": "UTC",
-    "duration_minutes": 30,
-    "organiser_available": true,
-    "exec_sponsor_available": true,
-    "rank_score": 100,
-    "is_approved": true,
-    "attendance_count": 3,
-    "total_attendees": 3,
-    "conflict_count": 0,
-    "attending": [
-      "anup.kesarwani@zensar.com",
-      "kanishk.punekar@zensar.com",
-      "v.kulkarni3@zensar.com"
-    ],
-    "conflicts": [],
-    "approved_by": "coordinator",
-    "approved_at": "2026-04-08T12:20:49.457016+00:00"
-  },
-  {
-    "slot_id": "slot_90b31898",
-    "cycle_id": "c_44ce9222",
-    "proposed_time": "2026-04-20T15:30:00.0000000",
-    "proposed_time_zone": "UTC",
-    "duration_minutes": 30,
-    "organiser_available": true,
-    "exec_sponsor_available": true,
-    "rank_score": 90,
-    "is_approved": false,
-    "attendance_count": 3,
-    "total_attendees": 3,
-    "conflict_count": 0,
-    "attending": [
-      "anup.kesarwani@zensar.com",
-      "kanishk.punekar@zensar.com",
-      "v.kulkarni3@zensar.com"
-    ],
-    "conflicts": []
-  },
-  {
-    "slot_id": "slot_e6b4c36f",
-    "cycle_id": "c_44ce9222",
-    "proposed_time": "2026-04-20T16:00:00.0000000",
-    "proposed_time_zone": "UTC",
-    "duration_minutes": 30,
-    "organiser_available": true,
-    "exec_sponsor_available": true,
-    "rank_score": 80,
-    "is_approved": false,
-    "attendance_count": 3,
-    "total_attendees": 3,
-    "conflict_count": 0,
-    "attending": [
-      "anup.kesarwani@zensar.com",
-      "kanishk.punekar@zensar.com",
-      "v.kulkarni3@zensar.com"
-    ],
-    "conflicts": []
-  },
-  {
     "slot_id": "slot_230d62ac",
     "cycle_id": "c_c2554135",
     "proposed_time": "2026-04-08T15:00:00.0000000",
@@ -1143,5 +1004,28 @@
       "Anup Kesarwani"
     ],
     "conflicts": []
+  },
+  {
+    "slot_id": "slot_b72532f7",
+    "cycle_id": "c_a0edf5d5",
+    "proposed_time": "2026-04-13T06:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 60.0,
+    "is_approved": true,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Aditya Vadgave",
+      "abhishek.biyani@zensar.com",
+      "Kanishk Punekar"
+    ],
+    "tentative": [],
+    "conflicts": [],
+    "approved_by": "coordinator",
+    "approved_at": "2026-04-09T09:48:31.961368+00:00"
   }
 ]

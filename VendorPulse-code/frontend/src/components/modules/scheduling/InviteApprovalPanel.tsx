@@ -264,7 +264,7 @@ export default function InviteApprovalPanel({
                 Agenda:
               </p>
               <ol className="list-decimal list-inside space-y-0.5 text-xs text-slate-600 dark:text-slate-400">
-                <li>Q1 Performance Review &amp; Scorecard Discussion</li>
+                <li>{quarter} Performance Review &amp; Scorecard Discussion</li>
                 <li>Key Issues, Concerns and Pushback Responses</li>
                 <li>Commitments and Action Items Review</li>
                 <li>Forward Planning &amp; AOB</li>

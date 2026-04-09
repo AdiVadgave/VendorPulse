@@ -26,6 +26,7 @@ interface AttendeeRefreshPanelProps {
   onAttendeesChanged: (updated: CycleAttendee[]) => void
   onDispatchComplete: () => void
   onResponsesSimulated: (updated: CycleAttendee[], slots: SlotProposal[]) => void
+  onBackToAttendance?: () => void
 }
 
 // ── Search & Add Attendee Form ───────────────────────────────────────────────
@@ -282,6 +283,7 @@ export default function AttendeeRefreshPanel({
   attendees,
   onAttendeesChanged,
   onResponsesSimulated,
+  onBackToAttendance,
 }: AttendeeRefreshPanelProps) {
   const today = new Date()
   const defaultStartDate = today.toISOString().split('T')[0]
@@ -420,6 +422,15 @@ export default function AttendeeRefreshPanel({
               </p>
             </div>
           </div>
+          {onBackToAttendance && (
+            <button
+              type="button"
+              onClick={onBackToAttendance}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              Back to Attendance
+            </button>
+          )}
         </div>
 
         <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-400 flex items-start gap-2">

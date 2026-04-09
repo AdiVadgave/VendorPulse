@@ -20,7 +20,7 @@ import {
   MOCK_SLOT_PROPOSALS,
   MOCK_ATTENDEES_RSVP,
 } from '@/mock/scheduling.mock'
-import { fetchAttendees, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
+import { completeAttendanceConfirmation, fetchAttendeesSeeded, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
 import {
   deriveScorecardAttendees,
   getInitialSubmissions,
@@ -238,7 +238,7 @@ export default function CycleDetail() {
   // Load real attendees from backend for API-created (non-mock) cycles
   useEffect(() => {
     if (isMockCycle || !cycleId) return
-    fetchAttendees(cycleId)
+    fetchAttendeesSeeded(cycleId, { seedFromPrevious: true })
       .then((attendees) => {
         if (attendees.length > 0) setSchedulingAttendees(attendees)
       })
@@ -628,7 +628,7 @@ function SchedulingTab({
   onPhaseChange: (p: SchedulingPhase) => void
   onAttendeesUpdated: (a: CycleAttendee[]) => void
   onSlotsReceived: (slots: SlotProposal[]) => void
-  onSlotSelected: (id: string) => void
+  onSlotSelected: (id: string | null) => void
   onSlotTimeZoneSelected: (tz: 'IST' | 'UTC' | 'GMT') => void
   isMockCycle: boolean
   onScorecardProceed: () => void
@@ -668,8 +668,15 @@ function SchedulingTab({
           cycleId={cycle.cycle_id}
           attendees={attendees}
           onAttendeesChanged={onAttendeesUpdated}
-          onConfirmationComplete={(confirmed) => {
+          onConfirmationComplete={async (confirmed) => {
             onAttendeesUpdated(confirmed)
+
+            // Persist workflow state for backend-enforced actions (e.g., rank-slots).
+            // Only do this when we actually have attendees to confirm.
+            if (!isMockCycle && confirmed.length > 0) {
+              await completeAttendanceConfirmation(cycle.cycle_id)
+            }
+
             onPhaseChange('attendee_refresh')
           }}
         />
@@ -680,6 +687,7 @@ function SchedulingTab({
           attendees={attendees}
           onAttendeesChanged={onAttendeesUpdated}
           onDispatchComplete={() => {}}
+          onBackToAttendance={() => onPhaseChange('attendance_confirmation')}
           onResponsesSimulated={(updated, rankedSlots) => {
             onAttendeesUpdated(updated)
             onSlotsReceived(rankedSlots)
@@ -709,6 +717,10 @@ function SchedulingTab({
             quarter={cycle.quarter}
             year={cycle.year}
             timeZoneOverride={selectedSlotTimeZone}
+            onBack={() => {
+              onSlotSelected(null)
+              onPhaseChange('slot_ranking')
+            }}
             onInviteSent={() => {
               // Meeting URL returned from Graph can be logged or used, but skipped here to simplify UI
               // For mock cycles seed pre-built RSVP data; for new cycles keep attendees as-is

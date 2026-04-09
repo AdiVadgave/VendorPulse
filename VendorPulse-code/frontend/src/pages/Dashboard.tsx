@@ -253,7 +253,7 @@ function NewCycleModal({
 export default function Dashboard() {
   const navigate = useNavigate()
   const today = new Date()
-  const { cycles, addCycle, setCycles, removeCycle } = useCycleStore()
+  const { cycles, addCycle, setCycles, removeCycle, getWorkflowState } = useCycleStore()
   const [showNewCycleModal, setShowNewCycleModal] = useState(false)
   const [isLoadingCycles, setIsLoadingCycles] = useState(false)
   const [loadingError, setLoadingError] = useState<string | null>(null)
@@ -398,8 +398,10 @@ export default function Dashboard() {
             )}
 
             {cycles.map((cycle) => {
-              const badge = STATE_BADGE[cycle.workflow_state]
-              const stateIdx = getStateIndex(cycle.workflow_state as WorkflowState)
+              const effectiveState = getWorkflowState(cycle.cycle_id)
+              const badge = STATE_BADGE[effectiveState]
+              const stateIdx = getStateIndex(effectiveState)
+              const stepNumber = stateIdx >= 0 ? stateIdx + 1 : 0
               const trend = VENDOR_TRENDS[cycle.vendor_name]
 
               return (
@@ -456,7 +458,7 @@ export default function Dashboard() {
                           badge?.classes ?? 'bg-slate-100 text-slate-600'
                         )}
                       >
-                        {WORKFLOW_STATE_LABELS[cycle.workflow_state as WorkflowState] ?? cycle.workflow_state}
+                        {WORKFLOW_STATE_LABELS[effectiveState] ?? effectiveState}
                       </span>
                       <ArrowRight size={14} className="text-slate-400" />
                     </div>
@@ -466,14 +468,17 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 rounded-full transition-all duration-500"
                         style={{
-                          width: `${((stateIdx + 1) / WORKFLOW_STATES.length) * 100}%`,
+                          width:
+                            stateIdx >= 0
+                              ? `${(stepNumber / WORKFLOW_STATES.length) * 100}%`
+                              : '0%',
                         }}
                       />
                     </div>
                     <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">
-                      {stateIdx + 1}/{WORKFLOW_STATES.length}
+                      {stepNumber}/{WORKFLOW_STATES.length}
                     </span>
                   </div>
                 </div>

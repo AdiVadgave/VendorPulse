@@ -60,7 +60,7 @@ export const TAB_MIN_STATE_INDEX: Record<TabKey, number> = {
   alignment: 6, // SCORECARD_COMPILED
   'vendor-prep': 7, // INTERNAL_ALIGNMENT
   meeting: 8, // VENDOR_PREP
-  actions: 0,
+  actions: 10, // POST_MEETING_COMPLETE
 }
 
 /**

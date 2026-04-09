@@ -1,8 +1,25 @@
 import { create } from 'zustand'
 import type { TabKey } from '@/utils/constants'
 import type { WorkflowState } from '@/utils/constants'
+import { WORKFLOW_STATES } from '@/utils/constants'
 import type { GovernanceCycle } from '@/types/cycle.types'
 import { MOCK_CYCLES } from '@/mock/cycles.mock'
+
+function workflowIndex(state: WorkflowState | undefined): number {
+  if (!state) return -1
+  return WORKFLOW_STATES.indexOf(state)
+}
+
+function pickMostAdvanced(
+  localState: WorkflowState | undefined,
+  backendState: WorkflowState
+): WorkflowState {
+  const localIdx = workflowIndex(localState)
+  const backendIdx = workflowIndex(backendState)
+  if (localIdx === -1) return backendState
+  if (backendIdx === -1) return localState
+  return localIdx >= backendIdx ? localState : backendState
+}
 
 interface CycleStore {
   activeCycleId: string | null
@@ -53,6 +70,9 @@ export const useCycleStore = create<CycleStore>()((set, get) => ({
 
   advanceWorkflow: (cycleId, newState) =>
     set((s) => ({
+      cycles: s.cycles.map((c) =>
+        c.cycle_id === cycleId ? { ...c, workflow_state: newState } : c
+      ),
       workflowStates: { ...s.workflowStates, [cycleId]: newState },
     })),
 
@@ -63,12 +83,21 @@ export const useCycleStore = create<CycleStore>()((set, get) => ({
     })),
 
   setCycles: (cycles) =>
-    set(() => ({
-      cycles,
-      workflowStates: Object.fromEntries(
-        cycles.map((cycle) => [cycle.cycle_id, cycle.workflow_state])
-      ) as Record<string, WorkflowState>,
-    })),
+    set((s) => {
+      const mergedCycles = cycles.map((cycle) => {
+        const mergedState = pickMostAdvanced(s.workflowStates[cycle.cycle_id], cycle.workflow_state)
+        return mergedState === cycle.workflow_state
+          ? cycle
+          : { ...cycle, workflow_state: mergedState }
+      })
+
+      return {
+        cycles: mergedCycles,
+        workflowStates: Object.fromEntries(
+          mergedCycles.map((cycle) => [cycle.cycle_id, cycle.workflow_state])
+        ) as Record<string, WorkflowState>,
+      }
+    }),
 
   removeCycle: (cycleId) =>
     set((s) => {
@@ -82,12 +111,15 @@ export const useCycleStore = create<CycleStore>()((set, get) => ({
 
   upsertCycle: (cycle) =>
     set((s) => {
+      const mergedState = pickMostAdvanced(s.workflowStates[cycle.cycle_id], cycle.workflow_state)
+      const nextCycle =
+        mergedState === cycle.workflow_state ? cycle : { ...cycle, workflow_state: mergedState }
       const exists = s.cycles.some((c) => c.cycle_id === cycle.cycle_id)
       return {
         cycles: exists
-          ? s.cycles.map((c) => (c.cycle_id === cycle.cycle_id ? cycle : c))
-          : [cycle, ...s.cycles],
-        workflowStates: { ...s.workflowStates, [cycle.cycle_id]: cycle.workflow_state },
+          ? s.cycles.map((c) => (c.cycle_id === nextCycle.cycle_id ? nextCycle : c))
+          : [nextCycle, ...s.cycles],
+        workflowStates: { ...s.workflowStates, [nextCycle.cycle_id]: nextCycle.workflow_state },
       }
     }),
 }))

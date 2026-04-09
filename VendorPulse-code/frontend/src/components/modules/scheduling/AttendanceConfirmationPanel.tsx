@@ -21,7 +21,7 @@ interface AttendanceConfirmationPanelProps {
   cycleId: string
   attendees: CycleAttendee[]
   onAttendeesChanged: (updated: CycleAttendee[]) => void
-  onConfirmationComplete: (confirmed: CycleAttendee[]) => void
+  onConfirmationComplete: (confirmed: CycleAttendee[]) => void | Promise<void>
 }
 
 const STATUS_CONFIG: Record<
@@ -153,6 +153,8 @@ export default function AttendanceConfirmationPanel({
   const [outreachSent, setOutreachSent] = useState(false)
   const [outreachError, setOutreachError] = useState<string | null>(null)
   const [simError, setSimError] = useState<string | null>(null)
+  const [isProceeding, setIsProceeding] = useState(false)
+  const [proceedError, setProceedError] = useState<string | null>(null)
 
   // Derive statuses — default to PENDING if not set
   const withStatus: (CycleAttendee & { confirmation_status: AttendanceConfirmationStatus })[] =
@@ -264,7 +266,9 @@ export default function AttendanceConfirmationPanel({
     }
   }
 
-  function handleProceed() {
+  async function handleProceed() {
+    setIsProceeding(true)
+    setProceedError(null)
     // Build final attendee list: swap out DECLINED/REPLACED with replacements
     const finalAttendees = withStatus.flatMap((a) => {
       if (a.confirmation_status === 'DECLINED' && !a.replaced_by) return [] // remove with no replacement
@@ -287,7 +291,14 @@ export default function AttendanceConfirmationPanel({
       }
       return [a]
     })
-    onConfirmationComplete(finalAttendees)
+
+    try {
+      await Promise.resolve(onConfirmationComplete(finalAttendees))
+    } catch (e) {
+      setProceedError(e instanceof Error ? e.message : 'Failed to proceed.')
+    } finally {
+      setIsProceeding(false)
+    }
   }
 
   return (
@@ -526,16 +537,25 @@ export default function AttendanceConfirmationPanel({
 
             <button
               onClick={handleProceed}
-              disabled={!allResolved}
+              disabled={!allResolved || isProceeding}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors',
-                !allResolved && 'opacity-50 cursor-not-allowed'
+                (!allResolved || isProceeding) && 'opacity-50 cursor-not-allowed'
               )}
             >
-              <ArrowRight size={14} />
-              Proceed to Add Attendees
+              {isProceeding ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+              {isProceeding ? 'Proceeding…' : 'Proceed to Add Attendees'}
             </button>
           </div>
+
+          {proceedError && (
+            <div className="px-5 pb-4">
+              <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                <AlertCircle size={12} />
+                {proceedError}
+              </p>
+            </div>
+          )}
         </div>
       )}
 

@@ -203,6 +203,52 @@ def poll_and_store(form_id: str | None = None) -> dict:
     }
 
 
+def fetch_raw_form_responses(form_id: str | None = None) -> dict:
+    """Fetch raw responses directly from Google Forms API without any parsing/mapping."""
+    fid = form_id or settings.google_form_id
+    print(f"[FORMS-RAW] fetch_raw_form_responses called with form_id={form_id}, resolved fid={fid}")
+    if not fid:
+        raise GoogleFormsError("GOOGLE_FORM_ID is not configured in .env")
+
+    service = _get_forms_service()
+
+    # Fetch form schema (for reference)
+    print(f"[FORMS-RAW] Fetching form schema for formId={fid}...")
+    try:
+        form = service.forms().get(formId=fid).execute()
+        print(f"[FORMS-RAW] Form title: '{form.get('info', {}).get('title', 'N/A')}', items: {len(form.get('items', []))}")
+    except Exception as exc:
+        print(f"[FORMS-RAW] ERROR fetching form schema: {type(exc).__name__}: {exc}")
+        raise
+
+    # Build question_id -> title lookup for convenience
+    question_titles = {}
+    for item in form.get("items", []):
+        q = item.get("questionItem", {}).get("question", {})
+        q_id = q.get("questionId", "")
+        title = item.get("title", "")
+        if q_id:
+            question_titles[q_id] = title
+
+    # Fetch raw responses
+    print(f"[FORMS-RAW] Fetching responses for formId={fid}...")
+    try:
+        resp = service.forms().responses().list(formId=fid).execute()
+        raw_responses = resp.get("responses", [])
+        print(f"[FORMS-RAW] Raw responses received: {len(raw_responses)}")
+    except Exception as exc:
+        print(f"[FORMS-RAW] ERROR fetching responses: {type(exc).__name__}: {exc}")
+        raise
+
+    return {
+        "form_id": fid,
+        "form_title": form.get("info", {}).get("title", ""),
+        "question_titles": question_titles,
+        "total": len(raw_responses),
+        "responses": raw_responses,
+    }
+
+
 def get_responses_for_cycle(cycle_id: str) -> list[dict]:
     """Return all stored responses that match a given cycle_id."""
     print(f"[FORMS-SERVICE] get_responses_for_cycle called with cycle_id={cycle_id}")

@@ -30,113 +30,13 @@
     "updated_at": "2026-04-02T10:19:02.445103+00:00"
   },
   {
-    "cycle_id": "c_44ce9222",
+    "cycle_id": "c_1355cf7d",
     "vendor_id": "v_custom",
     "vendor_name": "Zensar",
     "quarter": "Q1",
     "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-08T12:15:59.832240+00:00",
-    "updated_at": "2026-04-08T12:18:41.999832+00:00"
-  },
-  {
-    "cycle_id": "c_1bbd5d7a",
-    "vendor_id": "v_custom",
-    "vendor_name": "Amazon",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-09T07:11:53.128464+00:00",
-    "updated_at": "2026-04-09T07:19:17.069038+00:00"
-  },
-  {
-    "cycle_id": "c_df760153",
-    "vendor_id": "v_custom",
-    "vendor_name": "asdfasd",
-    "quarter": "Q1",
-    "year": 2026,
     "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-09T07:30:42.791606+00:00",
-    "updated_at": "2026-04-09T07:30:42.791606+00:00"
-  },
-  {
-    "cycle_id": "c_778b38f2",
-    "vendor_id": "v_custom",
-    "vendor_name": "asdfasd",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-09T07:30:42.806653+00:00",
-    "updated_at": "2026-04-09T07:30:42.806653+00:00"
-  },
-  {
-    "cycle_id": "c_ee4460d9",
-    "vendor_id": "v_custom",
-    "vendor_name": "asdfasd",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-09T07:30:46.988393+00:00",
-    "updated_at": "2026-04-09T07:30:46.988393+00:00"
-  },
-  {
-    "cycle_id": "c_e6767d95",
-    "vendor_id": "v_custom",
-    "vendor_name": "asdfasd",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-09T07:30:47.039342+00:00",
-    "updated_at": "2026-04-09T07:31:33.171705+00:00"
-  },
-  {
-    "cycle_id": "c_920b7eff",
-    "vendor_id": "v_custom",
-    "vendor_name": "asfdsadfasdsad",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-09T07:35:07.330817+00:00",
-    "updated_at": "2026-04-09T07:36:07.426350+00:00"
-  },
-  {
-    "cycle_id": "c_2c7ab163",
-    "vendor_id": "v_custom",
-    "vendor_name": "sadfasdfasdf",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-09T09:01:05.644288+00:00",
-    "updated_at": "2026-04-09T09:01:33.865527+00:00"
-  },
-  {
-    "cycle_id": "c_1a151918",
-    "vendor_id": "v1",
-    "vendor_name": "NovaTech Services",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-09T09:24:35.387984+00:00",
-    "updated_at": "2026-04-09T09:25:06.708018+00:00"
-  },
-  {
-    "cycle_id": "c_1a5bf887",
-    "vendor_id": "v_custom",
-    "vendor_name": "Test 10",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-09T10:12:54.307356+00:00",
-    "updated_at": "2026-04-09T10:13:15.578700+00:00"
-  },
-  {
-    "cycle_id": "c_fa237e54",
-    "vendor_id": "v_custom",
-    "vendor_name": "Test 11",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-09T10:26:20.893967+00:00",
-    "updated_at": "2026-04-09T10:26:58.163227+00:00"
+    "created_at": "2026-04-09T11:26:06.532609+00:00",
+    "updated_at": "2026-04-09T11:26:06.532609+00:00"
   }
 ]

@@ -16,6 +16,7 @@ from app.services.gmail_service import GmailSendError, build_scorecard_email, se
 from app.services.google_auth_service import is_authenticated
 from app.services.google_forms_service import (
     GoogleFormsError,
+    fetch_raw_form_responses,
     get_all_stored_responses,
     get_responses_for_cycle,
     poll_and_store,
@@ -157,6 +158,30 @@ def poll_form_responses(form_id: str | None = None):
         raise
 
     return PollResponse(**data)
+
+
+@router.get("/responses/raw")
+def get_raw_responses(form_id: str | None = None):
+    """Get raw Google Forms responses without any parsing or mapping."""
+    print(f"[SCORECARD-RAW] GET /responses/raw, form_id={form_id}")
+
+    if not is_authenticated():
+        print("[SCORECARD-RAW] ERROR: Not authenticated with Google")
+        raise HTTPException(
+            status_code=401,
+            detail="Google account not connected. Visit /auth/google to authenticate.",
+        )
+
+    try:
+        data = fetch_raw_form_responses(form_id)
+        print(f"[SCORECARD-RAW] Raw responses fetched: {data['total']} responses")
+        return data
+    except GoogleFormsError as exc:
+        print(f"[SCORECARD-RAW] GoogleFormsError: {exc}")
+        raise HTTPException(status_code=502, detail=str(exc))
+    except Exception as exc:
+        print(f"[SCORECARD-RAW] Unexpected error: {type(exc).__name__}: {exc}")
+        raise
 
 
 @router.get("/responses/{cycle_id}")

@@ -74,7 +74,7 @@ export default function TranscriptInput({ onParsed }: Props) {
         className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
       >
         <Sparkles size={14} />
-        {agentStatus === 'running' ? 'Parsing transcript...' : 'Parse Transcript with Claude'}
+        {agentStatus === 'running' ? 'Parsing transcript...' : 'Parse Transcript'}
       </button>
     </div>
   )

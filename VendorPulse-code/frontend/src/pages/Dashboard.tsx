@@ -16,7 +16,7 @@ import {
   Loader2,
   Trash2,
 } from 'lucide-react'
-import { WORKFLOW_STATE_LABELS, WORKFLOW_STATES } from '@/utils/constants'
+import { WORKFLOW_STATE_LABELS, WORKFLOW_STATES, TAB_LABELS, getDefaultTabFromState } from '@/utils/constants'
 import type { WorkflowState } from '@/utils/constants'
 import { cn } from '@/utils/cn'
 import { apiFetch } from '@/lib/api'
@@ -155,7 +155,7 @@ function NewCycleModal({
                   {v.name}
                 </option>
               ))}
-              <option value="__custom__">+ Custom vendor...</option>
+              <option value="__custom__">+ Add New Vendor</option>
             </select>
           </div>
 
@@ -528,16 +528,19 @@ export default function Dashboard() {
           Quick Access
         </p>
         <div className="flex flex-wrap gap-2">
-          {cycles.map((cycle) => (
-            <button
-              key={cycle.cycle_id}
-              onClick={() => navigate(`/cycles/${cycle.cycle_id}?tab=scheduling`)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-slate-700 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-800 rounded-lg text-sm transition-colors"
-            >
-              <Building2 size={13} />
-              {cycle.vendor_name} — Scheduling
-            </button>
-          ))}
+          {cycles.map((cycle) => {
+            const activeTab = getDefaultTabFromState(cycle.workflow_state as WorkflowState)
+            return (
+              <button
+                key={cycle.cycle_id}
+                onClick={() => navigate(`/cycles/${cycle.cycle_id}?tab=${activeTab}`)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-slate-700 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-800 rounded-lg text-sm transition-colors"
+              >
+                <Building2 size={13} />
+                {cycle.vendor_name} — {TAB_LABELS[activeTab]}
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>

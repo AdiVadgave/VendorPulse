@@ -1,4 +1,4 @@
-import type { ScorecardCategory } from './scorecard.types'
+import type { ScorecardCategory, ScorecardCategoryKey } from './scorecard.types'
 
 export interface CycleTrend {
   cycle_label: string // e.g. "Q1 2025"
@@ -47,4 +47,24 @@ export interface CrossVendorDataPoint {
   novatech: number
   coresystems: number
   meridian: number
+}
+
+/** Per-category vendor vs stakeholder score comparison */
+export interface StakeholderVsVendorPoint {
+  category: string
+  vendor: number
+  stakeholder: number
+}
+
+/** Insight derived from comparing vendor and stakeholder scores at parameter level */
+export interface ParameterInsight {
+  parameter_key: string
+  parameter_label: string
+  category: ScorecardCategoryKey
+  category_label: string
+  vendor_score: number
+  stakeholder_score: number
+  average: number
+  /** Positive = vendor rated themselves higher than stakeholders */
+  gap: number
 }

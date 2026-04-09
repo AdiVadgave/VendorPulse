@@ -117,32 +117,6 @@
     "user_id": "u9"
   },
   {
-    "attendee_id": "att_7b14407a",
-    "cycle_id": "c_fa483f2f",
-    "stakeholder_id": "s_1775649145248",
-    "name": "Anup Kesarwani",
-    "email": "anup.kesarwani@zensar.com",
-    "role": "VMO_COORDINATOR",
-    "organisation": "Shell VMO",
-    "is_key": true,
-    "invite_status": "PENDING",
-    "availability_submitted": false,
-    "user_id": "u16"
-  },
-  {
-    "attendee_id": "att_fff29d07",
-    "cycle_id": "c_fa483f2f",
-    "stakeholder_id": "s_1775649155645",
-    "name": "Kanishk Punekar",
-    "email": "kanishk.punekar@zensar.com",
-    "role": "VMO_COORDINATOR",
-    "organisation": "Zensar VMO",
-    "is_key": true,
-    "invite_status": "PENDING",
-    "availability_submitted": false,
-    "user_id": "u17"
-  },
-  {
     "attendee_id": "att_538e3089",
     "cycle_id": "c_44ce9222",
     "stakeholder_id": "s_1775650665523",

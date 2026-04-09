@@ -85,6 +85,9 @@ class SchedulingService:
         if not vendor_id:
             return []
 
+        quarter = cycle.get("quarter")
+        vendor_name = cycle.get("vendor_name")
+
         def _parse_dt(value: str) -> Optional[datetime]:
             if not value:
                 return None
@@ -96,8 +99,12 @@ class SchedulingService:
             except Exception:
                 return None
 
-        # Find previous cycles for this vendor
+        # Find previous cycles for this vendor.
+        # Note: frontend can create custom vendors with a shared id (e.g., 'v_custom'),
+        # so also match vendor_name in that case to avoid cross-vendor seeding.
         all_vendor_cycles = self._cycles.get_by_vendor(vendor_id)
+        if vendor_id == "v_custom" and vendor_name:
+            all_vendor_cycles = [c for c in all_vendor_cycles if c.get("vendor_name") == vendor_name]
 
         current_created_at = cycle.get("created_at", "")
         current_dt = _parse_dt(current_created_at)
@@ -123,12 +130,26 @@ class SchedulingService:
 
         previous_cycles.sort(key=_sort_key, reverse=True)
 
+        # Prefer the most recent cycle for the same quarter first.
+        same_quarter_cycles = (
+            [c for c in previous_cycles if quarter and c.get("quarter") == quarter]
+            if quarter
+            else []
+        )
+        candidate_groups: list[list[dict]] = []
+        if same_quarter_cycles:
+            candidate_groups.append(same_quarter_cycles)
+        candidate_groups.append(previous_cycles)
+
         # Walk back until we find the most recent cycle that *actually* has attendees.
         # This avoids false "no attendees" when the immediately previous cycle was created
         # but never had attendees added.
         prev_attendee_records: list[dict] = []
-        for prev in previous_cycles:
-            prev_attendee_records = self._attendees.get_for_cycle(prev["cycle_id"])
+        for group in candidate_groups:
+            for prev in group:
+                prev_attendee_records = self._attendees.get_for_cycle(prev["cycle_id"])
+                if prev_attendee_records:
+                    break
             if prev_attendee_records:
                 break
         if not prev_attendee_records:
@@ -157,13 +178,6 @@ class SchedulingService:
             }
             self._attendees.insert(new_record)
             new_attendees.append(new_record)
-
-        # Treat auto-seeded attendees as a completed attendee refresh step.
-        # This keeps the workflow consistent with the manual POST /attendees path
-        # and avoids blocking subsequent actions (e.g., Graph slot finding).
-        now = datetime.now(timezone.utc).isoformat()
-        if cycle and workflow_engine.can_transition(cycle.get("workflow_state", ""), "ATTENDEE_REFRESH_SENT"):
-            workflow_engine.advance(cycle, self._cycles, now)
 
         return new_attendees
 
@@ -224,6 +238,36 @@ class SchedulingService:
     # ──────────────────────────────────────────────────────────────────
     # Step 1b — Attendance confirmation (new governance cycle gate)
     # ──────────────────────────────────────────────────────────────────
+
+    def complete_attendance_confirmation(self, cycle_id: str) -> dict:
+        """Validate attendee confirmations and advance workflow to ATTENDEE_REFRESH_SENT."""
+        cycle = self._cycles.get_by_cycle_id(cycle_id)
+        if not cycle:
+            raise ValueError(f"Cycle '{cycle_id}' not found")
+
+        # Idempotent: if we're already past this point, just return the cycle.
+        if workflow_engine.state_index(cycle.get("workflow_state", "CYCLE_CREATED")) >= workflow_engine.state_index(
+            "ATTENDEE_REFRESH_SENT"
+        ):
+            return cycle
+
+        attendees = self._attendees.get_for_cycle(cycle_id)
+        if not attendees:
+            raise ValueError("No attendees found to confirm")
+
+        pending = [
+            a
+            for a in attendees
+            if (a.get("confirmation_status") in (None, "PENDING"))
+        ]
+        if pending:
+            raise ValueError(f"{len(pending)} attendee(s) still pending confirmation")
+
+        now = datetime.now(timezone.utc).isoformat()
+        if workflow_engine.can_transition(cycle.get("workflow_state", ""), "ATTENDEE_REFRESH_SENT"):
+            return workflow_engine.advance(cycle, self._cycles, now)
+
+        return self._cycles.get_by_cycle_id(cycle_id) or cycle
 
     def send_attendance_outreach(
         self,

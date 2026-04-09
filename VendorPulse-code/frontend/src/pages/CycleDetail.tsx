@@ -20,7 +20,7 @@ import {
   MOCK_SLOT_PROPOSALS,
   MOCK_ATTENDEES_RSVP,
 } from '@/mock/scheduling.mock'
-import { fetchAttendees, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
+import { completeAttendanceConfirmation, fetchAttendeesSeeded, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
 import {
   deriveScorecardAttendees,
   getInitialSubmissions,
@@ -238,7 +238,7 @@ export default function CycleDetail() {
   // Load real attendees from backend for API-created (non-mock) cycles
   useEffect(() => {
     if (isMockCycle || !cycleId) return
-    fetchAttendees(cycleId)
+    fetchAttendeesSeeded(cycleId, { seedFromPrevious: true })
       .then((attendees) => {
         if (attendees.length > 0) setSchedulingAttendees(attendees)
       })
@@ -668,8 +668,15 @@ function SchedulingTab({
           cycleId={cycle.cycle_id}
           attendees={attendees}
           onAttendeesChanged={onAttendeesUpdated}
-          onConfirmationComplete={(confirmed) => {
+          onConfirmationComplete={async (confirmed) => {
             onAttendeesUpdated(confirmed)
+
+            // Persist workflow state for backend-enforced actions (e.g., rank-slots).
+            // Only do this when we actually have attendees to confirm.
+            if (!isMockCycle && confirmed.length > 0) {
+              await completeAttendanceConfirmation(cycle.cycle_id)
+            }
+
             onPhaseChange('attendee_refresh')
           }}
         />

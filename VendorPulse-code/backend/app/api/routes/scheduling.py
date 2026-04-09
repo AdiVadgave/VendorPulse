@@ -109,6 +109,10 @@ def _check_workflow_state(cycle: dict, required_state: str) -> None:
         raise HTTPException(status_code=409, detail=str(exc))
 
 
+def _http409(detail: str) -> None:
+    raise HTTPException(status_code=409, detail=detail)
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Cycles
 # ──────────────────────────────────────────────────────────────────────────────
@@ -171,10 +175,11 @@ def delete_cycle(
 @router.get("/api/cycles/{cycleId}/attendees")
 def get_attendees(
     cycleId: str,
+    seedFromPrevious: bool = False,
     svc: SchedulingService = Depends(get_scheduling_service),
 ):
     # Important: do NOT auto-seed attendees by default.
-    return {"attendees": svc.get_attendees(cycleId, seed_from_previous=False)}
+    return {"attendees": svc.get_attendees(cycleId, seed_from_previous=seedFromPrevious)}
 
 
 @router.post("/api/cycles/{cycleId}/attendees", status_code=201)
@@ -186,6 +191,21 @@ def add_attendees(
 ):
     _get_cycle_or_404(cycleId, cycle_repo)   # ensure cycle exists
     return svc.add_attendees(cycleId, attendees)
+
+
+@router.post("/api/cycles/{cycleId}/scheduling/attendance-confirmation/complete")
+def complete_attendance_confirmation(
+    cycleId: str,
+    svc: SchedulingService = Depends(get_scheduling_service),
+    cycle_repo=Depends(get_cycle_repo),
+):
+    """Advance CYCLE_CREATED → ATTENDEE_REFRESH_SENT once confirmations are resolved."""
+    _get_cycle_or_404(cycleId, cycle_repo)
+    try:
+        updated = svc.complete_attendance_confirmation(cycleId)
+    except ValueError as exc:
+        _http409(str(exc))
+    return {"cycle": updated}
 
 
 @router.put("/api/cycles/{cycleId}/attendees/{attendeeId}")

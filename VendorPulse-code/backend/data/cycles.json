@@ -48,5 +48,25 @@
     "workflow_state": "AVAILABILITY_COLLECTED",
     "created_at": "2026-04-09T05:50:35.221810+00:00",
     "updated_at": "2026-04-09T05:51:07.082091+00:00"
+  },
+  {
+    "cycle_id": "c_443b5a79",
+    "vendor_id": "v1",
+    "vendor_name": "NovaTech Services",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "CYCLE_CREATED",
+    "created_at": "2026-04-09T06:52:30.812868+00:00",
+    "updated_at": "2026-04-09T06:52:30.812868+00:00"
+  },
+  {
+    "cycle_id": "c_18283d29",
+    "vendor_id": "v1",
+    "vendor_name": "NovaTech Services",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "AVAILABILITY_COLLECTED",
+    "created_at": "2026-04-09T07:20:41.269033+00:00",
+    "updated_at": "2026-04-09T07:28:21.607240+00:00"
   }
 ]

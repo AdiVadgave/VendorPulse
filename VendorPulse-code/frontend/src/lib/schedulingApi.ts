@@ -42,10 +42,31 @@ export async function fetchAllCycles(): Promise<GovernanceCycle[]> {
 // ── Attendees ────────────────────────────────────────────────────────────────
 
 export async function fetchAttendees(cycleId: string): Promise<CycleAttendee[]> {
-  const res = await apiFetch<{ attendees: CycleAttendee[] }>(
-    `/api/cycles/${cycleId}/attendees`
-  )
+  const res = await apiFetch<{ attendees: CycleAttendee[] }>(`/api/cycles/${cycleId}/attendees`)
   return res.attendees ?? []
+}
+
+export async function fetchAttendeesSeeded(
+  cycleId: string,
+  options?: { seedFromPrevious?: boolean }
+): Promise<CycleAttendee[]> {
+  const seedFromPrevious = options?.seedFromPrevious ?? false
+  const url = seedFromPrevious
+    ? `/api/cycles/${cycleId}/attendees?seedFromPrevious=true`
+    : `/api/cycles/${cycleId}/attendees`
+
+  const res = await apiFetch<{ attendees: CycleAttendee[] }>(url)
+  return res.attendees ?? []
+}
+
+export async function completeAttendanceConfirmation(
+  cycleId: string
+): Promise<GovernanceCycle> {
+  const res = await apiFetch<{ cycle: GovernanceCycle }>(
+    `/api/cycles/${cycleId}/scheduling/attendance-confirmation/complete`,
+    { method: 'POST' }
+  )
+  return res.cycle
 }
 
 export function getPreferredOrganizerEmail(attendees: CycleAttendee[]): string | null {

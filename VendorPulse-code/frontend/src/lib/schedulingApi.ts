@@ -84,6 +84,17 @@ export function getPreferredOrganizerEmail(attendees: CycleAttendee[]): string |
   return attendees[0]?.email ?? null
 }
 
+export async function getTokenOwnerOrganizerEmail(): Promise<string | null> {
+  try {
+    const info = await apiFetch<GraphTokenInfo>(`/api/graph/token-info`)
+    if (!info?.token_present) return null
+    const user = (info.user ?? '').trim().toLowerCase()
+    return user || null
+  } catch {
+    return null
+  }
+}
+
 export async function approveAttendeeKey(
   cycleId: string,
   attendeeId: string,

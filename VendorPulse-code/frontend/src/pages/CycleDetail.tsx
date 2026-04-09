@@ -83,7 +83,7 @@ import ActionLog from '@/components/shared/ActionLog'
 import EmptyState from '@/components/shared/EmptyState'
 import { cn } from '@/utils/cn'
 import type { TabKey, WorkflowState } from '@/utils/constants'
-import { WORKFLOW_STATES, TAB_LABELS, TAB_MIN_STATE_INDEX, getDefaultTabFromState } from '@/utils/constants'
+import { WORKFLOW_STATES, TAB_KEYS, TAB_LABELS, TAB_MIN_STATE_INDEX, getDefaultTabFromState } from '@/utils/constants'
 import { useCycleStore } from '@/store/useCycleStore'
 import type { SchedulingPhase, CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import type { StakeholderSubmission } from '@/types/scorecard.types'
@@ -130,23 +130,48 @@ export default function CycleDetail() {
   const advanceWorkflow = useCycleStore((s) => s.advanceWorkflow)
   const upsertCycle = useCycleStore((s) => s.upsertCycle)
   const storeCycle = useCycleStore((s) => cycleId ? s.getCycleById(cycleId) : undefined)
+  const savedLastTab = useCycleStore((s) => (cycleId ? s.lastTabs[cycleId] : undefined))
+  const setLastTab = useCycleStore((s) => s.setLastTab)
 
   // Store takes precedence (includes API-created cycles); fall back to mock
   const cycle = storeCycle ?? (cycleId ? getMockCycleById(cycleId) : undefined)
   const isMockCycle = cycleId ? !!getMockCycleById(cycleId) : false
 
+  const requestedTabParam = searchParams.get('tab')
+  const requestedTab: TabKey | null = TAB_KEYS.includes(requestedTabParam as TabKey)
+    ? (requestedTabParam as TabKey)
+    : null
+
+  const effectiveWorkflowState: WorkflowState | undefined = (storeWorkflowState ?? cycle?.workflow_state) as
+    | WorkflowState
+    | undefined
+  const effectiveStateIndex = effectiveWorkflowState ? WORKFLOW_STATES.indexOf(effectiveWorkflowState) : -1
+
+  function isTabAllowed(tab: TabKey): boolean {
+    if (effectiveStateIndex < 0) return tab === 'scheduling' || tab === 'overview'
+    return effectiveStateIndex >= TAB_MIN_STATE_INDEX[tab]
+  }
+
   // For API-created cycles not yet in store, show a loading state while we fetch from backend
   const [isLoadingCycle, setIsLoadingCycle] = useState(!cycle && !isMockCycle)
 
   // Initialise to the active step for the cycle's current state.
-  // Falls back to the URL ?tab param only while the cycle hasn't loaded yet.
+  // If a valid ?tab= is provided, honor it (when allowed for the current progress).
   const [activeTab, setActiveTab] = useState<TabKey>(() =>
-    cycle ? getDefaultTabFromState(cycle.workflow_state) : ((searchParams.get('tab') as TabKey) ?? 'scheduling')
+    requestedTab && isTabAllowed(requestedTab)
+      ? requestedTab
+      : (savedLastTab && isTabAllowed(savedLastTab) ? savedLastTab : (effectiveWorkflowState ? getDefaultTabFromState(effectiveWorkflowState) : 'scheduling'))
   )
+
+  // Persist last active tab per cycle so reopening returns to it.
+  useEffect(() => {
+    if (!cycleId) return
+    setLastTab(cycleId, activeTab)
+  }, [activeTab, cycleId, setLastTab])
 
   // --- Module A state ---
   const [schedulingPhase, setSchedulingPhase] = useState<SchedulingPhase>(() =>
-    cycle ? getInitialSchedulingPhase(cycle.workflow_state) : 'attendee_refresh'
+    effectiveWorkflowState ? getInitialSchedulingPhase(effectiveWorkflowState) : 'attendance_confirmation'
   )
   const [schedulingAttendees, setSchedulingAttendees] = useState<CycleAttendee[]>(
     isMockCycle ? MOCK_ATTENDEES_INITIAL : []
@@ -158,8 +183,8 @@ export default function CycleDetail() {
 
   // --- Module B state ---
   const [scorecardDispatched, setScorecardDispatched] = useState(false)
-  const [submissionsSimulated, setSubmissionsSimulated] = useState(false)
-  const [scorecardEntries, setScorecardEntries] = useState<ScorecardEntry[]>([])
+  const [, setSubmissionsSimulated] = useState(false)
+  const [, setScorecardEntries] = useState<ScorecardEntry[]>([])
   const [compiledScores, setCompiledScores] = useState<CompiledCategoryScore[] | null>(null)
 
   // Derive the 2 key scorecard attendees from the cycle's actual attendee list
@@ -226,7 +251,11 @@ export default function CycleDetail() {
         const state = backendCycle.workflow_state
         const idx = WORKFLOW_STATES.indexOf(state)
         setSchedulingPhase(getInitialSchedulingPhase(state))
-        setActiveTab(getDefaultTabFromState(state))
+        if (requestedTab && idx >= TAB_MIN_STATE_INDEX[requestedTab]) {
+          setActiveTab(requestedTab)
+        } else {
+          setActiveTab(getDefaultTabFromState(state))
+        }
         if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_REQUEST_SENT')) setScorecardDispatched(true)
         if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_COLLECTION')) setSubmissionsSimulated(true)
       })
@@ -386,8 +415,8 @@ export default function CycleDetail() {
       {/* Cycle header bar — sticky so progress bar stays visible on scroll */}
       <div className="sticky top-0 z-10 px-6 pt-4 pb-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center shrink-0">
-            <Building2 size={18} className="text-indigo-600 dark:text-indigo-400" />
+          <div className="w-9 h-9 bg-indigo-100 dark:bg-indigo-500/15 rounded-lg flex items-center justify-center shrink-0 ring-1 ring-indigo-200/70 dark:ring-indigo-500/30">
+            <Building2 size={18} className="text-indigo-700 dark:text-indigo-200" />
           </div>
           <div>
             <h2 className="font-semibold text-slate-900 dark:text-white text-sm">
@@ -422,7 +451,7 @@ export default function CycleDetail() {
                 className={cn(
                   'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                   isActive
-                    ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                    ? 'border-indigo-600 text-indigo-700 dark:text-indigo-200 dark:border-indigo-300 bg-indigo-50/60 dark:bg-indigo-500/10'
                     : isLocked
                       ? 'border-transparent text-slate-300 dark:text-slate-600 cursor-not-allowed'
                       : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
@@ -647,16 +676,16 @@ function SchedulingTab({
               <div key={step.key} className="flex items-center flex-1 min-w-0">
                 <div className={cn(
                   'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium flex-1 justify-center transition-all',
-                  isComplete && 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400',
-                  isActive && 'bg-indigo-600 text-white shadow-sm',
-                  isUpcoming && 'bg-slate-50 text-slate-400 dark:bg-slate-800/50 dark:text-slate-600'
+                  isComplete && 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200 ring-1 ring-emerald-200 dark:ring-emerald-500/30',
+                  isActive && 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-200/70 dark:ring-indigo-500/30',
+                  isUpcoming && 'bg-slate-100 text-slate-500 dark:bg-slate-800/70 dark:text-slate-300'
                 )}>
                   {isComplete && <CheckCircle2 size={11} />}
                   <span className="truncate hidden sm:inline">{step.label}</span>
                   <span className="sm:hidden">{idx + 1}</span>
                 </div>
                 {idx < SCHEDULING_STEPS.length - 1 && (
-                  <div className={cn('h-px w-4 shrink-0 mx-0.5', isComplete ? 'bg-emerald-300 dark:bg-emerald-700' : 'bg-slate-200 dark:bg-slate-700')} />
+                  <div className={cn('h-px w-4 shrink-0 mx-0.5', isComplete ? 'bg-emerald-400 dark:bg-emerald-500/60' : 'bg-slate-300 dark:bg-slate-700')} />
                 )}
               </div>
             )

@@ -21,7 +21,7 @@ export default function StakeholderVendorGap({ data, vendorName }: Props) {
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
       <div className="mb-1">
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Stakeholder vs Vendor Score Comparison
+          Internal Stakeholder vs Vendor Score Comparison
         </h3>
         <p className="text-xs text-slate-400 dark:text-slate-500">
           {vendorName} — Q1 2026 · Self-assessment vs stakeholder perception per category

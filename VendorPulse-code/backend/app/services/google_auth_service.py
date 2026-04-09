@@ -28,7 +28,7 @@ if settings.google_redirect_uri.startswith("http://localhost"):
 print(f"[AUTH-ENV] google_client_id = {settings.google_client_id[:20]}...")
 print(f"[AUTH-ENV] google_project_id = {settings.google_project_id}")
 print(f"[AUTH-ENV] google_redirect_uri = {settings.google_redirect_uri}")
-print(f"[AUTH-ENV] SCOPES will be: gmail.send, forms.responses.readonly")
+print(f"[AUTH-ENV] SCOPES will be: gmail.send, forms.responses.readonly, forms.body.readonly")
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/forms.responses.readonly",
+    "https://www.googleapis.com/auth/forms.body.readonly",
 ]
 
 TOKEN_PATH = settings.data_dir / "google_token.json"
@@ -128,27 +129,52 @@ def exchange_code_for_token(code: str, state: str | None = None) -> Credentials:
 def get_credentials() -> Credentials | None:
     """Load saved credentials, refreshing if expired. Returns None if
     the user has not authenticated yet."""
+    print(f"[AUTH-CREDS] Loading credentials from {TOKEN_PATH}")
     if not TOKEN_PATH.exists():
+        print("[AUTH-CREDS] Token file not found — not authenticated")
         return None
 
     try:
         creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
-    except Exception:
+    except Exception as exc:
         logger.warning("Corrupt token file — re-auth required")
+        print(f"[AUTH-CREDS] Failed to load token file: {exc}")
+        return None
+
+    # Check that the stored token has ALL required scopes
+    stored_scopes = set(creds.scopes or [])
+    required_scopes = set(SCOPES)
+    missing = required_scopes - stored_scopes
+    if missing:
+        print(f"[AUTH-CREDS] Token missing scopes: {missing}. Re-auth required.")
+        print(f"[AUTH-CREDS] Stored scopes: {stored_scopes}")
+        print(f"[AUTH-CREDS] Required scopes: {required_scopes}")
+        logger.warning("Token missing scopes %s — re-auth required", missing)
+        # Delete the stale token so user is prompted to re-authenticate
+        try:
+            TOKEN_PATH.unlink()
+            print("[AUTH-CREDS] Deleted stale token file")
+        except Exception:
+            pass
         return None
 
     if creds.valid:
+        print("[AUTH-CREDS] Credentials valid")
         return creds
 
     if creds.expired and creds.refresh_token:
+        print("[AUTH-CREDS] Token expired, attempting refresh...")
         try:
             creds.refresh(Request())
             _save_token(creds)
+            print("[AUTH-CREDS] Token refreshed successfully")
             return creds
-        except Exception:
+        except Exception as exc:
             logger.warning("Token refresh failed — re-auth required")
+            print(f"[AUTH-CREDS] Token refresh failed: {exc}")
             return None
 
+    print("[AUTH-CREDS] Credentials not valid and cannot refresh")
     return None
 
 

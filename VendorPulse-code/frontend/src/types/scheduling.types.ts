@@ -38,6 +38,7 @@ export interface SlotProposal {
   total_attendees: number
   conflict_count: number
   attending: string[]
+  tentative?: string[]
   conflicts: string[]
 }
 

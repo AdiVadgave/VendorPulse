@@ -46,7 +46,7 @@ export default function ScoreComparisonPanel({ comparisons }: Props) {
       <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
         <BarChart3 size={15} className="text-indigo-500" />
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Stakeholder vs Vendor — Score Comparison
+          Internal Stakeholder vs Vendor — Score Comparison
         </h3>
         {hasFlags && (
           <span className="ml-auto text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">

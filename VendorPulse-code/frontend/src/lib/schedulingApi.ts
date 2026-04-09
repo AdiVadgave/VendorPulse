@@ -19,6 +19,11 @@ export interface AgentRunResponse {
   run_id?: string
 }
 
+export interface GraphTokenInfo {
+  token_present: boolean
+  user?: string
+}
+
 // ── Cycles ───────────────────────────────────────────────────────────────────
 
 export async function fetchCycle(cycleId: string): Promise<GovernanceCycle | null> {
@@ -42,10 +47,31 @@ export async function fetchAllCycles(): Promise<GovernanceCycle[]> {
 // ── Attendees ────────────────────────────────────────────────────────────────
 
 export async function fetchAttendees(cycleId: string): Promise<CycleAttendee[]> {
-  const res = await apiFetch<{ attendees: CycleAttendee[] }>(
-    `/api/cycles/${cycleId}/attendees`
-  )
+  const res = await apiFetch<{ attendees: CycleAttendee[] }>(`/api/cycles/${cycleId}/attendees`)
   return res.attendees ?? []
+}
+
+export async function fetchAttendeesSeeded(
+  cycleId: string,
+  options?: { seedFromPrevious?: boolean }
+): Promise<CycleAttendee[]> {
+  const seedFromPrevious = options?.seedFromPrevious ?? false
+  const url = seedFromPrevious
+    ? `/api/cycles/${cycleId}/attendees?seedFromPrevious=true`
+    : `/api/cycles/${cycleId}/attendees`
+
+  const res = await apiFetch<{ attendees: CycleAttendee[] }>(url)
+  return res.attendees ?? []
+}
+
+export async function completeAttendanceConfirmation(
+  cycleId: string
+): Promise<GovernanceCycle> {
+  const res = await apiFetch<{ cycle: GovernanceCycle }>(
+    `/api/cycles/${cycleId}/scheduling/attendance-confirmation/complete`,
+    { method: 'POST' }
+  )
+  return res.cycle
 }
 
 export function getPreferredOrganizerEmail(attendees: CycleAttendee[]): string | null {
@@ -56,6 +82,17 @@ export function getPreferredOrganizerEmail(attendees: CycleAttendee[]): string |
   if (keyAttendee?.email) return keyAttendee.email
 
   return attendees[0]?.email ?? null
+}
+
+export async function getTokenOwnerOrganizerEmail(): Promise<string | null> {
+  try {
+    const info = await apiFetch<GraphTokenInfo>(`/api/graph/token-info`)
+    if (!info?.token_present) return null
+    const user = (info.user ?? '').trim().toLowerCase()
+    return user || null
+  } catch {
+    return null
+  }
 }
 
 export async function approveAttendeeKey(
@@ -70,24 +107,6 @@ export async function approveAttendeeKey(
   return res.attendee
 }
 
-// ── Agent run — autonomous scheduling ────────────────────────────────────────
-
-/**
- * Runs the Scheduling Agent for the given cycle.
- * When ENABLE_LLM=true: GPT-4o drives simulate → rank autonomously.
- * When disabled: deterministic fallback runs the same steps.
- * Returns ranked slot proposals in response.data.slots.
- */
-export async function runSchedulingAgent(
-  cycleId: string,
-  message = 'Simulate availability responses then rank the best meeting slots for this cycle.'
-): Promise<AgentRunResponse> {
-  return apiFetch<AgentRunResponse>(
-    `/api/cycles/${cycleId}/scheduling/agent/run`,
-    { method: 'POST', body: JSON.stringify({ message }) }
-  )
-}
-
 // ── Slot proposals ───────────────────────────────────────────────────────────
 
 export async function fetchSlots(cycleId: string): Promise<SlotProposal[]> {
@@ -100,27 +119,14 @@ export async function fetchSlots(cycleId: string): Promise<SlotProposal[]> {
 export async function approveSlot(
   cycleId: string,
   slotId: string,
-  approvedBy = 'coordinator'
+  approvedBy = 'coordinator',
+  timeZone?: 'IST' | 'UTC' | 'GMT'
 ): Promise<AgentRunResponse> {
+  const payload: Record<string, unknown> = { approved_by: approvedBy }
+  if (timeZone) payload.time_zone = timeZone
   return apiFetch<AgentRunResponse>(
     `/api/cycles/${cycleId}/scheduling/slots/${slotId}/approve`,
-    { method: 'PUT', body: JSON.stringify({ approved_by: approvedBy }) }
-  )
-}
-
-// ── Send invites ─────────────────────────────────────────────────────────────
-
-export async function sendInvites(
-  cycleId: string,
-  slotId: string,
-  organiserId: string
-): Promise<AgentRunResponse> {
-  return apiFetch<AgentRunResponse>(
-    `/api/cycles/${cycleId}/scheduling/send-invites`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ slot_id: slotId, organiser_id: organiserId }),
-    }
+    { method: 'PUT', body: JSON.stringify(payload) }
   )
 }
 

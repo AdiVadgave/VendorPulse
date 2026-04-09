@@ -10,7 +10,6 @@ import {
   Loader2,
   Search,
   CalendarClock,
-  Cpu,
   Globe,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
@@ -18,7 +17,7 @@ import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import { ROLE_LABELS } from '@/types/cycle.types'
 import type { StakeholderRole } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
-import { getPreferredOrganizerEmail, runSchedulingAgent } from '@/lib/schedulingApi'
+import { getPreferredOrganizerEmail, getTokenOwnerOrganizerEmail } from '@/lib/schedulingApi'
 import { MOCK_SYSTEM_USERS, type SystemUser } from '@/mock/scheduling.mock'
 
 interface AttendeeRefreshPanelProps {
@@ -27,6 +26,7 @@ interface AttendeeRefreshPanelProps {
   onAttendeesChanged: (updated: CycleAttendee[]) => void
   onDispatchComplete: () => void
   onResponsesSimulated: (updated: CycleAttendee[], slots: SlotProposal[]) => void
+  onBackToAttendance?: () => void
 }
 
 // ── Search & Add Attendee Form ───────────────────────────────────────────────
@@ -283,6 +283,7 @@ export default function AttendeeRefreshPanel({
   attendees,
   onAttendeesChanged,
   onResponsesSimulated,
+  onBackToAttendance,
 }: AttendeeRefreshPanelProps) {
   const today = new Date()
   const defaultStartDate = today.toISOString().split('T')[0]
@@ -292,9 +293,6 @@ export default function AttendeeRefreshPanel({
 
   const [showAddForm, setShowAddForm] = useState(false)
   const [togglingKey, setTogglingKey] = useState<string | null>(null)
-  const [isProceeding, setIsProceeding] = useState(false)
-  const [proceedStatus, setProceedStatus] = useState<string>('')
-  const [proceedError, setProceedError] = useState<string | null>(null)
   const [isGraphSearching, setIsGraphSearching] = useState(false)
   const [graphStatus, setGraphStatus] = useState<string>('')
   const [graphError, setGraphError] = useState<string | null>(null)
@@ -335,38 +333,28 @@ export default function AttendeeRefreshPanel({
     setShowAddForm(false)
   }
 
-  async function handleProceed() {
-    setIsProceeding(true)
-    setProceedError(null)
-    setProceedStatus('Running scheduling agent…')
-    try {
-      const result = await runSchedulingAgent(cycleId)
-      const slots = (result.data?.slots ?? []).map((slot) => {
-        const withDuration = slot as SlotProposal & { duration_minutes?: number }
-        return {
-          ...slot,
-          duration_minutes: withDuration.duration_minutes ?? 60,
-        }
-      })
-      setProceedStatus(result.summary || 'Done')
-      onResponsesSimulated(attendees, slots as SlotProposal[])
-    } catch (err) {
-      setProceedError(err instanceof Error ? err.message : 'Agent run failed')
-    } finally {
-      setIsProceeding(false)
-      setProceedStatus('')
-    }
-  }
-
   async function handleFindGraphSlots() {
     setIsGraphSearching(true)
     setGraphError(null)
     setGraphStatus('Finding real calendar slots via Graph…')
     try {
       const attendeeEmails = attendees.map((a) => a.email)
-      const organiserEmail = getPreferredOrganizerEmail(attendees) || 'organiser@zensar.com'
+      const organiserEmail = await getTokenOwnerOrganizerEmail()
+      const fallbackOrganizer = getPreferredOrganizerEmail(attendees)
+      if (!organiserEmail) {
+        setGraphError(
+          fallbackOrganizer
+            ? 'Could not resolve token owner organizer from Graph token. Refresh GRAPH_ACCESS_TOKEN and retry.'
+            : 'No organiser email found. Add at least one attendee with an email address.'
+        )
+        return
+      }
 
-      const result = await apiFetch<{ slot_proposals: SlotProposal[] }>(
+      const result = await apiFetch<{
+        message?: string
+        slot_proposals: SlotProposal[]
+        graph_summary?: { empty_suggestions_reason?: string; no_slots_reason?: string }
+      }>(
         `/api/cycles/${cycleId}/scheduling/graph/find-times`,
         {
           method: 'POST',
@@ -377,6 +365,7 @@ export default function AttendeeRefreshPanel({
             duration_hours: graphDurationHours,
             use_specific_attendees: attendeeEmails,
             time_zone: graphTimeZone,
+            debug: true,
           }),
         }
       )
@@ -393,6 +382,18 @@ export default function AttendeeRefreshPanel({
           proposed_time_zone: withDuration.proposed_time_zone ?? graphTimeZone,
         }
       })
+
+      if (slots.length === 0) {
+        const reason = result.graph_summary?.no_slots_reason?.trim() || result.graph_summary?.empty_suggestions_reason?.trim()
+        const msg = result.message?.trim()
+        setGraphError(
+          reason
+            ? `No slots found. Reason: ${reason}`
+            : msg || 'No common slots found for the selected attendees/date range in working-hours mode.'
+        )
+        return
+      }
+
       setGraphStatus(`Found ${slots.length} real calendar slots`)
       onResponsesSimulated(attendees, slots)
     } catch (err) {
@@ -421,14 +422,23 @@ export default function AttendeeRefreshPanel({
               </p>
             </div>
           </div>
+          {onBackToAttendance && (
+            <button
+              type="button"
+              onClick={onBackToAttendance}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              Back to Attendance
+            </button>
+          )}
         </div>
 
         <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-400 flex items-start gap-2">
           <CalendarClock size={14} className="shrink-0 mt-0.5" />
           <span>
             Add all attendees below. Once ready, click{' '}
-            <strong>Proceed to Scheduling</strong> — the scheduler agent will
-            analyse attendees and propose the best available time slots.
+            <strong>Find Slots (Graph)</strong> — VendorPulse will query calendar availability
+            via Microsoft Graph and return the best common time slots.
           </span>
         </div>
 
@@ -484,26 +494,11 @@ export default function AttendeeRefreshPanel({
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleProceed}
-              disabled={isProceeding || isGraphSearching || attendees.length === 0}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors',
-                (isProceeding || isGraphSearching || attendees.length === 0) && 'opacity-60 cursor-not-allowed'
-              )}
-            >
-              {isProceeding ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Cpu size={14} />
-              )}
-              {isProceeding ? (proceedStatus || 'Running agent…') : 'Run Scheduling Agent'}
-            </button>
-            <button
               onClick={handleFindGraphSlots}
-              disabled={isGraphSearching || isProceeding || attendees.length === 0}
+              disabled={isGraphSearching || attendees.length === 0}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors',
-                (isGraphSearching || isProceeding || attendees.length === 0) && 'opacity-60 cursor-not-allowed'
+                (isGraphSearching || attendees.length === 0) && 'opacity-60 cursor-not-allowed'
               )}
             >
               {isGraphSearching ? (
@@ -511,24 +506,18 @@ export default function AttendeeRefreshPanel({
               ) : (
                 <Globe size={14} />
               )}
-              {isGraphSearching ? (graphStatus || 'Finding slots…') : 'Find Real Slots (Graph)'}
+              {isGraphSearching ? (graphStatus || 'Finding slots…') : 'Find Slots (Graph)'}
             </button>
           </div>
-          {!isProceeding && !isGraphSearching && attendees.length > 0 && (
+          {!isGraphSearching && attendees.length > 0 && (
             <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
               <ArrowRight size={12} />
-              Choose deterministic ranking or real calendar availability
+              Uses Microsoft Graph calendar availability
             </span>
           )}
           {attendees.length === 0 && (
             <p className="text-xs text-slate-400 dark:text-slate-500">
               Add at least one attendee to proceed.
-            </p>
-          )}
-          {proceedError && (
-            <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
-              <AlertCircle size={12} />
-              {proceedError}
             </p>
           )}
           {graphError && (

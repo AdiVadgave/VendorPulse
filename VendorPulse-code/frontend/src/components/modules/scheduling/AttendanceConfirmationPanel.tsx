@@ -21,7 +21,7 @@ interface AttendanceConfirmationPanelProps {
   cycleId: string
   attendees: CycleAttendee[]
   onAttendeesChanged: (updated: CycleAttendee[]) => void
-  onConfirmationComplete: (confirmed: CycleAttendee[]) => void
+  onConfirmationComplete: (confirmed: CycleAttendee[]) => void | Promise<void>
 }
 
 const STATUS_CONFIG: Record<
@@ -151,7 +151,10 @@ export default function AttendanceConfirmationPanel({
   const [isSimulating, setIsSimulating] = useState(false)
   const [isSendingOutreach, setIsSendingOutreach] = useState(false)
   const [outreachSent, setOutreachSent] = useState(false)
+  const [outreachError, setOutreachError] = useState<string | null>(null)
   const [simError, setSimError] = useState<string | null>(null)
+  const [isProceeding, setIsProceeding] = useState(false)
+  const [proceedError, setProceedError] = useState<string | null>(null)
 
   // Derive statuses — default to PENDING if not set
   const withStatus: (CycleAttendee & { confirmation_status: AttendanceConfirmationStatus })[] =
@@ -216,15 +219,36 @@ export default function AttendanceConfirmationPanel({
 
   async function handleSendOutreach() {
     setIsSendingOutreach(true)
+    setOutreachError(null)
     try {
       // Call backend to trigger outreach emails/forms
-      await apiFetch(`/api/cycles/${cycleId}/scheduling/attendance-outreach`, {
+      const res = await apiFetch<{
+        status?: 'success' | 'failed' | 'partial' | 'pending_approval'
+        summary?: string
+        warnings?: string[]
+        data?: { mode?: string }
+      }>(`/api/cycles/${cycleId}/scheduling/attendance-outreach`, {
         method: 'POST',
       })
-    } catch {
-      // Mock fallback — outreach is simulated
-    } finally {
+      if (res?.status && res.status !== 'success') {
+        const warningText = (res.warnings ?? []).join(' ')
+        const results = (res.data as any)?.results as Array<any> | undefined
+        const firstFailure = results?.find((r) => r?.status === 'failed')
+        const detail = firstFailure?.message ? String(firstFailure.message) : ''
+        throw new Error(
+          [res.summary ?? 'Outreach failed.', detail, warningText].filter(Boolean).join(' ')
+        )
+      }
+
+      if (res?.data?.mode === 'demo') {
+        throw new Error('Outreach ran in demo mode (no email sent).')
+      }
+
       setOutreachSent(true)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to send outreach.'
+      setOutreachError(msg)
+    } finally {
       setIsSendingOutreach(false)
     }
   }
@@ -233,36 +257,18 @@ export default function AttendanceConfirmationPanel({
     setIsSimulating(true)
     setSimError(null)
     try {
-      // Try backend simulation
-      await apiFetch(`/api/cycles/${cycleId}/scheduling/simulate-attendance-confirmation`, {
-        method: 'POST',
-      })
-    } catch {
-      // Fallback: simulate locally
+      throw new Error('Simulation is disabled in Graph-only mode. Use real outreach responses.')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Simulation is disabled in Graph-only mode.'
+      setSimError(msg)
     } finally {
-      // Simulate responses: mark first 60% as CONFIRMED, remaining as varied
-      const updated = attendees.map((a, idx) => {
-        const total = attendees.length
-        if (idx < Math.ceil(total * 0.6)) {
-          return { ...a, confirmation_status: 'CONFIRMED' as AttendanceConfirmationStatus }
-        } else if (idx < Math.ceil(total * 0.85)) {
-          return {
-            ...a,
-            confirmation_status: 'REPLACED' as AttendanceConfirmationStatus,
-            replaced_by: `Replacement for ${a.name.split(' ')[0]}`,
-            replaced_by_email: `replacement.${a.email.split('@')[0]}@${a.email.split('@')[1]}`,
-            replacement_note: 'Nominated by outgoing attendee',
-          }
-        } else {
-          return { ...a, confirmation_status: 'CONFIRMED' as AttendanceConfirmationStatus }
-        }
-      })
-      onAttendeesChanged(updated)
       setIsSimulating(false)
     }
   }
 
-  function handleProceed() {
+  async function handleProceed() {
+    setIsProceeding(true)
+    setProceedError(null)
     // Build final attendee list: swap out DECLINED/REPLACED with replacements
     const finalAttendees = withStatus.flatMap((a) => {
       if (a.confirmation_status === 'DECLINED' && !a.replaced_by) return [] // remove with no replacement
@@ -285,7 +291,14 @@ export default function AttendanceConfirmationPanel({
       }
       return [a]
     })
-    onConfirmationComplete(finalAttendees)
+
+    try {
+      await Promise.resolve(onConfirmationComplete(finalAttendees))
+    } catch (e) {
+      setProceedError(e instanceof Error ? e.message : 'Failed to proceed.')
+    } finally {
+      setIsProceeding(false)
+    }
   }
 
   return (
@@ -360,6 +373,13 @@ export default function AttendanceConfirmationPanel({
             <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
               <AlertCircle size={12} />
               {simError}
+            </p>
+          )}
+
+          {outreachError && (
+            <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {outreachError}
             </p>
           )}
         </div>
@@ -517,16 +537,25 @@ export default function AttendanceConfirmationPanel({
 
             <button
               onClick={handleProceed}
-              disabled={!allResolved}
+              disabled={!allResolved || isProceeding}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors',
-                !allResolved && 'opacity-50 cursor-not-allowed'
+                (!allResolved || isProceeding) && 'opacity-50 cursor-not-allowed'
               )}
             >
-              <ArrowRight size={14} />
-              Proceed to Add Attendees
+              {isProceeding ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+              {isProceeding ? 'Proceeding…' : 'Proceed to Add Attendees'}
             </button>
           </div>
+
+          {proceedError && (
+            <div className="px-5 pb-4">
+              <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                <AlertCircle size={12} />
+                {proceedError}
+              </p>
+            </div>
+          )}
         </div>
       )}
 

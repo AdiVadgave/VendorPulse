@@ -12,7 +12,9 @@ class UserService:
     def __init__(self, repo: UserRepository) -> None:
         self._repo = repo
 
-    def list_users(self) -> list[dict]:
+    def list_users(self, query: Optional[str] = None) -> list[dict]:
+        if query:
+            return self._repo.search(query)
         return self._repo.find_all()
 
     def get_user(self, user_id: str) -> Optional[dict]:

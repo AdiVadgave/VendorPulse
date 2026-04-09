@@ -44,11 +44,11 @@ export default function WorkflowProgressBar({
                 'flex items-center gap-1.5 rounded-lg text-xs font-medium transition-colors flex-1 justify-center',
                 compact ? 'px-2 py-1' : 'px-3 py-1.5',
                 isComplete &&
-                  'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400',
+                  'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200 ring-1 ring-emerald-200 dark:ring-emerald-500/30',
                 isActive &&
-                  'bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/30',
+                  'bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/30 ring-1 ring-indigo-200/70 dark:ring-indigo-500/30',
                 isLocked &&
-                  'bg-slate-50 text-slate-400 dark:bg-slate-800/50 dark:text-slate-600'
+                  'bg-slate-100 text-slate-500 dark:bg-slate-800/70 dark:text-slate-300'
               )}
             >
               {isComplete && <CheckCircle2 size={12} />}
@@ -60,8 +60,8 @@ export default function WorkflowProgressBar({
                 className={cn(
                   'h-px w-3 shrink-0',
                   currentIndex > maxStateIndex
-                    ? 'bg-emerald-300 dark:bg-emerald-700'
-                    : 'bg-slate-200 dark:bg-slate-700'
+                    ? 'bg-emerald-400 dark:bg-emerald-700'
+                    : 'bg-slate-300 dark:bg-slate-700'
                 )}
               />
             )}

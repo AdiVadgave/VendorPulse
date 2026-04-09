@@ -42,7 +42,7 @@ export default function ScheduleAlignmentMeeting() {
         <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg px-4 py-3">
           <p className="text-xs font-semibold text-violet-600 dark:text-violet-400 mb-2">Suggested Agenda</p>
           <ul className="space-y-1 text-xs text-violet-800 dark:text-violet-300">
-            <li>1. Review score comparison — Stakeholder vs Vendor gaps</li>
+            <li>1. Review score comparison — Internal Stakeholder vs Vendor gaps</li>
             <li>2. Discuss flagged categories and agree on final internal position</li>
             <li>3. Align on face-off model roles before vendor meeting</li>
             <li>4. Capture action items and assign owners</li>

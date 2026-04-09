@@ -11,7 +11,7 @@ type TimeZoneView = 'IST' | 'UTC' | 'GMT'
 interface SlotRankingPanelProps {
   cycleId: string
   slots: SlotProposal[]
-  onSlotApproved: (slotId: string) => void
+  onSlotApproved: (slotId: string, timeZone: TimeZoneView) => void
   onBackToAttendees: () => void
 }
 
@@ -30,8 +30,8 @@ export default function SlotRankingPanel({
     setProcessingSlotId(slotId)
     setApproveError(null)
     try {
-      await approveSlot(cycleId, slotId)
-      onSlotApproved(slotId)
+      await approveSlot(cycleId, slotId, 'coordinator', timeZoneView)
+      onSlotApproved(slotId, timeZoneView)
     } catch (err) {
       setApproveError(err instanceof Error ? err.message : 'Failed to approve slot')
     } finally {
@@ -53,7 +53,6 @@ export default function SlotRankingPanel({
                 Slot Ranking
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Deterministic algorithm — no AI involvement in ranking
               </p>
             </div>
           </div>
@@ -86,13 +85,20 @@ export default function SlotRankingPanel({
 
         <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-start gap-2">
           <Info size={14} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-blue-700 dark:text-blue-400">
-            The scheduling agent has analysed availability for all {slots[0]?.total_attendees ?? '—'} attendees
-            and ranked {slots.length} viable slots. Ranking uses hard constraints
-            (organiser &amp; exec sponsor availability) and soft scores
-            (attendance coverage, timezone suitability). Select a slot to
-            generate a calendar invite draft.
-          </p>
+          {slots.length === 0 ? (
+            <p className="text-xs text-blue-700 dark:text-blue-400">
+              No viable slots were found for the selected attendees and date range. Go back and adjust the
+              attendee list, date range, duration, or timezone, then search again.
+            </p>
+          ) : (
+            <p className="text-xs text-blue-700 dark:text-blue-400">
+              The scheduling agent has analysed availability for all {slots[0]?.total_attendees ?? 'the selected'} attendees
+              and ranked {slots.length} viable slots. Ranking uses hard constraints
+              (organiser &amp; exec sponsor availability) and soft scores
+              (attendance coverage, timezone suitability). Select a slot to
+              generate a calendar invite draft.
+            </p>
+          )}
         </div>
 
         {approveError && (

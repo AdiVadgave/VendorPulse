@@ -126,6 +126,10 @@ class RankSlotsRequest(BaseModel):
 
 class ApproveSlotRequest(BaseModel):
     approved_by: str = Field(..., description="userId of the coordinator approving the slot")
+    time_zone: Optional[str] = Field(
+        default=None,
+        description="Optional timezone to use for the approved slot (e.g. IST, UTC, GMT)",
+    )
 
 
 class SimulateResponsesRequest(BaseModel):

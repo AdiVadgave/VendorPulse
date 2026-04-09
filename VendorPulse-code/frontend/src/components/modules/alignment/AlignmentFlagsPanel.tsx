@@ -60,7 +60,7 @@ export default function AlignmentFlagsPanel({ flags }: Props) {
       <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
         <AlertTriangle size={15} className="text-amber-500" />
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Alignment Flags — Stakeholder vs Vendor Gaps
+          Alignment Flags — Internal Stakeholder vs Vendor Gaps
         </h3>
         <span className="ml-auto text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
           {flags.length} flag{flags.length > 1 ? 's' : ''} across {groups.length} categor{groups.length > 1 ? 'ies' : 'y'}

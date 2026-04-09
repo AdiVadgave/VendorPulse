@@ -36,3 +36,11 @@ class UserRepository(BaseRepository):
             availability.append({"date": date, "slots": slots})
 
         return self.update_by_id("userId", user_id, {"availability": availability})
+    def search(self, query: str) -> list[dict]:
+        """Search users by name, email, or organisation."""
+        q = query.lower()
+        return self.find_by_predicate(
+            lambda u: q in u.get("name", "").lower()
+            or q in u.get("email", "").lower()
+            or q in u.get("organisation", "").lower()
+        )

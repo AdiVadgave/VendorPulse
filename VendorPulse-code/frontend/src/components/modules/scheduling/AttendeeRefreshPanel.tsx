@@ -17,7 +17,7 @@ import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import { ROLE_LABELS } from '@/types/cycle.types'
 import type { StakeholderRole } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
-import { getPreferredOrganizerEmail } from '@/lib/schedulingApi'
+import { getPreferredOrganizerEmail, getTokenOwnerOrganizerEmail } from '@/lib/schedulingApi'
 import { MOCK_SYSTEM_USERS, type SystemUser } from '@/mock/scheduling.mock'
 
 interface AttendeeRefreshPanelProps {
@@ -337,13 +337,22 @@ export default function AttendeeRefreshPanel({
     setGraphStatus('Finding real calendar slots via Graph…')
     try {
       const attendeeEmails = attendees.map((a) => a.email)
-      const organiserEmail = getPreferredOrganizerEmail(attendees)
+      const organiserEmail = await getTokenOwnerOrganizerEmail()
+      const fallbackOrganizer = getPreferredOrganizerEmail(attendees)
       if (!organiserEmail) {
-        setGraphError('No organiser email found. Add at least one attendee with an email address.')
+        setGraphError(
+          fallbackOrganizer
+            ? 'Could not resolve token owner organizer from Graph token. Refresh GRAPH_ACCESS_TOKEN and retry.'
+            : 'No organiser email found. Add at least one attendee with an email address.'
+        )
         return
       }
 
-      const result = await apiFetch<{ slot_proposals: SlotProposal[] }>(
+      const result = await apiFetch<{
+        message?: string
+        slot_proposals: SlotProposal[]
+        graph_summary?: { empty_suggestions_reason?: string; no_slots_reason?: string }
+      }>(
         `/api/cycles/${cycleId}/scheduling/graph/find-times`,
         {
           method: 'POST',
@@ -371,6 +380,18 @@ export default function AttendeeRefreshPanel({
           proposed_time_zone: withDuration.proposed_time_zone ?? graphTimeZone,
         }
       })
+
+      if (slots.length === 0) {
+        const reason = result.graph_summary?.no_slots_reason?.trim() || result.graph_summary?.empty_suggestions_reason?.trim()
+        const msg = result.message?.trim()
+        setGraphError(
+          reason
+            ? `No slots found. Reason: ${reason}`
+            : msg || 'No common slots found for the selected attendees/date range in working-hours mode.'
+        )
+        return
+      }
+
       setGraphStatus(`Found ${slots.length} real calendar slots`)
       onResponsesSimulated(attendees, slots)
     } catch (err) {

@@ -12,7 +12,7 @@ import {
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import { apiFetch } from '@/lib/api'
-import { getPreferredOrganizerEmail } from '@/lib/schedulingApi'
+import { getPreferredOrganizerEmail, getTokenOwnerOrganizerEmail } from '@/lib/schedulingApi'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
 
@@ -56,7 +56,7 @@ export default function InviteApprovalPanel({
   function toIanaZone(zone: string): string {
     const normalized = zone.toUpperCase()
     if (normalized === 'IST' || normalized.includes('INDIA')) return 'Asia/Kolkata'
-    if (normalized === 'GMT' || normalized.includes('GMT')) return 'Etc/GMT'
+    if (normalized === 'GMT' || normalized.includes('GMT')) return 'Europe/London'
     return 'UTC'
   }
 
@@ -90,7 +90,14 @@ export default function InviteApprovalPanel({
     let teamsMeetingUrl: string | null = null
 
     try {
-      const organiserEmail = getPreferredOrganizerEmail(attendees) || 'organiser@zensar.com'
+      const organiserEmail = await getTokenOwnerOrganizerEmail()
+      const fallbackOrganizer = getPreferredOrganizerEmail(attendees)
+      if (!organiserEmail) {
+        if (fallbackOrganizer) {
+          throw new Error('Could not resolve token owner organizer from Graph token. Refresh GRAPH_ACCESS_TOKEN and retry.')
+        }
+        throw new Error('No organiser email found. Add a valid coordinator attendee email.')
+      }
       const res = await apiFetch<{
         event_id: string
         teams_meeting_url: string
@@ -106,13 +113,17 @@ export default function InviteApprovalPanel({
       if (res) {
         teamsMeetingUrl = res.teams_meeting_url ?? null
       }
+
+      setAgentStatus('complete')
+      setIsProcessing(false)
+      onInviteSent(teamsMeetingUrl)
+      return
     } catch (err) {
       setGraphError(err instanceof Error ? err.message : 'Failed to create Teams meeting')
+      setAgentStatus('failed')
+      setIsProcessing(false)
+      return
     }
-
-    setAgentStatus('complete')
-    setIsProcessing(false)
-    onInviteSent(teamsMeetingUrl)
   }
 
   return (
@@ -167,6 +178,9 @@ export default function InviteApprovalPanel({
               <p className="text-xs text-slate-500 dark:text-slate-400">Time</p>
               <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
                 {formatTimeInZone(dateObj)} – {formatTimeInZone(endTime)} {displayZone}
+              </p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                Displayed in {displayZone} (converted from Graph UTC values)
               </p>
             </div>
           </div>

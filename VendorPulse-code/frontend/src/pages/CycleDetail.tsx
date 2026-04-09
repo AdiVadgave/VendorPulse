@@ -628,7 +628,7 @@ function SchedulingTab({
   onPhaseChange: (p: SchedulingPhase) => void
   onAttendeesUpdated: (a: CycleAttendee[]) => void
   onSlotsReceived: (slots: SlotProposal[]) => void
-  onSlotSelected: (id: string) => void
+  onSlotSelected: (id: string | null) => void
   onSlotTimeZoneSelected: (tz: 'IST' | 'UTC' | 'GMT') => void
   isMockCycle: boolean
   onScorecardProceed: () => void
@@ -680,6 +680,7 @@ function SchedulingTab({
           attendees={attendees}
           onAttendeesChanged={onAttendeesUpdated}
           onDispatchComplete={() => {}}
+          onBackToAttendance={() => onPhaseChange('attendance_confirmation')}
           onResponsesSimulated={(updated, rankedSlots) => {
             onAttendeesUpdated(updated)
             onSlotsReceived(rankedSlots)
@@ -709,6 +710,10 @@ function SchedulingTab({
             quarter={cycle.quarter}
             year={cycle.year}
             timeZoneOverride={selectedSlotTimeZone}
+            onBack={() => {
+              onSlotSelected(null)
+              onPhaseChange('slot_ranking')
+            }}
             onInviteSent={() => {
               // Meeting URL returned from Graph can be logged or used, but skipped here to simplify UI
               // For mock cycles seed pre-built RSVP data; for new cycles keep attendees as-is

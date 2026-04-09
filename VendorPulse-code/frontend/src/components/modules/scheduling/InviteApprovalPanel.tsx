@@ -25,6 +25,8 @@ interface InviteApprovalPanelProps {
   year: number
   timeZoneOverride?: 'IST' | 'UTC' | 'GMT'
   onInviteSent: (teamsMeetingId: string | null) => void
+  onBack?: () => void
+  isLocked?: boolean
 }
 
 export default function InviteApprovalPanel({
@@ -36,10 +38,13 @@ export default function InviteApprovalPanel({
   year,
   timeZoneOverride,
   onInviteSent,
+  onBack,
+  isLocked,
 }: InviteApprovalPanelProps) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('awaiting_approval')
   const [isProcessing, setIsProcessing] = useState(false)
   const [graphError, setGraphError] = useState<string | null>(null)
+  const [hasSentInvite, setHasSentInvite] = useState(false)
 
   const dateObj = new Date(slot.proposed_time)
   const durationMinutes = Number((slot as unknown as { duration_minutes?: number }).duration_minutes ?? 60)
@@ -83,6 +88,7 @@ export default function InviteApprovalPanel({
   }
 
   async function handleSend() {
+    if (Boolean(isLocked) || hasSentInvite || isProcessing) return
     setIsProcessing(true)
     setAgentStatus('running')
     setGraphError(null)
@@ -112,6 +118,7 @@ export default function InviteApprovalPanel({
 
     setAgentStatus('complete')
     setIsProcessing(false)
+    setHasSentInvite(true)
     onInviteSent(teamsMeetingUrl)
   }
 
@@ -298,26 +305,47 @@ export default function InviteApprovalPanel({
             </p>
           )}
         </div>
-        <button
-          onClick={handleSend}
-          disabled={isProcessing}
-          className={cn(
-            'flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0',
-            isProcessing && 'opacity-60 cursor-not-allowed'
+        <div className="flex items-center gap-2 whitespace-nowrap shrink-0">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              disabled={Boolean(isLocked) || isProcessing || hasSentInvite}
+              className={cn(
+                'px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700',
+                'text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors',
+                (Boolean(isLocked) || isProcessing || hasSentInvite) && 'opacity-60 cursor-not-allowed'
+              )}
+            >
+              Back
+            </button>
           )}
-        >
-          {isProcessing ? (
-            <>
-              <Send size={14} className="animate-pulse" />
-              Sending via Graph…
-            </>
-          ) : (
-            <>
-              <Globe size={14} />
-              Approve & Send Invite
-            </>
-          )}
-        </button>
+          <button
+            onClick={handleSend}
+            disabled={Boolean(isLocked) || isProcessing || hasSentInvite}
+            className={cn(
+              'flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors',
+              (Boolean(isLocked) || isProcessing || hasSentInvite) && 'opacity-60 cursor-not-allowed'
+            )}
+          >
+            {isProcessing ? (
+              <>
+                <Send size={14} className="animate-pulse" />
+                Sending via Graph…
+              </>
+            ) : hasSentInvite ? (
+              <>
+                <Send size={14} />
+                Invite Sent
+              </>
+            ) : (
+              <>
+                <Globe size={14} />
+                Approve & Send Invite
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )

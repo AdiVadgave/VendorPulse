@@ -30,26 +30,6 @@
     "updated_at": "2026-04-02T10:19:02.445103+00:00"
   },
   {
-    "cycle_id": "c_fa483f2f",
-    "vendor_id": "v_custom",
-    "vendor_name": "Anup",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-08T11:52:12.563098+00:00",
-    "updated_at": "2026-04-08T11:52:43.969087+00:00"
-  },
-  {
-    "cycle_id": "c_978773f1",
-    "vendor_id": "v_custom",
-    "vendor_name": "Amazon",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-08T12:14:43.370627+00:00",
-    "updated_at": "2026-04-08T12:14:43.370627+00:00"
-  },
-  {
     "cycle_id": "c_44ce9222",
     "vendor_id": "v_custom",
     "vendor_name": "Zensar",

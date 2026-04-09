@@ -24,6 +24,8 @@ interface CycleStore {
   setCycles: (cycles: GovernanceCycle[]) => void
   /** Remove a cycle by id */
   removeCycle: (cycleId: string) => void
+  /** Update an existing cycle's data and workflow state, or add it if not present */
+  upsertCycle: (cycle: GovernanceCycle) => void
 }
 
 const initialWorkflowStates: Record<string, WorkflowState> = Object.fromEntries(
@@ -75,6 +77,17 @@ export const useCycleStore = create<CycleStore>()((set, get) => ({
       return {
         cycles: s.cycles.filter((cycle) => cycle.cycle_id !== cycleId),
         workflowStates: nextStates,
+      }
+    }),
+
+  upsertCycle: (cycle) =>
+    set((s) => {
+      const exists = s.cycles.some((c) => c.cycle_id === cycle.cycle_id)
+      return {
+        cycles: exists
+          ? s.cycles.map((c) => (c.cycle_id === cycle.cycle_id ? cycle : c))
+          : [cycle, ...s.cycles],
+        workflowStates: { ...s.workflowStates, [cycle.cycle_id]: cycle.workflow_state },
       }
     }),
 }))

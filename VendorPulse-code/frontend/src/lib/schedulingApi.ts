@@ -4,6 +4,7 @@
  */
 import { apiFetch } from './api'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
+import type { GovernanceCycle } from '@/types/cycle.types'
 
 // ── Response shapes ──────────────────────────────────────────────────────────
 
@@ -16,6 +17,26 @@ export interface AgentRunResponse {
   next_actions: string[]
   requires_approval: boolean
   run_id?: string
+}
+
+// ── Cycles ───────────────────────────────────────────────────────────────────
+
+export async function fetchCycle(cycleId: string): Promise<GovernanceCycle | null> {
+  try {
+    const res = await apiFetch<{ cycle: GovernanceCycle }>(`/api/cycles/${cycleId}`)
+    return res.cycle ?? null
+  } catch {
+    return null
+  }
+}
+
+export async function fetchAllCycles(): Promise<GovernanceCycle[]> {
+  try {
+    const res = await apiFetch<{ cycles: GovernanceCycle[] }>('/api/cycles')
+    return res.cycles ?? []
+  } catch {
+    return []
+  }
 }
 
 // ── Attendees ────────────────────────────────────────────────────────────────

@@ -9,25 +9,20 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { VendorTrend } from '@/types/analytics.types'
-import type { ScorecardCategory } from '@/types/scorecard.types'
-import { CATEGORY_LABELS } from '@/types/scorecard.types'
+import type { ScorecardCategoryKey } from '@/types/scorecard.types'
+import { CATEGORY_LABELS, SCORECARD_CATEGORIES } from '@/types/scorecard.types'
 
 interface Props {
   trend: VendorTrend
-  selectedCategory: ScorecardCategory | 'ALL'
+  selectedCategory: ScorecardCategoryKey | 'ALL'
 }
 
-const CATEGORY_COLORS: Record<ScorecardCategory, string> = {
-  DELIVERY_QUALITY: '#6366f1',
-  SLA_COMPLIANCE: '#10b981',
-  INNOVATION: '#f59e0b',
-  COMMUNICATION: '#3b82f6',
-  VALUE_FOR_MONEY: '#8b5cf6',
+const CATEGORY_COLORS: Record<ScorecardCategoryKey, string> = {
+  RISK_COMPLIANCE: '#ef4444',
+  PERFORMANCE:     '#6366f1',
+  COMMERCIAL:      '#f59e0b',
+  RELATIONSHIP:    '#10b981',
 }
-
-const CATEGORIES: ScorecardCategory[] = [
-  'DELIVERY_QUALITY', 'SLA_COMPLIANCE', 'INNOVATION', 'COMMUNICATION', 'VALUE_FOR_MONEY',
-]
 
 export default function TrendLineChart({ trend, selectedCategory }: Props) {
   const data = trend.cycles.map((cycle) => ({
@@ -35,15 +30,16 @@ export default function TrendLineChart({ trend, selectedCategory }: Props) {
     ...cycle.scores,
   }))
 
-  const categoriesToShow = selectedCategory === 'ALL' ? CATEGORIES : [selectedCategory]
+  const categoriesToShow: ScorecardCategoryKey[] =
+    selectedCategory === 'ALL' ? SCORECARD_CATEGORIES : [selectedCategory]
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Score Trend — {trend.vendor_name}
+          Category Score Trends — {trend.vendor_name}
         </h3>
-        <p className="text-xs text-slate-400 dark:text-slate-500">Q1 2025 → Q1 2026</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">Q1 2025 → Q1 2026 · Score scale 1–5</p>
       </div>
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
@@ -72,11 +68,11 @@ export default function TrendLineChart({ trend, selectedCategory }: Props) {
               }}
               formatter={(value, name) => [
                 typeof value === 'number' ? value.toFixed(2) : value,
-                CATEGORY_LABELS[name as ScorecardCategory] ?? name,
+                CATEGORY_LABELS[name as ScorecardCategoryKey] ?? name,
               ]}
             />
             <Legend
-              formatter={(value) => CATEGORY_LABELS[value as ScorecardCategory] ?? value}
+              formatter={(value) => CATEGORY_LABELS[value as ScorecardCategoryKey] ?? value}
               wrapperStyle={{ fontSize: '11px' }}
             />
             {categoriesToShow.map((cat) => (

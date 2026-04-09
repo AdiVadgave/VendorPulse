@@ -93,7 +93,7 @@ export default function NotesInputPanel({ onActionsExtracted }: Props) {
           className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
         >
           <Sparkles size={14} />
-          {agentStatus === 'running' ? 'Extracting actions...' : 'Extract Action Items with Claude'}
+          {agentStatus === 'running' ? 'Extracting actions...' : 'Extract Action Items'}
         </button>
       </div>
 

@@ -20,7 +20,7 @@ import {
   MOCK_SLOT_PROPOSALS,
   MOCK_ATTENDEES_RSVP,
 } from '@/mock/scheduling.mock'
-import { fetchAttendees } from '@/lib/schedulingApi'
+import { fetchAttendees, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
 import {
   deriveScorecardAttendees,
   getInitialSubmissions,
@@ -83,7 +83,7 @@ import ActionLog from '@/components/shared/ActionLog'
 import EmptyState from '@/components/shared/EmptyState'
 import { cn } from '@/utils/cn'
 import type { TabKey, WorkflowState } from '@/utils/constants'
-import { WORKFLOW_STATES, TAB_LABELS, TAB_MIN_STATE_INDEX } from '@/utils/constants'
+import { WORKFLOW_STATES, TAB_LABELS, TAB_MIN_STATE_INDEX, getDefaultTabFromState } from '@/utils/constants'
 import { useCycleStore } from '@/store/useCycleStore'
 import type { SchedulingPhase, CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import type { StakeholderSubmission } from '@/types/scorecard.types'
@@ -128,19 +128,26 @@ export default function CycleDetail() {
   // Store-driven: covers both mock cycles and API-created cycles
   const storeWorkflowState = useCycleStore((s) => cycleId ? s.workflowStates[cycleId] : undefined)
   const advanceWorkflow = useCycleStore((s) => s.advanceWorkflow)
+  const upsertCycle = useCycleStore((s) => s.upsertCycle)
   const storeCycle = useCycleStore((s) => cycleId ? s.getCycleById(cycleId) : undefined)
 
   // Store takes precedence (includes API-created cycles); fall back to mock
   const cycle = storeCycle ?? (cycleId ? getMockCycleById(cycleId) : undefined)
-  const tabParam = (searchParams.get('tab') as TabKey) ?? 'overview'
-  const [activeTab, setActiveTab] = useState<TabKey>(tabParam)
+  const isMockCycle = cycleId ? !!getMockCycleById(cycleId) : false
+
+  // For API-created cycles not yet in store, show a loading state while we fetch from backend
+  const [isLoadingCycle, setIsLoadingCycle] = useState(!cycle && !isMockCycle)
+
+  // Initialise to the active step for the cycle's current state.
+  // Falls back to the URL ?tab param only while the cycle hasn't loaded yet.
+  const [activeTab, setActiveTab] = useState<TabKey>(() =>
+    cycle ? getDefaultTabFromState(cycle.workflow_state) : ((searchParams.get('tab') as TabKey) ?? 'scheduling')
+  )
 
   // --- Module A state ---
   const [schedulingPhase, setSchedulingPhase] = useState<SchedulingPhase>(() =>
     cycle ? getInitialSchedulingPhase(cycle.workflow_state) : 'attendee_refresh'
   )
-  // For mock cycles pre-seed attendees; for new API-created cycles start empty
-  const isMockCycle = cycleId ? !!getMockCycleById(cycleId) : false
   const [schedulingAttendees, setSchedulingAttendees] = useState<CycleAttendee[]>(
     isMockCycle ? MOCK_ATTENDEES_INITIAL : []
   )
@@ -206,6 +213,28 @@ export default function CycleDetail() {
     setSearchParams({ tab: activeTab }, { replace: true })
   }, [activeTab, setSearchParams])
 
+  // On mount, fetch the cycle from the backend for API-created cycles.
+  // This rehydrates the Zustand store after a page refresh so that workflow_state,
+  // scheduling phase, and scorecard dispatch state are all restored correctly.
+  useEffect(() => {
+    if (isMockCycle || !cycleId) return
+    setIsLoadingCycle(true)
+    fetchCycle(cycleId)
+      .then((backendCycle) => {
+        if (!backendCycle) return
+        upsertCycle(backendCycle)
+        const state = backendCycle.workflow_state
+        const idx = WORKFLOW_STATES.indexOf(state)
+        setSchedulingPhase(getInitialSchedulingPhase(state))
+        setActiveTab(getDefaultTabFromState(state))
+        if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_REQUEST_SENT')) setScorecardDispatched(true)
+        if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_COLLECTION')) setSubmissionsSimulated(true)
+      })
+      .catch(() => {/* backend offline — fall through to "not found" state */})
+      .finally(() => setIsLoadingCycle(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cycleId])
+
   // Load real attendees from backend for API-created (non-mock) cycles
   useEffect(() => {
     if (isMockCycle || !cycleId) return
@@ -215,6 +244,27 @@ export default function CycleDetail() {
       })
       .catch(() => {/* backend may be offline — keep empty list */})
   }, [cycleId, isMockCycle])
+
+  // Load saved slot proposals from backend for API-created cycles
+  useEffect(() => {
+    if (isMockCycle || !cycleId) return
+    fetchSlots(cycleId)
+      .then((slots) => {
+        if (slots.length > 0) setApiSlots(slots)
+      })
+      .catch(() => {/* backend may be offline — keep empty list */})
+  }, [cycleId, isMockCycle])
+
+  if (isLoadingCycle) {
+    return (
+      <div className="flex items-center justify-center h-full p-6">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading cycle…</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!cycle) {
     return (

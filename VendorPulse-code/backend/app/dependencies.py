@@ -156,3 +156,36 @@ def get_scheduling_agent(cycle_id: str | None = None):
         llm_svc=get_llm_service() if settings.enable_llm else None,
         agent_run_repo=get_agent_run_repo(),
     )
+
+
+def _fetch_compiled_scorecard(cycle_id: str) -> dict:
+    """
+    Reusable scorecard fetcher for the VendorPrepAgent.
+    Calls the same logic as GET /api/scorecard/compiled/{cycle_id}.
+    """
+    from app.api.routes.scorecard import get_compiled_scorecard
+    return get_compiled_scorecard(cycle_id)
+
+
+def get_vendor_prep_agent(cycle_id: str | None = None):
+    """Returns a VendorPrepAgent wired with all dependencies."""
+    from app.agents.vendor_prep_agent import VendorPrepAgent
+
+    return VendorPrepAgent(
+        scorecard_fetcher=_fetch_compiled_scorecard,
+        cycle_id=cycle_id,
+        llm_svc=get_llm_service() if settings.enable_llm else None,
+        agent_run_repo=get_agent_run_repo(),
+    )
+
+
+def get_meeting_agent(cycle_id: str | None = None):
+    """Returns a MeetingAgent wired with all dependencies."""
+    from app.agents.meeting_agent import MeetingAgent
+
+    return MeetingAgent(
+        meeting_repo=get_meeting_repo(),
+        cycle_id=cycle_id,
+        llm_svc=get_llm_service() if settings.enable_llm else None,
+        agent_run_repo=get_agent_run_repo(),
+    )

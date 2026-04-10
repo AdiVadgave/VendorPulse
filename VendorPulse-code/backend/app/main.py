@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import google_auth, graph_scheduling, meetings, scheduling, scorecard, users, vendors
+from app.api.routes import google_auth, graph_scheduling, meeting_agent, meetings, scheduling, scorecard, users, vendor_prep, vendors
 from app.config import settings
 from app.core.logging_config import setup_logging
 from app.middleware.request_logging import RequestLoggingMiddleware
@@ -59,6 +59,8 @@ app.include_router(graph_scheduling.router)
 app.include_router(google_auth.router)
 app.include_router(scorecard.router)
 app.include_router(vendors.router)
+app.include_router(vendor_prep.router)
+app.include_router(meeting_agent.router)
 
 logger.info("VendorPulse backend initialized — routers registered, middleware active")
 
@@ -94,5 +96,10 @@ def health():
             "graphFindTimes": "POST /api/cycles/{cycleId}/scheduling/graph/find-times",
             "graphSendInvite": "POST /api/cycles/{cycleId}/scheduling/graph/send-invite",
             "rsvp": "GET|PUT /api/cycles/{cycleId}/scheduling/rsvp",
+            "vendorPrepBrief": "POST /api/cycles/{cycleId}/vendor-prep/brief",
+            "vendorPrepPushback": "POST /api/cycles/{cycleId}/vendor-prep/pushback",
+            "meetingMinutes": "POST /api/cycles/{cycleId}/meeting/minutes",
+            "meetingExtractActions": "POST /api/cycles/{cycleId}/meeting/extract-actions",
+            "meetingParseTranscript": "POST /api/cycles/{cycleId}/meeting/parse-transcript",
         },
     }

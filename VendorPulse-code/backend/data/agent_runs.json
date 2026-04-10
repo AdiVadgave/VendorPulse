@@ -64,5 +64,159 @@
     "triggered_by": "USER",
     "error_message": "Error code: 500 - {'error': {'message': 'The server had an error while processing your request. Sorry about that!', 'type': 'server_error', 'param': None, 'code': None}}",
     "created_at": "2026-04-06T12:16:30.178018+00:00"
+  },
+  {
+    "run_id": "7572c59e-33e4-4797-a446-4aa45fc433bc",
+    "agent_name": "meeting_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Generate meeting minutes for meeting m1\", \"context\": {\"action\": \"generate_minutes\", \"params\": {\"meeting_id\": \"m1\", \"notes\": [{\"note_id\": \"n1\", \"meeting_id\": \"m1\", \"note_type\": \"DECISION\", \"content\": \"Approved SLA revision for Q2\", \"raised_by\": \"Sarah Chen\", \"timestamp\": \"10:15\"}, {\"note_id\": \"n2\", \"meeting_id\": \"m1\", \"note_type\": \"QUESTION\", \"content\": \"Why did delivery scores drop from 4.2 to 3.1?\", \"raised_by\": \"James Wilson\", \"timestamp\": \"10:22\"}, {\"note_id\": \"n3\", \"meeting_id\": \"m1\", \"note_type\": \"ACTION\", \"content\": \"Vendor to provide root cause analysis by April 20\", \"raised_by\": \"Maria Garcia\", \"timestamp\": \"10:30\"}, {\"note_id\": \"n4\", \"meeting_id\": \"m1\", \"note_type\": \"OBJECTION\", \"content\": \"Vendor disputes the compliance score methodology\", \"raised_by\": \"James Wilson\", \"timestamp\": \"10:35\"}], \"attendees\": [\"Sarah Chen\", \"James Wilson\", \"Maria Garcia\"], \"meeting_date\": \"2026-04-10\"}}}",
+    "output_payload": "{\"status\": \"failed\", \"agent\": \"meeting_agent\", \"summary\": \"Agent error: Error code: 500 - {'error': {'message': 'The server had an error while processing your request. Sorry about that!', 'type': 'server_error', 'param': None, 'code': None}}\", \"data\": null, \"warnings\": [], \"next_actions\": [\"RETRY\"], \"requires_approval\": false, \"run_id\": \"7572c59e-33e4-4797-a446-4aa45fc433bc\"}",
+    "status": "FAILED",
+    "triggered_by": "USER",
+    "error_message": "Error code: 500 - {'error': {'message': 'The server had an error while processing your request. Sorry about that!', 'type': 'server_error', 'param': None, 'code': None}}",
+    "created_at": "2026-04-10T15:27:07.895824+00:00"
+  },
+  {
+    "run_id": "df0bec0b-f4e8-44cc-a33a-082a908d0323",
+    "agent_name": "meeting_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Generate meeting minutes for meeting m1\", \"context\": {\"action\": \"generate_minutes\", \"params\": {\"meeting_id\": \"m1\", \"notes\": [{\"note_id\": \"n1\", \"meeting_id\": \"m1\", \"note_type\": \"DECISION\", \"content\": \"Approved SLA revision for Q2\", \"raised_by\": \"Sarah Chen\", \"timestamp\": \"10:15\"}, {\"note_id\": \"n2\", \"meeting_id\": \"m1\", \"note_type\": \"QUESTION\", \"content\": \"Why did delivery scores drop from 4.2 to 3.1?\", \"raised_by\": \"James Wilson\", \"timestamp\": \"10:22\"}, {\"note_id\": \"n3\", \"meeting_id\": \"m1\", \"note_type\": \"ACTION\", \"content\": \"Vendor to provide root cause analysis by April 20\", \"raised_by\": \"Maria Garcia\", \"timestamp\": \"10:30\"}, {\"note_id\": \"n4\", \"meeting_id\": \"m1\", \"note_type\": \"OBJECTION\", \"content\": \"Vendor disputes the compliance score methodology\", \"raised_by\": \"James Wilson\", \"timestamp\": \"10:35\"}], \"attendees\": [\"Sarah Chen\", \"James Wilson\", \"Maria Garcia\"], \"meeting_date\": \"2026-04-10\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"meeting_agent\", \"summary\": \"Meeting minutes generated.\", \"data\": {\"minutes\": {\"minutes_id\": \"fee54af0-9af3-40f8-b388-9c4b47a3d11a\", \"meeting_id\": \"m1\", \"cycle_id\": \"c1\", \"meeting_date\": \"2026-04-10\", \"attendees\": [\"Sarah Chen\", \"James Wilson\", \"Maria Garcia\"], \"executive_summary\": \"Governance meeting held on 2026-04-10 with 3 attendees.\", \"agenda_summaries\": [{\"topic\": \"General Discussion\", \"summary\": \"Meeting notes captured.\"}], \"key_decisions\": [\"Approved SLA revision for Q2\"], \"qa_log\": [{\"question\": \"Why did delivery scores drop from 4.2 to 3.1?\", \"raised_by\": \"James Wilson\", \"response\": \"Recorded during meeting.\"}], \"action_items\": [{\"description\": \"Vendor to provide root cause analysis by April 20\", \"owner\": \"Maria Garcia\", \"due_date\": \"\"}], \"generated_at\": \"2026-04-10T15:31:24.491648+00:00\"}}, \"warnings\": [], \"next_actions\": [\"APPROVE_MINUTES\"], \"requires_approval\": true, \"run_id\": \"df0bec0b-f4e8-44cc-a33a-082a908d0323\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:31:24.418629+00:00"
+  },
+  {
+    "run_id": "447b61c3-48a0-4a66-875c-633b6ddbbb58",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_e7a648c4",
+    "input_payload": "{\"user_message\": \"Generate a vendor brief for cycle c_e7a648c4\", \"context\": {\"action\": \"generate_vendor_brief\", \"params\": {\"vendor_name\": \"Zensar\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"vendor_prep_agent\", \"summary\": \"Vendor brief generated for Zensar.\", \"data\": {\"brief\": {\"overall_score\": 2.56, \"overall_trend\": \"stable\", \"category_ratings\": [{\"category\": \"Risk & Compliance\", \"score\": 2.0, \"rationale\": \"Internal average: 2.0, Vendor average: 4.0\", \"trend\": \"down\"}, {\"category\": \"Performance\", \"score\": 3.0, \"rationale\": \"Internal average: 3.0, Vendor average: 4.8\", \"trend\": \"flat\"}, {\"category\": \"Commercial\", \"score\": 2.5, \"rationale\": \"Internal average: 2.5, Vendor average: 4.25\", \"trend\": \"down\"}, {\"category\": \"Relationship\", \"score\": 2.5, \"rationale\": \"Internal average: 2.5, Vendor average: 4.5\", \"trend\": \"down\"}], \"key_concerns\": [\"Risk & Compliance: below target at 2.0/5\", \"Commercial: below target at 2.5/5\", \"Relationship: below target at 2.5/5\"], \"positive_areas\": [], \"open_actions\": 0, \"generated_at\": \"2026-04-10T15:32:05.766395+00:00\"}}, \"warnings\": [], \"next_actions\": [\"APPROVE_BRIEF\"], \"requires_approval\": true, \"run_id\": \"447b61c3-48a0-4a66-875c-633b6ddbbb58\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:32:05.599515+00:00"
+  },
+  {
+    "run_id": "7edf5f7d-5e0f-4ffe-b7d5-82baa509ddb1",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Draft 3 response options for pushback pb-001\", \"context\": {\"action\": \"handle_pushback\", \"params\": {\"pushback_id\": \"pb-001\", \"category\": \"DATA_DISPUTE\", \"description\": \"We believe the SLA adherence score of 2.8 does not account for the network outage on March 15 which was outside our control\", \"raised_by\": \"Vendor PM\", \"needs_legal_review\": false}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"vendor_prep_agent\", \"summary\": \"3 response options drafted for pushback 'pb-001'.\", \"data\": {\"pushback_id\": \"pb-001\", \"responses\": [{\"response_id\": \"15e29196-e07c-47cb-a0df-bfaab7c9ce1f\", \"pushback_id\": \"pb-001\", \"stance\": \"factual\", \"content\": \"Based on the scorecard data, the metrics indicate the current assessment is data-supported. We can review specific data points together.\", \"is_selected\": false}, {\"response_id\": \"567d5fca-bb50-43d6-ab22-4ff3eb7f4f46\", \"pushback_id\": \"pb-001\", \"stance\": \"neutral\", \"content\": \"We acknowledge this concern and propose a joint review to find common ground on the assessment criteria.\", \"is_selected\": false}, {\"response_id\": \"5ae2879a-6175-4e78-a35a-ffc27cc0bb5f\", \"pushback_id\": \"pb-001\", \"stance\": \"escalation\", \"content\": \"Per our service agreement, the current scores reflect documented performance. We recommend a formal review meeting to address discrepancies.\", \"is_selected\": false}]}, \"warnings\": [], \"next_actions\": [\"SELECT_RESPONSE\"], \"requires_approval\": true, \"run_id\": \"7edf5f7d-5e0f-4ffe-b7d5-82baa509ddb1\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:32:38.842743+00:00"
+  },
+  {
+    "run_id": "e25442b4-b45a-4142-8136-7aff922114d0",
+    "agent_name": "meeting_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Extract action items from these meeting minutes\", \"context\": {\"action\": \"extract_actions\", \"params\": {\"minutes_text\": \"Action: Vendor to provide root cause analysis for SLA miss by April 20 (owner: Maria Garcia). Action: Internal team to review compliance scoring methodology by April 25 (owner: James Wilson).\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"meeting_agent\", \"summary\": \"Extracted 0 action items.\", \"data\": {\"actions\": []}, \"warnings\": [], \"next_actions\": [\"REVIEW_ACTIONS\"], \"requires_approval\": false, \"run_id\": \"e25442b4-b45a-4142-8136-7aff922114d0\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:33:13.202648+00:00"
+  },
+  {
+    "run_id": "81f63324-b9e7-4d7b-8a97-94fca0e653cd",
+    "agent_name": "meeting_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Generate meeting minutes for meeting m1\", \"context\": {\"action\": \"generate_minutes\", \"params\": {\"meeting_id\": \"m1\", \"notes\": [{\"note_id\": \"n1\", \"meeting_id\": \"m1\", \"note_type\": \"DECISION\", \"content\": \"Approved SLA revision for Q2\", \"raised_by\": \"Sarah Chen\", \"timestamp\": \"10:15\"}, {\"note_id\": \"n2\", \"meeting_id\": \"m1\", \"note_type\": \"QUESTION\", \"content\": \"Why did delivery scores drop from 4.2 to 3.1?\", \"raised_by\": \"James Wilson\", \"timestamp\": \"10:22\"}, {\"note_id\": \"n3\", \"meeting_id\": \"m1\", \"note_type\": \"ACTION\", \"content\": \"Vendor to provide root cause analysis by April 20\", \"raised_by\": \"Maria Garcia\", \"timestamp\": \"10:30\"}, {\"note_id\": \"n4\", \"meeting_id\": \"m1\", \"note_type\": \"OBJECTION\", \"content\": \"Vendor disputes the compliance score methodology\", \"raised_by\": \"James Wilson\", \"timestamp\": \"10:35\"}], \"attendees\": [\"Sarah Chen\", \"James Wilson\", \"Maria Garcia\"], \"meeting_date\": \"2026-04-10\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"meeting_agent\", \"summary\": \"Meeting minutes generated.\", \"data\": {\"minutes\": {\"minutes_id\": \"6cd83e98-be14-11ec-b909-0242ac120002\", \"meeting_id\": \"m1\", \"cycle_id\": \"c1\", \"meeting_date\": \"2026-04-10\", \"attendees\": [\"Sarah Chen\", \"James Wilson\", \"Maria Garcia\"], \"executive_summary\": \"The governance meeting held on April 10, 2026, covered topics including SLA revisions for Q2, a decline in delivery scores, and the vendor's disagreement with compliance score methodology. Key decisions were made and actions were assigned to address the concerns raised.\", \"agenda_summaries\": [{\"topic\": \"SLA Revision for Q2\", \"summary\": \"The revised Service Level Agreement for the second quarter was reviewed and approved, outlining adjustments to service expectations and performance metrics.\"}, {\"topic\": \"Delivery Scores Analysis\", \"summary\": \"A discussion focused on the notable decrease in delivery scores from 4.2 to 3.1. The vendor was tasked with conducting a root cause analysis to identify underlying factors.\"}, {\"topic\": \"Compliance Score Dispute\", \"summary\": \"James Wilson raised an objection to the current methodology used to calculate compliance scores, leading to a discussion on possible improvements.\"}], \"key_decisions\": [\"Approved SLA revision for Q2.\"], \"qa_log\": [{\"question\": \"Why did delivery scores drop from 4.2 to 3.1?\", \"raised_by\": \"James Wilson\", \"response\": \"The vendor committed to providing a root cause analysis by April 20.\"}], \"action_items\": [{\"description\": \"Vendor to provide root cause analysis by April 20.\", \"owner\": \"Vendor\", \"due_date\": \"2026-04-20\"}], \"generated_at\": \"2026-04-10T12:00:00Z\"}}, \"warnings\": [], \"next_actions\": [\"APPROVE_MINUTES\"], \"requires_approval\": true, \"run_id\": \"81f63324-b9e7-4d7b-8a97-94fca0e653cd\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:43:43.514325+00:00"
+  },
+  {
+    "run_id": "574ed39d-18cb-4b73-9baf-fae56b9d8309",
+    "agent_name": "meeting_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Extract action items from these meeting minutes\", \"context\": {\"action\": \"extract_actions\", \"params\": {\"minutes_text\": \"Action: Vendor to provide root cause analysis for SLA miss by April 20 (owner: Maria Garcia). Action: Internal team to review compliance scoring methodology by April 25 (owner: James Wilson).\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"meeting_agent\", \"summary\": \"Extracted 0 action items.\", \"data\": {\"actions\": []}, \"warnings\": [], \"next_actions\": [\"REVIEW_ACTIONS\"], \"requires_approval\": false, \"run_id\": \"574ed39d-18cb-4b73-9baf-fae56b9d8309\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:44:59.930751+00:00"
+  },
+  {
+    "run_id": "be227681-8b92-4575-b1d0-6e015e181250",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_e7a648c4",
+    "input_payload": "{\"user_message\": \"Generate a vendor brief for cycle c_e7a648c4\", \"context\": {\"action\": \"generate_vendor_brief\", \"params\": {\"vendor_name\": \"Zensar\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"vendor_prep_agent\", \"summary\": \"Vendor brief generated for Zensar.\", \"data\": {\"brief\": {\"overall_score\": 2.56, \"overall_trend\": \"stable\", \"category_ratings\": [{\"category\": \"Risk & Compliance\", \"score\": 2.0, \"rationale\": \"The internal score for 'Risk & Compliance' is notably low at 2.0 compared to the vendor's average of 4.0. Significant discrepancies exist in parameters such as 'Release & Patch Management' and 'Security & Risk Management' where Anup Kesarwani rated at 1 and 2 respectively, indicating room for improvement.\", \"trend\": \"stable\"}, {\"category\": \"Performance\", \"score\": 3.0, \"rationale\": \"The 'Performance' category shows some inconsistencies between internal and vendor ratings, particularly in 'Delivery Timeliness' and 'Quality of Delivery'. Anup Kesarwani rated these areas with 1 and 2, suggesting challenges in timely and quality delivery.\", \"trend\": \"stable\"}, {\"category\": \"Commercial\", \"score\": 2.5, \"rationale\": \"The commercial category averages 2.5 internally compared to 4.25 from the vendor. 'Pricing Competitiveness' and 'Contract Compliance' are areas of concern with internal scores of 1 and 2. Anup Kesarwani has highlighted these issues, indicating a need to address these areas.\", \"trend\": \"stable\"}, {\"category\": \"Relationship\", \"score\": 2.5, \"rationale\": \"The 'Relationship' category has an internal average of 2.5 with 'Communication Effectiveness', 'Stakeholder Engagement', and 'Responsiveness' receiving lower scores by Anup Kesarwani (1, 2, and 3 respectively). Improved communication and engagement may be necessary.\", \"trend\": \"stable\"}], \"key_concerns\": [\"Low internal perception of 'Release & Patch Management' and security-related areas.\", \"Discrepancies in 'Delivery Timeliness' and 'Quality of Delivery'.\", \"Concerns over 'Pricing Competitiveness' and 'Contract Compliance'.\", \"Challenges in 'Communication Effectiveness' and overall engagement.\"], \"positive_areas\": [\"Vendor's consistent positive rating across all categories.\", \"'Operational Efficiency' and 'Billing Accuracy' rated highly internally and align with vendor evaluations.\"], \"open_actions\": 3, \"generated_at\": \"2023-10-31T12:00:00Z\"}}, \"warnings\": [], \"next_actions\": [\"APPROVE_BRIEF\"], \"requires_approval\": true, \"run_id\": \"be227681-8b92-4575-b1d0-6e015e181250\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:46:15.379458+00:00"
+  },
+  {
+    "run_id": "c190c692-8ee9-4e8f-a4a6-892b898149f2",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Draft 3 response options for pushback pb-001\", \"context\": {\"action\": \"handle_pushback\", \"params\": {\"pushback_id\": \"pb-001\", \"category\": \"DATA_DISPUTE\", \"description\": \"We believe the SLA adherence score of 2.8 does not account for the network outage on March 15 which was outside our control\", \"raised_by\": \"Vendor PM\", \"needs_legal_review\": false}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"vendor_prep_agent\", \"summary\": \"3 response options drafted for pushback 'pb-001'.\", \"data\": {\"pushback_id\": \"pb-001\", \"responses\": [{\"response_id\": \"88375270-1b77-4531-87ff-f8736d0f3fd6\", \"pushback_id\": \"pb-001\", \"stance\": \"factual\", \"content\": \"Based on the scorecard data, the metrics indicate the current assessment is data-supported. We can review specific data points together.\", \"is_selected\": false}, {\"response_id\": \"88e476e0-cb15-42cd-b244-58f7d936346f\", \"pushback_id\": \"pb-001\", \"stance\": \"neutral\", \"content\": \"We acknowledge this concern and propose a joint review to find common ground on the assessment criteria.\", \"is_selected\": false}, {\"response_id\": \"5ebeb741-0a4a-4da6-b61a-06f1d524a0c3\", \"pushback_id\": \"pb-001\", \"stance\": \"escalation\", \"content\": \"Per our service agreement, the current scores reflect documented performance. We recommend a formal review meeting to address discrepancies.\", \"is_selected\": false}]}, \"warnings\": [], \"next_actions\": [\"SELECT_RESPONSE\"], \"requires_approval\": true, \"run_id\": \"c190c692-8ee9-4e8f-a4a6-892b898149f2\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:46:24.913566+00:00"
+  },
+  {
+    "run_id": "81b00ccb-8086-4481-9bcf-d8149e9e8ea4",
+    "agent_name": "meeting_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Extract action items from these meeting minutes\", \"context\": {\"action\": \"extract_actions\", \"params\": {\"minutes_text\": \"Action: Vendor to provide root cause analysis for SLA miss by April 20 (owner: Maria Garcia). Action: Internal team to review compliance scoring methodology by April 25 (owner: James Wilson).\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"meeting_agent\", \"summary\": \"Extracted 0 action items.\", \"data\": {\"actions\": []}, \"warnings\": [], \"next_actions\": [\"REVIEW_ACTIONS\"], \"requires_approval\": false, \"run_id\": \"81b00ccb-8086-4481-9bcf-d8149e9e8ea4\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:51:30.903467+00:00"
+  },
+  {
+    "run_id": "e8f5e9a1-8a0b-4f94-92c9-bca9756c94b0",
+    "agent_name": "meeting_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Extract action items from these meeting minutes\", \"context\": {\"action\": \"extract_actions\", \"params\": {\"minutes_text\": \"Action: Vendor to provide root cause analysis for SLA miss by April 20 (owner: Maria Garcia). Action: Internal team to review compliance scoring methodology by April 25 (owner: James Wilson).\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"meeting_agent\", \"summary\": \"Extracted 0 action items.\", \"data\": {\"actions\": []}, \"warnings\": [], \"next_actions\": [\"REVIEW_ACTIONS\"], \"requires_approval\": false, \"run_id\": \"e8f5e9a1-8a0b-4f94-92c9-bca9756c94b0\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:51:54.648357+00:00"
+  },
+  {
+    "run_id": "71e782a0-a304-46e1-a3d8-e08d779da54f",
+    "agent_name": "meeting_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Extract action items from these meeting minutes\", \"context\": {\"action\": \"extract_actions\", \"params\": {\"minutes_text\": \"Action: Vendor to provide root cause analysis for SLA miss by April 20 (owner: Maria Garcia). Action: Internal team to review compliance scoring methodology by April 25 (owner: James Wilson).\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"meeting_agent\", \"summary\": \"Extracted 0 action items.\", \"data\": {\"actions\": []}, \"warnings\": [], \"next_actions\": [\"REVIEW_ACTIONS\"], \"requires_approval\": false, \"run_id\": \"71e782a0-a304-46e1-a3d8-e08d779da54f\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:55:25.833939+00:00"
+  },
+  {
+    "run_id": "14cc7e6d-03ad-461f-b5a5-7d19d41fa504",
+    "agent_name": "meeting_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Extract action items from these meeting minutes\", \"context\": {\"action\": \"extract_actions\", \"params\": {\"minutes_text\": \"Action: Vendor to provide root cause analysis for SLA miss by April 20 (owner: Maria Garcia). Action: Internal team to review compliance scoring methodology by April 25 (owner: James Wilson).\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"meeting_agent\", \"summary\": \"Extracted 0 action items.\", \"data\": {\"actions\": []}, \"warnings\": [], \"next_actions\": [\"REVIEW_ACTIONS\"], \"requires_approval\": false, \"run_id\": \"14cc7e6d-03ad-461f-b5a5-7d19d41fa504\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:57:15.033520+00:00"
+  },
+  {
+    "run_id": "5288655b-78ac-41cb-8cbc-97fb268c8e0e",
+    "agent_name": "meeting_agent",
+    "cycle_id": "c1",
+    "input_payload": "{\"user_message\": \"Extract action items from these meeting minutes\", \"context\": {\"action\": \"extract_actions\", \"params\": {\"minutes_text\": \"Action: Vendor to provide root cause analysis for SLA miss by April 20 (owner: Maria Garcia). Action: Internal team to review compliance scoring methodology by April 25 (owner: James Wilson).\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"meeting_agent\", \"summary\": \"Extracted 2 action items.\", \"data\": {\"actions\": [{\"description\": \"Vendor to provide root cause analysis for SLA miss\", \"owner\": \"Maria Garcia\", \"due_date\": \"April 20\"}, {\"description\": \"Internal team to review compliance scoring methodology\", \"owner\": \"James Wilson\", \"due_date\": \"April 25\"}]}, \"warnings\": [], \"next_actions\": [\"REVIEW_ACTIONS\"], \"requires_approval\": false, \"run_id\": \"5288655b-78ac-41cb-8cbc-97fb268c8e0e\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-10T15:58:01.485743+00:00"
   }
 ]

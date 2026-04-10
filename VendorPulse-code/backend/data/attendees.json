@@ -71,5 +71,48 @@
     "invite_status": "PENDING",
     "availability_submitted": false,
     "user_id": "u20"
+  },
+  {
+    "attendee_id": "att_2f9d3607",
+    "cycle_id": "c_1807c2c4",
+    "stakeholder_id": "s_1775800793017",
+    "name": "Kanishk Punekar",
+    "email": "kanishk.punekar@zensar.com",
+    "role": "VMO_COORDINATOR",
+    "organisation": "Zensar IDT",
+    "is_key": true,
+    "invite_status": "PENDING",
+    "availability_submitted": false,
+    "user_id": "u17",
+    "confirmation_status": "CONFIRMED"
+  },
+  {
+    "attendee_id": "att_949d3661",
+    "cycle_id": "c_1807c2c4",
+    "stakeholder_id": "s_1775800800565",
+    "name": "Aditya Vadgave",
+    "email": "aditya.vadgave@zensar.com",
+    "role": "VMO_COORDINATOR",
+    "organisation": "Zensar VMO",
+    "is_key": true,
+    "invite_status": "PENDING",
+    "availability_submitted": false,
+    "user_id": "u18",
+    "confirmation_status": "CONFIRMED"
+  },
+  {
+    "attendee_id": "att_68e17331",
+    "cycle_id": "c_1807c2c4",
+    "stakeholder_id": "s_1775820378039",
+    "name": "Anup Kesarwani",
+    "email": "anup.kesarwani@zensar.com",
+    "gmail": "anupkesarwani3537@gmail.com",
+    "role": "VMO_COORDINATOR",
+    "organisation": "Zensar VMO",
+    "type": "Internal Stakeholder",
+    "is_key": true,
+    "invite_status": "PENDING",
+    "availability_submitted": false,
+    "user_id": "u16"
   }
 ]

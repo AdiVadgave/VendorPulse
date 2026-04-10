@@ -1,4 +1,4 @@
-﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock } from 'lucide-react'
+﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock, Sparkles } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { SlotProposal } from '@/types/scheduling.types'
 
@@ -34,6 +34,23 @@ const RANK_CONFIG = [
   },
 ]
 
+const ORDINAL_SUFFIXES = ['th', 'st', 'nd', 'rd']
+function ordinalLabel(n: number): string {
+  const v = n % 100
+  const suffix =
+    v >= 11 && v <= 13
+      ? 'th'
+      : ORDINAL_SUFFIXES[n % 10] ?? 'th'
+  return `${n}${suffix} Choice`
+}
+
+const FALLBACK_RANK_CFG = {
+  badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+  border: 'border-slate-200 dark:border-slate-800',
+  ring: '',
+  icon: null,
+}
+
 export default function SlotCard({
   slot,
   rank,
@@ -41,7 +58,11 @@ export default function SlotCard({
   isProcessing = false,
   timeZoneView = 'IST',
 }: SlotCardProps) {
-  const cfg = RANK_CONFIG[rank - 1] ?? RANK_CONFIG[2]
+  const baseCfg = RANK_CONFIG[rank - 1] ?? FALLBACK_RANK_CFG
+  const cfg = {
+    ...baseCfg,
+    label: RANK_CONFIG[rank - 1] ? baseCfg.label : ordinalLabel(rank),
+  }
   const dateObj = new Date(slot.proposed_time)
   const durationMinutes = Number((slot as unknown as { duration_minutes?: number }).duration_minutes ?? 60)
   const durationMs = durationMinutes * 60 * 1000
@@ -74,9 +95,10 @@ export default function SlotCard({
     })
   }
 
-  const attendancePct = Math.round(
-    (slot.attendance_count / slot.total_attendees) * 100
-  )
+  const attendancePct =
+    slot.total_attendees > 0
+      ? Math.round((slot.attendance_count / slot.total_attendees) * 100)
+      : 0
 
   return (
     <div
@@ -143,6 +165,14 @@ export default function SlotCard({
           />
         </div>
       </div>
+
+      {/* AI rationale */}
+      {slot.ranking_rationale && (
+        <p className="mb-4 text-xs italic text-slate-500 dark:text-slate-400 flex items-start gap-1.5">
+          <Sparkles size={11} className="shrink-0 mt-0.5 text-indigo-400" />
+          {slot.ranking_rationale}
+        </p>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">

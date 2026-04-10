@@ -44,6 +44,7 @@ export interface SlotProposal {
   attending: string[]
   tentative?: string[]
   conflicts: string[]
+  ranking_rationale?: string
 }
 
 export type SchedulingPhase =

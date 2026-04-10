@@ -1,56 +1,5 @@
 [
   {
-    "cycle_id": "c_5358c22b",
-    "vendor_id": "v_custom",
-    "vendor_name": "test 12",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "SCORECARD_REQUEST_SENT",
-    "created_at": "2026-04-09T18:22:25.634426+00:00",
-    "updated_at": "2026-04-09T18:51:20.067110+00:00",
-    "scorecard_dispatched_at": "2026-04-09T18:51:20.067110+00:00",
-    "scorecard_dispatched_to": [
-      "anupkesarwani3537@gmail.com",
-      "kanishkpunekar54@gmail.com"
-    ]
-  },
-  {
-    "cycle_id": "c_3378f049",
-    "vendor_id": "v_custom",
-    "vendor_name": "Zensar-test",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "SCORECARD_REQUEST_SENT",
-    "created_at": "2026-04-10T05:04:50.226531+00:00",
-    "updated_at": "2026-04-10T05:06:15.319570+00:00",
-    "scorecard_dispatched_at": "2026-04-10T05:06:15.319570+00:00",
-    "scorecard_dispatched_to": [
-      "adivadgave16@gmail.com",
-      "anupkesarwani3537@gmail.com",
-      "kanishkpunekar54@gmail.com"
-    ]
-  },
-  {
-    "cycle_id": "c_7f77530d",
-    "vendor_id": "v1",
-    "vendor_name": "NovaTech Services",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-10T05:40:34.841446+00:00",
-    "updated_at": "2026-04-10T05:40:34.841446+00:00"
-  },
-  {
-    "cycle_id": "c_264282c0",
-    "vendor_id": "v_90f8956e",
-    "vendor_name": "zensar",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "MEETING_SCHEDULED",
-    "created_at": "2026-04-10T05:59:40.162885+00:00",
-    "updated_at": "2026-04-10T06:00:09.566744+00:00"
-  },
-  {
     "cycle_id": "c_3263169f",
     "vendor_id": "v_90f8956e",
     "vendor_name": "zensar",
@@ -59,5 +8,20 @@
     "workflow_state": "ATTENDEE_REFRESH_SENT",
     "created_at": "2026-04-10T08:45:38.096556+00:00",
     "updated_at": "2026-04-10T08:45:45.478985+00:00"
+  },
+  {
+    "cycle_id": "c_e7a648c4",
+    "vendor_id": "v_35989bd9",
+    "vendor_name": "Zensar-test",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "SCORECARD_REQUEST_SENT",
+    "created_at": "2026-04-10T09:17:16.307264+00:00",
+    "updated_at": "2026-04-10T09:21:20.151840+00:00",
+    "scorecard_dispatched_at": "2026-04-10T09:21:20.151840+00:00",
+    "scorecard_dispatched_to": [
+      "kanishkpunekar54@gmail.com",
+      "anupkesarwani3537@gmail.com"
+    ]
   }
 ]

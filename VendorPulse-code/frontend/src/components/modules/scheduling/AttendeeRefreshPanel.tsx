@@ -11,6 +11,7 @@ import {
   Search,
   CalendarClock,
   Globe,
+  Trash2,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
@@ -303,6 +304,7 @@ export default function AttendeeRefreshPanel({
   const [showAddForm, setShowAddForm] = useState(false)
   const [togglingKey, setTogglingKey] = useState<string | null>(null)
   const [togglingType, setTogglingType] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isGraphSearching, setIsGraphSearching] = useState(false)
   const [graphStatus, setGraphStatus] = useState<string>('')
   const [graphError, setGraphError] = useState<string | null>(null)
@@ -362,6 +364,21 @@ export default function AttendeeRefreshPanel({
       )
     } finally {
       setTogglingType(null)
+    }
+  }
+
+  async function handleDeleteAttendee(attendee: CycleAttendee) {
+    setDeletingId(attendee.attendee_id)
+    try {
+      await apiFetch(`/api/cycles/${cycleId}/attendees/${attendee.attendee_id}`, {
+        method: 'DELETE',
+      })
+      onAttendeesChanged(attendees.filter((a) => a.attendee_id !== attendee.attendee_id))
+    } catch {
+      // still remove from UI optimistically
+      onAttendeesChanged(attendees.filter((a) => a.attendee_id !== attendee.attendee_id))
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -614,6 +631,7 @@ export default function AttendeeRefreshPanel({
                   <th className="text-left px-4 py-2.5 font-medium">Organisation</th>
                   <th className="text-left px-4 py-2.5 font-medium">Type</th>
                   <th className="text-left px-4 py-2.5 font-medium">Key</th>
+                  <th className="text-left px-4 py-2.5 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -671,6 +689,25 @@ export default function AttendeeRefreshPanel({
                           <Key size={11} />
                         )}
                         {a.is_key ? 'Key' : 'Set key'}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleDeleteAttendee(a)}
+                        disabled={deletingId === a.attendee_id}
+                        title="Remove attendee"
+                        className={cn(
+                          'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors',
+                          'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50',
+                          deletingId === a.attendee_id && 'opacity-50 cursor-not-allowed'
+                        )}
+                      >
+                        {deletingId === a.attendee_id ? (
+                          <Loader2 size={11} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={11} />
+                        )}
+                        Delete
                       </button>
                     </td>
                   </tr>

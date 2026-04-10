@@ -23,6 +23,7 @@ from app.dependencies import (
     get_cycle_repo,
     get_scheduling_service,
     get_slot_repo,
+    get_vendor_repo,
 )
 from app.models.scheduling import (
     ApproveSlotRequest,
@@ -111,7 +112,11 @@ def list_cycles(cycle_repo=Depends(get_cycle_repo)):
 
 
 @router.post("/api/cycles", status_code=201)
-def create_cycle(payload: CycleCreate, cycle_repo=Depends(get_cycle_repo)):
+def create_cycle(
+    payload: CycleCreate,
+    cycle_repo=Depends(get_cycle_repo),
+    vendor_repo=Depends(get_vendor_repo),
+):
     import uuid
     from datetime import datetime, timezone
 
@@ -119,11 +124,25 @@ def create_cycle(payload: CycleCreate, cycle_repo=Depends(get_cycle_repo)):
         "create_cycle called — vendor_id=%s, vendor_name=%s, quarter=%s, year=%s",
         payload.vendor_id, payload.vendor_name, payload.quarter, payload.year,
     )
+
+    # Resolve or persist the vendor so future cycles can reuse it.
+    vendor_id = payload.vendor_id
+    vendor_name = payload.vendor_name.strip()
+
+    if vendor_id == "v_custom":
+        # Check if a vendor with this name already exists; reuse its id if so.
+        new_vid = f"v_{uuid.uuid4().hex[:8]}"
+        persisted = vendor_repo.find_or_create(
+            vendor_name, vendor_id=new_vid, category=payload.category
+        )
+        vendor_id = persisted["vendor_id"]
+        logger.info("create_cycle: resolved vendor '%s' → vendor_id=%s", vendor_name, vendor_id)
+
     now = datetime.now(timezone.utc).isoformat()
     cycle = {
         "cycle_id": f"c_{uuid.uuid4().hex[:8]}",
-        "vendor_id": payload.vendor_id,
-        "vendor_name": payload.vendor_name,
+        "vendor_id": vendor_id,
+        "vendor_name": vendor_name,
         "quarter": payload.quarter,
         "year": payload.year,
         "workflow_state": "CYCLE_CREATED",

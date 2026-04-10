@@ -138,6 +138,33 @@ export async function fetchRsvpStatus(cycleId: string) {
   )
 }
 
+// ── Vendors ──────────────────────────────────────────────────────────────────
+
+export interface VendorRecord {
+  vendor_id: string
+  name: string
+  category: string
+  status: string
+}
+
+export async function fetchVendors(): Promise<VendorRecord[]> {
+  try {
+    const res = await apiFetch<{ vendors: VendorRecord[] }>('/api/vendors')
+    return res.vendors ?? []
+  } catch {
+    return []
+  }
+}
+
+export async function fetchCategories(): Promise<string[]> {
+  try {
+    const res = await apiFetch<{ categories: string[] }>('/api/categories')
+    return res.categories ?? []
+  } catch {
+    return []
+  }
+}
+
 // ── Users ───────────────────────────────────────────────────────────────────
 
 export interface SystemUser {

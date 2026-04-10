@@ -155,6 +155,7 @@ class CycleCreate(BaseModel):
     vendor_name: str
     quarter: Literal["Q1", "Q2", "Q3", "Q4"]
     year: int
+    category: str = "IT Infrastructure"
 
 
 class Cycle(BaseModel):

@@ -46,5 +46,11 @@
     "name": "Zensar-test",
     "category": "Software Development",
     "status": "active"
+  },
+  {
+    "vendor_id": "v_0b0bce16",
+    "name": "mattel",
+    "category": "IT Infrastructure",
+    "status": "active"
   }
 ]

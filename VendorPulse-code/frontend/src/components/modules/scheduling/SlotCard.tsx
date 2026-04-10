@@ -1,6 +1,7 @@
 ﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock, Sparkles } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { SlotProposal } from '@/types/scheduling.types'
+import { SCHEDULING_CONFIG } from '@/config/scheduling.config'
 
 interface SlotCardProps {
   slot: SlotProposal
@@ -64,7 +65,7 @@ export default function SlotCard({
     label: RANK_CONFIG[rank - 1] ? baseCfg.label : ordinalLabel(rank),
   }
   const dateObj = new Date(slot.proposed_time)
-  const durationMinutes = Number((slot as unknown as { duration_minutes?: number }).duration_minutes ?? 60)
+  const durationMinutes = Number((slot as unknown as { duration_minutes?: number }).duration_minutes ?? SCHEDULING_CONFIG.DEFAULT_DURATION_MINUTES)
   const durationMs = durationMinutes * 60 * 1000
   const endObj = new Date(dateObj.getTime() + durationMs)
 
@@ -155,9 +156,9 @@ export default function SlotCard({
           <div
             className={cn(
               'h-full rounded-full',
-              slot.rank_score >= 85
+              slot.rank_score >= SCHEDULING_CONFIG.SCORE_HIGH_THRESHOLD
                 ? 'bg-emerald-500'
-                : slot.rank_score >= 70
+                : slot.rank_score >= SCHEDULING_CONFIG.SCORE_MEDIUM_THRESHOLD
                   ? 'bg-indigo-500'
                   : 'bg-amber-500'
             )}
@@ -200,11 +201,15 @@ export default function SlotCard({
       {/* Key attendees */}
       <div className="flex items-center gap-3 mb-4 text-xs">
         <div className="flex items-center gap-1.5">
-          <CheckCircle2 size={13} className="text-emerald-500" />
+          {slot.organiser_available
+            ? <CheckCircle2 size={13} className="text-emerald-500" />
+            : <XCircle size={13} className="text-red-500" />}
           <span className="text-slate-600 dark:text-slate-400">Organiser available</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <CheckCircle2 size={13} className="text-emerald-500" />
+          {slot.exec_sponsor_available
+            ? <CheckCircle2 size={13} className="text-emerald-500" />
+            : <XCircle size={13} className="text-red-500" />}
           <span className="text-slate-600 dark:text-slate-400">Exec Sponsor available</span>
         </div>
       </div>

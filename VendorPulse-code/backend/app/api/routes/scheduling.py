@@ -410,7 +410,8 @@ def approve_slot(
                 f"Attending: {', '.join(draft.get('attending', []))}"
             )
             draft["draft_body"] = llm_svc.call_simple(
-                user_prompt, system=INVITE_DRAFT_SYSTEM_PROMPT, max_tokens=300
+                user_prompt, system=INVITE_DRAFT_SYSTEM_PROMPT,
+                max_tokens=settings.scheduling_llm_invite_max_tokens,
             )
             draft["draft_subject"] = (
                 f"VendorPulse QBR — {cycle.get('vendor_name', 'Vendor')} "

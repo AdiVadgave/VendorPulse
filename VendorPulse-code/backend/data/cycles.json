@@ -33,5 +33,15 @@
     "workflow_state": "MEETING_SCHEDULED",
     "created_at": "2026-04-10T11:21:57.475792+00:00",
     "updated_at": "2026-04-10T11:28:17.785555+00:00"
+  },
+  {
+    "cycle_id": "c_0557c83f",
+    "vendor_id": "v_0b0bce16",
+    "vendor_name": "mattel",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "AVAILABILITY_COLLECTED",
+    "created_at": "2026-04-10T12:39:52.365964+00:00",
+    "updated_at": "2026-04-10T12:40:43.332808+00:00"
   }
 ]

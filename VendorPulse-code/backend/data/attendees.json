@@ -88,5 +88,35 @@
     "invite_status": "PENDING",
     "availability_submitted": false,
     "user_id": "u17"
+  },
+  {
+    "attendee_id": "att_0572d6cf",
+    "cycle_id": "c_c5bf1e16",
+    "stakeholder_id": "s_1775799808600",
+    "name": "Anup Kesarwani",
+    "email": "anup.kesarwani@zensar.com",
+    "gmail": "anupkesarwani3537@gmail.com",
+    "role": "VMO_COORDINATOR",
+    "organisation": "Zensar VMO",
+    "type": "Internal Stakeholder",
+    "is_key": true,
+    "invite_status": "PENDING",
+    "availability_submitted": false,
+    "user_id": "u16"
+  },
+  {
+    "attendee_id": "att_0dd7aea8",
+    "cycle_id": "c_c5bf1e16",
+    "stakeholder_id": "s_1775799821753",
+    "name": "Aditya Vadgave",
+    "email": "aditya.vadgave@zensar.com",
+    "gmail": "adivadgave16@gmail.com",
+    "role": "VMO_COORDINATOR",
+    "organisation": "Zensar VMO",
+    "type": "Vendor",
+    "is_key": true,
+    "invite_status": "PENDING",
+    "availability_submitted": false,
+    "user_id": "u18"
   }
 ]

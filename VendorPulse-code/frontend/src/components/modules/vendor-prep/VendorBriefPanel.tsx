@@ -5,9 +5,11 @@ import type { CompiledScorecard } from '@/types/scorecard.types'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
+import { apiFetch } from '@/lib/api'
 import { cn } from '@/utils/cn'
 
 interface Props {
+  cycleId: string
   vendorName: string
   brief: VendorBrief | null
   compiledScorecard?: CompiledScorecard | null
@@ -40,74 +42,44 @@ function ScoreDots({ score }: { score: number }) {
   )
 }
 
-export default function VendorBriefPanel({ vendorName, brief, compiledScorecard, onBriefGenerated, onBriefApproved }: Props) {
+export default function VendorBriefPanel({ cycleId, vendorName, brief, compiledScorecard, onBriefGenerated, onBriefApproved }: Props) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
   const [showApproval, setShowApproval] = useState(false)
   const [approved, setApproved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  function handleGenerate() {
+  async function handleGenerate() {
     setAgentStatus('running')
-    setTimeout(() => {
+    setError(null)
+
+    try {
+      // Build request payload from compiled scorecard
+      const categories = (compiledScorecard?.categories ?? []).map((cat) => ({
+        category_label: cat.category_label,
+        internal_avg: cat.internal_avg,
+        vendor_avg: cat.vendor_avg,
+      }))
+
+      const result = await apiFetch<{ brief: VendorBrief }>(
+        `/api/cycles/${cycleId}/vendor-prep/generate-brief`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            vendor_name: vendorName,
+            categories,
+            overall_internal_avg: compiledScorecard?.overall_internal_avg ?? null,
+            overall_vendor_avg: compiledScorecard?.overall_vendor_avg ?? null,
+            key_recommendations: compiledScorecard?.key_recommendations ?? [],
+          }),
+        }
+      )
       setAgentStatus('awaiting_approval')
       setShowApproval(true)
-
-      // Build brief from compiled scorecard if available
-      if (compiledScorecard && compiledScorecard.categories.length > 0) {
-        const cs = compiledScorecard
-        const iAvg = cs.overall_internal_avg ?? 0
-        const vAvg = cs.overall_vendor_avg ?? 0
-        const overall = (iAvg + vAvg) / 2
-
-        const category_ratings = cs.categories.map((cat) => {
-          const catI = cat.internal_avg ?? 0
-          const catV = cat.vendor_avg ?? 0
-          const avg = catI && catV ? (catI + catV) / 2 : catI || catV
-          const gap = Math.abs(catI - catV)
-          const trend: 'up' | 'down' | 'flat' = avg >= 3.5 ? 'up' : avg < 2.5 ? 'down' : 'flat'
-          const rationale = gap > 1
-            ? `Significant gap between Internal (${catI.toFixed(1)}) and Vendor (${catV.toFixed(1)}) — needs alignment discussion.`
-            : `Internal: ${catI.toFixed(1)}, Vendor: ${catV.toFixed(1)} — ${avg >= 4 ? 'strong performance' : avg >= 3 ? 'acceptable, room for improvement' : 'requires attention'}.`
-          return { category: cat.category_label, score: parseFloat(avg.toFixed(2)), rationale, trend }
-        })
-
-        const key_concerns: string[] = []
-        const positive_areas: string[] = []
-        cs.categories.forEach((cat) => {
-          cat.parameters.forEach((p) => {
-            const iS = p.internal_avg ?? 0
-            const vS = p.vendor_avg ?? 0
-            if (iS < 2.5 || vS < 2.5) key_concerns.push(`${p.parameter_label}: low score (Internal ${iS.toFixed(1)}, Vendor ${vS.toFixed(1)})`)
-            if (Math.abs(iS - vS) > 1) key_concerns.push(`${p.parameter_label}: ${Math.abs(iS - vS).toFixed(1)} point gap between Internal and Vendor`)
-            if (iS >= 4 && vS >= 4) positive_areas.push(`${p.parameter_label}: strong alignment (${iS.toFixed(1)} / ${vS.toFixed(1)})`)
-          })
-        })
-
-        if (cs.key_recommendations.length > 0) {
-          key_concerns.push(...cs.key_recommendations.slice(0, 2))
-        }
-
-        onBriefGenerated({
-          overall_score: parseFloat(overall.toFixed(2)),
-          overall_trend: overall >= 3.5 ? 'improving' : overall < 2.5 ? 'declining' : 'stable',
-          category_ratings,
-          key_concerns: key_concerns.slice(0, 5),
-          positive_areas: positive_areas.slice(0, 5),
-          open_actions: key_concerns.length,
-          generated_at: new Date().toISOString(),
-        })
-      } else {
-        // Fallback when no compiled scorecard is available
-        onBriefGenerated({
-          overall_score: 0,
-          overall_trend: 'stable',
-          category_ratings: [],
-          key_concerns: ['No scorecard data available — compile scorecard first'],
-          positive_areas: [],
-          open_actions: 0,
-          generated_at: new Date().toISOString(),
-        })
-      }
-    }, 1800)
+      onBriefGenerated(result.brief)
+    } catch (err: any) {
+      setAgentStatus('failed')
+      setError(err?.message ?? 'Failed to generate vendor brief.')
+    }
   }
 
   function handleApprove() {
@@ -136,11 +108,17 @@ export default function VendorBriefPanel({ vendorName, brief, compiledScorecard,
             </div>
             <div>
               <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Vendor Brief</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{vendorName} · Claude-generated</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{vendorName} · AI-generated</p>
             </div>
           </div>
           <AgentStatusBadge status={agentStatus} />
         </div>
+
+        {error && (
+          <p className="mb-3 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
 
         {!brief ? (
           <button
@@ -246,11 +224,11 @@ export default function VendorBriefPanel({ vendorName, brief, compiledScorecard,
         <ApprovalPanel
           title="Approve Vendor Brief"
           summary={`Review the AI-generated vendor brief for ${vendorName} before the prep call.`}
-          warnings={['This brief will be used to prepare the Zensar team — vendor does not see it directly.']}
+          warnings={['This brief will be used to prepare the team — vendor does not see it directly.']}
           previewContent={
             <div className="space-y-2">
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                {vendorName} — Q1 2026 Vendor Prep Brief
+                {vendorName} — Vendor Prep Brief
               </p>
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 Overall Score: <strong>{brief.overall_score}/5</strong> · Trend: {trendLabel}

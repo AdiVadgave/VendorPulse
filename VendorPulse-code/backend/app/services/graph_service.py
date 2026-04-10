@@ -261,6 +261,15 @@ class GraphService:
             except Exception:
                 return None
 
+        def _fixed_offset_minutes(graph_time_zone: str) -> int | None:
+            """Return a deterministic UTC offset fallback when zoneinfo data is unavailable."""
+            normalized = (graph_time_zone or "").strip().upper()
+            if normalized in {"INDIA STANDARD TIME", "IST"}:
+                return 330
+            if normalized in {"UTC", "GMT STANDARD TIME", "GMT"}:
+                return 0
+            return None
+
         # Parse start time and compute end time
         try:
             start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
@@ -278,8 +287,16 @@ class GraphService:
                 if tzinfo_target is not None:
                     start_local = start_dt.astimezone(tzinfo_target).replace(tzinfo=None)
                 else:
-                    # Fall back to treating the provided wall-clock time as already local.
-                    start_local = start_dt.replace(tzinfo=None)
+                    # Fallback for environments without tzdata (common on Windows):
+                    # preserve the absolute UTC instant by applying a deterministic
+                    # offset for known Graph zones.
+                    offset_minutes = _fixed_offset_minutes(graph_tz)
+                    if offset_minutes is None:
+                        # Last-resort fallback for unknown zones.
+                        start_local = start_dt.replace(tzinfo=None)
+                    else:
+                        utc_dt = start_dt.astimezone(timezone.utc)
+                        start_local = (utc_dt + timedelta(minutes=offset_minutes)).replace(tzinfo=None)
         else:
             # Naive datetime is assumed to already be in the provided timezone.
             start_local = start_dt

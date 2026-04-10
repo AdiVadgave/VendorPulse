@@ -32,6 +32,9 @@ import {
   buildCategoryComparisons,
   generateAlignmentInsights,
   buildAlignmentFlags,
+  generateWhatChangedBullets,
+  buildComparisonsFromScorecard,
+  buildFlagsFromScorecard,
 } from '@/mock/alignment.mock'
 import {
   MOCK_PUSHBACK_ITEMS,
@@ -195,15 +198,7 @@ export default function CycleDetail() {
   }, [advanceWorkflow, cycle])
 
   // --- Module C state ---
-  const [alignmentActions, setAlignmentActions] = useState<ExtractedAction[]>(MOCK_ALIGNMENT_ACTIONS)
-
-  const WHAT_CHANGED_BULLETS = [
-    'Performance improved by +0.90 points to 3.90 — strongest improvement this cycle, driven by delivery quality and SLA adherence.',
-    'Commercial category up +0.50 points — billing accuracy and contract compliance both performing well.',
-    'Risk & Compliance edged up +0.34 points — security posture improving but patch management remains a discussion point.',
-    'Relationship dipped −0.37 points to 4.13 — communication effectiveness gap between Stakeholder (3) and Vendor (4) needs alignment.',
-    'Key flag: Delivery Timeliness, Pricing Competitiveness, and Communication show 1+ point gaps between Stakeholder and Vendor scores.',
-  ]
+  const [alignmentActions, setAlignmentActions] = useState<ExtractedAction[]>([])
 
   // --- Module D state ---
   const [vendorBrief, setVendorBrief] = useState<VendorBrief | null>(
@@ -365,9 +360,8 @@ export default function CycleDetail() {
     setPushbackItems((prev) => prev.map((p) => (p.pushback_id === id ? { ...p, status } : p)))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function handleGeneratePushbackResponses(_id: string) {
-    // Responses already seeded via mock
+  function handlePushbackResponsesGenerated(pushbackId: string, responses: PushbackResponse[]) {
+    setPushbackResponses((prev) => ({ ...prev, [pushbackId]: responses }))
   }
 
   function handleSelectPushbackResponse(pushbackId: string, responseId: string) {
@@ -507,9 +501,9 @@ export default function CycleDetail() {
         {activeTab === 'alignment' && (
           <AlignmentTab
             cycle={cycle}
-            whatChangedBullets={WHAT_CHANGED_BULLETS}
             actions={alignmentActions}
             compiledScores={compiledScores}
+            compiledScorecard={compiledScorecard}
             onActionsExtracted={(extracted) => {
               setAlignmentActions(extracted)
               setAllActions((prev) => {
@@ -526,6 +520,7 @@ export default function CycleDetail() {
         {activeTab === 'vendor-prep' && (
           <VendorPrepTab
             cycle={cycle}
+            cycleId={cycle.cycle_id}
             vendorBrief={vendorBrief}
             compiledScorecard={compiledScorecard}
             onBriefGenerated={setVendorBrief}
@@ -536,7 +531,7 @@ export default function CycleDetail() {
             pushbackItems={pushbackItems}
             pushbackResponses={pushbackResponses}
             onPushbackAdd={handlePushbackAdd}
-            onGenerateResponses={handleGeneratePushbackResponses}
+            onResponsesGenerated={handlePushbackResponsesGenerated}
             onSelectResponse={handleSelectPushbackResponse}
             onPushbackStatusChange={handlePushbackStatusChange}
           />
@@ -545,6 +540,7 @@ export default function CycleDetail() {
         {activeTab === 'meeting' && (
           <MeetingTab
             cycle={cycle}
+            cycleId={cycle.cycle_id}
             meetingNotes={meetingNotes}
             minutesApproved={minutesApproved}
             onNoteAdd={handleNoteAdd}
@@ -828,21 +824,44 @@ function ScorecardTab({
 
 /* ── Alignment Tab ────────────────────────────────────────── */
 function AlignmentTab({
-  cycle, whatChangedBullets, actions, onActionsExtracted, compiledScores,
+  cycle, actions, onActionsExtracted, compiledScores, compiledScorecard,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
-  whatChangedBullets: string[]
   actions: ExtractedAction[]
   onActionsExtracted: (a: ExtractedAction[]) => void
   compiledScores: CompiledCategoryScore[] | null
+  compiledScorecard?: CompiledScorecard | null
 }) {
-  // Build dynamic comparisons & insights from compiled scorecard data
-  const comparisons = compiledScores ? buildCategoryComparisons(compiledScores) : []
-  const dynamicFlags = compiledScores ? buildAlignmentFlags(compiledScores) : []
+  // Prefer building comparisons directly from the 2-column compiled scorecard
+  // (uses real internal_avg / vendor_avg values). Legacy path kept as fallback.
+  const comparisons = compiledScorecard
+    ? buildComparisonsFromScorecard(compiledScorecard)
+    : compiledScores
+      ? buildCategoryComparisons(compiledScores)
+      : []
+
+  const dynamicFlags = compiledScorecard
+    ? buildFlagsFromScorecard(compiledScorecard)
+    : compiledScores
+      ? buildAlignmentFlags(compiledScores)
+      : []
+
   const insights = generateAlignmentInsights(comparisons, MOCK_SCORE_DELTAS)
 
-  // Use dynamic flags if compiled scores are available, otherwise fall back to mock
+  // Use dynamic flags if compiled data is available, otherwise fall back to mock
   const flags = dynamicFlags.length > 0 ? dynamicFlags : MOCK_ALIGNMENT_FLAGS
+
+  // Generate what-changed bullets dynamically from compiled data, fallback to static
+  const STATIC_BULLETS = [
+    'Performance improved by +0.90 points to 3.90 — strongest improvement this cycle, driven by delivery quality and SLA adherence.',
+    'Commercial category up +0.50 points — billing accuracy and contract compliance both performing well.',
+    'Risk & Compliance edged up +0.34 points — security posture improving but patch management remains a discussion point.',
+    'Relationship dipped −0.37 points to 4.13 — communication effectiveness gap between Stakeholder (3) and Vendor (4) needs alignment.',
+    'Key flag: Delivery Timeliness, Pricing Competitiveness, and Communication show 1+ point gaps between Stakeholder and Vendor scores.',
+  ]
+  const whatChangedBullets = comparisons.length > 0
+    ? generateWhatChangedBullets(comparisons, flags)
+    : STATIC_BULLETS
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -857,7 +876,7 @@ function AlignmentTab({
       <AlignmentFlagsPanel flags={flags} />
       <FaceOffModelEditor positions={MOCK_FACE_OFF} />
       <ScheduleAlignmentMeeting />
-      <NotesInputPanel onActionsExtracted={onActionsExtracted} />
+      <NotesInputPanel cycleId={cycleId} onActionsExtracted={onActionsExtracted} />
       {actions.length > 0 && (
         <ActionLog
           actions={actions.map(a => ({ ...a, cycle_ref: `${cycle.vendor_name} ${cycle.quarter} ${cycle.year}` }))}
@@ -869,10 +888,11 @@ function AlignmentTab({
 
 /* ── Vendor Prep Tab ──────────────────────────────────────── */
 function VendorPrepTab({
-  cycle, vendorBrief, compiledScorecard, onBriefGenerated, onBriefApproved,
-  pushbackItems, pushbackResponses, onPushbackAdd, onGenerateResponses, onSelectResponse, onPushbackStatusChange,
+  cycle, cycleId, vendorBrief, compiledScorecard, onBriefGenerated, onBriefApproved,
+  pushbackItems, pushbackResponses, onPushbackAdd, onResponsesGenerated, onSelectResponse, onPushbackStatusChange,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
+  cycleId: string
   vendorBrief: VendorBrief | null
   compiledScorecard?: CompiledScorecard | null
   onBriefGenerated: (b: VendorBrief) => void
@@ -880,13 +900,14 @@ function VendorPrepTab({
   pushbackItems: PushbackItem[]
   pushbackResponses: Record<string, PushbackResponse[]>
   onPushbackAdd: (item: Omit<PushbackItem, 'pushback_id' | 'cycle_id' | 'created_at'>) => void
-  onGenerateResponses: (id: string) => void
+  onResponsesGenerated: (pid: string, responses: PushbackResponse[]) => void
   onSelectResponse: (pid: string, rid: string) => void
   onPushbackStatusChange: (id: string, s: PushbackItem['status']) => void
 }) {
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <VendorBriefPanel
+        cycleId={cycleId}
         vendorName={cycle.vendor_name}
         brief={vendorBrief}
         compiledScorecard={compiledScorecard}
@@ -895,9 +916,11 @@ function VendorPrepTab({
       />
       <PushbackInput onAdd={onPushbackAdd} />
       <PushbackResponseCards
+        cycleId={cycleId}
+        vendorName={cycle.vendor_name}
         items={pushbackItems}
         responses={pushbackResponses}
-        onGenerate={onGenerateResponses}
+        onResponsesGenerated={onResponsesGenerated}
         onSelectResponse={onSelectResponse}
       />
       <UnresolvedItemTracker
@@ -911,9 +934,10 @@ function VendorPrepTab({
 
 /* ── Meeting Tab ──────────────────────────────────────────── */
 function MeetingTab({
-  cycle, meetingNotes, minutesApproved, onNoteAdd, onTranscriptParsed, onMinutesApproved, allActions, onActionStatusChange,
+  cycle, cycleId, meetingNotes, minutesApproved, onNoteAdd, onTranscriptParsed, onMinutesApproved, allActions, onActionStatusChange,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
+  cycleId: string
   meetingNotes: MeetingNote[]
   minutesApproved: boolean
   onNoteAdd: (n: Omit<MeetingNote, 'note_id' | 'meeting_id'>) => void
@@ -939,9 +963,10 @@ function MeetingTab({
       />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <LiveCapturePanel notes={meetingNotes} onAdd={onNoteAdd} />
-        <TranscriptInput onParsed={onTranscriptParsed} />
+        <TranscriptInput cycleId={cycleId} onParsed={onTranscriptParsed} />
       </div>
       <MeetingMinutesViewer
+        cycleId={cycleId}
         notes={meetingNotes}
         vendorName={cycle.vendor_name}
         quarter={cycle.quarter}

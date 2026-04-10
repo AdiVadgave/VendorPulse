@@ -5,13 +5,13 @@ import {
   MOCK_RECURRING_ISSUES,
   MOCK_RADAR_DATA,
   MOCK_CROSS_VENDOR_DATA,
-  MOCK_LEADERSHIP_BRIEFS,
   MOCK_STAKEHOLDER_VS_VENDOR,
   MOCK_PARAMETER_INSIGHTS,
 } from '@/mock/analytics.mock'
 import type { ScorecardCategoryKey } from '@/types/scorecard.types'
 import { CATEGORY_LABELS, SCORECARD_CATEGORIES } from '@/types/scorecard.types'
 import type { LeadershipBrief } from '@/types/analytics.types'
+import { apiFetch } from '@/lib/api'
 import TrendLineChart from '@/components/modules/analytics/TrendLineChart'
 import RadarChartComponent from '@/components/modules/analytics/RadarChartComponent'
 import CrossVendorComparison from '@/components/modules/analytics/CrossVendorComparison'
@@ -58,28 +58,40 @@ function overallScoreColor(score: number) {
 export default function Analytics() {
   const [selectedVendorId, setSelectedVendorId]     = useState('v1')
   const [selectedCategory, setSelectedCategory]     = useState<ScorecardCategoryKey | 'ALL'>('ALL')
-  const [leadershipBriefs, setLeadershipBriefs]     = useState<Record<string, LeadershipBrief>>(MOCK_LEADERSHIP_BRIEFS)
+  const [leadershipBriefs, setLeadershipBriefs]     = useState<Record<string, LeadershipBrief>>({})
 
   const selectedTrend   = MOCK_VENDOR_TRENDS.find((t) => t.vendor_id === selectedVendorId)!
   const radarData       = MOCK_RADAR_DATA[selectedVendorId]
   const gapData         = MOCK_STAKEHOLDER_VS_VENDOR[selectedVendorId]
   const insights        = MOCK_PARAMETER_INSIGHTS[selectedVendorId] ?? []
   const vendorOption    = VENDOR_OPTIONS.find((v) => v.id === selectedVendorId)!
-  const brief           = MOCK_LEADERSHIP_BRIEFS[selectedVendorId]
-  const trajectory      = brief?.trajectory ?? 'stable'
+  const brief           = leadershipBriefs[selectedVendorId] ?? null
+  const trajectory      = brief?.trajectory ?? vendorOption.trend
   const trajectoryConf  = TRAJECTORY_CONFIG[trajectory]
   const overall         = overallScore(selectedVendorId)
   const openIssues      = MOCK_RECURRING_ISSUES.filter((i) => i.vendor_id === selectedVendorId && i.status === 'OPEN').length
   const flaggedParams   = insights.filter((i) => Math.abs(i.gap) >= 1 || i.average < 3.0).length
 
-  function handleGenerateBrief() {
-    setLeadershipBriefs((prev) => ({
-      ...prev,
-      [selectedVendorId]: {
-        ...MOCK_LEADERSHIP_BRIEFS[selectedVendorId],
-        generated_at: new Date().toISOString(),
-      },
+  async function handleGenerateBrief() {
+    const trendCycles = selectedTrend.cycles.map((c) => ({
+      cycle_label: c.cycle_label,
+      scores: c.scores,
     }))
+    const recurringIssues = MOCK_RECURRING_ISSUES
+      .filter((i) => i.vendor_id === selectedVendorId)
+      .map((i) => ({ description: i.description, occurrences: i.occurrences, status: i.status }))
+
+    const result = await apiFetch<{ brief: LeadershipBrief }>('/api/analytics/leadership-brief', {
+      method: 'POST',
+      body: JSON.stringify({
+        vendor_id: selectedVendorId,
+        vendor_name: vendorOption.name,
+        trend_cycles: trendCycles,
+        recurring_issues: recurringIssues,
+        overall_trajectory: vendorOption.trend,
+      }),
+    })
+    setLeadershipBriefs((prev) => ({ ...prev, [selectedVendorId]: result.brief }))
   }
 
   return (

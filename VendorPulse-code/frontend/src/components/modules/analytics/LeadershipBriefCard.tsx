@@ -9,7 +9,7 @@ interface Props {
   vendorId: string
   vendorName: string
   brief: LeadershipBrief | null
-  onGenerate: () => void
+  onGenerate: () => Promise<void>
 }
 
 const TRAJECTORY_CONFIG = {
@@ -20,13 +20,18 @@ const TRAJECTORY_CONFIG = {
 
 export default function LeadershipBriefCard({ vendorName, brief, onGenerate }: Props) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(brief ? 'complete' : 'idle')
+  const [error, setError] = useState<string | null>(null)
 
-  function handleGenerate() {
+  async function handleGenerate() {
     setAgentStatus('running')
-    setTimeout(() => {
+    setError(null)
+    try {
+      await onGenerate()
       setAgentStatus('complete')
-      onGenerate()
-    }, 2000)
+    } catch (err: any) {
+      setAgentStatus('failed')
+      setError(err?.message ?? 'Failed to generate leadership brief.')
+    }
   }
 
   const trajectoryConfig = brief ? TRAJECTORY_CONFIG[brief.trajectory] : null
@@ -41,7 +46,7 @@ export default function LeadershipBriefCard({ vendorName, brief, onGenerate }: P
           </div>
           <div>
             <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Leadership Brief</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{vendorName} · Claude-generated</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{vendorName} · AI-generated</p>
           </div>
         </div>
         <AgentStatusBadge status={agentStatus} />
@@ -53,6 +58,11 @@ export default function LeadershipBriefCard({ vendorName, brief, onGenerate }: P
             Generate an executive briefing card synthesising vendor trajectory, recurring issues,
             prior commitments, and recommended focus areas.
           </p>
+          {error && (
+            <p className="mb-3 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
           <button
             onClick={handleGenerate}
             disabled={agentStatus === 'running'}
@@ -136,7 +146,8 @@ export default function LeadershipBriefCard({ vendorName, brief, onGenerate }: P
           <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/30">
             <button
               onClick={handleGenerate}
-              className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline"
+              disabled={agentStatus === 'running'}
+              className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline disabled:opacity-50"
             >
               Regenerate
             </button>

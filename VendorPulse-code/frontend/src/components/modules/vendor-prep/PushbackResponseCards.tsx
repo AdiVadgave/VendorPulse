@@ -4,12 +4,15 @@ import type { PushbackItem, PushbackResponse } from '@/types/vendor-prep.types'
 import { PUSHBACK_CATEGORY_LABELS } from '@/types/vendor-prep.types'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { AgentStatus } from '@/types/agent.types'
+import { apiFetch } from '@/lib/api'
 import { cn } from '@/utils/cn'
 
 interface Props {
+  cycleId: string
+  vendorName: string
   items: PushbackItem[]
   responses: Record<string, PushbackResponse[]>
-  onGenerate: (pushbackId: string) => void
+  onResponsesGenerated: (pushbackId: string, responses: PushbackResponse[]) => void
   onSelectResponse: (pushbackId: string, responseId: string) => void
 }
 
@@ -20,25 +23,47 @@ const STANCE_CONFIG = {
 }
 
 function PushbackCard({
+  cycleId,
+  vendorName,
   item,
   responses,
-  onGenerate,
+  onGenerated,
   onSelect,
 }: {
+  cycleId: string
+  vendorName: string
   item: PushbackItem
   responses: PushbackResponse[]
-  onGenerate: () => void
+  onGenerated: (responses: PushbackResponse[]) => void
   onSelect: (id: string) => void
 }) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(responses.length > 0 ? 'complete' : 'idle')
   const [selected, setSelected] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  function handleGenerate() {
+  async function handleGenerate() {
     setAgentStatus('running')
-    setTimeout(() => {
+    setError(null)
+    try {
+      const result = await apiFetch<{ responses: PushbackResponse[] }>(
+        `/api/cycles/${cycleId}/vendor-prep/pushback/draft`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            pushback_id: item.pushback_id,
+            description: item.description,
+            category: item.category,
+            raised_by: item.raised_by,
+            vendor_name: vendorName,
+          }),
+        }
+      )
       setAgentStatus('complete')
-      onGenerate()
-    }, 1400)
+      onGenerated(result.responses)
+    } catch (err: any) {
+      setAgentStatus('failed')
+      setError(err?.message ?? 'Failed to generate responses.')
+    }
   }
 
   function handleSelect(id: string) {
@@ -72,7 +97,7 @@ function PushbackCard({
       {item.needs_legal_review ? (
         <div className="px-5 py-4 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           <Lock size={14} />
-          AI response drafts excluded — requires legal/commercial review before Zensar can respond.
+          AI response drafts excluded — requires legal/commercial review before responding.
         </div>
       ) : responses.length > 0 ? (
         <div className="p-4 space-y-2">
@@ -108,7 +133,12 @@ function PushbackCard({
           })}
         </div>
       ) : (
-        <div className="px-5 py-4">
+        <div className="px-5 py-4 space-y-2">
+          {error && (
+            <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded px-2 py-1">
+              {error}
+            </p>
+          )}
           <button
             onClick={handleGenerate}
             disabled={agentStatus === 'running'}
@@ -123,7 +153,7 @@ function PushbackCard({
   )
 }
 
-export default function PushbackResponseCards({ items, responses, onGenerate, onSelectResponse }: Props) {
+export default function PushbackResponseCards({ cycleId, vendorName, items, responses, onResponsesGenerated, onSelectResponse }: Props) {
   if (items.length === 0) {
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center">
@@ -142,9 +172,11 @@ export default function PushbackResponseCards({ items, responses, onGenerate, on
       {items.map((item) => (
         <PushbackCard
           key={item.pushback_id}
+          cycleId={cycleId}
+          vendorName={vendorName}
           item={item}
           responses={responses[item.pushback_id] ?? []}
-          onGenerate={() => onGenerate(item.pushback_id)}
+          onGenerated={(newResponses) => onResponsesGenerated(item.pushback_id, newResponses)}
           onSelect={(rid) => onSelectResponse(item.pushback_id, rid)}
         />
       ))}

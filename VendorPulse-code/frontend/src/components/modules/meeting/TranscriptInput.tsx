@@ -3,9 +3,10 @@ import { FileText, Sparkles } from 'lucide-react'
 import type { MeetingNote } from '@/types/meeting.types'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { AgentStatus } from '@/types/agent.types'
-import { MOCK_MEETING_NOTES } from '@/mock/meeting.mock'
+import { apiFetch } from '@/lib/api'
 
 interface Props {
+  cycleId: string
   onParsed: (notes: MeetingNote[]) => void
 }
 
@@ -27,17 +28,32 @@ Emma Davies [10:52]: Decision: The pricing dispute is escalated to Zensar Commer
 
 Alex Thompson [10:58]: Action: I'll schedule the joint incident review for the February SLA event within the next 7 days.`
 
-export default function TranscriptInput({ onParsed }: Props) {
+export default function TranscriptInput({ cycleId, onParsed }: Props) {
   const [transcript, setTranscript] = useState('')
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
+  const [error, setError] = useState<string | null>(null)
+  const [parsedCount, setParsedCount] = useState<number | null>(null)
 
-  function handleParse() {
+  async function handleParse() {
     if (!transcript.trim()) return
     setAgentStatus('running')
-    setTimeout(() => {
+    setError(null)
+    setParsedCount(null)
+    try {
+      const result = await apiFetch<{ notes: MeetingNote[]; count: number }>(
+        `/api/cycles/${cycleId}/meeting/parse-transcript`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ transcript }),
+        }
+      )
       setAgentStatus('complete')
-      onParsed(MOCK_MEETING_NOTES)
-    }, 2000)
+      setParsedCount(result.count)
+      onParsed(result.notes)
+    } catch (err: any) {
+      setAgentStatus('failed')
+      setError(err?.message ?? 'Failed to parse transcript. Is the backend running with LLM enabled?')
+    }
   }
 
   return (
@@ -63,10 +79,22 @@ export default function TranscriptInput({ onParsed }: Props) {
       <textarea
         value={transcript}
         onChange={(e) => setTranscript(e.target.value)}
-        placeholder="Paste full meeting transcript here. Claude will parse it into structured note types: questions, objections, decisions, appreciations, and action items..."
+        placeholder="Paste full meeting transcript here. The AI will parse it into structured note types: questions, objections, decisions, appreciations, and action items..."
         rows={8}
         className="w-full text-sm text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400"
       />
+
+      {error && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+          {error}
+        </p>
+      )}
+
+      {parsedCount !== null && agentStatus === 'complete' && (
+        <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-3 py-2">
+          {parsedCount} note{parsedCount !== 1 ? 's' : ''} extracted and added to Live Capture
+        </p>
+      )}
 
       <button
         onClick={handleParse}

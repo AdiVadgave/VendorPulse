@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { FileText, Sparkles, Copy, CheckCircle2 } from 'lucide-react'
-import type { MeetingMinutes } from '@/types/meeting.types'
-import type { MeetingNote } from '@/types/meeting.types'
+import type { MeetingMinutes, MeetingNote } from '@/types/meeting.types'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
-import { MOCK_MEETING_MINUTES } from '@/mock/meeting.mock'
+import { apiFetch } from '@/lib/api'
 
 interface Props {
+  cycleId: string
   notes: MeetingNote[]
   vendorName: string
   quarter: string
@@ -15,20 +15,42 @@ interface Props {
   onApproved: () => void
 }
 
-export default function MeetingMinutesViewer({ notes, vendorName, quarter, year, onApproved }: Props) {
+export default function MeetingMinutesViewer({ cycleId, notes, vendorName, quarter, year, onApproved }: Props) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
   const [minutes, setMinutes] = useState<MeetingMinutes | null>(null)
   const [showApproval, setShowApproval] = useState(false)
   const [approved, setApproved] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  function handleGenerate() {
+  async function handleGenerate() {
     setAgentStatus('running')
-    setTimeout(() => {
-      setMinutes(MOCK_MEETING_MINUTES)
+    setError(null)
+    try {
+      const result = await apiFetch<{ minutes: MeetingMinutes }>(
+        `/api/cycles/${cycleId}/meeting/generate-minutes`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            notes: notes.map((n) => ({
+              note_type: n.note_type,
+              content: n.content,
+              raised_by: n.raised_by,
+              timestamp: n.timestamp,
+            })),
+            vendor_name: vendorName,
+            quarter,
+            year,
+          }),
+        }
+      )
+      setMinutes(result.minutes)
       setAgentStatus('awaiting_approval')
       setShowApproval(true)
-    }, 2200)
+    } catch (err: any) {
+      setAgentStatus('failed')
+      setError(err?.message ?? 'Failed to generate meeting minutes.')
+    }
   }
 
   function handleApprove() {
@@ -69,11 +91,17 @@ export default function MeetingMinutesViewer({ notes, vendorName, quarter, year,
             </div>
             <div>
               <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Meeting Minutes</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{vendorName} {quarter} {year} · Claude-generated</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{vendorName} {quarter} {year} · AI-generated</p>
             </div>
           </div>
           <AgentStatusBadge status={agentStatus} />
         </div>
+
+        {error && (
+          <p className="mb-3 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
 
         {!minutes ? (
           <button
@@ -134,19 +162,21 @@ export default function MeetingMinutesViewer({ notes, vendorName, quarter, year,
             </div>
 
             {/* Agenda summaries */}
-            <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
-                Agenda Summaries
-              </p>
-              <div className="space-y-2">
-                {minutes.agenda_summaries.map((a, i) => (
-                  <div key={i} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{a.topic}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{a.summary}</p>
-                  </div>
-                ))}
+            {minutes.agenda_summaries.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
+                  Agenda Summaries
+                </p>
+                <div className="space-y-2">
+                  {minutes.agenda_summaries.map((a, i) => (
+                    <div key={i} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{a.topic}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{a.summary}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Action items */}
             <div>

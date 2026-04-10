@@ -29,5 +29,20 @@
       "anupkesarwani3537@gmail.com",
       "kanishkpunekar54@gmail.com"
     ]
+  },
+  {
+    "cycle_id": "c_c5bf1e16",
+    "vendor_id": "v_custom",
+    "vendor_name": "ZenDemo",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "SCORECARD_REQUEST_SENT",
+    "created_at": "2026-04-10T05:43:16.010795+00:00",
+    "updated_at": "2026-04-10T05:44:06.301698+00:00",
+    "scorecard_dispatched_at": "2026-04-10T05:44:06.301698+00:00",
+    "scorecard_dispatched_to": [
+      "anupkesarwani3537@gmail.com",
+      "adivadgave16@gmail.com"
+    ]
   }
 ]

@@ -176,10 +176,23 @@ export default function CycleDetail() {
   const [apiSlots, setApiSlots] = useState<SlotProposal[] | null>(null)
 
   // --- Module B state ---
-  const [scorecardDispatched, setScorecardDispatched] = useState(false)
+  const [scorecardDispatched, setScorecardDispatched] = useState(() => {
+    if (!effectiveWorkflowState) return false
+    return WORKFLOW_STATES.indexOf(effectiveWorkflowState) >= WORKFLOW_STATES.indexOf('SCORECARD_REQUEST_SENT')
+  })
   const [, setSubmissionsSimulated] = useState(false)
   const [compiledScores, setCompiledScores] = useState<CompiledCategoryScore[] | null>(null)
   const [compiledScorecard, setCompiledScorecard] = useState<CompiledScorecard | null>(null)
+
+  const handleCompiledFetched = useCallback((cs: CompiledScorecard) => {
+    setCompiledScorecard(cs)
+    const legacy = compiledScorecardToLegacy(cs)
+    setCompiledScores(legacy)
+    if (cs.internal_respondents > 0 && cs.vendor_respondents > 0) {
+      setSubmissionsSimulated(true)
+      advanceWorkflow(cycle!.cycle_id, 'SCORECARD_COMPILED')
+    }
+  }, [advanceWorkflow, cycle])
 
   // --- Module C state ---
   const [alignmentActions, setAlignmentActions] = useState<ExtractedAction[]>(MOCK_ALIGNMENT_ACTIONS)
@@ -235,6 +248,15 @@ export default function CycleDetail() {
         }
         if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_REQUEST_SENT')) setScorecardDispatched(true)
         if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_COLLECTION')) setSubmissionsSimulated(true)
+        // Auto-fetch compiled scorecard if already compiled
+        if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_COMPILED')) {
+          getCompiledScorecard(cycleId).then((cs) => {
+            if (cs && (cs.internal_respondents > 0 || cs.vendor_respondents > 0)) {
+              setCompiledScorecard(cs)
+              setCompiledScores(compiledScorecardToLegacy(cs))
+            }
+          }).catch(() => {/* ignore */})
+        }
       })
       .catch(() => {/* backend offline — fall through to "not found" state */})
       .finally(() => setIsLoadingCycle(false))
@@ -476,15 +498,7 @@ export default function CycleDetail() {
             dispatched={scorecardDispatched}
             onDispatched={() => setScorecardDispatched(true)}
             compiledScorecard={compiledScorecard}
-            onCompiledFetched={(cs: CompiledScorecard) => {
-              setCompiledScorecard(cs)
-              const legacy = compiledScorecardToLegacy(cs)
-              setCompiledScores(legacy)
-              if (cs.internal_respondents > 0 && cs.vendor_respondents > 0) {
-                setSubmissionsSimulated(true)
-                advanceWorkflow(cycle!.cycle_id, 'SCORECARD_COMPILED')
-              }
-            }}
+            onCompiledFetched={handleCompiledFetched}
             cycleId={cycle.cycle_id}
             attendees={schedulingAttendees}
           />
@@ -797,6 +811,7 @@ function ScorecardTab({
         year={cycle.year}
         attendees={attendees}
         onDispatched={onDispatched}
+        alreadyDispatched={dispatched}
       />
       {dispatched && (
         <SubmissionTracker

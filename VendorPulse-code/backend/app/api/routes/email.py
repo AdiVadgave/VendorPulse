@@ -9,11 +9,15 @@ Implementation notes:
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
 from app.config import settings
 from app.services.email_service import EmailSendError, EmailService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["email"])
 
@@ -30,8 +34,10 @@ class SendEmailResponse(BaseModel):
 
 @router.post("/api/email/send", response_model=SendEmailResponse)
 def send_email(payload: SendEmailRequest):
+    logger.info("send_email called — to=%s, subject=%s", payload.to_email, payload.subject)
     # Ensure email settings are present
     if not settings.smtp_host or not settings.smtp_username or not settings.smtp_password:
+        logger.error("send_email: SMTP not configured")
         raise HTTPException(
             status_code=500,
             detail=(
@@ -49,6 +55,8 @@ def send_email(payload: SendEmailRequest):
             text=payload.text,
         )
     except EmailSendError as exc:
+        logger.error("send_email failed — to=%s, error=%s", payload.to_email, exc)
         raise HTTPException(status_code=502, detail=str(exc))
 
+    logger.info("send_email success — to=%s", payload.to_email)
     return SendEmailResponse(message="Email sent")

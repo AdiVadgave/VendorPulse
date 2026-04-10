@@ -166,3 +166,5 @@ class Cycle(BaseModel):
     workflow_state: str
     created_at: str
     updated_at: str
+    scorecard_dispatched_at: Optional[str] = None
+    scorecard_dispatched_to: Optional[list[str]] = None

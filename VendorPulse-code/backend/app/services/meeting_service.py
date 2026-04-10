@@ -58,6 +58,11 @@ class MeetingService:
 
         Raises ValueError for hard failures (missing users, organiser conflict).
         """
+        logger.info(
+            "create_meeting — title=%s, organizerId=%s, participantIds=%s, timeSlot=%s, cycleId=%s",
+            payload.title, payload.organizerId, payload.participantIds,
+            payload.timeSlot.model_dump() if payload.timeSlot else None, payload.cycleId,
+        )
         # Validate organiser
         if not self._users.get_by_user_id(payload.organizerId):
             raise ValueError(f"Organiser '{payload.organizerId}' not found")
@@ -107,6 +112,7 @@ class MeetingService:
             "meetingType": payload.meetingType,
         }
         stored = self._meetings.insert(meeting)
+        logger.info("create_meeting success — meetingId=%s, warnings=%s", meeting["meetingId"], warnings)
         return stored, warnings
 
     # ------------------------------------------------------------------
@@ -123,12 +129,17 @@ class MeetingService:
         return self._meetings.update_by_id("meetingId", meeting_id, updates)
 
     def cancel_meeting(self, meeting_id: str, organiser_id: str) -> Optional[dict]:
+        logger.info("cancel_meeting — meetingId=%s, organiser_id=%s", meeting_id, organiser_id)
         meeting = self._meetings.get_by_meeting_id(meeting_id)
         if meeting is None:
+            logger.warning("cancel_meeting: meeting %s not found", meeting_id)
             return None
         if meeting.get("organizerId") != organiser_id:
+            logger.warning("cancel_meeting: permission denied — organiser mismatch for %s", meeting_id)
             raise PermissionError("Only the organiser can cancel this meeting")
-        return self._meetings.cancel(meeting_id)
+        result = self._meetings.cancel(meeting_id)
+        logger.info("cancel_meeting success — meetingId=%s", meeting_id)
+        return result
 
     # ------------------------------------------------------------------
     # Invite response
@@ -137,12 +148,14 @@ class MeetingService:
     def respond_to_meeting(
         self, meeting_id: str, user_id: str, status: str
     ) -> Optional[dict]:
+        logger.info("respond_to_meeting — meetingId=%s, userId=%s, status=%s", meeting_id, user_id, status)
         meeting = self._meetings.get_by_meeting_id(meeting_id)
         if meeting is None:
             return None
 
         participant_ids = [p.get("userId") for p in meeting.get("participants", [])]
         if user_id not in participant_ids:
+            logger.warning("respond_to_meeting: user %s is not a participant in meeting %s", user_id, meeting_id)
             raise PermissionError("User is not a participant in this meeting")
 
         responded_at = datetime.now(timezone.utc).isoformat()

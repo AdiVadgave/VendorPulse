@@ -75,8 +75,13 @@
     "vendor_name": "test 12",
     "quarter": "Q1",
     "year": 2026,
-    "workflow_state": "MEETING_SCHEDULED",
+    "workflow_state": "SCORECARD_REQUEST_SENT",
     "created_at": "2026-04-09T18:22:25.634426+00:00",
-    "updated_at": "2026-04-09T18:23:30.384782+00:00"
+    "updated_at": "2026-04-09T18:51:20.067110+00:00",
+    "scorecard_dispatched_at": "2026-04-09T18:51:20.067110+00:00",
+    "scorecard_dispatched_to": [
+      "anupkesarwani3537@gmail.com",
+      "kanishkpunekar54@gmail.com"
+    ]
   }
 ]

@@ -3,6 +3,7 @@ import { CheckCircle2, Clock, RefreshCw, Loader2, Mail } from 'lucide-react'
 import { format } from 'date-fns'
 import type { SubmissionTrackerData, SubmissionTrackerEntry } from '@/types/scorecard.types'
 import { cn } from '@/utils/cn'
+import { POLLING_INTERVALS } from '@/utils/constants'
 import { getSubmissionTracker, pollFormResponses } from '@/lib/scorecardApi'
 
 interface Props {
@@ -35,10 +36,10 @@ export default function SubmissionTracker({ cycleId, onSubmissionsUpdated }: Pro
     }
   }, [cycleId, onSubmissionsUpdated])
 
-  // Poll on mount and every 60 seconds
+  // Poll on mount and then on the configured interval
   useEffect(() => {
     doPoll()
-    pollIntervalRef.current = setInterval(doPoll, 60_000)
+    pollIntervalRef.current = setInterval(doPoll, POLLING_INTERVALS.SUBMISSION_TRACKER_MS)
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
     }

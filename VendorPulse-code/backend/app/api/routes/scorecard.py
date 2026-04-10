@@ -10,10 +10,16 @@ Provides endpoints for:
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from datetime import datetime, timezone
+
 from app.config import settings
+from app.dependencies import get_cycle_repo
+from app.core.workflow_engine import workflow_engine, WORKFLOW_STATES
 from app.services.gmail_service import GmailSendError, build_scorecard_email, send_html_email
 from app.services.google_auth_service import is_authenticated
 from app.services.google_forms_service import (
@@ -23,6 +29,8 @@ from app.services.google_forms_service import (
     get_responses_for_cycle,
     poll_and_store,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/scorecard", tags=["scorecard"])
 
@@ -71,24 +79,43 @@ class PollResponse(BaseModel):
 @router.post("/dispatch", response_model=DispatchResponse)
 def dispatch_scorecard_emails(payload: DispatchRequest):
     """Send scorecard request emails to all key attendees via Gmail."""
-    print(f"[SCORECARD-DISPATCH] Received dispatch request: cycle_id={payload.cycle_id}, vendor={payload.vendor_name}, quarter={payload.quarter}, year={payload.year}")
-    print(f"[SCORECARD-DISPATCH] Attendees: {[(a.name, a.email) for a in payload.attendees]}")
-    print(f"[SCORECARD-DISPATCH] form_url from payload: {payload.form_url}")
+    logger.info(
+        "SCORECARD-DISPATCH: cycle_id=%s, vendor=%s, quarter=%s, year=%s",
+        payload.cycle_id, payload.vendor_name, payload.quarter, payload.year,
+    )
+    logger.info("SCORECARD-DISPATCH: attendees=%s", [(a.name, a.email) for a in payload.attendees])
+    logger.debug("SCORECARD-DISPATCH: form_url from payload=%s", payload.form_url)
+
+    # Idempotency: if scorecard already dispatched, return previous result
+    cycle_repo = get_cycle_repo()
+    cycle = cycle_repo.get_by_cycle_id(payload.cycle_id)
+    if cycle and cycle.get("scorecard_dispatched_at"):
+        logger.info("SCORECARD-DISPATCH: already dispatched at %s, returning idempotent response", cycle["scorecard_dispatched_at"])
+        already_sent = cycle.get("scorecard_dispatched_to", [])
+        return DispatchResponse(
+            total=len(already_sent),
+            sent=len(already_sent),
+            failed=0,
+            results=[
+                DispatchResult(attendee=email, email=email, status="sent")
+                for email in already_sent
+            ],
+        )
 
     if not is_authenticated():
-        print("[SCORECARD-DISPATCH] ERROR: Not authenticated with Google")
+        logger.warning("SCORECARD-DISPATCH: not authenticated with Google")
         raise HTTPException(
             status_code=401,
             detail="Google account not connected. Visit /auth/google to authenticate.",
         )
 
     form_url = payload.form_url or settings.google_form_url
-    print(f"[SCORECARD-DISPATCH] Using form_url: {form_url}")
+    logger.info("SCORECARD-DISPATCH: using form_url=%s", form_url)
     results: list[DispatchResult] = []
     sent_count = 0
 
     for attendee in payload.attendees:
-        print(f"[SCORECARD-DISPATCH] Building email for {attendee.name} ({attendee.email})")
+        logger.info("SCORECARD-DISPATCH: building email for %s (%s)", attendee.name, attendee.email)
         email_data = build_scorecard_email(
             attendee_name=attendee.name,
             vendor_name=payload.vendor_name,
@@ -99,14 +126,14 @@ def dispatch_scorecard_emails(payload: DispatchRequest):
         )
 
         try:
-            print(f"[SCORECARD-DISPATCH] Sending email to {attendee.email}...")
+            logger.info("SCORECARD-DISPATCH: sending email to %s...", attendee.email)
             result = send_html_email(
                 to_email=attendee.email,
                 subject=email_data["subject"],
                 html_body=email_data["html_body"],
                 text_body=email_data["text_body"],
             )
-            print(f"[SCORECARD-DISPATCH] Email sent successfully to {attendee.email}, message_id={result.get('id')}")
+            logger.info("SCORECARD-DISPATCH: email sent to %s, message_id=%s", attendee.email, result.get("id"))
             results.append(
                 DispatchResult(
                     attendee=attendee.name,
@@ -117,7 +144,7 @@ def dispatch_scorecard_emails(payload: DispatchRequest):
             )
             sent_count += 1
         except GmailSendError as exc:
-            print(f"[SCORECARD-DISPATCH] FAILED to send to {attendee.email}: {exc}")
+            logger.error("SCORECARD-DISPATCH: failed to send to %s: %s", attendee.email, exc)
             results.append(
                 DispatchResult(
                     attendee=attendee.name,
@@ -127,7 +154,21 @@ def dispatch_scorecard_emails(payload: DispatchRequest):
                 )
             )
 
-    print(f"[SCORECARD-DISPATCH] Done: {sent_count} sent, {len(payload.attendees) - sent_count} failed")
+    logger.info("SCORECARD-DISPATCH: done — %d sent, %d failed", sent_count, len(payload.attendees) - sent_count)
+
+    # Persist dispatch record and advance workflow
+    if sent_count > 0 and cycle:
+        now = datetime.now(timezone.utc).isoformat()
+        sent_emails = [r.email for r in results if r.status == "sent"]
+        cycle_repo.mark_scorecard_dispatched(payload.cycle_id, now, sent_emails)
+        try:
+            ws_idx = WORKFLOW_STATES.index(cycle.get("workflow_state", ""))
+            target_idx = WORKFLOW_STATES.index("SCORECARD_REQUEST_SENT")
+            if ws_idx < target_idx:
+                workflow_engine.transition_to(cycle, "SCORECARD_REQUEST_SENT", cycle_repo, now)
+        except Exception as exc:
+            logger.warning("SCORECARD-DISPATCH: workflow advance failed: %s", exc)
+
     return DispatchResponse(
         total=len(payload.attendees),
         sent=sent_count,
@@ -139,24 +180,24 @@ def dispatch_scorecard_emails(payload: DispatchRequest):
 @router.post("/poll", response_model=PollResponse)
 def poll_form_responses(form_id: str | None = None):
     """Poll Google Forms for new scorecard responses and store them."""
-    print(f"[SCORECARD-POLL] Received poll request: form_id={form_id}")
+    logger.info("SCORECARD-POLL: form_id=%s", form_id)
 
     if not is_authenticated():
-        print("[SCORECARD-POLL] ERROR: Not authenticated with Google")
+        logger.warning("SCORECARD-POLL: not authenticated with Google")
         raise HTTPException(
             status_code=401,
             detail="Google account not connected. Visit /auth/google to authenticate.",
         )
 
     try:
-        print(f"[SCORECARD-POLL] Calling poll_and_store(form_id={form_id})...")
+        logger.info("SCORECARD-POLL: calling poll_and_store(form_id=%s)", form_id)
         data = poll_and_store(form_id)
-        print(f"[SCORECARD-POLL] Poll result: total={data.get('total')}, new={data.get('new')}, responses_count={len(data.get('responses', []))}")
+        logger.info("SCORECARD-POLL: result — total=%s, new=%s", data.get("total"), data.get("new"))
     except GoogleFormsError as exc:
-        print(f"[SCORECARD-POLL] GoogleFormsError: {exc}")
+        logger.error("SCORECARD-POLL: GoogleFormsError: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc))
     except Exception as exc:
-        print(f"[SCORECARD-POLL] Unexpected error: {type(exc).__name__}: {exc}")
+        logger.exception("SCORECARD-POLL: unexpected error: %s", exc)
         raise
 
     return PollResponse(**data)
@@ -165,10 +206,10 @@ def poll_form_responses(form_id: str | None = None):
 @router.get("/responses/raw")
 def get_raw_responses(form_id: str | None = None):
     """Get raw Google Forms responses without any parsing or mapping."""
-    print(f"[SCORECARD-RAW] GET /responses/raw, form_id={form_id}")
+    logger.info("SCORECARD-RAW: GET /responses/raw, form_id=%s", form_id)
 
     if not is_authenticated():
-        print("[SCORECARD-RAW] ERROR: Not authenticated with Google")
+        logger.warning("SCORECARD-RAW: not authenticated with Google")
         raise HTTPException(
             status_code=401,
             detail="Google account not connected. Visit /auth/google to authenticate.",
@@ -176,57 +217,57 @@ def get_raw_responses(form_id: str | None = None):
 
     try:
         data = fetch_raw_form_responses(form_id)
-        print(f"[SCORECARD-RAW] Raw responses fetched: {data['total']} responses")
+        logger.info("SCORECARD-RAW: fetched %s raw responses", data["total"])
         return data
     except GoogleFormsError as exc:
-        print(f"[SCORECARD-RAW] GoogleFormsError: {exc}")
+        logger.error("SCORECARD-RAW: GoogleFormsError: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc))
     except Exception as exc:
-        print(f"[SCORECARD-RAW] Unexpected error: {type(exc).__name__}: {exc}")
+        logger.exception("SCORECARD-RAW: unexpected error: %s", exc)
         raise
 
 
 @router.get("/responses/{cycle_id}")
 def get_cycle_responses(cycle_id: str):
     """Get all scorecard responses for a specific cycle. Fetches live from Google Forms if authenticated."""
-    print(f"[SCORECARD-RESPONSES] GET /responses/{cycle_id}")
+    logger.info("SCORECARD-RESPONSES: GET /responses/%s", cycle_id)
 
     if is_authenticated():
-        print(f"[SCORECARD-RESPONSES] Authenticated — fetching live from Google Forms")
+        logger.info("SCORECARD-RESPONSES: authenticated — fetching live from Google Forms")
         try:
             data = poll_and_store()
             responses = [r for r in data["responses"] if r.get("cycle_id") == cycle_id]
-            print(f"[SCORECARD-RESPONSES] Live fetch: {len(responses)} matched cycle_id={cycle_id}")
+            logger.info("SCORECARD-RESPONSES: live fetch — %d matched cycle_id=%s", len(responses), cycle_id)
         except Exception as exc:
-            print(f"[SCORECARD-RESPONSES] Live fetch failed ({exc}), falling back to stored data")
+            logger.warning("SCORECARD-RESPONSES: live fetch failed (%s), falling back to stored data", exc)
             responses = get_responses_for_cycle(cycle_id)
     else:
-        print(f"[SCORECARD-RESPONSES] Not authenticated — using stored data")
+        logger.info("SCORECARD-RESPONSES: not authenticated — using stored data")
         responses = get_responses_for_cycle(cycle_id)
 
-    print(f"[SCORECARD-RESPONSES] Returning {len(responses)} responses for cycle_id={cycle_id}")
+    logger.info("SCORECARD-RESPONSES: returning %d responses for cycle_id=%s", len(responses), cycle_id)
     return {"cycle_id": cycle_id, "count": len(responses), "responses": responses}
 
 
 @router.get("/responses")
 def get_all_responses():
     """Get all scorecard responses. Fetches live from Google Forms if authenticated."""
-    print("[SCORECARD-RESPONSES] GET /responses (all)")
+    logger.info("SCORECARD-RESPONSES: GET /responses (all)")
 
     if is_authenticated():
-        print("[SCORECARD-RESPONSES] Authenticated — fetching live from Google Forms")
+        logger.info("SCORECARD-RESPONSES: authenticated — fetching live from Google Forms")
         try:
             data = poll_and_store()
             responses = data["responses"]
-            print(f"[SCORECARD-RESPONSES] Live fetch: {len(responses)} total responses")
+            logger.info("SCORECARD-RESPONSES: live fetch — %d total responses", len(responses))
         except Exception as exc:
-            print(f"[SCORECARD-RESPONSES] Live fetch failed ({exc}), falling back to stored data")
+            logger.warning("SCORECARD-RESPONSES: live fetch failed (%s), falling back to stored data", exc)
             responses = get_all_stored_responses()
     else:
-        print("[SCORECARD-RESPONSES] Not authenticated — using stored data")
+        logger.info("SCORECARD-RESPONSES: not authenticated — using stored data")
         responses = get_all_stored_responses()
 
-    print(f"[SCORECARD-RESPONSES] Returning {len(responses)} responses")
+    logger.info("SCORECARD-RESPONSES: returning %d responses", len(responses))
     return {"count": len(responses), "responses": responses}
 
 

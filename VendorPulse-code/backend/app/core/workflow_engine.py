@@ -22,8 +22,11 @@ Usage
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +156,7 @@ class WorkflowEngine:
         if next_st is None:
             raise WorkflowViolationError(current, "<terminal>")
         ts = updated_at or datetime.now(timezone.utc).isoformat()
+        logger.info("workflow advance — cycle=%s, %s -> %s", cycle.get("cycle_id"), current, next_st)
         return cycle_repo.advance_workflow_state(cycle["cycle_id"], next_st, ts)
 
     def transition_to(
@@ -165,6 +169,7 @@ class WorkflowEngine:
         current = cycle.get("workflow_state", "")
         self.validate_transition(current, target)
         ts = updated_at or datetime.now(timezone.utc).isoformat()
+        logger.info("workflow transition — cycle=%s, %s -> %s", cycle.get("cycle_id"), current, target)
         return cycle_repo.advance_workflow_state(cycle["cycle_id"], target, ts)
 
 

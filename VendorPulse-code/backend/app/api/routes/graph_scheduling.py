@@ -28,10 +28,7 @@ from pydantic import BaseModel, Field
 
 router = APIRouter(tags=["graph-scheduling"])
 
-# Use uvicorn's logger so messages show up with the default FastAPI/Uvicorn log config.
-logger = logging.getLogger("uvicorn.error")
-logger.setLevel(logging.INFO)
-logger.propagate = True
+logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -630,9 +627,10 @@ def send_meeting_invite_graph(
 ):
     """
     Create a real Teams meeting event and send invites to all cycle attendees.
-    
+
     Takes an approved slot_id and converts it to a real Teams meeting via Graph.
     """
+    logger.info("send_meeting_invite_graph called — cycleId=%s, slot_id=%s, organiser=%s", cycleId, payload.slot_id, payload.organiser_email)
     # Fetch cycle
     cycle = _get_cycle_or_404(cycleId, cycle_repo)
 
@@ -737,10 +735,15 @@ def send_meeting_invite_graph(
     if workflow_engine.can_transition(cycle.get("workflow_state", ""), "MEETING_SCHEDULED"):
         workflow_engine.transition_to(cycle, "MEETING_SCHEDULED", cycle_repo, now)
 
-    return {
+    response_payload = {
         "message": "Teams meeting created and invites sent",
         "event_id": result.get("id"),
         "teams_meeting_url": result.get("onlineMeetingUrl"),
         "web_link": result.get("webLink"),
         "slot_id": payload.slot_id,
     }
+    logger.info(
+        "send_meeting_invite_graph success — cycleId=%s, event_id=%s, attendees=%d",
+        cycleId, result.get("id"), len(attendee_emails),
+    )
+    return response_payload

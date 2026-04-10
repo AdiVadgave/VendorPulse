@@ -20,3 +20,12 @@ class CycleRepository(BaseRepository):
         return self.update_by_id(
             "cycle_id", cycle_id, {"workflow_state": new_state, "updated_at": updated_at}
         )
+
+    def mark_scorecard_dispatched(
+        self, cycle_id: str, dispatched_at: str, emails: list[str]
+    ) -> Optional[dict]:
+        return self.update_by_id(
+            "cycle_id",
+            cycle_id,
+            {"scorecard_dispatched_at": dispatched_at, "scorecard_dispatched_to": emails},
+        )

@@ -15,6 +15,7 @@ interface Props {
   year: number
   attendees: CycleAttendee[]
   onDispatched: () => void
+  alreadyDispatched?: boolean
 }
 
 const REMINDER_SCHEDULE = [
@@ -27,10 +28,10 @@ const TOTAL_PARAMETERS = SCORECARD_STRUCTURE.reduce((sum, c) => sum + c.paramete
 
 const GOOGLE_AUTH_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/google`
 
-export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched }: Props) {
-  const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
+export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, alreadyDispatched = false }: Props) {
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>(alreadyDispatched ? 'complete' : 'idle')
   const [showApproval, setShowApproval] = useState(false)
-  const [dispatched, setDispatched] = useState(false)
+  const [dispatched, setDispatched] = useState(alreadyDispatched)
   const [googleConnected, setGoogleConnected] = useState<boolean | null>(null)
   const [dispatchResult, setDispatchResult] = useState<DispatchResponse | null>(null)
   const [error, setError] = useState<string | null>(null)

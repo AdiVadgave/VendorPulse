@@ -39,9 +39,9 @@ const SEVERITY_CONFIG = {
 
 export default function ChangeHighlightsPanel({ deltas, whatChangedBullets, insights }: Props) {
   const significant = deltas.filter((d) => d.significant)
-  const [insightsOpen, setInsightsOpen] = useState(true)
+  const [insightsOpen, setInsightsOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(true)
-  const [deltasOpen, setDeltasOpen] = useState(true)
+  const [deltasOpen, setDeltasOpen] = useState(false)
 
   return (
     <div className="space-y-4">

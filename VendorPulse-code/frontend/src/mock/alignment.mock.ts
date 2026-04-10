@@ -6,7 +6,7 @@ import type {
   CategoryComparison,
   AlignmentInsight,
 } from '@/types/alignment.types'
-import type { CompiledCategoryScore } from '@/types/scorecard.types'
+import type { CompiledCategoryScore, CompiledScorecard } from '@/types/scorecard.types'
 import { SCORECARD_STRUCTURE, CATEGORY_LABELS } from '@/types/scorecard.types'
 
 /* ── Score Deltas vs Previous Cycle (Q4 2025) ──────────────── */
@@ -179,7 +179,83 @@ export function generateWhatChangedBullets(
   return bullets.slice(0, 5) // Cap at 5 bullets
 }
 
-/* ── Build Stakeholder vs Vendor Comparison from Compiled Scores */
+/* ── Build Comparisons directly from 2-column CompiledScorecard ─ */
+
+export function buildComparisonsFromScorecard(
+  scorecard: CompiledScorecard,
+): CategoryComparison[] {
+  return scorecard.categories.map((cat) => {
+    const parameters = cat.parameters.map((param) => {
+      const stakeholderScore = param.internal_avg ?? 0
+      const vendorScore = param.vendor_avg ?? 0
+      const diff = Math.abs(stakeholderScore - vendorScore)
+
+      return {
+        parameter_key: param.parameter_key,
+        parameter_label: param.parameter_label,
+        category: cat.category,
+        category_label: cat.category_label,
+        stakeholder_score: stakeholderScore,
+        vendor_score: vendorScore,
+        difference: parseFloat(diff.toFixed(2)),
+        high_variance: diff > 1,
+        low_score: stakeholderScore < 3 || vendorScore < 3,
+      }
+    })
+
+    return {
+      category: cat.category,
+      category_label: cat.category_label,
+      stakeholder_avg: cat.internal_avg ?? 0,
+      vendor_avg: cat.vendor_avg ?? 0,
+      difference: parseFloat(Math.abs((cat.internal_avg ?? 0) - (cat.vendor_avg ?? 0)).toFixed(2)),
+      parameters,
+    }
+  })
+}
+
+/* ── Build Alignment Flags directly from CompiledScorecard ───── */
+
+export function buildFlagsFromScorecard(
+  scorecard: CompiledScorecard,
+): AlignmentFlag[] {
+  const flags: AlignmentFlag[] = []
+  let id = 0
+
+  for (const cat of scorecard.categories) {
+    for (const param of cat.parameters) {
+      const stakeholderScore = param.internal_avg ?? 0
+      const vendorScore = param.vendor_avg ?? 0
+      if (stakeholderScore === 0 && vendorScore === 0) continue
+      const spread = Math.abs(vendorScore - stakeholderScore)
+
+      if (spread >= 1) {
+        id++
+        const high = vendorScore > stakeholderScore ? 'Vendor' : 'Stakeholder'
+        const low = vendorScore > stakeholderScore ? 'Stakeholder' : 'Vendor'
+        const highVal = Math.max(vendorScore, stakeholderScore)
+        const lowVal = Math.min(vendorScore, stakeholderScore)
+
+        flags.push({
+          flag_id: `af-dyn-${id}`,
+          category: cat.category,
+          parameter_key: param.parameter_key,
+          parameter_label: param.parameter_label,
+          spread,
+          high_stakeholder: high,
+          high_score: highVal,
+          low_stakeholder: low,
+          low_score: lowVal,
+          prompt_question: `${high} scores ${param.parameter_label} at ${highVal}; ${low} at ${lowVal} — ${spread >= 2 ? 'major discrepancy, requires immediate discussion' : 'moderate gap, discuss during alignment call'}.`,
+        })
+      }
+    }
+  }
+
+  return flags.sort((a, b) => b.spread - a.spread)
+}
+
+/* ── Build Stakeholder vs Vendor Comparison from Compiled Scores (legacy) */
 
 export function buildCategoryComparisons(
   compiledScores: CompiledCategoryScore[],

@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react'
 import { TrendingUp, CheckCircle2, ChevronDown, ChevronRight, Info } from 'lucide-react'
 import type { CompiledScorecard, CompiledParameter, IndividualScore } from '@/types/scorecard.types'
-import { PARAMETER_TOOLTIPS } from '@/types/scorecard.types'
 import { cn } from '@/utils/cn'
 
 interface Props {
@@ -32,11 +31,11 @@ function ScoreCell({ value }: { value: number | null }) {
   )
 }
 
-/* ── Hover Tooltip for individual scores ─────────────────────── */
+/* ── Hover Tooltip for individual scores + comments ──────────── */
 
 function ScoreTooltip({ scores, label }: { scores: IndividualScore[]; label: string }) {
   return (
-    <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-slate-900 dark:bg-slate-700 text-white rounded-lg shadow-xl p-3 pointer-events-none">
+    <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 dark:bg-slate-700 text-white rounded-lg shadow-xl p-3 pointer-events-none">
       <p className="text-xs font-semibold mb-2 text-slate-300">{label} Breakdown</p>
       <div className="space-y-1.5">
         {scores.map((s, i) => (
@@ -123,10 +122,9 @@ function GapIndicator({ internal, vendor }: { internal: number | null; vendor: n
 }
 
 export default function CompiledScorecardTable({ scorecard }: Props) {
-  const [panelOpen, setPanelOpen] = useState(true)
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
-    scorecard.categories.forEach((c) => { init[c.category] = true })
+    scorecard.categories.forEach((c) => { init[c.category] = false })
     return init
   })
 
@@ -161,23 +159,17 @@ export default function CompiledScorecardTable({ scorecard }: Props) {
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-        {/* Header — click to collapse/expand entire panel */}
-        <button
-          onClick={() => setPanelOpen(!panelOpen)}
-          className="w-full px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
-        >
+        {/* Header */}
+        <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
           <CheckCircle2 size={15} className="text-emerald-500" />
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
             Compiled Scorecard
           </h3>
-          <span className="ml-auto flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
+          <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">
             {totalRespondents} respondent{totalRespondents !== 1 ? 's' : ''} ({internal_respondents} internal, {vendor_respondents} vendor)
-            {panelOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </span>
-        </button>
+        </div>
 
-        {panelOpen && (
-          <>
             {/* Controls bar */}
             <div className="px-5 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
@@ -218,7 +210,7 @@ export default function CompiledScorecardTable({ scorecard }: Props) {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {categories.map((cat) => {
-                    const isExpanded = expandedCats[cat.category] ?? true
+                    const isExpanded = expandedCats[cat.category] ?? false
                     return (
                       <CategorySection
                         key={cat.category}
@@ -260,8 +252,6 @@ export default function CompiledScorecardTable({ scorecard }: Props) {
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400" /> 4.5+ Excellent</span>
               </div>
             </div>
-          </>
-        )}
       </div>
     </div>
   )
@@ -302,55 +292,35 @@ function CategorySection({
         </td>
       </tr>
       {/* Parameter rows — visible only when expanded */}
-      {isExpanded && cat.parameters.map((param: CompiledParameter) => {
-        const isLowScore = (param.internal_avg !== null && param.internal_avg < 3) || (param.vendor_avg !== null && param.vendor_avg < 3)
-        const hasHighGap = param.internal_avg !== null && param.vendor_avg !== null && Math.abs(param.internal_avg - param.vendor_avg) >= 1.5
-
-        return (
-          <tr
-            key={param.parameter_key}
-            className={cn(
-              'transition-colors',
-              isLowScore ? 'bg-red-50/40 dark:bg-red-900/10' : hasHighGap ? 'bg-amber-50/30 dark:bg-amber-900/10' : 'hover:bg-slate-50/60 dark:hover:bg-slate-800/30',
-            )}
-          >
-            <td className="px-4 py-2 pl-10 text-slate-600 dark:text-slate-400 whitespace-nowrap">
-              <span className="flex items-center gap-1.5 group/param">
-                {param.parameter_label}
-                {PARAMETER_TOOLTIPS[param.parameter_key] && (
-                  <span className="relative">
-                    <Info size={11} className="text-slate-300 dark:text-slate-600 group-hover/param:text-slate-500 dark:group-hover/param:text-slate-400 transition-colors cursor-help" />
-                    <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-48 px-2.5 py-1.5 bg-slate-900 dark:bg-slate-600 text-white text-[10px] leading-snug rounded-md shadow-lg opacity-0 pointer-events-none group-hover/param:opacity-100 transition-opacity whitespace-normal text-center">
-                      {PARAMETER_TOOLTIPS[param.parameter_key]}
-                    </span>
-                  </span>
-                )}
-                {isLowScore && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" title="Low score" />}
-                {hasHighGap && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="High gap" />}
-              </span>
-            </td>
-            <td className="px-3 py-2 text-center">
-              <HoverableScoreCell
-                value={param.internal_avg}
-                count={param.internal_count}
-                scores={param.internal_scores}
-                label="Internal Stakeholder"
-              />
-            </td>
-            <td className="px-3 py-2 text-center">
-              <HoverableScoreCell
-                value={param.vendor_avg}
-                count={param.vendor_count}
-                scores={param.vendor_scores}
-                label="Vendor"
-              />
-            </td>
-            <td className="px-3 py-2 text-center">
-              <GapIndicator internal={param.internal_avg} vendor={param.vendor_avg} />
-            </td>
-          </tr>
-        )
-      })}
+      {isExpanded && cat.parameters.map((param: CompiledParameter) => (
+        <tr
+          key={param.parameter_key}
+          className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
+        >
+          <td className="px-4 py-2 pl-10 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+            {param.parameter_label}
+          </td>
+          <td className="px-3 py-2 text-center">
+            <HoverableScoreCell
+              value={param.internal_avg}
+              count={param.internal_count}
+              scores={param.internal_scores}
+              label="Internal Stakeholder"
+            />
+          </td>
+          <td className="px-3 py-2 text-center">
+            <HoverableScoreCell
+              value={param.vendor_avg}
+              count={param.vendor_count}
+              scores={param.vendor_scores}
+              label="Vendor"
+            />
+          </td>
+          <td className="px-3 py-2 text-center">
+            <GapIndicator internal={param.internal_avg} vendor={param.vendor_avg} />
+          </td>
+        </tr>
+      ))}
     </>
   )
 }

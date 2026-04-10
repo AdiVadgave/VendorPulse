@@ -372,16 +372,20 @@ def get_compiled_scorecard(cycle_id: str):
     attendee_repo = get_attendee_repo()
     attendees = [a for a in attendee_repo.find_all() if a.get("cycle_id") == cycle_id]
 
-    # Build email → attendee type lookup
+    # Build email → attendee type and name lookup
     email_type_map: dict[str, str] = {}
+    email_name_map: dict[str, str] = {}
     for att in attendees:
         gmail = (att.get("gmail") or "").lower().strip()
         corp = (att.get("email") or "").lower().strip()
         att_type = att.get("type", "Internal Stakeholder")
+        att_name = att.get("name", "Unknown")
         if gmail:
             email_type_map[gmail] = att_type
+            email_name_map[gmail] = att_name
         if corp:
             email_type_map[corp] = att_type
+            email_name_map[corp] = att_name
 
     # Get responses (read from stored data — polling is done via POST /poll)
     responses = get_responses_for_cycle(cycle_id)
@@ -411,23 +415,31 @@ def get_compiled_scorecard(cycle_id: str):
         for param in cat_def["parameters"]:
             pkey = param["key"]
 
-            # Collect scores from internal responses
+            # Collect scores from internal responses (with respondent names)
             i_scores = []
+            i_individual = []
             for resp in internal_responses:
                 raw = resp.get(pkey)
                 if raw:
                     s = _parse_score(raw)
                     if s and 1 <= s <= 5:
                         i_scores.append(s)
+                        resp_email = (resp.get("email") or "").lower().strip()
+                        resp_name = email_name_map.get(resp_email, resp_email or "Unknown")
+                        i_individual.append({"name": resp_name, "score": s})
 
-            # Collect scores from vendor responses
+            # Collect scores from vendor responses (with respondent names)
             v_scores = []
+            v_individual = []
             for resp in vendor_responses:
                 raw = resp.get(pkey)
                 if raw:
                     s = _parse_score(raw)
                     if s and 1 <= s <= 5:
                         v_scores.append(s)
+                        resp_email = (resp.get("email") or "").lower().strip()
+                        resp_name = email_name_map.get(resp_email, resp_email or "Unknown")
+                        v_individual.append({"name": resp_name, "score": s})
 
             i_avg = round(sum(i_scores) / len(i_scores), 2) if i_scores else None
             v_avg = round(sum(v_scores) / len(v_scores), 2) if v_scores else None
@@ -446,6 +458,8 @@ def get_compiled_scorecard(cycle_id: str):
                 "vendor_avg": v_avg,
                 "internal_count": len(i_scores),
                 "vendor_count": len(v_scores),
+                "internal_scores": i_individual,
+                "vendor_scores": v_individual,
             })
 
         cat_i_avg = round(sum(cat_internal_scores) / len(cat_internal_scores), 2) if cat_internal_scores else None

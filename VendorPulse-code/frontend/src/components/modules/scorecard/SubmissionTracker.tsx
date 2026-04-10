@@ -63,10 +63,24 @@ export default function SubmissionTracker({ cycleId, onSubmissionsUpdated }: Pro
 
   if (!tracker) {
     return (
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <Loader2 size={14} className="animate-spin" />
-          Loading submission tracker...
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Loader2 size={14} className="animate-spin" />
+            Loading submission tracker...
+          </div>
+        </div>
+        {/* Skeleton rows */}
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="px-5 py-3.5 flex items-center gap-4 animate-pulse">
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32" />
+                <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-48" />
+              </div>
+              <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-full w-20" />
+            </div>
+          ))}
         </div>
       </div>
     )
@@ -78,12 +92,21 @@ export default function SubmissionTracker({ cycleId, onSubmissionsUpdated }: Pro
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-slate-900 dark:text-white text-sm">
+          <h3 className="font-semibold text-slate-900 dark:text-white text-sm flex items-center gap-2">
             Submission Tracker
+            <span className={cn(
+              'text-xs px-2 py-0.5 rounded-full font-medium',
+              submitted === total_key_attendees && total_key_attendees > 0
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+            )}>
+              {submitted}/{total_key_attendees} submitted
+            </span>
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {submitted} of {total_key_attendees} key attendees submitted
             {pollCount > 0 && <span className="ml-2 text-indigo-500">(polled {pollCount}x)</span>}
+            {lastPollTime && <span className="ml-2 text-slate-400">&middot; Last checked {lastPollTime}</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -147,7 +170,7 @@ export default function SubmissionTracker({ cycleId, onSubmissionsUpdated }: Pro
                     ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
                     : 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
                 )}>
-                  {entry.type}
+                  {entry.type === 'Internal Stakeholder' ? 'Internal Stakeholder (Shell)' : `Vendor (${entry.organisation || 'Zensar'})`}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">

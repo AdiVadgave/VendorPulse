@@ -31,6 +31,7 @@ function ScoreBar({ score, color, label }: { score: number; color: string; label
 }
 
 export default function ScoreComparisonPanel({ comparisons }: Props) {
+  const [panelOpen, setPanelOpen] = useState(true)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   const hasFlags = comparisons.some((c) =>
@@ -43,23 +44,32 @@ export default function ScoreComparisonPanel({ comparisons }: Props) {
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-      <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
+      <button
+        onClick={() => setPanelOpen(!panelOpen)}
+        className="w-full px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
+      >
         <BarChart3 size={15} className="text-indigo-500" />
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
           Internal Stakeholder vs Vendor — Score Comparison
         </h3>
-        {hasFlags && (
-          <span className="ml-auto text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
-            Discrepancies found
+        <span className="ml-auto flex items-center gap-2">
+          {hasFlags && (
+            <span className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
+              Discrepancies found
+            </span>
+          )}
+          <span className="text-slate-400 dark:text-slate-500">
+            {panelOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </span>
-        )}
-      </div>
+        </span>
+      </button>
 
+      {panelOpen && <>
       {/* Legend */}
       <div className="px-5 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-6 text-xs text-slate-500 dark:text-slate-400">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-sm bg-blue-500" />
-          <span>Stakeholder</span>
+          <span>Internal Stakeholder (Shell)</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-sm bg-orange-500" />
@@ -181,6 +191,7 @@ export default function ScoreComparisonPanel({ comparisons }: Props) {
           )
         })}
       </div>
+      </>}
     </div>
   )
 }

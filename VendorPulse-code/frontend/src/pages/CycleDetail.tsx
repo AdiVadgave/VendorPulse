@@ -32,6 +32,9 @@ import {
   buildCategoryComparisons,
   generateAlignmentInsights,
   buildAlignmentFlags,
+  generateWhatChangedBullets,
+  buildComparisonsFromScorecard,
+  buildFlagsFromScorecard,
 } from '@/mock/alignment.mock'
 import {
   MOCK_PUSHBACK_ITEMS,
@@ -195,15 +198,7 @@ export default function CycleDetail() {
   }, [advanceWorkflow, cycle])
 
   // --- Module C state ---
-  const [alignmentActions, setAlignmentActions] = useState<ExtractedAction[]>(MOCK_ALIGNMENT_ACTIONS)
-
-  const WHAT_CHANGED_BULLETS = [
-    'Performance improved by +0.90 points to 3.90 — strongest improvement this cycle, driven by delivery quality and SLA adherence.',
-    'Commercial category up +0.50 points — billing accuracy and contract compliance both performing well.',
-    'Risk & Compliance edged up +0.34 points — security posture improving but patch management remains a discussion point.',
-    'Relationship dipped −0.37 points to 4.13 — communication effectiveness gap between Stakeholder (3) and Vendor (4) needs alignment.',
-    'Key flag: Delivery Timeliness, Pricing Competitiveness, and Communication show 1+ point gaps between Stakeholder and Vendor scores.',
-  ]
+  const [alignmentActions, setAlignmentActions] = useState<ExtractedAction[]>([])
 
   // --- Module D state ---
   const [vendorBrief, setVendorBrief] = useState<VendorBrief | null>(
@@ -507,9 +502,9 @@ export default function CycleDetail() {
         {activeTab === 'alignment' && (
           <AlignmentTab
             cycle={cycle}
-            whatChangedBullets={WHAT_CHANGED_BULLETS}
             actions={alignmentActions}
             compiledScores={compiledScores}
+            compiledScorecard={compiledScorecard}
             onActionsExtracted={(extracted) => {
               setAlignmentActions(extracted)
               setAllActions((prev) => {
@@ -828,21 +823,44 @@ function ScorecardTab({
 
 /* ── Alignment Tab ────────────────────────────────────────── */
 function AlignmentTab({
-  cycle, whatChangedBullets, actions, onActionsExtracted, compiledScores,
+  cycle, actions, onActionsExtracted, compiledScores, compiledScorecard,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
-  whatChangedBullets: string[]
   actions: ExtractedAction[]
   onActionsExtracted: (a: ExtractedAction[]) => void
   compiledScores: CompiledCategoryScore[] | null
+  compiledScorecard?: CompiledScorecard | null
 }) {
-  // Build dynamic comparisons & insights from compiled scorecard data
-  const comparisons = compiledScores ? buildCategoryComparisons(compiledScores) : []
-  const dynamicFlags = compiledScores ? buildAlignmentFlags(compiledScores) : []
+  // Prefer building comparisons directly from the 2-column compiled scorecard
+  // (uses real internal_avg / vendor_avg values). Legacy path kept as fallback.
+  const comparisons = compiledScorecard
+    ? buildComparisonsFromScorecard(compiledScorecard)
+    : compiledScores
+      ? buildCategoryComparisons(compiledScores)
+      : []
+
+  const dynamicFlags = compiledScorecard
+    ? buildFlagsFromScorecard(compiledScorecard)
+    : compiledScores
+      ? buildAlignmentFlags(compiledScores)
+      : []
+
   const insights = generateAlignmentInsights(comparisons, MOCK_SCORE_DELTAS)
 
-  // Use dynamic flags if compiled scores are available, otherwise fall back to mock
+  // Use dynamic flags if compiled data is available, otherwise fall back to mock
   const flags = dynamicFlags.length > 0 ? dynamicFlags : MOCK_ALIGNMENT_FLAGS
+
+  // Generate what-changed bullets dynamically from compiled data, fallback to static
+  const STATIC_BULLETS = [
+    'Performance improved by +0.90 points to 3.90 — strongest improvement this cycle, driven by delivery quality and SLA adherence.',
+    'Commercial category up +0.50 points — billing accuracy and contract compliance both performing well.',
+    'Risk & Compliance edged up +0.34 points — security posture improving but patch management remains a discussion point.',
+    'Relationship dipped −0.37 points to 4.13 — communication effectiveness gap between Stakeholder (3) and Vendor (4) needs alignment.',
+    'Key flag: Delivery Timeliness, Pricing Competitiveness, and Communication show 1+ point gaps between Stakeholder and Vendor scores.',
+  ]
+  const whatChangedBullets = comparisons.length > 0
+    ? generateWhatChangedBullets(comparisons, flags)
+    : STATIC_BULLETS
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">

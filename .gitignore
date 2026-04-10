@@ -80,3 +80,8 @@ client_secret.json
 /dev artifacts/.ipynb_checkpoints/
 VendorPulse-code/backend/data/cycles.json
 VendorPulse-code/backend/data/slot_proposals.json
+VendorPulse-code/backend/data/google_token.json
+VendorPulse-code/backend/data/attendees.json
+VendorPulse-code/backend/data/cycles.json
+VendorPulse-code/backend/data/scorecard_responses.json
+VendorPulse-code/backend/data/slot_proposals.json

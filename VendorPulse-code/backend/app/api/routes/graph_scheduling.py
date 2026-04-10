@@ -408,6 +408,50 @@ def find_meeting_times_graph(
 
     filtered_conflicts = 0
     processed = 0
+
+    def _base_score_from_confidence(raw_confidence: object) -> float:
+        """
+        Map Graph confidence to slot base score.
+
+        Graph can return either textual confidence levels (high/medium/low)
+        or numeric confidence values (often 0..100, sometimes 0..1).
+        """
+        if raw_confidence is None:
+            return 60.0
+
+        if isinstance(raw_confidence, (int, float)):
+            numeric = float(raw_confidence)
+            # Normalize fractional confidence (0..1) to percentage.
+            if 0.0 <= numeric <= 1.0:
+                numeric *= 100.0
+            if numeric >= 90.0:
+                return 100.0
+            if numeric >= 70.0:
+                return 80.0
+            return 60.0
+
+        text = str(raw_confidence).strip().lower()
+        if text == "high":
+            return 100.0
+        if text == "medium":
+            return 80.0
+        if text == "low":
+            return 60.0
+
+        # Be permissive for stringified numeric values like "100.0".
+        try:
+            numeric = float(text)
+        except ValueError:
+            return 60.0
+
+        if 0.0 <= numeric <= 1.0:
+            numeric *= 100.0
+        if numeric >= 90.0:
+            return 100.0
+        if numeric >= 70.0:
+            return 80.0
+        return 60.0
+
     for idx, suggestion in enumerate(suggestions):
         processed += 1
         # Graph returns time in meetingTimeSlot.start.dateTime
@@ -463,8 +507,10 @@ def find_meeting_times_graph(
             filtered_conflicts += 1
             continue
 
-        confidence = str(suggestion.get("confidenceLevel") or suggestion.get("confidence") or "low").lower()
-        base_score = 100.0 if confidence == "high" else 80.0 if confidence == "medium" else 60.0
+        confidence_raw = suggestion.get("confidenceLevel")
+        if confidence_raw is None:
+            confidence_raw = suggestion.get("confidence")
+        base_score = _base_score_from_confidence(confidence_raw)
         tentative_penalty = len(tentative_names) * 15.0
         # Prefer higher attendance, then higher confidence; penalize tentatives so
         # completely free slots sort above tentative ones.

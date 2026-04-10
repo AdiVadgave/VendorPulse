@@ -21,9 +21,11 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from app.config import Settings, settings
 from app.core.workflow_engine import WorkflowStateError, WorkflowViolationError, workflow_engine
-from app.dependencies import get_cycle_repo, get_attendee_repo, get_slot_repo
+from app.dependencies import get_cycle_repo, get_attendee_repo, get_slot_repo, get_llm_service
 from app.services.graph_service import GraphService
+from app.services.llm_service import LLMService
 from app.utils.demo_attendees import get_attendee_name
+from app.utils.prompts import SLOT_RATIONALE_PROMPT, CONFLICT_NUDGE_SYSTEM_PROMPT
 from pydantic import BaseModel, Field
 
 router = APIRouter(tags=["graph-scheduling"])
@@ -174,6 +176,7 @@ def find_meeting_times_graph(
     cycle_repo=Depends(get_cycle_repo),
     attendee_repo=Depends(get_attendee_repo),
     slot_repo=Depends(get_slot_repo),
+    llm_svc: LLMService = Depends(get_llm_service),
 ):
     """
     Find real meeting times using Microsoft Graph findMeetingTimes.
@@ -570,6 +573,24 @@ def find_meeting_times_graph(
     if workflow_engine.can_transition(cycle.get("workflow_state", ""), "AVAILABILITY_COLLECTED"):
         workflow_engine.advance(cycle, cycle_repo, now)
 
+    # AI augmentation: annotate top 3 slots with a plain-English rationale sentence.
+    # Falls back silently if LLM is disabled or the call fails.
+    if llm_svc.is_enabled:
+        for sp in slot_proposals[:3]:
+            try:
+                context_str = (
+                    f"Time: {sp['proposed_time']}, "
+                    f"Attending: {len(sp['attending'])}/{sp['total_attendees']}, "
+                    f"Conflicts: {sp['conflict_count']}, "
+                    f"Tentative: {len(sp.get('tentative', []))}, "
+                    f"Score: {sp['rank_score']}"
+                )
+                sp["ranking_rationale"] = llm_svc.call_simple(
+                    context_str, system=SLOT_RATIONALE_PROMPT, max_tokens=60
+                )
+            except Exception:
+                pass  # fall back silently — rationale stays absent
+
     response_payload = {
         "message": (
             f"Found {len(slot_proposals)} real meeting slots via Graph"
@@ -670,6 +691,7 @@ def send_meeting_invite_graph(
     cycle_repo=Depends(get_cycle_repo),
     attendee_repo=Depends(get_attendee_repo),
     slot_repo=Depends(get_slot_repo),
+    llm_svc: LLMService = Depends(get_llm_service),
 ):
     """
     Create a real Teams meeting event and send invites to all cycle attendees.
@@ -781,12 +803,28 @@ def send_meeting_invite_graph(
     if workflow_engine.can_transition(cycle.get("workflow_state", ""), "MEETING_SCHEDULED"):
         workflow_engine.transition_to(cycle, "MEETING_SCHEDULED", cycle_repo, now)
 
+    # AI augmentation: generate a short personalised message for each attendee
+    # who had a conflict on the approved slot, so the coordinator can send
+    # follow-up nudges. Falls back silently if LLM is disabled or call fails.
+    nudge_messages: dict[str, str] = {}
+    if llm_svc.is_enabled:
+        for name in slot.get("conflicts", []):
+            try:
+                nudge_messages[name] = llm_svc.call_simple(
+                    f"Attendee name: {name}, Meeting time: {slot.get('proposed_time', '')}",
+                    system=CONFLICT_NUDGE_SYSTEM_PROMPT,
+                    max_tokens=120,
+                )
+            except Exception:
+                pass  # fall back silently — nudge stays absent for this person
+
     response_payload = {
         "message": "Teams meeting created and invites sent",
         "event_id": result.get("id"),
         "teams_meeting_url": result.get("onlineMeetingUrl"),
         "web_link": result.get("webLink"),
         "slot_id": payload.slot_id,
+        "nudge_messages": nudge_messages,
     }
     logger.info(
         "send_meeting_invite_graph success — cycleId=%s, event_id=%s, attendees=%d",

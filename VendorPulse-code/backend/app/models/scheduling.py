@@ -85,6 +85,8 @@ class SlotProposal(BaseModel):
     slot_id: str
     cycle_id: str
     proposed_time: str   # ISO-8601 datetime
+    proposed_time_zone: Optional[str] = None
+    duration_minutes: Optional[int] = None
     organiser_available: bool
     exec_sponsor_available: bool
     rank_score: float
@@ -93,9 +95,11 @@ class SlotProposal(BaseModel):
     total_attendees: int
     conflict_count: int
     attending: list[str]   # display names
+    tentative: list[str] = []
     conflicts: list[str]   # display names
     approved_by: Optional[str] = None
     approved_at: Optional[str] = None
+    ranking_rationale: Optional[str] = None   # LLM-generated plain-English explanation
 
 
 # ---------------------------------------------------------------------------

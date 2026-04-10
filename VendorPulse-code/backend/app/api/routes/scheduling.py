@@ -21,10 +21,13 @@ from app.dependencies import (
     get_attendee_repo,
     get_agent_run_repo,
     get_cycle_repo,
+    get_llm_service,
     get_scheduling_service,
     get_slot_repo,
     get_vendor_repo,
 )
+from app.services.llm_service import LLMService
+from app.utils.prompts import INVITE_DRAFT_SYSTEM_PROMPT
 from app.models.scheduling import (
     ApproveSlotRequest,
     CycleAttendeeCreate,
@@ -386,12 +389,36 @@ def approve_slot(
     payload: ApproveSlotRequest,
     svc: SchedulingService = Depends(get_scheduling_service),
     cycle_repo=Depends(get_cycle_repo),
+    llm_svc: LLMService = Depends(get_llm_service),
 ):
     logger.info("approve_slot called — cycleId=%s, slotId=%s, approved_by=%s", cycleId, slotId, payload.approved_by)
     # Require at least AVAILABILITY_COLLECTED before approving a slot
     cycle = _get_cycle_or_404(cycleId, cycle_repo)
     _check_workflow_state(cycle, "AVAILABILITY_COLLECTED")
     result = svc.approve_slot(cycleId, slotId, payload.approved_by, time_zone=payload.time_zone)
+
+    # AI augmentation: replace the static invite draft with a personalised LLM-generated version.
+    # Falls back silently to the existing static draft if LLM is disabled or the call fails.
+    if llm_svc.is_enabled and result.data and result.data.get("invite_draft"):
+        try:
+            draft = result.data["invite_draft"]
+            user_prompt = (
+                f"Vendor: {cycle.get('vendor_name', 'the vendor')}, "
+                f"Quarter: {cycle.get('quarter', '')} {cycle.get('year', '')}, "
+                f"Meeting time: {draft.get('proposed_time', '')}, "
+                f"Timezone: {payload.time_zone or 'UTC'}, "
+                f"Attending: {', '.join(draft.get('attending', []))}"
+            )
+            draft["draft_body"] = llm_svc.call_simple(
+                user_prompt, system=INVITE_DRAFT_SYSTEM_PROMPT, max_tokens=300
+            )
+            draft["draft_subject"] = (
+                f"VendorPulse QBR — {cycle.get('vendor_name', 'Vendor')} "
+                f"{cycle.get('quarter', '')} {cycle.get('year', '')} Governance Meeting"
+            )
+        except Exception:
+            pass  # fall back to static draft
+
     logger.info("approve_slot success — cycleId=%s, slotId=%s", cycleId, slotId)
     return result
 

@@ -1,4 +1,4 @@
-﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock } from 'lucide-react'
+﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock, Sparkles } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { SlotProposal } from '@/types/scheduling.types'
 
@@ -165,6 +165,14 @@ export default function SlotCard({
           />
         </div>
       </div>
+
+      {/* AI rationale */}
+      {slot.ranking_rationale && (
+        <p className="mb-4 text-xs italic text-slate-500 dark:text-slate-400 flex items-start gap-1.5">
+          <Sparkles size={11} className="shrink-0 mt-0.5 text-indigo-400" />
+          {slot.ranking_rationale}
+        </p>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">

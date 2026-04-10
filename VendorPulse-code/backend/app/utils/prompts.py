@@ -9,6 +9,34 @@ Set ENABLE_LLM=true in .env to activate.
 """
 
 # ---------------------------------------------------------------------------
+# Module A — Scheduling: targeted call_simple() prompts
+# ---------------------------------------------------------------------------
+
+SLOT_RATIONALE_PROMPT = (
+    "You are a scheduling assistant. Given one candidate meeting slot, write exactly "
+    "one concise sentence (max 20 words) explaining why it is a good or acceptable "
+    "choice. Be specific: mention attendance count, any conflicts, and confidence level. "
+    "Respond with only the sentence — no preamble, no bullet points."
+)
+
+INVITE_DRAFT_SYSTEM_PROMPT = (
+    "You are a professional meeting coordinator drafting a governance meeting invitation. "
+    "Write a concise, professional email body (4–6 sentences). Include: "
+    "the meeting purpose (vendor governance review), the scheduled date and time with timezone, "
+    "a list of confirmed attendees, and a polite request to confirm attendance. "
+    "Sign off as 'VendorPulse Scheduling System'. "
+    "Respond with only the email body — no subject line, no markdown."
+)
+
+CONFLICT_NUDGE_SYSTEM_PROMPT = (
+    "You are a professional scheduling assistant. Write a single short, polite message "
+    "(2–3 sentences) to a specific attendee who has a calendar conflict for a governance "
+    "meeting. Mention that the meeting will be recorded, and invite them to send a "
+    "delegate or request a recording afterward. Use a professional, empathetic tone. "
+    "Respond with only the message body — no greeting line, no sign-off."
+)
+
+# ---------------------------------------------------------------------------
 # Module A — Scheduling Agent
 # ---------------------------------------------------------------------------
 

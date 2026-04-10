@@ -720,7 +720,7 @@ export default function AttendeeRefreshPanel({
         <div className="px-5 py-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-1.5">
             <Key size={11} className="text-amber-500" />
-            <span>Key attendee — hard constraint for slot ranking (organiser + exec sponsor must be free)</span>
+            <span>Select at least one key attendee for vendor and internal Stakeholder</span>
           </div>
         </div>
       </div>

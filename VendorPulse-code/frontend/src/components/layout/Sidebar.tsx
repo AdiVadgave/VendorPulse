@@ -84,7 +84,7 @@ export default function Sidebar() {
           {!sidebarCollapsed && (
             <div className="min-w-0">
               <p className="font-semibold text-slate-900 dark:text-white text-sm leading-tight">
-                VendorPulse
+                Zen-VendorPulse
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                 Governance Platform

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ClipboardList, Send, Bell, Clock, AlertTriangle, CheckCircle2, ExternalLink } from 'lucide-react'
+import { ClipboardList, Send, Bell, Clock, AlertTriangle, CheckCircle2, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
@@ -27,6 +27,63 @@ const REMINDER_SCHEDULE = [
 const TOTAL_PARAMETERS = SCORECARD_STRUCTURE.reduce((sum, c) => sum + c.parameters.length, 0)
 
 const GOOGLE_AUTH_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/google`
+
+function CategoriesDropdown() {
+  const [open, setOpen] = useState(false)
+  const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({})
+
+  function toggleCat(key: string) {
+    setExpandedCats((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+      >
+        <span>Scorecard Categories &amp; Parameters</span>
+        <span className="flex items-center gap-1">
+          <span className="text-[10px] font-normal normal-case">{SCORECARD_STRUCTURE.length} categories &middot; {TOTAL_PARAMETERS} params</span>
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-2">
+          {SCORECARD_STRUCTURE.map((cat) => {
+            const isExpanded = expandedCats[cat.key] ?? true
+            return (
+              <div key={cat.key} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => toggleCat(cat.key)}
+                  className="w-full flex items-center justify-between p-3 hover:bg-slate-100 dark:hover:bg-slate-700/30 transition-colors"
+                >
+                  <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    {cat.label}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs text-slate-400">
+                    {cat.parameters.length} params
+                    {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <div className="px-3 pb-3 space-y-0.5">
+                    {cat.parameters.map((param) => (
+                      <div key={param.key} className="flex items-center justify-between text-xs py-0.5 px-2">
+                        <span className="text-slate-600 dark:text-slate-400">{param.label}</span>
+                        <span className="text-slate-400 dark:text-slate-500">1&ndash;5</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, alreadyDispatched = false }: Props) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(alreadyDispatched ? 'complete' : 'idle')
@@ -124,29 +181,8 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
           ))}
         </div>
 
-        {/* Scorecard categories with parameters */}
-        <div className="mb-4">
-          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
-            Scorecard Categories &amp; Parameters
-          </p>
-          <div className="space-y-2">
-            {SCORECARD_STRUCTURE.map((cat) => (
-              <div key={cat.key} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">
-                  {cat.label}
-                </p>
-                <div className="space-y-0.5">
-                  {cat.parameters.map((param) => (
-                    <div key={param.key} className="flex items-center justify-between text-xs py-0.5 px-2">
-                      <span className="text-slate-600 dark:text-slate-400">{param.label}</span>
-                      <span className="text-slate-400 dark:text-slate-500">1&ndash;5</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Scorecard categories with parameters — collapsible */}
+        <CategoriesDropdown />
 
         {/* Key Attendees */}
         <div className="mb-4">
@@ -166,7 +202,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
                       ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
                       : 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
                   }`}>
-                    {a.type}
+                    {a.type === 'Internal Stakeholder' ? 'Internal Stakeholder (Shell)' : `Vendor (${a.organisation || 'Zensar'})`}
                   </span>
                   <span className="text-xs text-slate-400 dark:text-slate-500">{a.role.replace(/_/g, ' ')}</span>
                 </div>

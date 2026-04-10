@@ -1,0 +1,372 @@
+
+<style>
+  .plan-wrap { font-family: var(--font-sans); padding: 1rem 0; color: var(--color-text-primary); }
+  .section-title { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .05em; margin: 1.5rem 0 .5rem; }
+  .product-header { display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem; }
+  .product-badge { background: #3C3489; color: #EEEDFE; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px; }
+  .product-title { font-size: 20px; font-weight: 500; }
+  .product-sub { font-size: 13px; color: var(--color-text-secondary); margin-top: 2px; }
+
+  /* Gantt */
+  .gantt-wrap { overflow-x: auto; }
+  .gantt { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .gantt th { padding: 6px 8px; font-weight: 500; color: var(--color-text-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); text-align: center; white-space: nowrap; }
+  .gantt th.left { text-align: left; min-width: 120px; }
+  .gantt td { padding: 4px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); vertical-align: middle; }
+  .gantt td.role { font-size: 11px; color: var(--color-text-secondary); white-space: nowrap; }
+  .gantt td.task { font-size: 12px; }
+  .bar-cell { text-align: center; }
+  .bar { display: inline-block; height: 18px; border-radius: 4px; vertical-align: middle; min-width: 6px; }
+
+  /* Color map per role */
+  .bar-arch   { background: #534AB7; }
+  .bar-d1     { background: #0F6E56; }
+  .bar-d2     { background: #993C1D; }
+  .bar-d3     { background: #185FA5; }
+  .bar-d4     { background: #854F0B; }
+  .bar-d5     { background: #993556; }
+  .bar-shared { background: #5F5E5A; }
+
+  /* Milestone row */
+  .milestone-row td { background: var(--color-background-secondary); }
+  .milestone-label { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); }
+
+  /* Feature cards */
+  .feat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: .5rem; }
+  .feat-card { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 10px 12px; }
+  .feat-card-title { font-size: 12px; font-weight: 500; margin-bottom: 4px; }
+  .feat-card-dev { font-size: 11px; color: var(--color-text-secondary); }
+  .feat-tag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 10px; margin-top: 5px; }
+  .tag-ai     { background: #CECBF6; color: #26215C; }
+  .tag-ui     { background: #9FE1CB; color: #04342C; }
+  .tag-data   { background: #B5D4F4; color: #042C53; }
+  .tag-infra  { background: #D3D1C7; color: #2C2C2A; }
+
+  /* Team legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: .5rem; }
+  .leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--color-text-secondary); }
+  .leg-dot  { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  /* Risk table */
+  .risk-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .risk-table th { text-align: left; padding: 5px 8px; font-weight: 500; color: var(--color-text-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .risk-table td { padding: 5px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .pill { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+  .pill-h { background: #F7C1C1; color: #501313; }
+  .pill-m { background: #FAC775; color: #412402; }
+  .pill-l { background: #C0DD97; color: #173404; }
+</style>
+
+<div class="plan-wrap">
+  <div class="product-header">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="product-title">VendorPulse</div>
+        <div class="product-badge">by Zensar</div>
+      </div>
+      <div class="product-sub">Agentic AI for Governance Cycle Automation · 1-week prototype sprint</div>
+    </div>
+  </div>
+
+  <!-- Team Legend -->
+  <div class="section-title">Team</div>
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:#534AB7"></div>Architect (solution design, integration oversight)</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#0F6E56"></div>Dev 1 — Meeting & scheduling agent</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#993C1D"></div>Dev 2 — Scorecard collection & validation agent</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#185FA5"></div>Dev 3 — Meeting support & minutes agent</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#854F0B"></div>Dev 4 — Cross-cycle memory & analytics</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#993556"></div>Dev 5 — Dashboard UI & demo shell</div>
+  </div>
+
+  <!-- Gantt -->
+  <div class="section-title">5-day Gantt (Mon–Fri)</div>
+  <div class="gantt-wrap">
+  <table class="gantt">
+    <thead>
+      <tr>
+        <th class="left">Task / Owner</th>
+        <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <!-- Day 0 row -->
+      <tr class="milestone-row"><td colspan="6" class="milestone-label">▸ Day 1 — Architecture & scaffolding</td></tr>
+
+      <tr>
+        <td class="task">Tech stack decision, repo setup, mock data schema</td>
+        <td class="role">Architect</td>
+        <td class="bar-cell"><div class="bar bar-arch" style="width:100%"></div></td>
+        <td></td><td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Calendar / email mock API + auth stubs</td>
+        <td class="role">Dev 1</td>
+        <td class="bar-cell"><div class="bar bar-d1" style="width:100%"></div></td>
+        <td></td><td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Scorecard data model + form skeleton</td>
+        <td class="role">Dev 2</td>
+        <td class="bar-cell"><div class="bar bar-d2" style="width:100%"></div></td>
+        <td></td><td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">LLM prompt design (minutes, action items)</td>
+        <td class="role">Dev 3</td>
+        <td class="bar-cell"><div class="bar bar-d3" style="width:100%"></div></td>
+        <td></td><td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Historical data store + trend logic outline</td>
+        <td class="role">Dev 4</td>
+        <td class="bar-cell"><div class="bar bar-d4" style="width:100%"></div></td>
+        <td></td><td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">UI framework, routing, component library</td>
+        <td class="role">Dev 5</td>
+        <td class="bar-cell"><div class="bar bar-d5" style="width:100%"></div></td>
+        <td></td><td></td><td></td><td></td>
+      </tr>
+
+      <!-- Day 2 -->
+      <tr class="milestone-row"><td colspan="6" class="milestone-label">▸ Day 2 — Core agent build</td></tr>
+
+      <tr>
+        <td class="task">Agent orchestration layer, tool-call wiring</td>
+        <td class="role">Architect</td>
+        <td></td>
+        <td class="bar-cell"><div class="bar bar-arch" style="width:100%"></div></td>
+        <td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Scheduling agent: availability check + invite draft</td>
+        <td class="role">Dev 1</td>
+        <td></td>
+        <td class="bar-cell"><div class="bar bar-d1" style="width:100%"></div></td>
+        <td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Scorecard reminder + input form (dynamic)</td>
+        <td class="role">Dev 2</td>
+        <td></td>
+        <td class="bar-cell"><div class="bar bar-d2" style="width:100%"></div></td>
+        <td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Real-time meeting agent (objection capture, Q&A log)</td>
+        <td class="role">Dev 3</td>
+        <td></td>
+        <td class="bar-cell"><div class="bar bar-d3" style="width:100%"></div></td>
+        <td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Trend engine: score delta, anomaly detection</td>
+        <td class="role">Dev 4</td>
+        <td></td>
+        <td class="bar-cell"><div class="bar bar-d4" style="width:100%"></div></td>
+        <td></td><td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Dashboard skeleton: navigation + card grid</td>
+        <td class="role">Dev 5</td>
+        <td></td>
+        <td class="bar-cell"><div class="bar bar-d5" style="width:100%"></div></td>
+        <td></td><td></td><td></td>
+      </tr>
+
+      <!-- Day 3 -->
+      <tr class="milestone-row"><td colspan="6" class="milestone-label">▸ Day 3 — Integration & feature completion</td></tr>
+
+      <tr>
+        <td class="task">End-to-end flow review, integration debug</td>
+        <td class="role">Architect</td>
+        <td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-arch" style="width:100%"></div></td>
+        <td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Attendee update form + confirmation tracking</td>
+        <td class="role">Dev 1</td>
+        <td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-d1" style="width:100%"></div></td>
+        <td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Validation engine: flag outliers, auto-averaging</td>
+        <td class="role">Dev 2</td>
+        <td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-d2" style="width:100%"></div></td>
+        <td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Auto-minutes + action log generator (LLM)</td>
+        <td class="role">Dev 3</td>
+        <td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-d3" style="width:100%"></div></td>
+        <td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Recurring issue detection, historical comparison</td>
+        <td class="role">Dev 4</td>
+        <td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-d4" style="width:100%"></div></td>
+        <td></td><td></td>
+      </tr>
+      <tr>
+        <td class="task">Wireup modules to dashboard, live data feeds</td>
+        <td class="role">Dev 5</td>
+        <td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-d5" style="width:100%"></div></td>
+        <td></td><td></td>
+      </tr>
+
+      <!-- Day 4 -->
+      <tr class="milestone-row"><td colspan="6" class="milestone-label">▸ Day 4 — Demo narrative & polish</td></tr>
+
+      <tr>
+        <td class="task">Demo script, story arc, slide deck outline</td>
+        <td class="role">Architect</td>
+        <td></td><td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-arch" style="width:100%"></div></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td class="task">Demo flow: scheduling walkthrough, invite preview</td>
+        <td class="role">Dev 1 + Dev 5</td>
+        <td></td><td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-shared" style="width:100%"></div></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td class="task">Demo flow: scorecard input → validation → report</td>
+        <td class="role">Dev 2 + Dev 5</td>
+        <td></td><td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-shared" style="width:100%"></div></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td class="task">Demo flow: live meeting → minutes → action log</td>
+        <td class="role">Dev 3 + Dev 5</td>
+        <td></td><td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-shared" style="width:100%"></div></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td class="task">Demo flow: trend view, recurring issue alert</td>
+        <td class="role">Dev 4 + Dev 5</td>
+        <td></td><td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-shared" style="width:100%"></div></td>
+        <td></td>
+      </tr>
+
+      <!-- Day 5 -->
+      <tr class="milestone-row"><td colspan="6" class="milestone-label">▸ Day 5 — Dry-run & handoff</td></tr>
+      <tr>
+        <td class="task">Full team dry-run, bug fixes, narrative refinement</td>
+        <td class="role">All</td>
+        <td></td><td></td><td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-shared" style="width:100%"></div></td>
+      </tr>
+      <tr>
+        <td class="task">Deploy to demo environment, access tested</td>
+        <td class="role">Architect</td>
+        <td></td><td></td><td></td><td></td>
+        <td class="bar-cell"><div class="bar bar-arch" style="width:100%"></div></td>
+      </tr>
+
+    </tbody>
+  </table>
+  </div>
+
+  <!-- Feature modules -->
+  <div class="section-title">Product modules (what the demo covers)</div>
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-card-title">Scheduling agent</div>
+      <div class="feat-card-dev">Dev 1</div>
+      <div>Attendee refresh form, availability polling, optimal slot ranking, invite draft & confirmation tracker.</div>
+      <div><span class="feat-tag tag-ai">AI agent</span></div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-title">Scorecard collector</div>
+      <div class="feat-card-dev">Dev 2</div>
+      <div>Dynamic input forms, automated reminders, outlier flagging, auto-averaging, consolidated report.</div>
+      <div><span class="feat-tag tag-ai">AI agent</span></div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-title">Meeting co-pilot</div>
+      <div class="feat-card-dev">Dev 3</div>
+      <div>Real-time Q&A / objection capture, auto-generated minutes, live action log with owners.</div>
+      <div><span class="feat-tag tag-ai">AI agent</span></div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-title">Memory & trends</div>
+      <div class="feat-card-dev">Dev 4</div>
+      <div>Cross-cycle score history, trend charts, recurring issue alerts, vendor improvement tracking.</div>
+      <div><span class="feat-tag tag-data">Analytics</span></div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-title">Vendor prep brief</div>
+      <div class="feat-card-dev">Dev 3</div>
+      <div>Summarise scorecard inputs, draft Shell response options to vendor pushback, track unresolved items.</div>
+      <div><span class="feat-tag tag-ai">AI agent</span></div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-title">Dashboard shell</div>
+      <div class="feat-card-dev">Dev 5</div>
+      <div>Unified UI tying all modules: cycle status overview, notification centre, quick-action buttons.</div>
+      <div><span class="feat-tag tag-ui">UI / UX</span></div>
+    </div>
+  </div>
+
+  <!-- Tech stack -->
+  <div class="section-title">Recommended tech stack (vibe-coding friendly)</div>
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-card-title">Frontend</div>
+      <div>React + Vite · Tailwind CSS · shadcn/ui · Cursor / Copilot for scaffolding</div>
+      <div><span class="feat-tag tag-ui">UI</span></div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-title">Agent layer</div>
+      <div>LangChain or LlamaIndex · Claude / GPT-4o via API · Tool-call pattern for each agent</div>
+      <div><span class="feat-tag tag-ai">AI agent</span></div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-title">Backend</div>
+      <div>FastAPI (Python) or Node/Express · Mock calendar & email via JSON fixtures</div>
+      <div><span class="feat-tag tag-infra">Infra</span></div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-title">Data</div>
+      <div>SQLite / Supabase for scorecard history · Seed with 3–4 cycles of realistic mock data</div>
+      <div><span class="feat-tag tag-data">Data</span></div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-card-title">Deploy</div>
+      <div>Vercel (frontend) + Railway/Render (backend) · One URL for the demo day</div>
+      <div><span class="feat-tag tag-infra">Infra</span></div>
+    </div>
+  </div>
+
+  <!-- Risks -->
+  <div class="section-title">Key risks & mitigations</div>
+  <table class="risk-table">
+    <thead><tr><th>Risk</th><th>Impact</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>LLM output quality / hallucination in minutes</td><td><span class="pill pill-h">High</span></td><td>Use structured prompts with JSON output mode; human review step in demo flow</td></tr>
+      <tr><td>Integration complexity eats build time</td><td><span class="pill pill-h">High</span></td><td>Use mock APIs / fixtures from Day 1; no real calendar/email needed for demo</td></tr>
+      <tr><td>Demo data looks fake or thin</td><td><span class="pill pill-m">Med</span></td><td>Pre-seed 4 realistic EGB cycles with plausible vendor names and scores</td></tr>
+      <tr><td>Team velocity gaps (vibe coding ramp-up)</td><td><span class="pill pill-m">Med</span></td><td>Architect unblocks daily; Copilot-generated boilerplate reviewed before merge</td></tr>
+      <tr><td>Scope creep beyond 5 modules</td><td><span class="pill pill-l">Low</span></td><td>Architect owns scope freeze after Day 1; contract management module excluded from MVP</td></tr>
+    </tbody>
+  </table>
+
+  <!-- MVP scope note -->
+  <div style="margin-top:1.25rem;padding:10px 14px;background:var(--color-background-secondary);border-left:2px solid #534AB7;border-radius:0 var(--border-radius-md) var(--border-radius-md) 0;font-size:12px;color:var(--color-text-secondary);">
+    <strong style="color:var(--color-text-primary);font-weight:500;">MVP scope note:</strong> Contract management (Section B) is deliberately excluded from this prototype. It requires deeper integration design and legal workflow nuance — position it as Phase 2 in the Shell presentation.
+  </div>
+</div>

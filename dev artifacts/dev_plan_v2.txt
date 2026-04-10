@@ -1,0 +1,624 @@
+VendorPulse MVP — Development Plan
+1. What We Are Building
+VendorPulse is not a chatbot. It is:
+
+A workflow orchestrator that moves a governance cycle through defined stages
+A document intelligence layer that generates briefs, minutes, and responses using Claude
+A governance memory system that stores historical data across cycles
+A human-approved automation assistant — AI suggests, humans approve
+The product automates Shell's EGB/QBR governance cycle end-to-end: from scheduling through post-meeting analytics.
+
+2. Tech Stack
+Layer	Technology
+Frontend	React 18 + Vite + Tailwind CSS + shadcn/ui
+Charts	Recharts
+Forms	React Hook Form + Zod
+Client State	Zustand
+Server State	TanStack Query (React Query v5)
+Backend	FastAPI (Python 3.11+)
+ORM	SQLAlchemy 2.0 (async)
+DB	SQLite (file-based, easy to reset for demo)
+Migrations	Alembic
+Validation	Pydantic v2
+AI	Anthropic Claude API (tool-calling pattern)
+Mock Services	In-process Python classes (no external deps)
+3. Project Folder Structure
+
+vendorpulse/
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── ui/              # shadcn/ui primitives (Button, Card, Badge, etc.)
+│   │   │   ├── modules/         # Per-module components
+│   │   │   │   ├── scheduling/
+│   │   │   │   ├── scorecard/
+│   │   │   │   ├── alignment/
+│   │   │   │   ├── vendor-prep/
+│   │   │   │   ├── meeting/
+│   │   │   │   └── analytics/
+│   │   │   └── shared/          # ApprovalPanel, AgentStatusBadge, ActionLog, etc.
+│   │   ├── pages/
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── CycleDetail.tsx  # main workspace per cycle
+│   │   │   └── Analytics.tsx
+│   │   ├── api/                 # typed API client functions (axios/fetch wrappers)
+│   │   ├── store/               # Zustand stores
+│   │   ├── hooks/               # custom hooks per module
+│   │   └── types/               # shared TypeScript types matching backend schemas
+│   └── vite.config.ts
+│
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── api/
+│   │   │   └── routes/
+│   │   │       ├── cycles.py
+│   │   │       ├── scheduling.py
+│   │   │       ├── scorecard.py
+│   │   │       ├── alignment.py
+│   │   │       ├── vendor_prep.py
+│   │   │       ├── meeting.py
+│   │   │       └── analytics.py
+│   │   ├── core/
+│   │   │   ├── config.py
+│   │   │   ├── database.py
+│   │   │   └── workflow_engine.py   # state machine
+│   │   ├── agents/
+│   │   │   ├── base_agent.py        # shared agent pattern
+│   │   │   ├── scheduling_agent.py
+│   │   │   ├── scorecard_agent.py
+│   │   │   ├── alignment_agent.py
+│   │   │   ├── vendor_prep_agent.py
+│   │   │   ├── meeting_agent.py
+│   │   │   └── memory_agent.py
+│   │   ├── services/
+│   │   │   ├── mock/
+│   │   │   │   ├── mock_calendar.py
+│   │   │   │   ├── mock_email.py
+│   │   │   │   ├── mock_forms.py
+│   │   │   │   └── mock_notifications.py
+│   │   │   ├── llm_service.py       # Claude API wrapper
+│   │   │   ├── analytics_service.py
+│   │   │   └── validation_service.py
+│   │   ├── models/                  # SQLAlchemy ORM models
+│   │   ├── schemas/                 # Pydantic request/response schemas
+│   │   ├── repositories/            # DB access layer
+│   │   └── utils/
+│   │       ├── prompts.py           # all LLM prompt templates
+│   │       ├── slot_ranking.py      # deterministic slot ranker
+│   │       ├── score_diff.py        # cycle comparison engine
+│   │       └── text_parsing.py      # action item extractor
+│   ├── seed/
+│   │   └── seed_data.py
+│   ├── alembic/
+│   └── tests/
+└── docs/
+4. Data Model
+Core Tables
+vendors
+
+
+vendor_id, name, category, status, created_at
+Seed: NovaTech Services, CoreSystems Ltd, Meridian IT
+
+governance_cycles
+
+
+cycle_id, vendor_id, cycle_name, quarter, year,
+workflow_state (enum), created_at, updated_at
+Workflow state drives everything (see Section 6).
+
+stakeholders
+
+
+stakeholder_id, name, email, role, organisation (Shell/Vendor),
+is_active, created_at
+Roles: VMO_COORDINATOR, INTERNAL_LEAD, VENDOR_MANAGER, EGB_CHAIR, TECHNICAL_LEAD, COMMERCIAL_LEAD
+
+cycle_attendees
+
+
+id, cycle_id, stakeholder_id,
+is_confirmed, is_key (organiser/exec = true),
+replacement_name, replacement_email,
+invite_status (PENDING/ACCEPTED/DECLINED)
+scorecards
+
+
+scorecard_id, cycle_id, stakeholder_id, vendor_id,
+category (enum), score (1-5), comment,
+is_valid, validation_flags (JSON), submitted_at
+Categories: DELIVERY_QUALITY, SLA_COMPLIANCE, INNOVATION, COMMUNICATION, VALUE_FOR_MONEY
+
+meetings
+
+
+meeting_id, cycle_id, meeting_type (INTERNAL_ALIGNMENT/VENDOR_PREP/EGB_QBR),
+scheduled_time, location_or_dial_in,
+invite_sent_at, minutes_generated_at
+meeting_notes
+
+
+note_id, meeting_id, note_type (QUESTION/OBJECTION/DECISION/APPRECIATION/ACTION),
+content, raised_by_role, timestamp, is_actioned
+action_items
+
+
+action_id, cycle_id, source_module (ALIGNMENT/VENDOR_PREP/MEETING),
+description, owner, due_date, status (OPEN/IN_PROGRESS/CLOSED),
+created_at
+issues
+
+
+issue_id, vendor_id, description,
+first_seen_cycle_id, occurrences (int),
+status (OPEN/RESOLVED), last_owner, last_updated
+Powers the recurring issue detection alert.
+
+face_off_model
+
+
+id, cycle_id, position_number, shell_name, shell_role,
+vendor_name, vendor_role
+notifications
+
+
+notification_id, cycle_id, stakeholder_id,
+type (SCORECARD_REQUEST/REMINDER_1/REMINDER_2/ESCALATION/INVITE),
+content (text), sent_at, status
+agent_runs
+
+
+run_id, agent_name, cycle_id,
+input_payload (JSON), output_payload (JSON),
+status (SUCCESS/FAILED/PENDING),
+error_message, triggered_by, created_at
+Every agent action is logged here — critical for traceability.
+
+slot_proposals
+
+
+slot_id, cycle_id, proposed_time, timezone,
+organiser_available (bool), exec_sponsor_available (bool),
+attendee_availability (JSON: {stakeholder_id: bool}),
+rank_score, is_approved
+5. Standard Agent Response Contract
+Every agent returns this exact shape — the frontend never parses raw AI text:
+
+
+{
+  "status": "success | failed | partial | pending_approval",
+  "agent": "scheduling_agent",
+  "summary": "Attendee refresh form generated for 9 stakeholders.",
+  "data": {},
+  "warnings": ["3 stakeholders have not responded"],
+  "next_actions": ["APPROVE_INVITE", "SEND_REMINDER"],
+  "requires_approval": true,
+  "run_id": "uuid"
+}
+6. Workflow Engine (State Machine)
+The workflow_state on each cycle only moves forward and only when prerequisites are met.
+
+
+CYCLE_CREATED
+    → ATTENDEE_REFRESH_SENT       (trigger: start scheduling)
+    → AVAILABILITY_COLLECTED      (trigger: all key attendees responded)
+    → MEETING_SCHEDULED           (trigger: organiser approved a slot)
+    → SCORECARD_REQUEST_SENT      (trigger: organiser approves dispatch)
+    → SCORECARD_COLLECTION        (trigger: at least 1 submission received)
+    → SCORECARD_COMPILED          (trigger: deadline passed or manual compile)
+    → INTERNAL_ALIGNMENT          (trigger: scorecard compiled)
+    → VENDOR_PREP                 (trigger: alignment complete)
+    → MEETING_IN_PROGRESS         (trigger: meeting started)
+    → POST_MEETING_COMPLETE       (trigger: minutes approved)
+    → ARCHIVED                    (trigger: manual)
+Enforcement rules (examples):
+
+Cannot send vendor brief before scorecard is compiled
+Cannot generate meeting minutes before meeting notes exist
+Cannot move to ARCHIVED without at least one approved action item log
+The workflow engine is a simple Python class with can_transition(from_state, to_state) and transition(cycle_id, to_state). No LLM involvement here — pure deterministic logic.
+
+7. Mock Services
+All four services implement a clean interface so they can be swapped for real integrations later.
+
+MockCalendarService
+
+Returns fixture availability for each stakeholder based on seeded schedule data
+get_availability(stakeholder_ids, date_range) → {stakeholder_id: [free_slots]}
+No external calls, no auth
+MockEmailService
+
+Stores all "sent" emails to a mock_outbox table
+Returns a preview object the UI can render
+send(to, subject, body, attachments) → {preview_id, html_preview}
+UI shows: "This email will be sent to X. [Approve] [Edit] [Cancel]"
+MockFormService
+
+Generates a form link that opens a modal in the UI (not a real external form)
+Simulates async responses coming back by pre-populating response data from seed
+create_form(type, fields, recipients) → {form_id, submission_url}
+MockNotificationService
+
+Writes to the notifications table
+In the UI, a "Notifications" panel shows all pending/sent notifications
+send_reminder(stakeholder_id, cycle_id, reminder_level) → notification record
+8. Claude API Agent Pattern
+Each agent follows this exact pattern:
+
+
+class BaseAgent:
+    def __init__(self, db_session, cycle_id):
+        self.db = db_session
+        self.cycle_id = cycle_id
+        self.client = anthropic.Anthropic()
+
+    async def run(self, user_action: str, context: dict) -> AgentResponse:
+        # 1. Build tool definitions
+        tools = self._get_tools()
+        # 2. Call Claude with system prompt + tools
+        # 3. Execute tool calls as Claude requests them
+        # 4. Return structured AgentResponse
+        # 5. Log to agent_runs table
+What uses LLM (Claude):
+
+Generating vendor brief narrative from scored data
+Drafting 2-3 pushback response options
+Extracting structured action items from pasted meeting notes
+Generating meeting minutes from captured note items
+Generating leadership briefing card insights
+Generating change highlight summary
+What is deterministic (no LLM):
+
+Slot ranking algorithm (hard/soft constraints scoring)
+Score validation (range check, comment requirement)
+Outlier detection (standard deviation calculation)
+Score averaging and compilation
+Cycle-to-cycle score diff (simple delta calculation)
+Alignment flag detection (spread >= 1.5 threshold)
+Recurring issue detection (count query on issues table)
+Trend chart data (pure DB aggregation)
+Workflow state transitions
+This split keeps the system reliable and avoids hallucination in critical paths.
+
+9. Module-by-Module Plan
+Module A — Meeting Scheduling & Coordination
+Goal: Go from a blank cycle to a confirmed meeting invite with tracked RSVPs.
+
+Steps:
+
+User clicks "Start New Cycle" → creates cycle record in CYCLE_CREATED state
+System loads attendees from previous cycle
+Scheduling agent generates attendee refresh form (rendered as modal in UI — no external form)
+User reviews and dispatches → state moves to ATTENDEE_REFRESH_SENT
+Mock responses come in (simulated by pre-seeded data + a "Simulate Responses" button)
+Attendee list is updated; new names added, old ones replaced
+MockCalendarService returns availability for all confirmed attendees
+Deterministic slot ranker runs:
+Organiser + exec sponsor = hard constraint (slot invalid if they're blocked)
+Score = (confirmed attendees / total) × 100 − conflict penalty − timezone penalty
+Top 3 ranked slots shown with attendance breakdown table
+Organiser clicks "Approve This Slot"
+Invite draft is generated and shown in approval panel
+"Send Invite" (mock) → MockEmailService stores to outbox → notification table updated
+Confirmation tracker panel shows ACCEPTED / DECLINED / PENDING per attendee
+Auto-nudge message generated for non-responders (shown in notifications)
+UI components needed:
+
+AttendeeRefreshPanel — shows current list, refresh form, response status
+SlotRankingPanel — 3 slot cards with breakdown
+InviteApprovalPanel — email preview + approve/reject
+ConfirmationTracker — live table of RSVPs
+Module B — Scorecard Collection & Validation
+Goal: Collect, validate, flag outliers, and compile a final scorecard.
+
+Steps:
+
+Triggered after meeting is scheduled (can run in parallel)
+Scorecard request form generated for each stakeholder (5 categories, 1–5 scale, comment field)
+Dispatch shown in approval panel → "Send to 8 stakeholders" → MockEmailService
+State moves to SCORECARD_REQUEST_SENT
+Reminder schedule runs automatically (visible in notifications panel):
+T-5 days: informational tone
+T-2 days: deadline notice tone
+T-day: escalation flag to organiser
+Each submission goes through validation service (deterministic):
+All required fields present?
+Score 1–5 range?
+Score = 1 or 5 → comment required
+Flag if score deviates > 1.5 std deviations from group average (re-checked after each batch)
+Invalid submissions trigger a correction request back to submitter
+Scorecard collection status panel shows per-stakeholder submission status
+On deadline or manual trigger → "Compile Scorecard"
+Final scorecard table generated: per-stakeholder scores + averages + outlier flags
+State moves to SCORECARD_COMPILED
+Validation rules (in validation_service.py, purely deterministic):
+
+
+score < 1 or score > 5       → ERROR: out of range
+score == 1 or 5, no comment  → ERROR: comment required
+|score - group_avg| > 1.5σ   → WARNING: outlier flagged
+category missing              → ERROR: required field
+UI components:
+
+ScorecardDispatchPanel — approval for sending requests
+SubmissionTracker — per-stakeholder status table with reminder history
+CompiledScorecardTable — final table with outlier badges + averages row
+Module C — Internal Alignment Call Support
+Goal: Prepare the internal team for the EGB/QBR by surfacing what changed and capturing actions.
+
+Steps:
+
+Triggered after scorecard is compiled
+Deterministic score diff engine compares current cycle vs previous cycle:
+Delta ≥ 1 point per category → highlighted change
+New issues not in prior cycle → flagged as new
+Alignment flag engine: for each category, check spread between stakeholder scores:
+Spread ≥ 1.5 points → generate flag question (e.g. "Technical Lead scores Delivery Quality at 2; Commercial Lead at 4 — resolve before vendor call")
+Claude generates a 3-5 bullet "What Changed" summary from the diff data
+Face-off model panel shows current Shell/Vendor role-name mappings
+User can update any position via inline edit form
+During/after internal call, coordinator pastes notes into text area
+Claude extracts structured action items: description, owner (if mentioned), due date (if mentioned)
+Action items added to action log with status = OPEN
+State moves to INTERNAL_ALIGNMENT
+UI components:
+
+ChangeHighlightsPanel — bullet list of deltas, new issues
+AlignmentFlagsPanel — list of divergence flags with prompt questions
+FaceOffModelEditor — numbered grid, inline editable
+NotesInputPanel — paste area + "Extract Actions" button
+ActionLog — shared component used across modules C, D, E
+Module D — Vendor Prep Call Support
+Goal: Give the Shell team a ready vendor brief and manage pushback professionally.
+
+Steps:
+
+Triggered after internal alignment is complete
+Claude generates vendor brief using tool calls to fetch:
+Current scorecard averages
+Category-level stakeholder comments
+Previous cycle scores (for trend context)
+Open action items from Module C
+Output: structured brief with Overall Score, Per-Category Ratings + Rationale, Key Concerns, Positive Areas
+Brief shown in approval panel — human reviews before vendor sees it
+Vendor objection/pushback input form (free text + category selector):
+Categories: DATA_DISPUTE, PROCESS_CONCERN, RESOURCE_CONSTRAINT, SCOPE_DISAGREEMENT, OTHER
+For each pushback item, Claude drafts 3 response options:
+Factual stance (data-backed, no judgment)
+Neutral collaborative stance
+Firm escalation stance
+Items requiring legal/commercial review are flagged and excluded from AI drafts
+Shell team reviews responses, selects or edits one
+Unresolved items go to issue tracker with status = OPEN
+Face-off model update and notes/action capture (same as Module C)
+State moves to VENDOR_PREP
+UI components:
+
+VendorBriefPanel — structured brief card with approval button
+PushbackInput — form to add objections
+PushbackResponseCards — 3-option cards with select/edit
+UnresolvedItemTracker — table with status badges
+ActionLog — reused from Module C
+Module E — EGB/QBR Live Meeting Support
+Goal: Real-time capture during the meeting + automatic post-meeting artefact generation.
+
+Steps:
+
+At meeting start, show trend briefing card (generated by Module F's trend engine):
+3-cycle score movement per category
+Most improved / most concerning areas
+Predicted areas of vendor challenge (based on recurring issues)
+Live capture panel — facilitator logs items during meeting:
+QUESTION (+ who raised it)
+OBJECTION (+ category)
+DECISION
+APPRECIATION
+ACTION ITEM
+Each item is timestamped
+Alternatively: paste full meeting transcript → Claude parses into structured items
+"Generate Minutes" button → Claude produces:
+Meeting metadata (date, attendees, cycle ref)
+Executive summary (2-3 sentences)
+Agenda summaries
+Key decisions list
+Q&A and objection log
+Action items extracted
+Minutes shown in approval panel
+On approval, action items merged with existing open items from Modules C and D
+Minutes available for copy-to-clipboard export
+State moves to POST_MEETING_COMPLETE
+UI components:
+
+MeetingBriefingCard — pre-meeting summary (from analytics engine)
+LiveCapturePanel — type-selector + text input + timestamped feed
+TranscriptInput — paste-and-parse alternate mode
+MeetingMinutesViewer — structured minutes display + copy button
+ActionLog — final merged action log
+Module F — Cross-Cycle Memory & Analytics Dashboard
+Goal: Persistent institutional memory, trend charts, recurring issue detection, leadership briefs.
+
+Steps (data-driven, no real-time actions needed):
+
+All historical cycles auto-stored (4 pre-seeded cycles + any new cycles created)
+Trend chart: per-vendor per-category line chart over cycles (Recharts LineChart)
+Radar/spider chart: current vs previous cycle overall vendor health (Recharts RadarChart)
+Cross-vendor bar chart: current cycle scores side-by-side
+Recurring issue detection (deterministic):
+Query issues table for same vendor: occurrences >= 2 AND status = OPEN
+Display as red alert cards: "Delivery Quality flagged for 3 consecutive cycles — Vendor X"
+Leadership briefing card (Claude-generated):
+Input: trend data + recurring issues + prior unresolved items + prior agreements
+Output: Vendor Trajectory (improving/stable/declining) + Unresolved Recurring Issues + Prior Commitments Requiring Follow-up + Recommended Focus Areas
+Charts and brief accessible from main Analytics page and from within each cycle's module
+UI components:
+
+TrendLineChart — per-vendor per-category over time
+RadarChart — current vs prior cycle
+CrossVendorComparison — bar chart current cycle
+RecurringIssueAlerts — alert card list
+LeadershipBriefCard — 4-section card with "Generate" button
+10. Frontend Architecture
+Page Structure
+
+/ (Dashboard)
+    → Active cycles overview
+    → Start New Cycle CTA
+    → Recent agent runs log
+    → Quick access to each vendor
+
+/cycles/:cycleId  (Cycle Workspace — tabbed layout)
+    Tab: Overview     → workflow state progress bar, summary cards
+    Tab: Scheduling   → Module A
+    Tab: Scorecard    → Module B
+    Tab: Alignment    → Module C
+    Tab: Vendor Prep  → Module D
+    Tab: Meeting      → Module E
+    Tab: Actions      → Unified action log across all modules
+
+/analytics  (Analytics Dashboard)
+    → Module F charts and briefings
+    → Vendor selector
+    → Leadership brief generator
+Shared UI Patterns
+Approval Panel — used everywhere a "send" action exists:
+
+
+┌─────────────────────────────────────┐
+│ [Agent summary text]               │
+│ Preview: [content to be sent]      │
+│ Recipients: Alex, Priya, Marcus    │
+│ [Approve & Send]  [Edit]  [Cancel] │
+└─────────────────────────────────────┘
+Workflow Progress Bar — always visible in cycle workspace:
+
+
+[Scheduling ✓] → [Scorecard ✓] → [Alignment ●] → [Vendor Prep] → [Meeting] → [Complete]
+Agent Status Badge — shows on every module tab:
+
+IDLE / RUNNING / AWAITING_APPROVAL / COMPLETE / FAILED
+Action Log — shared component: table with filter by source module, status badges, owner, due date
+
+11. Key API Endpoints
+Method	Path	Purpose
+POST	/api/cycles	Create new governance cycle
+GET	/api/cycles	List all cycles
+GET	/api/cycles/{id}	Cycle detail + workflow state
+POST	/api/cycles/{id}/scheduling/start	Trigger attendee refresh
+POST	/api/cycles/{id}/scheduling/simulate-responses	Demo: simulate attendee responses
+GET	/api/cycles/{id}/scheduling/slots	Get ranked slot proposals
+POST	/api/cycles/{id}/scheduling/approve-slot	Approve a slot
+POST	/api/cycles/{id}/scorecard/send-request	Dispatch scorecard forms
+POST	/api/cycles/{id}/scorecard/submit	Submit a score (mock form)
+POST	/api/cycles/{id}/scorecard/compile	Compile final scorecard
+GET	/api/cycles/{id}/scorecard/compiled	Get compiled scorecard
+GET	/api/cycles/{id}/alignment/changes	Get score diffs vs prior cycle
+GET	/api/cycles/{id}/alignment/flags	Get alignment divergence flags
+POST	/api/cycles/{id}/alignment/extract-actions	Extract actions from notes
+POST	/api/cycles/{id}/vendor-prep/generate-brief	Generate vendor brief (AI)
+POST	/api/cycles/{id}/vendor-prep/pushback	Add pushback item
+GET	/api/cycles/{id}/vendor-prep/pushback/{pid}/responses	Get AI response drafts
+POST	/api/cycles/{id}/meeting/capture	Add live meeting note
+POST	/api/cycles/{id}/meeting/generate-minutes	Generate minutes (AI)
+GET	/api/cycles/{id}/meeting/minutes	Get generated minutes
+GET	/api/analytics/vendors/{vid}/trends	Score trends over cycles
+GET	/api/analytics/recurring-issues	All recurring issue alerts
+POST	/api/analytics/cycles/{id}/leadership-brief	Generate leadership brief (AI)
+GET	/api/agent-runs	Full agent execution log
+12. Seed Data Strategy
+The seed data must tell a story — not just fill tables:
+
+3 Vendors:
+
+NovaTech Services — improving trajectory (scores trending up over 4 cycles)
+CoreSystems Ltd — declining trajectory (scores dropping, 2 recurring issues)
+Meridian IT — stable/flat
+4 Historical Cycles: Q1–Q4 of previous year, 5 categories each
+
+Scoring pattern:
+
+
+Category              | NovaTech | CoreSystems | Meridian
+----------------------|----------|-------------|--------
+Delivery Quality      | 3→3→4→4  | 4→3→3→2     | 3→3→3→3
+SLA Compliance        | 2→3→3→4  | 3→3→2→2     | 4→4→3→4
+Innovation            | 3→3→4→5  | 3→2→2→2     | 3→3→3→3
+Communication         | 3→4→4→4  | 4→3→3→2     | 3→3→4→3
+Value for Money       | 3→3→3→4  | 4→4→3→3     | 3→3→3→3
+Recurring issues:
+
+CoreSystems: "Delivery Quality consistently below SLA threshold" — flagged Q2, Q3, Q4
+CoreSystems: "Delayed invoice submissions" — flagged Q3, Q4
+NovaTech: "Innovation KPIs not aligned to contract commitments" — flagged Q2, Q3 (resolved Q4)
+8–10 stakeholders seeded across Shell VMO, IDT, and vendor teams
+
+Pre-seeded action items from historical cycles (some OPEN, some CLOSED) to make the action log realistic.
+
+13. Build Sequence (5-Day Sprint)
+Day 1 — Foundation
+Project scaffolding (Vite + FastAPI)
+Database setup (SQLAlchemy + Alembic migrations for all tables)
+Seed data script (4 cycles, 3 vendors, realistic scores)
+Workflow engine (state machine class)
+Base agent pattern + agent_runs logging
+Mock services (calendar, email, forms, notifications)
+Global API contract (base response schema)
+Frontend: routing, layout shell, Tailwind config, shadcn/ui setup
+Day 2 — Module A + B (Scheduling + Scorecard)
+Scheduling agent: attendee refresh, slot ranking (deterministic), invite draft
+Scheduling UI: AttendeeRefreshPanel, SlotRankingPanel, InviteApprovalPanel, ConfirmationTracker
+Scorecard agent: validation service (deterministic), compilation, averaging
+Scorecard UI: DispatchPanel, SubmissionTracker, CompiledScorecardTable
+"Simulate Responses" demo button for both modules
+Day 3 — Module C + D (Alignment + Vendor Prep)
+Score diff engine (deterministic, no LLM)
+Alignment flag engine (deterministic spread check)
+Claude integration for action item extraction from notes
+Claude integration for vendor brief generation
+Claude integration for pushback response drafting (3 options)
+Alignment UI: ChangeHighlights, AlignmentFlags, FaceOffModelEditor, NotesInput
+Vendor Prep UI: VendorBriefPanel, PushbackInput, ResponseCards, UnresolvedTracker
+Shared ActionLog component
+Day 4 — Module E + F (Meeting + Analytics)
+Live capture panel with note types
+Transcript paste + Claude parsing
+Claude meeting minutes generation
+Trend charts (Recharts): line, radar, bar
+Recurring issue detection (deterministic DB query)
+Claude leadership brief generation
+Meeting UI: BriefingCard, LiveCapturePanel, MinutesViewer
+Analytics page: all 3 chart types + RecurringIssueAlerts + LeadershipBriefCard
+Day 5 — Integration + Demo Hardening
+End-to-end workflow state machine wiring (all 6 modules connected)
+8-step demo narrative walkthrough — test and fix
+Approval panels reviewed for all send actions
+Agent execution trace log page
+Error handling: LLM retry, graceful fallback text, empty states
+Demo data review — make sure the story reads correctly
+Performance check: all responses < 5 seconds
+Deploy to public URL (Render / Railway / Fly.io for FastAPI; Vercel/Netlify for React)
+14. Demo Flow Alignment
+The 8-step demo narrative maps directly to the build:
+
+Step	Module	Trigger	What Demo Shows
+1	A	"Start New Cycle" button	Attendee refresh form dispatched
+2	A	"Simulate Responses" button	Agent ranks top 3 slots, organiser approves
+3	B	"Send Scorecard Request"	Dispatch panel + reminder schedule visible
+4	B	"Simulate Submissions"	Outlier flagged in compiled scorecard
+5	C	Auto-triggered	Change highlights + one alignment flag raised
+6	D	"Generate Vendor Brief"	Brief generated → pushback entered → 3 response drafts
+7	E	"Start Meeting"	Notes captured → minutes generated → action log shown
+8	F	Navigate to Analytics	Recurring issue alert fires → leadership brief generated
+Every step has a button/action trigger — no manual data entry during the demo.
+
+15. Key Design Decisions
+Decision	Rationale
+SQLite over Postgres	Zero-config, file-based, perfect for demo; schema-compatible with Postgres for production
+Tool-calling agents over prompt-only	Better control, lower hallucination, easier debugging
+Deterministic logic for validation and ranking	Explainable to a Shell executive audience; no AI "black box" for critical paths
+Mock services behind interfaces	Swap to Outlook/Teams API later without rewriting agent code
+Single JSON contract (AgentResponse)	Frontend never guesses shape; stable even as AI outputs evolve
+Human approval before every "send" action	Builds client trust; legally important for governance context
+Workflow state machine	Prevents impossible state combinations (can't generate minutes without notes)
+Seed data tells a story	Demo analytics only work if the data has deliberate trends and recurring issues
+This plan covers the full product — all 6 modules, all 4 personas, the complete 8-step demo narrative, and the technical architecture to make it reliable and presentation-ready. Ready to start implementation whenever you give the go-ahead.

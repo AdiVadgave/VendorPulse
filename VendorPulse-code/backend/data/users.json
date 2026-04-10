@@ -1,0 +1,182 @@
+[
+  {
+    "userId": "u1",
+    "name": "Alex Thompson",
+    "email": "alex.thompson@zensar.com",
+    "gmail": "alexthompson@gmail.com",
+    "role": "VMO_COORDINATOR",
+    "organisation": "Zensar VMO",
+    "avatar": "AT"
+  },
+  {
+    "userId": "u2",
+    "name": "Sarah Chen",
+    "email": "sarah.chen@zensar.com",
+    "gmail": "sarahchen@gmail.com",
+    "role": "EGB_CHAIR",
+    "organisation": "Zensar IDT",
+    "avatar": "SC"
+  },
+  {
+    "userId": "u3",
+    "name": "Priya Sharma",
+    "email": "priya.sharma@zensar.com",
+    "gmail": "priyasharma@gmail.com",
+    "role": "INTERNAL_LEAD",
+    "organisation": "Zensar IDT",
+    "avatar": "PS"
+  },
+  {
+    "userId": "u4",
+    "name": "Marcus Williams",
+    "email": "marcus.williams@zensar.com",
+    "gmail": "",
+    "role": "VENDOR_MANAGER",
+    "organisation": "Zensar VMO",
+    "avatar": "MW"
+  },
+  {
+    "userId": "u5",
+    "name": "James O'Brien",
+    "email": "james.obrien@zensar.com",
+    "gmail": "",
+    "role": "TECHNICAL_LEAD",
+    "organisation": "Zensar IDT",
+    "avatar": "JO"
+  },
+  {
+    "userId": "u6",
+    "name": "Emma Davies",
+    "email": "emma.davies@zensar.com",
+    "gmail": "",
+    "role": "COMMERCIAL_LEAD",
+    "organisation": "Zensar VMO",
+    "avatar": "ED"
+  },
+  {
+    "userId": "u7",
+    "name": "Raj Patel",
+    "email": "raj.patel@novatech.com",
+    "gmail": "",
+    "role": "VENDOR_MANAGER",
+    "organisation": "NovaTech Services",
+    "avatar": "RP"
+  },
+  {
+    "userId": "u8",
+    "name": "Lisa Wang",
+    "email": "lisa.wang@novatech.com",
+    "gmail": "",
+    "role": "TECHNICAL_LEAD",
+    "organisation": "NovaTech Services",
+    "avatar": "LW"
+  },
+  {
+    "userId": "u9",
+    "name": "David Kim",
+    "email": "david.kim@novatech.com",
+    "gmail": "",
+    "role": "COMMERCIAL_LEAD",
+    "organisation": "NovaTech Services",
+    "avatar": "DK"
+  },
+  {
+    "userId": "u10",
+    "name": "Tom Baker",
+    "email": "tom.baker@zensar.com",
+    "gmail": "",
+    "role": "VENDOR_MANAGER",
+    "organisation": "Zensar VMO",
+    "avatar": "TB"
+  },
+  {
+    "userId": "u11",
+    "name": "Nina Okafor",
+    "email": "nina.okafor@coresystems.com",
+    "gmail": "",
+    "role": "Member",
+    "organisation": "CoreSystems Ltd",
+    "avatar": "NO"
+  },
+  {
+    "userId": "u12",
+    "name": "Liam Nguyen",
+    "email": "liam.nguyen@meridianit.com",
+    "gmail": "",
+    "role": "Member",
+    "organisation": "Meridian IT",
+    "avatar": "LN"
+  },
+  {
+    "userId": "u13",
+    "name": "Sophie Hart",
+    "email": "sophie.hart@zensar.com",
+    "gmail": "",
+    "role": "INTERNAL_LEAD",
+    "organisation": "Zensar IDT",
+    "avatar": "SH"
+  },
+  {
+    "userId": "u14",
+    "name": "Carlos Rivera",
+    "email": "carlos.rivera@novatech.com",
+    "gmail": "",
+    "role": "Member",
+    "organisation": "NovaTech Services",
+    "avatar": "CR"
+  },
+  {
+    "userId": "u15",
+    "name": "Aisha Malik",
+    "email": "aisha.malik@coresystems.com",
+    "gmail": "",
+    "role": "Member",
+    "organisation": "CoreSystems Ltd",
+    "avatar": "AM"
+  },
+  {
+    "userId": "u16",
+    "name": "Anup Kesarwani",
+    "email": "anup.kesarwani@zensar.com",
+    "gmail": "anupkesarwani3537@gmail.com",
+    "role": "INTERNAL_LEAD",
+    "organisation": "Zensar VMO",
+    "avatar": "AK"
+  },
+  {
+    "userId": "u17",
+    "name": "Kanishk Punekar",
+    "email": "kanishk.punekar@zensar.com",
+    "gmail": "kanishkpunekar54@gmail.com",
+    "role": "TECHNICAL_LEAD",
+    "organisation": "Zensar IDT",
+    "avatar": "KP"
+  },
+  {
+    "userId": "u18",
+    "name": "Aditya Vadgave",
+    "email": "aditya.vadgave@zensar.com",
+    "gmail": "adivadgave16@gmail.com",
+    "role": "VENDOR_MANAGER",
+    "organisation": "Zensar VMO",
+    "avatar": "AV"
+  },
+  {
+    "userId": "u19",
+    "name": "Vivek Kulkarni",
+    "email": "v.kulkarni3@zensar.com",
+    "gmail": "vivekkulkarni@gmail.com",
+    "role": "VENDOR_MANAGER",
+    "organisation": "Zensar VMO",
+    "avatar": "VK"
+  },
+  {
+    "userId": "u20",
+    "name": "abhishek Biyani",
+    "email": "abhishek.biyani@zensar.com",
+    "gmail": "",
+    "role": "VENDOR_MANAGER",
+    "organisation": "Derivco VMO",
+    "avatar": "AB"
+  }
+]

@@ -1,0 +1,87 @@
+# VendorPulse (root)
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*.swn
+
+#claude
+**/claude/
+.claude/
+
+/google sheet
+Backend/google sheet/*
+client_secret.json
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# JetBrains
+.idea/
+
+# Visual Studio / MSBuild
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.ntvs*
+*.njsproj
+*.sln
+
+# --- Node / JS ---
+**/node_modules/
+**/logs/
+**/*.log
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+**/lerna-debug.log*
+
+# Vite / build outputs
+**/dist/
+**/dist-ssr/
+**/.vite/
+**/*.local
+
+# TypeScript
+**/*.tsbuildinfo
+
+# dotenv (do not commit secrets)
+**/.env
+**/.env.*
+!**/.env.example
+
+# --- Python (repo has scripts in dev artifacts) ---
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.venv/
+**/venv/
+
+# --- Backend common (if/when used) ---
+# Java / Maven / Gradle
+**/target/
+**/.gradle/
+
+# .NET
+**/bin/
+**/obj/
+
+# --- Project-specific ---
+/dev artifacts/.ipynb_checkpoints/
+VendorPulse-code/backend/data/cycles.json
+VendorPulse-code/backend/data/slot_proposals.json
+VendorPulse-code/backend/data/google_token.json
+VendorPulse-code/backend/data/attendees.json
+VendorPulse-code/backend/data/cycles.json
+VendorPulse-code/backend/data/scorecard_responses.json
+VendorPulse-code/backend/data/slot_proposals.json

@@ -1,0 +1,189 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.wrap{padding:1rem 0}
+.legend{display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.leg{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--color-text-secondary)}
+.ldot{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+.phase-block{margin-bottom:10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden}
+.phase-header{display:flex;align-items:center;gap:12px;padding:11px 16px;cursor:pointer;user-select:none}
+.phase-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;flex-shrink:0}
+.phase-title{font-size:14px;font-weight:500;color:var(--color-text-primary);flex:1}
+.phase-sub{font-size:12px;color:var(--color-text-secondary)}
+.phase-toggle{font-size:12px;color:var(--color-text-secondary);transition:transform .2s}
+.phase-toggle.open{transform:rotate(90deg)}
+.phase-steps{background:var(--color-background-secondary)}
+.step{display:grid;grid-template-columns:36px 1fr 1fr 200px;gap:0;border-top:0.5px solid var(--color-border-tertiary)}
+.step-num{padding:12px 0 12px 16px;font-size:12px;font-weight:500;color:var(--color-text-secondary);display:flex;align-items:flex-start;padding-top:14px}
+.step-action{padding:12px 14px;border-left:0.5px solid var(--color-border-tertiary)}
+.step-who{font-size:11px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:5px}
+.step-desc{font-size:12px;color:var(--color-text-primary);line-height:1.6}
+.step-detail{padding:12px 14px;border-left:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);line-height:1.6}
+.step-hitl{padding:12px 14px;border-left:0.5px solid var(--color-border-tertiary);font-size:12px;line-height:1.6}
+.col-hdr{display:grid;grid-template-columns:36px 1fr 1fr 200px;gap:0;background:var(--color-background-primary);border-top:0.5px solid var(--color-border-tertiary);padding:7px 0}
+.col-h{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.04em}
+.col-h:nth-child(1){padding-left:16px}
+.col-h:nth-child(2){padding-left:14px;border-left:0.5px solid var(--color-border-tertiary)}
+.col-h:nth-child(3){padding-left:14px;border-left:0.5px solid var(--color-border-tertiary)}
+.col-h:nth-child(4){padding-left:14px;border-left:0.5px solid var(--color-border-tertiary)}
+.tag-agent{background:#EEEDFE;color:#3C3489;padding:2px 7px;border-radius:10px;font-size:10px}
+.tag-human{background:#E1F5EE;color:#085041;padding:2px 7px;border-radius:10px;font-size:10px}
+.tag-both{background:#E6F1FB;color:#0C447C;padding:2px 7px;border-radius:10px;font-size:10px}
+.hitl-yes{color:var(--color-text-warning);font-weight:500}
+.hitl-no{color:var(--color-text-secondary)}
+.hitl-badge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10px;font-weight:500;margin-bottom:4px}
+.hb-gate{background:#FAEEDA;color:#633806}
+.hb-review{background:#E6F1FB;color:#0C447C}
+.hb-none{background:var(--color-background-primary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-tertiary)}
+.ph-a{background:#E6F1FB;color:#0C447C}
+.ph-b{background:#E1F5EE;color:#085041}
+.ph-c{background:#EEEDFE;color:#3C3489}
+.ph-d{background:#FAEEDA;color:#633806}
+.ph-e{background:#FCEBEB;color:#791F1F}
+.ph-f{background:#EAF3DE;color:#27500A}
+</style>
+
+<div class="wrap">
+  <div class="legend">
+    <div class="leg"><div class="ldot" style="background:#EEEDFE;border:1px solid #AFA9EC"></div>Agent does it automatically</div>
+    <div class="leg"><div class="ldot" style="background:#E1F5EE;border:1px solid #5DCAA5"></div>Human does it</div>
+    <div class="leg"><div class="ldot" style="background:#E6F1FB;border:1px solid #85B7EB"></div>Agent + Human together</div>
+    <div class="ldot" style="background:#FAEEDA;border:1px solid #EF9F27;border-radius:3px;width:14px;height:14px"></div><span style="font-size:13px;color:var(--color-text-secondary)">Approval gate — human must approve before agent proceeds</span>
+    <div class="ldot" style="background:#E6F1FB;border:1px solid #85B7EB;border-radius:3px;width:14px;height:14px"></div><span style="font-size:13px;color:var(--color-text-secondary)">Review checkpoint — human reviews AI output, can edit</span>
+  </div>
+
+  <div id="phases"></div>
+</div>
+
+<script>
+const phases = [
+  {
+    id:"A", label:"Phase 1 — Meeting Scheduling", sub:"Triggered at cycle start · Module A",
+    icon:"ph-a",
+    steps:[
+      {n:"1", who:"agent", action:"Agent sends attendee refresh form", detail:"Reads last meeting's attendee list and automatically sends each person a short form: 'Are you still on the team? If not, who replaces you?'", hitl:"none", hitlNote:"Fully automatic — no human input needed to trigger this."},
+      {n:"2", who:"both", action:"Attendees fill in the form", detail:"Each attendee responds to the refresh form. The agent collects all responses and updates the attendee list automatically.", hitl:"review", hitlNote:"Human: attendees respond to the form. Agent: consolidates responses and flags anyone who didn't reply."},
+      {n:"3", who:"agent", action:"Agent checks calendars and proposes slots", detail:"Looks at the organiser's and exec sponsor's availability first (hard rule), then finds when the biggest group is free. Generates the top 3 meeting slot options ranked by attendance.", hitl:"none", hitlNote:"Fully automatic — no calendar access needed from the user."},
+      {n:"4", who:"human", action:"Organiser picks the best slot", detail:"The coordinator sees the ranked options with a breakdown of who can and can't attend each slot. They pick one and click 'Approve'.", hitl:"gate", hitlNote:"APPROVAL GATE — agent will not send any invite until a human explicitly approves the slot."},
+      {n:"5", who:"agent", action:"Agent generates and sends the invite", detail:"Drafts a standard invite with the subject, body, attendee list, and dial-in details. Dispatches to all attendees.", hitl:"review", hitlNote:"Human can optionally edit the invite text before it is sent."},
+      {n:"6", who:"agent", action:"Agent tracks confirmations and nudges", detail:"Monitors who has accepted or declined. Automatically sends a follow-up nudge to anyone who hasn't responded within 24 hours.", hitl:"none", hitlNote:"Fully automatic — no human action required unless an escalation is triggered."},
+    ]
+  },
+  {
+    id:"B", label:"Phase 2 — Scorecard Collection", sub:"Runs 2–3 weeks before EGB meeting · Module B",
+    icon:"ph-b",
+    steps:[
+      {n:"7", who:"agent", action:"Agent sends scorecard request to all stakeholders", detail:"Dispatches a scorecard input form to every relevant person: VMO Coordinator, Technical Lead, Commercial Lead, and others. Form includes vendor name, categories, scoring scale, and deadline.", hitl:"none", hitlNote:"Fully automatic — coordinator just sets the deadline once per cycle."},
+      {n:"8", who:"human", action:"Stakeholders fill in their scores", detail:"Each stakeholder scores the vendor across 5 categories (1–5 scale) and adds comments, especially for extreme scores.", hitl:"none", hitlNote:"Human task — the agent cannot score on behalf of humans."},
+      {n:"9", who:"agent", action:"Agent sends reminders on schedule", detail:"Day 5 before deadline: informational reminder. Day 2: firm deadline notice. Day of: escalation flag to the coordinator. Tone automatically gets firmer with each round.", hitl:"none", hitlNote:"Fully automatic. Coordinator is alerted if someone is overdue but doesn't need to chase manually."},
+      {n:"10", who:"agent", action:"Agent validates every submission", detail:"Checks: no blanks, all scores within 1–5 range, and any score at the extremes (1 or 5) must have a written comment. Flags outliers where one score is far from the group average.", hitl:"none", hitlNote:"Fully automatic. Agent sends a correction request back to the submitter if validation fails."},
+      {n:"11", who:"human", action:"Coordinator reviews outlier flags", detail:"The coordinator sees flagged scores highlighted in the compiled scorecard. They decide whether to accept the score as valid or request a correction.", hitl:"review", hitlNote:"REVIEW CHECKPOINT — human reviews AI-flagged outliers before the scorecard is considered final."},
+      {n:"12", who:"agent", action:"Agent compiles the final scorecard", detail:"Averages all valid scores per category, produces the consolidated scorecard, and makes it available for the alignment call.", hitl:"none", hitlNote:"Fully automatic once the coordinator has reviewed the outlier flags."},
+    ]
+  },
+  {
+    id:"C", label:"Phase 3 — Internal Alignment Call", sub:"1 week before EGB meeting · Module C",
+    icon:"ph-c",
+    steps:[
+      {n:"13", who:"agent", action:"Agent generates a 'what changed' summary", detail:"Compares this cycle's scores against last cycle. Highlights categories that moved by 1+ point, new issues that weren't there before, and areas where the internal team's scores vary widely.", hitl:"none", hitlNote:"Fully automatic — briefing is ready before the call starts."},
+      {n:"14", who:"agent", action:"Agent flags internal alignment gaps", detail:"Identifies where two stakeholders scored the same category more than 1.5 points apart and generates a prompt question for the team to resolve (e.g., 'Tech Lead and Commercial Lead differ by 2 points on Delivery Quality — agree on rationale before vendor call').", hitl:"none", hitlNote:"Fully automatic — agent produces the questions, humans answer them in the call."},
+      {n:"15", who:"human", action:"Internal team runs the alignment call", detail:"The team discusses the flagged gaps, agrees on Shell's unified position for each category, and records any decisions.", hitl:"none", hitlNote:"Entirely a human activity — the agent listens (if note input is provided) but does not participate in the discussion."},
+      {n:"16", who:"both", action:"Notes pasted in — agent structures action items", detail:"Coordinator pastes raw meeting notes into the system. Agent parses them and produces a structured action log with owner, description, and due date extracted automatically.", hitl:"review", hitlNote:"REVIEW CHECKPOINT — coordinator reviews the structured action log and corrects any misattributed owners or dates before saving."},
+      {n:"17", who:"both", action:"Face-off model updated via form", detail:"Agent lists all current name/role pairs in numbered boxes. Coordinator fills in a simple form to update whoever has changed. Agent applies changes instantly.", hitl:"gate", hitlNote:"APPROVAL GATE — agent updates the official face-off model only after coordinator confirms the form."},
+    ]
+  },
+  {
+    id:"D", label:"Phase 4 — Vendor Prep Call", sub:"2–3 days before EGB meeting · Module D",
+    icon:"ph-d",
+    steps:[
+      {n:"18", who:"agent", action:"Agent generates vendor brief", detail:"Produces a ready-to-use document: overall score and trend, key concerns to raise, positive areas to acknowledge, with rationale drawn automatically from stakeholder comments.", hitl:"review", hitlNote:"REVIEW CHECKPOINT — Vendor Manager reviews and approves the brief before it is shared with the vendor or used in the prep call."},
+      {n:"19", who:"both", action:"Vendor prep call happens", detail:"Shell team (Vendor Manager + Commercial Lead) runs the call with the vendor. Vendor presents their side, raises objections, and asks questions.", hitl:"none", hitlNote:"Entirely a human activity — the agent is not present in the call itself."},
+      {n:"20", who:"human", action:"Vendor Manager logs pushback items", detail:"After or during the call, the coordinator logs each vendor objection or question into the system — selecting a category (data dispute, process concern, resource constraint, etc.).", hitl:"none", hitlNote:"Human logs the items — agent does not infer them from a recording."},
+      {n:"21", who:"agent", action:"Agent drafts response options", detail:"For each logged pushback item, the agent generates 2–3 response options: a neutral/fact-based response, an acknowledge-and-investigate response, and a firm/escalation response.", hitl:"review", hitlNote:"REVIEW CHECKPOINT — Shell team selects the preferred response option. They can also edit the draft before it is used."},
+      {n:"22", who:"agent", action:"Agent tracks unresolved items", detail:"Any pushback item not resolved during the prep call is automatically logged as an open issue with the date, who raised it, and what kind of follow-up is needed (e.g., legal review, procurement sign-off).", hitl:"none", hitlNote:"Fully automatic — unresolved items appear on the dashboard until a human marks them resolved."},
+    ]
+  },
+  {
+    id:"E", label:"Phase 5 — EGB / QBR Live Meeting", sub:"Meeting day · Module E",
+    icon:"ph-e",
+    steps:[
+      {n:"23", who:"agent", action:"Agent prepares a pre-meeting trend briefing", detail:"Before the meeting starts, the system shows the EGB Chair a 1-page summary: score movement over the last 3 cycles, most improved and most concerning areas, and predicted topics the vendor is likely to challenge.", hitl:"none", hitlNote:"Fully automatic — briefing is visible on the dashboard before the meeting begins."},
+      {n:"24", who:"human", action:"EGB Chair runs the governance meeting", detail:"The Chair leads the meeting. Vendor and Shell teams discuss performance, raise concerns, acknowledge achievements, and make decisions.", hitl:"none", hitlNote:"The meeting itself is a human activity — the agent supports but does not run it."},
+      {n:"25", who:"both", action:"Note-taker logs items in real time", detail:"A designated note-taker (usually the coordinator) types or pastes each question, objection, appreciation, and decision into the live capture panel, selecting the type for each entry.", hitl:"none", hitlNote:"Human types the items — agent categorises, timestamps, and stores them instantly."},
+      {n:"26", who:"agent", action:"Agent auto-generates meeting minutes", detail:"Using all captured items, the agent drafts structured minutes: meeting metadata, an executive summary, agenda item summaries, decisions made, and the full Q&A log.", hitl:"review", hitlNote:"REVIEW CHECKPOINT — EGB Chair or coordinator reviews the draft minutes and approves or edits before they are circulated."},
+      {n:"27", who:"agent", action:"Agent produces the action log", detail:"Extracts all action items from the captured entries, assigns owners and due dates (from what was mentioned), and merges with any open items from Phases 3 and 4.", hitl:"review", hitlNote:"REVIEW CHECKPOINT — coordinator reviews the action log, corrects owners and dates, then marks it as finalised."},
+    ]
+  },
+  {
+    id:"F", label:"Phase 6 — Post-Meeting & Ongoing Memory", sub:"After every cycle · Module F",
+    icon:"ph-f",
+    steps:[
+      {n:"28", who:"agent", action:"Agent stores all cycle data", detail:"Saves scores, comments, actions, decisions, and attendee data from this cycle into the historical store. Data is available immediately for the next cycle's analysis.", hitl:"none", hitlNote:"Fully automatic — no human action needed."},
+      {n:"29", who:"agent", action:"Agent detects recurring issues", detail:"Scans the historical action log. If the same issue appears in 2 or more cycles without a resolved status, it surfaces as an alert on the dashboard with the first date raised and the number of occurrences.", hitl:"none", hitlNote:"Fully automatic — agent monitors across cycles continuously."},
+      {n:"30", who:"human", action:"Leadership reviews the trends dashboard", detail:"The EGB Chair or VMO Lead opens the trends dashboard to review vendor trajectories, cross-vendor comparisons, and recurring issue alerts — informing their strategy for the next cycle.", hitl:"none", hitlNote:"Human activity — the agent presents the data, humans interpret and decide."},
+      {n:"31", who:"agent", action:"Agent generates leadership briefing card", detail:"Before the next cycle's EGB meeting, the agent automatically produces a briefing card for the Chair: vendor trajectory, unresolved recurring issues, prior commitments requiring follow-up, and recommended focus areas.", hitl:"review", hitlNote:"REVIEW CHECKPOINT — Chair reviews the briefing card and can annotate it before the meeting."},
+      {n:"32", who:"human", action:"Team decides next cycle actions", detail:"Based on the trend data and briefing, the VMO team agrees on whether to escalate a vendor, trigger a penalty clause review, or acknowledge improvements — feeding directly into the next cycle's Phase 1.", hitl:"none", hitlNote:"Strategic decisions always remain with humans. The agent provides data and recommendations but never makes governance decisions."},
+    ]
+  }
+];
+
+const phaseColors = {A:"#E6F1FB",B:"#E1F5EE",C:"#EEEDFE",D:"#FAEEDA",E:"#FCEBEB",F:"#EAF3DE"};
+const phaseIconColors = {A:"ph-a",B:"ph-b",C:"ph-c",D:"ph-d",E:"ph-e",F:"ph-f"};
+
+function whoLabel(w){
+  if(w==="agent") return '<span class="tag-agent">Agent</span>';
+  if(w==="human") return '<span class="tag-human">Human</span>';
+  return '<span class="tag-both">Agent + Human</span>';
+}
+function hitlBadge(h){
+  if(h==="gate") return '<div class="hitl-badge hb-gate">Approval gate</div>';
+  if(h==="review") return '<div class="hitl-badge hb-review">Review checkpoint</div>';
+  return '<div class="hitl-badge hb-none">Automatic</div>';
+}
+
+const container = document.getElementById("phases");
+phases.forEach(ph => {
+  const div = document.createElement("div");
+  div.className = "phase-block";
+  const bg = phaseColors[ph.id];
+  div.innerHTML = `
+    <div class="phase-header" onclick="toggle('ph${ph.id}')" style="background:${bg}20">
+      <div class="phase-icon ${ph.icon}" style="background:${bg};color:var(--color-text-primary)">${ph.id}</div>
+      <div style="flex:1">
+        <div class="phase-title">${ph.label}</div>
+        <div class="phase-sub">${ph.sub}</div>
+      </div>
+      <div class="phase-toggle open" id="arr${ph.id}">&#9654;</div>
+    </div>
+    <div class="phase-steps" id="ph${ph.id}">
+      <div class="col-hdr">
+        <div class="col-h">#</div>
+        <div class="col-h">What happens</div>
+        <div class="col-h">How it works</div>
+        <div class="col-h">Human in the loop?</div>
+      </div>
+      ${ph.steps.map(s=>`
+        <div class="step">
+          <div class="step-num">${s.n}</div>
+          <div class="step-action">
+            <div class="step-who">${whoLabel(s.who)}</div>
+            <div class="step-desc">${s.action}</div>
+          </div>
+          <div class="step-detail">${s.detail}</div>
+          <div class="step-hitl">${hitlBadge(s.hitl)}<div style="color:var(--color-text-secondary)">${s.hitlNote}</div></div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+  container.appendChild(div);
+});
+
+function toggle(id){
+  const el = document.getElementById(id);
+  const ph = id.replace("ph","");
+  const arr = document.getElementById("arr"+ph);
+  if(el.style.display==="none"){el.style.display="";arr.classList.add("open")}
+  else{el.style.display="none";arr.classList.remove("open")}
+}
+</script>

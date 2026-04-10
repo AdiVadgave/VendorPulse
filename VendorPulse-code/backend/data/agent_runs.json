@@ -1,0 +1,68 @@
+[
+  {
+    "run_id": "2200aac8-6d16-4d6b-82a8-cdd77c7b6517",
+    "agent_name": "scheduling_agent",
+    "cycle_id": "c_9e91621c",
+    "input_payload": "{\"user_message\": \"Simulate availability responses then rank the best meeting slots for this cycle.\", \"context\": {}}",
+    "output_payload": "{\"status\": \"failed\", \"agent\": \"scheduling_agent\", \"summary\": \"Agent error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-S-hAx*************Mavw. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}\", \"data\": null, \"warnings\": [], \"next_actions\": [\"RETRY\"], \"requires_approval\": false, \"run_id\": \"2200aac8-6d16-4d6b-82a8-cdd77c7b6517\"}",
+    "status": "FAILED",
+    "triggered_by": "USER",
+    "error_message": "Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-S-hAx*************Mavw. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}",
+    "created_at": "2026-04-03T08:57:01.278491+00:00"
+  },
+  {
+    "run_id": "c4ba6a07-3cd6-432a-b9df-bce1a6af3ad6",
+    "agent_name": "scheduling_agent",
+    "cycle_id": "c_9e91621c",
+    "input_payload": "{\"user_message\": \"Simulate availability responses then rank the best meeting slots for this cycle.\", \"context\": {}}",
+    "output_payload": "{\"status\": \"failed\", \"agent\": \"scheduling_agent\", \"summary\": \"Agent error: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-S-hAx*************Mavw. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}\", \"data\": null, \"warnings\": [], \"next_actions\": [\"RETRY\"], \"requires_approval\": false, \"run_id\": \"c4ba6a07-3cd6-432a-b9df-bce1a6af3ad6\"}",
+    "status": "FAILED",
+    "triggered_by": "USER",
+    "error_message": "Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-S-hAx*************Mavw. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}",
+    "created_at": "2026-04-03T09:04:59.629354+00:00"
+  },
+  {
+    "run_id": "5da15f77-2988-4bd4-a4cf-cf2f12a671b3",
+    "agent_name": "scheduling_agent",
+    "cycle_id": "c_9e91621c",
+    "input_payload": "{\"user_message\": \"Simulate availability responses then rank the best meeting slots for this cycle.\", \"context\": {}}",
+    "output_payload": "{\"status\": \"failed\", \"agent\": \"scheduling_agent\", \"summary\": \"Agent error: Error code: 500 - {'error': {'message': 'The server had an error while processing your request. Sorry about that!', 'type': 'server_error', 'param': None, 'code': None}}\", \"data\": null, \"warnings\": [], \"next_actions\": [\"RETRY\"], \"requires_approval\": false, \"run_id\": \"5da15f77-2988-4bd4-a4cf-cf2f12a671b3\"}",
+    "status": "FAILED",
+    "triggered_by": "USER",
+    "error_message": "Error code: 500 - {'error': {'message': 'The server had an error while processing your request. Sorry about that!', 'type': 'server_error', 'param': None, 'code': None}}",
+    "created_at": "2026-04-03T09:14:13.088639+00:00"
+  },
+  {
+    "run_id": "96b6fa3a-8e3b-4f9e-953a-a48e3c850e4a",
+    "agent_name": "scheduling_agent",
+    "cycle_id": "c_9e91621c",
+    "input_payload": "{\"user_message\": \"Simulate availability responses then rank the best meeting slots for this cycle.\", \"context\": {}}",
+    "output_payload": "{}",
+    "status": "PENDING",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-04-03T09:18:12.386994+00:00"
+  },
+  {
+    "run_id": "7b43c372-0b33-418e-84b5-6c935e482078",
+    "agent_name": "scheduling_agent",
+    "cycle_id": "c_2b39f578",
+    "input_payload": "{\"user_message\": \"Simulate availability responses then rank the best meeting slots for this cycle.\", \"context\": {}}",
+    "output_payload": "{\"status\": \"failed\", \"agent\": \"scheduling_agent\", \"summary\": \"Agent error: Error code: 500 - {'error': {'message': 'Service Unavailable', 'type': 'service_unavailable_error', 'param': None, 'code': None}}\", \"data\": null, \"warnings\": [], \"next_actions\": [\"RETRY\"], \"requires_approval\": false, \"run_id\": \"7b43c372-0b33-418e-84b5-6c935e482078\"}",
+    "status": "FAILED",
+    "triggered_by": "USER",
+    "error_message": "Error code: 500 - {'error': {'message': 'Service Unavailable', 'type': 'service_unavailable_error', 'param': None, 'code': None}}",
+    "created_at": "2026-04-03T14:01:16.220530+00:00"
+  },
+  {
+    "run_id": "27abe06a-faec-4d4b-847d-6bfa1b7a6515",
+    "agent_name": "scheduling_agent",
+    "cycle_id": "c_6f3a0271",
+    "input_payload": "{\"user_message\": \"Simulate availability responses then rank the best meeting slots for this cycle.\", \"context\": {}}",
+    "output_payload": "{\"status\": \"failed\", \"agent\": \"scheduling_agent\", \"summary\": \"Agent error: Error code: 500 - {'error': {'message': 'The server had an error while processing your request. Sorry about that!', 'type': 'server_error', 'param': None, 'code': None}}\", \"data\": null, \"warnings\": [], \"next_actions\": [\"RETRY\"], \"requires_approval\": false, \"run_id\": \"27abe06a-faec-4d4b-847d-6bfa1b7a6515\"}",
+    "status": "FAILED",
+    "triggered_by": "USER",
+    "error_message": "Error code: 500 - {'error': {'message': 'The server had an error while processing your request. Sorry about that!', 'type': 'server_error', 'param': None, 'code': None}}",
+    "created_at": "2026-04-06T12:16:30.178018+00:00"
+  }
+]

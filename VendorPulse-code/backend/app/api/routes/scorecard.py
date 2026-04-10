@@ -232,18 +232,7 @@ def get_cycle_responses(cycle_id: str):
     """Get all scorecard responses for a specific cycle. Fetches live from Google Forms if authenticated."""
     logger.info("SCORECARD-RESPONSES: GET /responses/%s", cycle_id)
 
-    if is_authenticated():
-        logger.info("SCORECARD-RESPONSES: authenticated — fetching live from Google Forms")
-        try:
-            data = poll_and_store()
-            responses = [r for r in data["responses"] if r.get("cycle_id") == cycle_id]
-            logger.info("SCORECARD-RESPONSES: live fetch — %d matched cycle_id=%s", len(responses), cycle_id)
-        except Exception as exc:
-            logger.warning("SCORECARD-RESPONSES: live fetch failed (%s), falling back to stored data", exc)
-            responses = get_responses_for_cycle(cycle_id)
-    else:
-        logger.info("SCORECARD-RESPONSES: not authenticated — using stored data")
-        responses = get_responses_for_cycle(cycle_id)
+    responses = get_responses_for_cycle(cycle_id)
 
     logger.info("SCORECARD-RESPONSES: returning %d responses for cycle_id=%s", len(responses), cycle_id)
     return {"cycle_id": cycle_id, "count": len(responses), "responses": responses}
@@ -254,18 +243,7 @@ def get_all_responses():
     """Get all scorecard responses. Fetches live from Google Forms if authenticated."""
     logger.info("SCORECARD-RESPONSES: GET /responses (all)")
 
-    if is_authenticated():
-        logger.info("SCORECARD-RESPONSES: authenticated — fetching live from Google Forms")
-        try:
-            data = poll_and_store()
-            responses = data["responses"]
-            logger.info("SCORECARD-RESPONSES: live fetch — %d total responses", len(responses))
-        except Exception as exc:
-            logger.warning("SCORECARD-RESPONSES: live fetch failed (%s), falling back to stored data", exc)
-            responses = get_all_stored_responses()
-    else:
-        logger.info("SCORECARD-RESPONSES: not authenticated — using stored data")
-        responses = get_all_stored_responses()
+    responses = get_all_stored_responses()
 
     logger.info("SCORECARD-RESPONSES: returning %d responses", len(responses))
     return {"count": len(responses), "responses": responses}
@@ -287,15 +265,8 @@ def get_submission_tracker(cycle_id: str):
     attendees = [a for a in attendee_repo.find_all() if a.get("cycle_id") == cycle_id]
     key_attendees = [a for a in attendees if a.get("is_key")]
 
-    # Get responses for this cycle
-    if is_authenticated():
-        try:
-            data = poll_and_store()
-            responses = [r for r in data["responses"] if r.get("cycle_id") == cycle_id]
-        except Exception:
-            responses = get_responses_for_cycle(cycle_id)
-    else:
-        responses = get_responses_for_cycle(cycle_id)
+    # Get responses for this cycle (read from stored data — polling is done via POST /poll)
+    responses = get_responses_for_cycle(cycle_id)
 
     # Build email → response lookup (use first response per email for dedup)
     email_response_map: dict[str, dict] = {}
@@ -412,15 +383,8 @@ def get_compiled_scorecard(cycle_id: str):
         if corp:
             email_type_map[corp] = att_type
 
-    # Get responses
-    if is_authenticated():
-        try:
-            data = poll_and_store()
-            responses = [r for r in data["responses"] if r.get("cycle_id") == cycle_id]
-        except Exception:
-            responses = get_responses_for_cycle(cycle_id)
-    else:
-        responses = get_responses_for_cycle(cycle_id)
+    # Get responses (read from stored data — polling is done via POST /poll)
+    responses = get_responses_for_cycle(cycle_id)
 
     # Classify responses by type
     internal_responses: list[dict] = []

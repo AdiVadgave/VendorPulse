@@ -16,7 +16,11 @@ export default function SubmissionTracker({ cycleId, onSubmissionsUpdated }: Pro
   const [isPolling, setIsPolling] = useState(false)
   const [pollCount, setPollCount] = useState(0)
   const [lastPollTime, setLastPollTime] = useState<string | null>(null)
+  const [allCollected, setAllCollected] = useState(false)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Keep a stable ref for the callback so the interval never resets
+  const callbackRef = useRef(onSubmissionsUpdated)
+  callbackRef.current = onSubmissionsUpdated
 
   const doPoll = useCallback(async () => {
     try {
@@ -26,15 +30,19 @@ export default function SubmissionTracker({ cycleId, onSubmissionsUpdated }: Pro
       // Then get the submission tracker
       const data = await getSubmissionTracker(cycleId)
       setTracker(data)
-      onSubmissionsUpdated?.(data)
+      callbackRef.current?.(data)
       setPollCount((c) => c + 1)
       setLastPollTime(new Date().toLocaleTimeString())
+      // Stop polling once all key attendees have submitted
+      if (data.total_key_attendees > 0 && data.pending === 0) {
+        setAllCollected(true)
+      }
     } catch {
       // Backend may not be ready
     } finally {
       setIsPolling(false)
     }
-  }, [cycleId, onSubmissionsUpdated])
+  }, [cycleId])
 
   // Poll on mount and then on the configured interval
   useEffect(() => {
@@ -44,6 +52,14 @@ export default function SubmissionTracker({ cycleId, onSubmissionsUpdated }: Pro
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
     }
   }, [doPoll])
+
+  // Stop the interval once all responses have been collected
+  useEffect(() => {
+    if (allCollected && pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+  }, [allCollected])
 
   if (!tracker) {
     return (

@@ -120,6 +120,7 @@ def fetch_form_responses(form_id: str | None = None) -> list[dict]:
 
     question_map: dict[str, str] = {}
     for item in form.get("items", []):
+        # Handle regular questions (questionItem)
         q = item.get("questionItem", {}).get("question", {})
         q_id = q.get("questionId", "")
         title = item.get("title", "")
@@ -127,6 +128,20 @@ def fetch_form_responses(form_id: str | None = None) -> list[dict]:
         logger.debug("FORMS-FETCH: question title='%s', q_id=%s, mapped_to=%s", title, q_id, mapped)
         if mapped and q_id:
             question_map[q_id] = mapped
+
+        # Handle question groups / grids (questionGroupItem) — each row is a sub-question
+        group = item.get("questionGroupItem")
+        if group:
+            group_title = title  # The group's overall title
+            for row_item in group.get("questions", []):
+                row_q = row_item.get("questionId", "")
+                row_title = row_item.get("rowQuestion", {}).get("title", "")
+                # Try matching the row title first, then fall back to group title
+                row_mapped = _match_question(row_title) or _match_question(group_title)
+                logger.debug("FORMS-FETCH: group row title='%s', q_id=%s, mapped_to=%s",
+                             row_title, row_q, row_mapped)
+                if row_mapped and row_q:
+                    question_map[row_q] = row_mapped
 
     logger.debug("FORMS-FETCH: question map built — %d mappings", len(question_map))
 
@@ -161,6 +176,11 @@ def fetch_form_responses(form_id: str | None = None) -> list[dict]:
             if text_answers:
                 value = text_answers[0].get("value", "")
                 record[field_key] = value
+            else:
+                # Handle grade/scale answers (used in grid & scale question types)
+                grade = answer_data.get("grade", {})
+                if grade.get("score") is not None:
+                    record[field_key] = str(int(grade["score"]))
 
         parsed.append(record)
 
@@ -183,13 +203,17 @@ def poll_and_store(form_id: str | None = None) -> dict:
     logger.info("FORMS-POLL: fetched %d responses from Google Forms", len(new_responses))
 
     stored = _load_stored_responses()
-    existing_ids = {r["response_id"] for r in stored}
+    existing_map = {r["response_id"]: i for i, r in enumerate(stored)}
 
     new_count = 0
     for resp in new_responses:
-        if resp["response_id"] not in existing_ids:
+        idx = existing_map.get(resp["response_id"])
+        if idx is not None:
+            # Update existing response with any new/fixed fields
+            stored[idx] = resp
+        else:
             stored.append(resp)
-            existing_ids.add(resp["response_id"])
+            existing_map[resp["response_id"]] = len(stored) - 1
             new_count += 1
             logger.debug("FORMS-POLL: new response added — id=%s", resp["response_id"])
 

@@ -34,6 +34,23 @@ const RANK_CONFIG = [
   },
 ]
 
+const ORDINAL_SUFFIXES = ['th', 'st', 'nd', 'rd']
+function ordinalLabel(n: number): string {
+  const v = n % 100
+  const suffix =
+    v >= 11 && v <= 13
+      ? 'th'
+      : ORDINAL_SUFFIXES[n % 10] ?? 'th'
+  return `${n}${suffix} Choice`
+}
+
+const FALLBACK_RANK_CFG = {
+  badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+  border: 'border-slate-200 dark:border-slate-800',
+  ring: '',
+  icon: null,
+}
+
 export default function SlotCard({
   slot,
   rank,
@@ -41,7 +58,11 @@ export default function SlotCard({
   isProcessing = false,
   timeZoneView = 'IST',
 }: SlotCardProps) {
-  const cfg = RANK_CONFIG[rank - 1] ?? RANK_CONFIG[2]
+  const baseCfg = RANK_CONFIG[rank - 1] ?? FALLBACK_RANK_CFG
+  const cfg = {
+    ...baseCfg,
+    label: RANK_CONFIG[rank - 1] ? baseCfg.label : ordinalLabel(rank),
+  }
   const dateObj = new Date(slot.proposed_time)
   const durationMinutes = Number((slot as unknown as { duration_minutes?: number }).duration_minutes ?? 60)
   const durationMs = durationMinutes * 60 * 1000
@@ -74,9 +95,10 @@ export default function SlotCard({
     })
   }
 
-  const attendancePct = Math.round(
-    (slot.attendance_count / slot.total_attendees) * 100
-  )
+  const attendancePct =
+    slot.total_attendees > 0
+      ? Math.round((slot.attendance_count / slot.total_attendees) * 100)
+      : 0
 
   return (
     <div

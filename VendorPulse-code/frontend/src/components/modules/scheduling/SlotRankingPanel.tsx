@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Cpu, Info, AlertCircle } from 'lucide-react'
+import { Cpu, Info, AlertCircle, ChevronDown } from 'lucide-react'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import SlotCard from './SlotCard'
 import type { SlotProposal } from '@/types/scheduling.types'
@@ -21,10 +21,13 @@ export default function SlotRankingPanel({
   onSlotApproved,
   onBackToAttendees,
 }: SlotRankingPanelProps) {
+  const PAGE_SIZE = 3
+
   const [agentStatus] = useState<AgentStatus>('complete')
   const [processingSlotId, setProcessingSlotId] = useState<string | null>(null)
   const [approveError, setApproveError] = useState<string | null>(null)
   const [timeZoneView, setTimeZoneView] = useState<TimeZoneView>('IST')
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   async function handleApprove(slotId: string) {
     setProcessingSlotId(slotId)
@@ -93,10 +96,12 @@ export default function SlotRankingPanel({
           ) : (
             <p className="text-xs text-blue-700 dark:text-blue-400">
               The scheduling agent has analysed availability for all {slots[0]?.total_attendees ?? 'the selected'} attendees
-              and ranked {slots.length} viable slots. Ranking uses hard constraints
+              and ranked {slots.length} viable slot{slots.length !== 1 ? 's' : ''}. Ranking uses hard constraints
               (organiser &amp; exec sponsor availability) and soft scores
-              (attendance coverage, timezone suitability). Select a slot to
-              generate a calendar invite draft.
+              (attendance coverage, timezone suitability).{' '}
+              {slots.length > PAGE_SIZE
+                ? `Showing the top ${Math.min(visibleCount, slots.length)} — use "Show more" to see additional options.`
+                : 'Select a slot to generate a calendar invite draft.'}
             </p>
           )}
         </div>
@@ -111,7 +116,7 @@ export default function SlotRankingPanel({
 
       {/* Slot cards */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {slots.map((slot, idx) => (
+        {slots.slice(0, visibleCount).map((slot, idx) => (
           <SlotCard
             key={slot.slot_id}
             slot={slot}
@@ -123,7 +128,23 @@ export default function SlotRankingPanel({
         ))}
       </div>
 
-      
+      {/* Load more */}
+      {visibleCount < slots.length && (
+        <div className="flex flex-col items-center gap-1.5 pt-1">
+          <button
+            type="button"
+            onClick={() => setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, slots.length))}
+            className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+          >
+            <ChevronDown size={15} />
+            Show {Math.min(PAGE_SIZE, slots.length - visibleCount)} more slot
+            {Math.min(PAGE_SIZE, slots.length - visibleCount) !== 1 ? 's' : ''}
+          </button>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            Showing {Math.min(visibleCount, slots.length)} of {slots.length} slots
+          </p>
+        </div>
+      )}
     </div>
   )
 }

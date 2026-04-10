@@ -13,11 +13,23 @@ import os
 from pathlib import Path
 from typing import Any
 
+from app.config import settings
+
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+# Scopes needed for sending Gmail and reading Google Forms responses
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/forms.responses.readonly",
+    "https://www.googleapis.com/auth/forms.body.readonly",
+]
 
 # Allow HTTP redirect URIs for local development (localhost).
 # In production, use HTTPS and remove this.
@@ -28,15 +40,6 @@ if settings.google_redirect_uri.startswith("http://localhost"):
 logger.info("AUTH-ENV: google_client_id=%s..., project=%s, redirect_uri=%s",
             settings.google_client_id[:20], settings.google_project_id, settings.google_redirect_uri)
 logger.debug("AUTH-ENV: SCOPES=%s", SCOPES)
-
-logger = logging.getLogger(__name__)
-
-# Scopes needed for sending Gmail and reading Google Forms responses
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/forms.responses.readonly",
-    "https://www.googleapis.com/auth/forms.body.readonly",
-]
 
 TOKEN_PATH = settings.data_dir / "google_token.json"
 

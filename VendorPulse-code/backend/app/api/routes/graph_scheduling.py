@@ -270,11 +270,11 @@ def find_meeting_times_graph(
             date_range_end=payload.date_range_end,
             duration_hours=payload.duration_hours,
             time_zone=payload.time_zone,
-            max_candidates=10,
+            max_candidates=settings.scheduling_max_graph_candidates,
             # In dev mode, token owner is always organiser and must be enforced.
-            is_organizer_optional=False,
-            require_all_attendees=True,
-            activity_domain="work",
+            is_organizer_optional=settings.scheduling_is_organizer_optional,
+            require_all_attendees=settings.scheduling_require_all_attendees,
+            activity_domain=settings.scheduling_activity_domain,
         ))
     except Exception as e:
         import traceback
@@ -418,42 +418,58 @@ def find_meeting_times_graph(
 
         Graph can return either textual confidence levels (high/medium/low)
         or numeric confidence values (often 0..100, sometimes 0..1).
+        Thresholds and mapped scores are read from settings so they can be
+        tuned via .env without touching this file.
         """
+        high_t = settings.scheduling_confidence_high_threshold
+        med_t  = settings.scheduling_confidence_medium_threshold
+        high_s = settings.scheduling_confidence_high_score
+        med_s  = settings.scheduling_confidence_medium_score
+        low_s  = settings.scheduling_confidence_low_score
+
         if raw_confidence is None:
-            return 60.0
+            return low_s
 
         if isinstance(raw_confidence, (int, float)):
             numeric = float(raw_confidence)
             # Normalize fractional confidence (0..1) to percentage.
             if 0.0 <= numeric <= 1.0:
                 numeric *= 100.0
-            if numeric >= 90.0:
-                return 100.0
-            if numeric >= 70.0:
-                return 80.0
-            return 60.0
+            if numeric >= high_t:
+                return high_s
+            if numeric >= med_t:
+                return med_s
+            return low_s
 
         text = str(raw_confidence).strip().lower()
         if text == "high":
-            return 100.0
+            return high_s
         if text == "medium":
-            return 80.0
+            return med_s
         if text == "low":
-            return 60.0
+            return low_s
 
         # Be permissive for stringified numeric values like "100.0".
         try:
             numeric = float(text)
         except ValueError:
-            return 60.0
+            return low_s
 
         if 0.0 <= numeric <= 1.0:
             numeric *= 100.0
-        if numeric >= 90.0:
-            return 100.0
-        if numeric >= 70.0:
-            return 80.0
-        return 60.0
+        if numeric >= high_t:
+            return high_s
+        if numeric >= med_t:
+            return med_s
+        return low_s
+
+    # Identify exec sponsor email once — used to compute exec_sponsor_available per slot.
+    # The role that maps to the exec sponsor is read from settings (default: "EGB_CHAIR").
+    exec_sponsor_email: str | None = next(
+        (a.get("email", "").strip().lower() for a in attendees
+         if a.get("role") == settings.scheduling_exec_sponsor_role),
+        None,
+    )
 
     for idx, suggestion in enumerate(suggestions):
         processed += 1
@@ -506,6 +522,12 @@ def find_meeting_times_graph(
         # but they are ranked below fully free attendees.
         # Organiser availability is enforced by Graph when isOrganizerOptional=False.
         organiser_available = True
+        # Exec sponsor is available only when their Graph status is free (tentative = uncertain).
+        if exec_sponsor_email:
+            _es_status = availability_by_email.get(exec_sponsor_email, "unknown")
+            exec_sponsor_available = _is_free(_es_status)
+        else:
+            exec_sponsor_available = True  # EGB_CHAIR not in cycle attendees — cannot determine
         if conflict_names:
             filtered_conflicts += 1
             continue
@@ -514,10 +536,13 @@ def find_meeting_times_graph(
         if confidence_raw is None:
             confidence_raw = suggestion.get("confidence")
         base_score = _base_score_from_confidence(confidence_raw)
-        tentative_penalty = len(tentative_names) * 15.0
+        tentative_penalty = len(tentative_names) * settings.scheduling_tentative_penalty
         # Prefer higher attendance, then higher confidence; penalize tentatives so
         # completely free slots sort above tentative ones.
-        computed_score = max(0.0, min(100.0, base_score - tentative_penalty))
+        computed_score = max(
+            settings.scheduling_score_min,
+            min(settings.scheduling_score_max, base_score - tentative_penalty),
+        )
 
         # Build SlotProposal
         slot_id = f"slot_{uuid.uuid4().hex[:8]}"
@@ -528,7 +553,7 @@ def find_meeting_times_graph(
             "proposed_time_zone": display_tz,
             "duration_minutes": int(payload.duration_hours * 60),
             "organiser_available": organiser_available,
-            "exec_sponsor_available": True,
+            "exec_sponsor_available": exec_sponsor_available,
             "rank_score": computed_score,
             "is_approved": False,
             "attendance_count": len(attending_names) + len(tentative_names),
@@ -586,7 +611,8 @@ def find_meeting_times_graph(
                     f"Score: {sp['rank_score']}"
                 )
                 sp["ranking_rationale"] = llm_svc.call_simple(
-                    context_str, system=SLOT_RATIONALE_PROMPT, max_tokens=60
+                    context_str, system=SLOT_RATIONALE_PROMPT,
+                    max_tokens=settings.scheduling_llm_rationale_max_tokens,
                 )
             except Exception:
                 pass  # fall back silently — rationale stays absent
@@ -813,7 +839,7 @@ def send_meeting_invite_graph(
                 nudge_messages[name] = llm_svc.call_simple(
                     f"Attendee name: {name}, Meeting time: {slot.get('proposed_time', '')}",
                     system=CONFLICT_NUDGE_SYSTEM_PROMPT,
-                    max_tokens=120,
+                    max_tokens=settings.scheduling_llm_nudge_max_tokens,
                 )
             except Exception:
                 pass  # fall back silently — nudge stays absent for this person

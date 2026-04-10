@@ -5,6 +5,7 @@ import SlotCard from './SlotCard'
 import type { SlotProposal } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
 import { approveSlot } from '@/lib/schedulingApi'
+import { SCHEDULING_CONFIG } from '@/config/scheduling.config'
 
 type TimeZoneView = 'IST' | 'UTC' | 'GMT'
 
@@ -21,7 +22,7 @@ export default function SlotRankingPanel({
   onSlotApproved,
   onBackToAttendees,
 }: SlotRankingPanelProps) {
-  const PAGE_SIZE = 3
+  const PAGE_SIZE = SCHEDULING_CONFIG.PAGE_SIZE
 
   const [agentStatus] = useState<AgentStatus>('complete')
   const [processingSlotId, setProcessingSlotId] = useState<string | null>(null)

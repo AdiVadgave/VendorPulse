@@ -1776,5 +1776,46 @@
       "Anup Kesarwani"
     ],
     "conflicts": []
+  },
+  {
+    "slot_id": "slot_880486be",
+    "cycle_id": "c_0557c83f",
+    "proposed_time": "2026-04-15T09:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 60,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 85.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Kanishk Punekar"
+    ],
+    "tentative": [
+      "Aditya Vadgave"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_d6bca878",
+    "cycle_id": "c_0557c83f",
+    "proposed_time": "2026-04-15T10:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 60,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 70.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [],
+    "tentative": [
+      "Aditya Vadgave",
+      "Kanishk Punekar"
+    ],
+    "conflicts": []
   }
 ]

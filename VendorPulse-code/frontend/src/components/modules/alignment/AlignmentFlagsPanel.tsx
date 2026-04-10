@@ -18,6 +18,7 @@ interface CategoryGroup {
 }
 
 export default function AlignmentFlagsPanel({ flags }: Props) {
+  const [panelOpen, setPanelOpen] = useState(true)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   if (flags.length === 0) {
@@ -39,8 +40,6 @@ export default function AlignmentFlagsPanel({ flags }: Props) {
   }
 
   const groups: CategoryGroup[] = Array.from(groupMap.entries()).map(([cat, catFlags]) => {
-    const highScores = catFlags.map((f) => f.high_score)
-    const lowScores = catFlags.map((f) => f.low_score)
     return {
       category: cat,
       label: CATEGORY_LABELS[cat],
@@ -57,17 +56,25 @@ export default function AlignmentFlagsPanel({ flags }: Props) {
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-      <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
+      <button
+        onClick={() => setPanelOpen(!panelOpen)}
+        className="w-full px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
+      >
         <AlertTriangle size={15} className="text-amber-500" />
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
           Alignment Flags — Internal Stakeholder vs Vendor Gaps
         </h3>
-        <span className="ml-auto text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
-          {flags.length} flag{flags.length > 1 ? 's' : ''} across {groups.length} categor{groups.length > 1 ? 'ies' : 'y'}
+        <span className="ml-auto flex items-center gap-2">
+          <span className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
+            {flags.length} flag{flags.length > 1 ? 's' : ''} across {groups.length} categor{groups.length > 1 ? 'ies' : 'y'}
+          </span>
+          <span className="text-slate-400 dark:text-slate-500">
+            {panelOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </span>
         </span>
-      </div>
+      </button>
 
-      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+      {panelOpen && <div className="divide-y divide-slate-100 dark:divide-slate-800">
         {groups.map((group) => {
           const isOpen = !!expanded[group.category]
 
@@ -154,7 +161,7 @@ export default function AlignmentFlagsPanel({ flags }: Props) {
             </div>
           )
         })}
-      </div>
+      </div>}
     </div>
   )
 }

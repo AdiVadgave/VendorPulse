@@ -40,5 +40,11 @@
     "name": "hcl",
     "category": "cloud service",
     "status": "active"
+  },
+  {
+    "vendor_id": "v_35989bd9",
+    "name": "Zensar-test",
+    "category": "Software Development",
+    "status": "active"
   }
 ]

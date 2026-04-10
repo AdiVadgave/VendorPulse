@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import google_auth, graph_scheduling, meetings, scheduling, scorecard, users
+from app.api.routes import google_auth, graph_scheduling, meetings, scheduling, scorecard, users, vendors
 from app.config import settings
 from app.core.logging_config import setup_logging
 from app.middleware.request_logging import RequestLoggingMiddleware
@@ -58,6 +58,7 @@ app.include_router(scheduling.router)
 app.include_router(graph_scheduling.router)
 app.include_router(google_auth.router)
 app.include_router(scorecard.router)
+app.include_router(vendors.router)
 
 logger.info("VendorPulse backend initialized — routers registered, middleware active")
 

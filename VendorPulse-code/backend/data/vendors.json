@@ -16,5 +16,29 @@
     "name": "Meridian IT",
     "category": "Managed Services",
     "status": "active"
+  },
+  {
+    "vendor_id": "v_90f8956e",
+    "name": "zensar",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_7eec2082",
+    "name": "zendavor",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_81f0a855",
+    "name": "amazon",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_8135c7c8",
+    "name": "hcl",
+    "category": "cloud service",
+    "status": "active"
   }
 ]

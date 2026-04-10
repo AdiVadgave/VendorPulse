@@ -17,6 +17,7 @@ from app.repositories.cycle_repository import CycleRepository
 from app.repositories.meeting_repository import MeetingRepository
 from app.repositories.slot_repository import SlotRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.vendor_repository import VendorRepository
 from app.services.availability_service import AvailabilityService
 from app.services.llm_service import LLMService
 from app.services.meeting_service import MeetingService
@@ -60,6 +61,11 @@ def get_slot_repo() -> SlotRepository:
 @lru_cache(maxsize=None)
 def get_agent_run_repo() -> AgentRunRepository:
     return AgentRunRepository(settings.data_dir)
+
+
+@lru_cache(maxsize=None)
+def get_vendor_repo() -> VendorRepository:
+    return VendorRepository(settings.data_dir)
 
 
 # ── Core services ─────────────────────────────────────────────────────────────

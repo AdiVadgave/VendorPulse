@@ -29,5 +29,35 @@
       "anupkesarwani3537@gmail.com",
       "kanishkpunekar54@gmail.com"
     ]
+  },
+  {
+    "cycle_id": "c_7f77530d",
+    "vendor_id": "v1",
+    "vendor_name": "NovaTech Services",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "CYCLE_CREATED",
+    "created_at": "2026-04-10T05:40:34.841446+00:00",
+    "updated_at": "2026-04-10T05:40:34.841446+00:00"
+  },
+  {
+    "cycle_id": "c_264282c0",
+    "vendor_id": "v_90f8956e",
+    "vendor_name": "zensar",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "MEETING_SCHEDULED",
+    "created_at": "2026-04-10T05:59:40.162885+00:00",
+    "updated_at": "2026-04-10T06:00:09.566744+00:00"
+  },
+  {
+    "cycle_id": "c_3263169f",
+    "vendor_id": "v_90f8956e",
+    "vendor_name": "zensar",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "ATTENDEE_REFRESH_SENT",
+    "created_at": "2026-04-10T08:45:38.096556+00:00",
+    "updated_at": "2026-04-10T08:45:45.478985+00:00"
   }
 ]

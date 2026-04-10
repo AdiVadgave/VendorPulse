@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
@@ -8,6 +8,7 @@ import {
   Activity,
   AlertCircle,
   CalendarClock,
+  ChevronDown,
   Layers,
   TrendingUp,
   TrendingDown,
@@ -15,6 +16,7 @@ import {
   X,
   Loader2,
   Trash2,
+  Search,
 } from 'lucide-react'
 import { WORKFLOW_STATE_LABELS, WORKFLOW_STATES, TAB_LABELS, getDefaultTabFromState } from '@/utils/constants'
 import type { WorkflowState } from '@/utils/constants'
@@ -22,7 +24,8 @@ import { cn } from '@/utils/cn'
 import { apiFetch } from '@/lib/api'
 import { useCycleStore } from '@/store/useCycleStore'
 import type { GovernanceCycle } from '@/types/cycle.types'
-import { MOCK_VENDORS } from '@/mock/cycles.mock'
+import { fetchVendors, fetchCategories } from '@/lib/schedulingApi'
+import type { VendorRecord } from '@/lib/schedulingApi'
 
 const STATE_BADGE: Record<string, { classes: string; progress: number }> = {
   CYCLE_CREATED:         { classes: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400', progress: 5 },
@@ -61,6 +64,7 @@ function getStateIndex(state: WorkflowState) {
 interface NewCycleForm {
   vendor_id: string
   vendor_name: string
+  category: string
   quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4'
   year: number
 }
@@ -73,32 +77,129 @@ function NewCycleModal({
   onCreate: (cycle: GovernanceCycle) => void
 }) {
   const currentYear = new Date().getFullYear()
+  const [vendors, setVendors] = useState<VendorRecord[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [categoryQuery, setCategoryQuery] = useState('')
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
   const [form, setForm] = useState<NewCycleForm>({
-    vendor_id: MOCK_VENDORS[0].vendor_id,
-    vendor_name: MOCK_VENDORS[0].name,
+    vendor_id: '',
+    vendor_name: '',
+    category: '',
     quarter: 'Q1',
     year: currentYear,
   })
-  const [customVendor, setCustomVendor] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const categoryDropdownRef = useRef<HTMLDivElement>(null)
 
-  function handleVendorChange(e: React.ChangeEvent<HTMLSelectElement>) {
+  // Load vendors and categories from API on mount
+  useEffect(() => {
+    fetchVendors().then(setVendors)
+    fetchCategories().then(setCategories)
+  }, [])
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    function handleOutsideClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
+        setCategoryDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
+  // Filter vendors based on search query (case-insensitive partial match)
+  const filteredVendors = vendors.filter((v) =>
+    v.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Determine if the typed name is a new (not yet existing) vendor
+  const isNewVendor =
+    searchQuery.trim().length > 0 &&
+    !vendors.some((v) => v.name.toLowerCase() === searchQuery.trim().toLowerCase())
+
+  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value
-    if (val === '__custom__') {
-      setCustomVendor(true)
-      setForm((f) => ({ ...f, vendor_id: 'v_custom', vendor_name: '' }))
+    setSearchQuery(val)
+    setDropdownOpen(true)
+    // If the typed text matches no existing vendor, treat it as a new vendor
+    const matched = vendors.find((v) => v.name.toLowerCase() === val.trim().toLowerCase())
+    if (matched) {
+      setCategoryQuery(matched.category)
+      setForm((f) => ({ ...f, vendor_id: matched.vendor_id, vendor_name: matched.name, category: matched.category }))
     } else {
-      setCustomVendor(false)
-      const v = MOCK_VENDORS.find((v) => v.vendor_id === val)
-      setForm((f) => ({ ...f, vendor_id: val, vendor_name: v?.name ?? '' }))
+      // Reset category so the dropdown shows all options for the new vendor
+      setCategoryQuery('')
+      setForm((f) => ({ ...f, vendor_id: 'v_custom', vendor_name: val.trim(), category: '' }))
     }
   }
+
+  function handleSelectVendor(v: VendorRecord) {
+    setSearchQuery(v.name)
+    setCategoryQuery(v.category)
+    setForm((f) => ({ ...f, vendor_id: v.vendor_id, vendor_name: v.name, category: v.category }))
+    setDropdownOpen(false)
+  }
+
+  function handleSelectNew() {
+    // Reset category so the user always picks fresh for a new vendor
+    setCategoryQuery('')
+    setForm((f) => ({ ...f, vendor_id: 'v_custom', vendor_name: searchQuery.trim(), category: '' }))
+    setDropdownOpen(false)
+  }
+
+  const filteredCategories = categories.filter((c) =>
+    c.toLowerCase().includes(categoryQuery.toLowerCase())
+  )
+
+  const isNewCategory =
+    categoryQuery.trim().length > 0 &&
+    !categories.some((c) => c.toLowerCase() === categoryQuery.trim().toLowerCase())
+
+  // When focused: clear the input so the user sees all categories (not filtered).
+  // form.category retains the previously selected value.
+  function handleCategoryFocus() {
+    setCategoryQuery('')
+    setCategoryDropdownOpen(true)
+  }
+
+  function handleCategoryChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value
+    setCategoryQuery(val)
+    setCategoryDropdownOpen(true)
+    setForm((f) => ({ ...f, category: val.trim() }))
+  }
+
+  function handleSelectCategory(cat: string) {
+    setCategoryQuery(cat)
+    setForm((f) => ({ ...f, category: cat }))
+    setCategoryDropdownOpen(false)
+  }
+
+  // When the dropdown closes without a selection, restore the input display to
+  // whatever is actually selected so the field doesn't look empty.
+  useEffect(() => {
+    if (!categoryDropdownOpen) {
+      setCategoryQuery(form.category)
+    }
+  }, [categoryDropdownOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.vendor_name.trim()) {
       setError('Vendor name is required.')
+      return
+    }
+    if (form.vendor_id === 'v_custom' && !form.category.trim()) {
+      setError('Category is required for new vendors.')
       return
     }
     setIsSubmitting(true)
@@ -109,6 +210,7 @@ function NewCycleModal({
         body: JSON.stringify({
           vendor_id: form.vendor_id,
           vendor_name: form.vendor_name.trim(),
+          category: form.category.trim() || 'IT Infrastructure',
           quarter: form.quarter,
           year: form.year,
         }),
@@ -140,40 +242,162 @@ function NewCycleModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Vendor */}
+          {/* Vendor search */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
               Vendor
             </label>
-            <select
-              value={customVendor ? '__custom__' : form.vendor_id}
-              onChange={handleVendorChange}
-              className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              {MOCK_VENDORS.map((v) => (
-                <option key={v.vendor_id} value={v.vendor_id}>
-                  {v.name}
-                </option>
-              ))}
-              <option value="__custom__">+ Add New Vendor</option>
-            </select>
+            <div className="relative" ref={dropdownRef}>
+              <div className="relative">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  placeholder="Search or type a new vendor name…"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  onFocus={() => setDropdownOpen(true)}
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  autoComplete="off"
+                />
+              </div>
+
+              {dropdownOpen && (filteredVendors.length > 0 || isNewVendor) && (
+                <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                  {filteredVendors.map((v) => (
+                    <button
+                      key={v.vendor_id}
+                      type="button"
+                      onMouseDown={() => handleSelectVendor(v)}
+                      className={cn(
+                        'w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors',
+                        form.vendor_id === v.vendor_id && searchQuery === v.name
+                          ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400'
+                          : 'text-slate-700 dark:text-slate-300'
+                      )}
+                    >
+                      <Building2 size={13} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{v.name}</span>
+                      <span className="ml-auto text-xs text-slate-400 shrink-0">{v.category}</span>
+                    </button>
+                  ))}
+                  {isNewVendor && (
+                    <button
+                      type="button"
+                      onMouseDown={handleSelectNew}
+                      className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors border-t border-slate-100 dark:border-slate-700"
+                    >
+                      <Plus size={13} className="shrink-0" />
+                      <span>Add "{searchQuery.trim()}" as new vendor</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Selected vendor chip */}
+            {form.vendor_name && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                {form.vendor_id === 'v_custom' ? (
+                  <span className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded text-xs border border-amber-200 dark:border-amber-800">
+                    New vendor — will be saved
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded text-xs border border-emerald-200 dark:border-emerald-800">
+                    Existing vendor — attendees auto-seeded from last cycle
+                  </span>
+                )}
+              </p>
+            )}
           </div>
 
-          {customVendor && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Vendor Name
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Accenture Services"
-                value={form.vendor_name}
-                onChange={(e) => setForm((f) => ({ ...f, vendor_name: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                autoFocus
-              />
-            </div>
-          )}
+          {/* Category */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              Category
+            </label>
+            {form.vendor_id && form.vendor_id !== 'v_custom' ? (
+              /* Existing vendor — show category as read-only */
+              <div className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400">
+                <Layers size={13} className="text-slate-400 shrink-0" />
+                <span>{form.category}</span>
+                <span className="ml-auto text-xs text-slate-400">from vendor</span>
+              </div>
+            ) : (
+              /* New vendor — show searchable category dropdown */
+              <div className="relative" ref={categoryDropdownRef}>
+                <div className="relative">
+                  <Layers
+                    size={14}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search or type a new category…"
+                    value={categoryQuery}
+                    onChange={handleCategoryChange}
+                    onFocus={handleCategoryFocus}
+                    disabled={!form.vendor_name.trim()}
+                    className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      if (!form.vendor_name.trim()) return
+                      setCategoryQuery('')
+                      setCategoryDropdownOpen((o) => !o)
+                    }}
+                    disabled={!form.vendor_name.trim()}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 disabled:pointer-events-none"
+                    tabIndex={-1}
+                  >
+                    <ChevronDown size={14} className={cn('transition-transform', categoryDropdownOpen && 'rotate-180')} />
+                  </button>
+                </div>
+
+                {categoryDropdownOpen && (filteredCategories.length > 0 || isNewCategory || categoryQuery.trim() === '') && (
+                  <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
+                    {filteredCategories.length === 0 && !isNewCategory && (
+                      <p className="px-3 py-2 text-xs text-slate-400 dark:text-slate-500">
+                        No categories found
+                      </p>
+                    )}
+                    {filteredCategories.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onMouseDown={() => handleSelectCategory(cat)}
+                        className={cn(
+                          'w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors',
+                          form.category === cat
+                            ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400'
+                            : 'text-slate-700 dark:text-slate-300'
+                        )}
+                      >
+                        <Layers size={13} className="text-slate-400 shrink-0" />
+                        <span className="truncate">{cat}</span>
+                      </button>
+                    ))}
+                    {isNewCategory && (
+                      <button
+                        type="button"
+                        onMouseDown={() => handleSelectCategory(categoryQuery.trim())}
+                        className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors border-t border-slate-100 dark:border-slate-700"
+                      >
+                        <Plus size={13} className="shrink-0" />
+                        <span>Add "{categoryQuery.trim()}" as new category</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             {/* Quarter */}

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Sparkles, TrendingUp, TrendingDown, Minus, CheckCircle2, AlertTriangle, Send } from 'lucide-react'
 import type { VendorBrief } from '@/types/vendor-prep.types'
+import type { CompiledScorecard } from '@/types/scorecard.types'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
@@ -9,6 +10,7 @@ import { cn } from '@/utils/cn'
 interface Props {
   vendorName: string
   brief: VendorBrief | null
+  compiledScorecard?: CompiledScorecard | null
   onBriefGenerated: (brief: VendorBrief) => void
   onBriefApproved: () => void
 }
@@ -38,7 +40,7 @@ function ScoreDots({ score }: { score: number }) {
   )
 }
 
-export default function VendorBriefPanel({ vendorName, brief, onBriefGenerated, onBriefApproved }: Props) {
+export default function VendorBriefPanel({ vendorName, brief, compiledScorecard, onBriefGenerated, onBriefApproved }: Props) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
   const [showApproval, setShowApproval] = useState(false)
   const [approved, setApproved] = useState(false)
@@ -48,30 +50,63 @@ export default function VendorBriefPanel({ vendorName, brief, onBriefGenerated, 
     setTimeout(() => {
       setAgentStatus('awaiting_approval')
       setShowApproval(true)
-      // Simulate generation — in real app this would come from API
-      onBriefGenerated({
-        overall_score: 3.8,
-        overall_trend: 'improving',
-        category_ratings: [
-          { category: 'Delivery Quality', score: 3.83, rationale: 'Consistent delivery against agreed timelines.', trend: 'up' },
-          { category: 'SLA Compliance', score: 3.67, rationale: 'One major incident exceeded SLA window in February.', trend: 'up' },
-          { category: 'Innovation', score: 4.0, rationale: 'Two AI automation pilots proposed — mixed internal feedback.', trend: 'up' },
-          { category: 'Communication', score: 3.67, rationale: 'General quality good. Escalation handling needs improvement.', trend: 'down' },
-          { category: 'Value for Money', score: 3.83, rationale: 'Q1 pricing increase of 8% flagged by Commercial Lead.', trend: 'up' },
-        ],
-        key_concerns: [
-          'Innovation score outlier — internal disagreement on roadmap alignment',
-          'SLA breach in February — vendor must provide root cause analysis',
-          'Q1 pricing increase lacks contract-aligned justification',
-        ],
-        positive_areas: [
-          'Delivery Quality improved by 0.83 points vs Q4 2025',
-          'Innovation proposals demonstrate proactive engagement',
-          'Overall trajectory improving — 4th consecutive quarter of score increase',
-        ],
-        open_actions: 3,
-        generated_at: new Date().toISOString(),
-      })
+
+      // Build brief from compiled scorecard if available
+      if (compiledScorecard && compiledScorecard.categories.length > 0) {
+        const cs = compiledScorecard
+        const iAvg = cs.overall_internal_avg ?? 0
+        const vAvg = cs.overall_vendor_avg ?? 0
+        const overall = (iAvg + vAvg) / 2
+
+        const category_ratings = cs.categories.map((cat) => {
+          const catI = cat.internal_avg ?? 0
+          const catV = cat.vendor_avg ?? 0
+          const avg = catI && catV ? (catI + catV) / 2 : catI || catV
+          const gap = Math.abs(catI - catV)
+          const trend: 'up' | 'down' | 'flat' = avg >= 3.5 ? 'up' : avg < 2.5 ? 'down' : 'flat'
+          const rationale = gap > 1
+            ? `Significant gap between Internal (${catI.toFixed(1)}) and Vendor (${catV.toFixed(1)}) — needs alignment discussion.`
+            : `Internal: ${catI.toFixed(1)}, Vendor: ${catV.toFixed(1)} — ${avg >= 4 ? 'strong performance' : avg >= 3 ? 'acceptable, room for improvement' : 'requires attention'}.`
+          return { category: cat.category_label, score: parseFloat(avg.toFixed(2)), rationale, trend }
+        })
+
+        const key_concerns: string[] = []
+        const positive_areas: string[] = []
+        cs.categories.forEach((cat) => {
+          cat.parameters.forEach((p) => {
+            const iS = p.internal_avg ?? 0
+            const vS = p.vendor_avg ?? 0
+            if (iS < 2.5 || vS < 2.5) key_concerns.push(`${p.parameter_label}: low score (Internal ${iS.toFixed(1)}, Vendor ${vS.toFixed(1)})`)
+            if (Math.abs(iS - vS) > 1) key_concerns.push(`${p.parameter_label}: ${Math.abs(iS - vS).toFixed(1)} point gap between Internal and Vendor`)
+            if (iS >= 4 && vS >= 4) positive_areas.push(`${p.parameter_label}: strong alignment (${iS.toFixed(1)} / ${vS.toFixed(1)})`)
+          })
+        })
+
+        if (cs.key_recommendations.length > 0) {
+          key_concerns.push(...cs.key_recommendations.slice(0, 2))
+        }
+
+        onBriefGenerated({
+          overall_score: parseFloat(overall.toFixed(2)),
+          overall_trend: overall >= 3.5 ? 'improving' : overall < 2.5 ? 'declining' : 'stable',
+          category_ratings,
+          key_concerns: key_concerns.slice(0, 5),
+          positive_areas: positive_areas.slice(0, 5),
+          open_actions: key_concerns.length,
+          generated_at: new Date().toISOString(),
+        })
+      } else {
+        // Fallback when no compiled scorecard is available
+        onBriefGenerated({
+          overall_score: 0,
+          overall_trend: 'stable',
+          category_ratings: [],
+          key_concerns: ['No scorecard data available — compile scorecard first'],
+          positive_areas: [],
+          open_actions: 0,
+          generated_at: new Date().toISOString(),
+        })
+      }
     }, 1800)
   }
 

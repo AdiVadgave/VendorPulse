@@ -27,19 +27,16 @@ router = APIRouter(tags=["google-auth"])
 @router.get("/auth/google")
 def google_auth_start():
     """Redirect to Google's OAuth2 consent screen."""
-    print("[AUTH] === Starting Google OAuth flow ===")
+    logger.info("AUTH: starting Google OAuth flow")
     auth_url, state = start_oauth_flow()
-    print(f"[AUTH] Generated auth URL: {auth_url}")
-    print(f"[AUTH] State token: {state}")
+    logger.info("AUTH: generated auth URL, state=%s", state)
+    logger.debug("AUTH: auth_url=%s", auth_url)
     return RedirectResponse(auth_url)
 
 @router.get("/auth/callback")
 def google_auth_callback(code: str | None = None, error: str | None = None, state: str | None = None):
     """Handle the OAuth2 callback from Google."""
-    print("[AUTH] === Callback received ===")
-    print(f"[AUTH] Code present: {bool(code)}")
-    print(f"[AUTH] Code value (first 20 chars): {code[:20] if code else 'None'}...")
-    print(f"[AUTH] Error: {error}")
+    logger.info("AUTH: callback received — code_present=%s, error=%s", bool(code), error)
 
     if error:
         raise HTTPException(status_code=400, detail=f"OAuth error: {error}")
@@ -47,12 +44,11 @@ def google_auth_callback(code: str | None = None, error: str | None = None, stat
         raise HTTPException(status_code=400, detail="No authorization code received")
 
     try:
-        print("[AUTH] Calling exchange_code_for_token...")
+        logger.info("AUTH: exchanging authorization code for token...")
         exchange_code_for_token(code, state)
-        print("[AUTH] Token exchange successful!")
+        logger.info("AUTH: token exchange successful")
     except Exception as exc:
-        print(f"[AUTH] TOKEN EXCHANGE FAILED: {type(exc).__name__}: {exc}")
-        logger.exception("Token exchange failed")
+        logger.exception("AUTH: token exchange failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Token exchange failed: {exc}")
 
     return HTMLResponse(

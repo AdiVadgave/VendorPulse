@@ -10,6 +10,7 @@ Serves:
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
@@ -17,6 +18,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import google_auth, graph_scheduling, meetings, scheduling, scorecard, users
 from app.config import settings
+from app.core.logging_config import setup_logging
+from app.middleware.request_logging import RequestLoggingMiddleware
+
+# ── Initialize logging before anything else ───────────────────────────────────
+setup_logging()
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="VendorPulse Backend",
@@ -30,6 +37,8 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# ── Middleware (order matters: last added = first executed) ────────────────────
+
 # Allow all origins during development. Restrict in production.
 app.add_middleware(
     CORSMiddleware,
@@ -39,6 +48,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Request/response logging with request IDs
+app.add_middleware(RequestLoggingMiddleware)
+
 # ── Register routers ──────────────────────────────────────────────────────────
 app.include_router(users.router)
 app.include_router(meetings.router)
@@ -46,6 +58,8 @@ app.include_router(scheduling.router)
 app.include_router(graph_scheduling.router)
 app.include_router(google_auth.router)
 app.include_router(scorecard.router)
+
+logger.info("VendorPulse backend initialized — routers registered, middleware active")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

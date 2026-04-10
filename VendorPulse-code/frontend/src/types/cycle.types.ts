@@ -16,6 +16,10 @@ export interface GovernanceCycle {
   workflow_state: WorkflowState
   created_at: string
   updated_at: string
+  scorecard_dispatched_at?: string | null
+  scorecard_dispatched_to?: string[] | null
+  scorecard_dispatched?: boolean
+  meeting_scheduled?: boolean
 }
 
 export type StakeholderRole =

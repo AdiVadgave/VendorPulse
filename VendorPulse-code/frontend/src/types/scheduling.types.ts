@@ -4,14 +4,18 @@ export type InviteStatus = 'ACCEPTED' | 'DECLINED' | 'PENDING'
 
 export type AttendanceConfirmationStatus = 'PENDING' | 'CONFIRMED' | 'REPLACED' | 'DECLINED'
 
+export type AttendeeType = 'Internal Stakeholder' | 'Vendor'
+
 export interface CycleAttendee {
   attendee_id: string
   stakeholder_id: string
   cycle_id?: string
   name: string
   email: string
+  gmail?: string
   role: StakeholderRole
   organisation: string
+  type: AttendeeType
   is_key: boolean
   invite_status: InviteStatus
   availability_submitted: boolean

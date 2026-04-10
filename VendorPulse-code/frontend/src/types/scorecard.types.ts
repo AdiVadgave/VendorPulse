@@ -77,6 +77,26 @@ export const ALL_PARAMETERS = SCORECARD_STRUCTURE.flatMap((cat) =>
   cat.parameters.map((p) => ({ ...p, category: cat.key }))
 )
 
+/** Short tooltips explaining each scorecard parameter */
+export const PARAMETER_TOOLTIPS: Record<string, string> = {
+  RELEASE_PATCH_MGMT: 'Timeliness and quality of release and patch deployments',
+  SECURITY_RISK_MGMT: 'Adherence to security protocols and risk mitigation practices',
+  AUDIT_COMPLIANCE: 'Compliance with audit requirements and regulatory standards',
+  DELIVERY_TIMELINESS: 'On-time delivery of committed milestones and deliverables',
+  QUALITY_OF_DELIVERY: 'Defect rates, rework frequency, and output quality',
+  RESOURCE_CAPABILITY: 'Skill levels, certifications, and team competency',
+  SLA_ADHERENCE: 'Compliance with agreed service level agreements',
+  OPERATIONAL_EFFICIENCY: 'Process optimization and operational productivity',
+  PRICING_COMPETITIVENESS: 'Value for money relative to market benchmarks',
+  CONTRACT_COMPLIANCE: 'Adherence to contractual terms and obligations',
+  COST_CONTROL: 'Budget management and cost optimization',
+  BILLING_ACCURACY: 'Accuracy and timeliness of invoicing',
+  COMMUNICATION_EFFECTIVENESS: 'Clarity, frequency, and quality of communication',
+  STAKEHOLDER_ENGAGEMENT: 'Proactive engagement with key stakeholders',
+  RESPONSIVENESS: 'Speed and quality of response to queries and issues',
+  COLLABORATION_ALIGNMENT: 'Strategic alignment and collaborative problem-solving',
+}
+
 /* ── Submission Tracking ────────────────────────────────────── */
 
 export type SubmissionStatus = 'PENDING' | 'SUBMITTED' | 'INVALID' | 'CORRECTED'
@@ -122,4 +142,64 @@ export interface CompiledCategoryScore {
   category_label: string
   parameters: ParameterScore[]
   category_average: number
+}
+
+/* ── 2-Column Compiled Scorecard (Internal vs Vendor) ──────── */
+
+export interface IndividualScore {
+  name: string
+  score: number
+}
+
+export interface CompiledParameter {
+  parameter_key: string
+  parameter_label: string
+  internal_avg: number | null
+  vendor_avg: number | null
+  internal_count: number
+  vendor_count: number
+  internal_scores?: IndividualScore[]
+  vendor_scores?: IndividualScore[]
+}
+
+export interface CompiledCategory {
+  category: ScorecardCategoryKey
+  category_label: string
+  internal_avg: number | null
+  vendor_avg: number | null
+  parameters: CompiledParameter[]
+}
+
+export interface CompiledScorecard {
+  cycle_id: string
+  internal_respondents: number
+  vendor_respondents: number
+  overall_internal_avg: number | null
+  overall_vendor_avg: number | null
+  categories: CompiledCategory[]
+  comments: Record<string, { internal: string[]; vendor: string[] }>
+  key_recommendations: string[]
+}
+
+/* ── Submission Tracker ────────────────────────────────────── */
+
+export interface SubmissionTrackerEntry {
+  attendee_id: string
+  name: string
+  email: string
+  gmail: string
+  type: 'Internal Stakeholder' | 'Vendor'
+  role: string
+  organisation: string
+  submitted: boolean
+  submitted_at: string | null
+  response_id: string | null
+}
+
+export interface SubmissionTrackerData {
+  cycle_id: string
+  total_key_attendees: number
+  submitted: number
+  pending: number
+  tracker: SubmissionTrackerEntry[]
 }

@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from typing import Optional
 
-from app.core.workflow_engine import WorkflowStateError, WorkflowViolationError, workflow_engine
+from app.core.workflow_engine import WORKFLOW_STATES, WorkflowStateError, WorkflowViolationError, workflow_engine
 from app.dependencies import (
     get_attendee_repo,
     get_agent_run_repo,
@@ -33,6 +34,8 @@ from app.models.scheduling import (
 from app.services.scheduling_service import SchedulingService
 from app.services.graph_service import GraphService
 from app.config import Settings, settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["scheduling"])
 
@@ -101,7 +104,10 @@ def _http409(detail: str) -> None:
 
 @router.get("/api/cycles")
 def list_cycles(cycle_repo=Depends(get_cycle_repo)):
-    return {"cycles": cycle_repo.find_all()}
+    logger.info("list_cycles called")
+    cycles = cycle_repo.find_all()
+    logger.info("list_cycles returning %d cycles", len(cycles))
+    return {"cycles": cycles}
 
 
 @router.post("/api/cycles", status_code=201)
@@ -109,6 +115,10 @@ def create_cycle(payload: CycleCreate, cycle_repo=Depends(get_cycle_repo)):
     import uuid
     from datetime import datetime, timezone
 
+    logger.info(
+        "create_cycle called — vendor_id=%s, vendor_name=%s, quarter=%s, year=%s",
+        payload.vendor_id, payload.vendor_name, payload.quarter, payload.year,
+    )
     now = datetime.now(timezone.utc).isoformat()
     cycle = {
         "cycle_id": f"c_{uuid.uuid4().hex[:8]}",
@@ -120,12 +130,21 @@ def create_cycle(payload: CycleCreate, cycle_repo=Depends(get_cycle_repo)):
         "created_at": now,
         "updated_at": now,
     }
-    return {"cycle": cycle_repo.insert(cycle), "message": "Cycle created"}
+    result = cycle_repo.insert(cycle)
+    logger.info("create_cycle success — cycle_id=%s", cycle["cycle_id"])
+    return {"cycle": result, "message": "Cycle created"}
 
 
 @router.get("/api/cycles/{cycleId}")
 def get_cycle(cycleId: str, cycle_repo=Depends(get_cycle_repo)):
-    return {"cycle": _get_cycle_or_404(cycleId, cycle_repo)}
+    logger.info("get_cycle called — cycleId=%s", cycleId)
+    cycle = _get_cycle_or_404(cycleId, cycle_repo)
+    ws = cycle.get("workflow_state", "CYCLE_CREATED")
+    ws_idx = WORKFLOW_STATES.index(ws) if ws in WORKFLOW_STATES else 0
+    cycle["scorecard_dispatched"] = bool(cycle.get("scorecard_dispatched_at"))
+    cycle["meeting_scheduled"] = ws_idx >= WORKFLOW_STATES.index("MEETING_SCHEDULED")
+    logger.info("get_cycle success — cycleId=%s, workflow_state=%s", cycleId, ws)
+    return {"cycle": cycle}
 
 
 @router.delete("/api/cycles/{cycleId}")
@@ -135,12 +154,14 @@ def delete_cycle(
     attendee_repo=Depends(get_attendee_repo),
     slot_repo=Depends(get_slot_repo),
 ):
+    logger.info("delete_cycle called — cycleId=%s", cycleId)
     _get_cycle_or_404(cycleId, cycle_repo)
 
     removed_attendees = attendee_repo.delete_for_cycle(cycleId)
     slot_repo.clear_for_cycle(cycleId)
     cycle_repo.delete_by_id("cycle_id", cycleId)
 
+    logger.info("delete_cycle success — cycleId=%s, removed_attendees=%d", cycleId, removed_attendees)
     return {
         "message": f"Cycle '{cycleId}' deleted",
         "cycle_id": cycleId,
@@ -159,8 +180,10 @@ def get_attendees(
     seedFromPrevious: bool = False,
     svc: SchedulingService = Depends(get_scheduling_service),
 ):
-    # Important: do NOT auto-seed attendees by default.
-    return {"attendees": svc.get_attendees(cycleId, seed_from_previous=seedFromPrevious)}
+    logger.info("get_attendees called — cycleId=%s, seedFromPrevious=%s", cycleId, seedFromPrevious)
+    attendees = svc.get_attendees(cycleId, seed_from_previous=seedFromPrevious)
+    logger.info("get_attendees returning %d attendees for cycleId=%s", len(attendees), cycleId)
+    return {"attendees": attendees}
 
 
 @router.post("/api/cycles/{cycleId}/attendees", status_code=201)
@@ -170,8 +193,11 @@ def add_attendees(
     svc: SchedulingService = Depends(get_scheduling_service),
     cycle_repo=Depends(get_cycle_repo),
 ):
+    logger.info("add_attendees called — cycleId=%s, count=%d", cycleId, len(attendees))
     _get_cycle_or_404(cycleId, cycle_repo)   # ensure cycle exists
-    return svc.add_attendees(cycleId, attendees)
+    result = svc.add_attendees(cycleId, attendees)
+    logger.info("add_attendees success — cycleId=%s", cycleId)
+    return result
 
 
 @router.post("/api/cycles/{cycleId}/scheduling/attendance-confirmation/complete")
@@ -233,6 +259,7 @@ def send_attendance_outreach(
     Trigger outreach to all attendees from the last cycle to confirm attendance.
     In production this would send emails/forms; here it marks outreach as sent.
     """
+    logger.info("send_attendance_outreach called — cycleId=%s", cycleId)
     _get_cycle_or_404(cycleId, cycle_repo)
 
     # Ensure attendees are loaded (may auto-seed from previous cycle)
@@ -341,10 +368,13 @@ def approve_slot(
     svc: SchedulingService = Depends(get_scheduling_service),
     cycle_repo=Depends(get_cycle_repo),
 ):
+    logger.info("approve_slot called — cycleId=%s, slotId=%s, approved_by=%s", cycleId, slotId, payload.approved_by)
     # Require at least AVAILABILITY_COLLECTED before approving a slot
     cycle = _get_cycle_or_404(cycleId, cycle_repo)
     _check_workflow_state(cycle, "AVAILABILITY_COLLECTED")
-    return svc.approve_slot(cycleId, slotId, payload.approved_by, time_zone=payload.time_zone)
+    result = svc.approve_slot(cycleId, slotId, payload.approved_by, time_zone=payload.time_zone)
+    logger.info("approve_slot success — cycleId=%s, slotId=%s", cycleId, slotId)
+    return result
 
 
 @router.post("/api/cycles/{cycleId}/scheduling/send-invites")

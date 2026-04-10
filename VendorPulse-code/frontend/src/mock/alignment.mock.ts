@@ -130,6 +130,55 @@ export const MOCK_ALIGNMENT_ACTIONS: ExtractedAction[] = [
   },
 ]
 
+/* ── Generate Dynamic "What Changed" Bullets from Compiled Scores ── */
+
+export function generateWhatChangedBullets(
+  comparisons: CategoryComparison[],
+  flags: AlignmentFlag[],
+): string[] {
+  const bullets: string[] = []
+
+  // Sort categories by difference (highest variance first)
+  const sorted = [...comparisons].sort((a, b) => b.difference - a.difference)
+
+  for (const cat of sorted) {
+    const avgScore = (cat.stakeholder_avg + cat.vendor_avg) / 2
+    const highVarianceParams = cat.parameters.filter((p) => p.high_variance)
+    const lowScoreParams = cat.parameters.filter((p) => p.low_score)
+
+    if (cat.difference > 1) {
+      const detail = highVarianceParams.length > 0
+        ? ` — ${highVarianceParams.map((p) => p.parameter_label).join(', ')} show${highVarianceParams.length === 1 ? 's' : ''} significant gaps.`
+        : '.'
+      bullets.push(
+        `${cat.category_label}: ${cat.difference.toFixed(1)} point gap between Internal Stakeholder (${cat.stakeholder_avg.toFixed(1)}) and Vendor (${cat.vendor_avg.toFixed(1)})${detail}`
+      )
+    } else if (lowScoreParams.length > 0) {
+      bullets.push(
+        `${cat.category_label}: ${lowScoreParams.map((p) => p.parameter_label).join(', ')} scored below 3.0 — flag for improvement plan.`
+      )
+    } else if (avgScore >= 4.0) {
+      bullets.push(
+        `${cat.category_label}: Strong performance at ${avgScore.toFixed(1)} avg — Stakeholder and Vendor well aligned.`
+      )
+    } else {
+      bullets.push(
+        `${cat.category_label}: Average score ${avgScore.toFixed(1)} — Internal Stakeholder (${cat.stakeholder_avg.toFixed(1)}) vs Vendor (${cat.vendor_avg.toFixed(1)}).`
+      )
+    }
+  }
+
+  // Add a summary flag count if any
+  if (flags.length > 0) {
+    const maxGap = Math.max(...flags.map((f) => f.spread))
+    bullets.push(
+      `Key flag: ${flags.length} parameter${flags.length > 1 ? 's' : ''} flagged with gaps up to ${maxGap.toFixed(1)} points between Internal Stakeholder and Vendor scores.`
+    )
+  }
+
+  return bullets.slice(0, 5) // Cap at 5 bullets
+}
+
 /* ── Build Stakeholder vs Vendor Comparison from Compiled Scores */
 
 export function buildCategoryComparisons(
@@ -139,9 +188,11 @@ export function buildCategoryComparisons(
     const catDef = SCORECARD_STRUCTURE.find((s) => s.key === cat.category)
 
     const parameters = cat.parameters.map((param) => {
-      // Expect 2 scores: first = vendor, second = stakeholder (per scorecard submission order)
-      const vendorScore = param.scores[0]?.score ?? 0
-      const stakeholderScore = param.scores[1]?.score ?? 0
+      // Scores array: internal stakeholder first, vendor second
+      const internalScore = param.scores.find((s) => s.stakeholder_id === 'internal')
+      const vendorScoreEntry = param.scores.find((s) => s.stakeholder_id === 'vendor')
+      const stakeholderScore = internalScore?.score ?? (param.scores[0]?.score ?? 0)
+      const vendorScore = vendorScoreEntry?.score ?? (param.scores[1]?.score ?? 0)
       const diff = Math.abs(stakeholderScore - vendorScore)
 
       return {
@@ -260,8 +311,10 @@ export function buildAlignmentFlags(
   for (const cat of compiledScores) {
     for (const param of cat.parameters) {
       if (param.scores.length < 2) continue
-      const vendorScore = param.scores[0]?.score ?? 0
-      const stakeholderScore = param.scores[1]?.score ?? 0
+      const internalEntry = param.scores.find((s) => s.stakeholder_id === 'internal')
+      const vendorEntry = param.scores.find((s) => s.stakeholder_id === 'vendor')
+      const stakeholderScore = internalEntry?.score ?? (param.scores[0]?.score ?? 0)
+      const vendorScore = vendorEntry?.score ?? (param.scores[1]?.score ?? 0)
       const spread = Math.abs(vendorScore - stakeholderScore)
 
       if (spread >= 1) {

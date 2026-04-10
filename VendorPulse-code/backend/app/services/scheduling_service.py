@@ -13,11 +13,14 @@ Design principles:
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
 from app.models.common import AgentResponse
+
+logger = logging.getLogger(__name__)
 from app.models.scheduling import (
     CycleAttendeeCreate,
     CycleAttendeeUpdate,
@@ -69,8 +72,10 @@ class SchedulingService:
         If `seed_from_previous=True` and the cycle is new (CYCLE_CREATED) and has no
         attendees, attempt to import them from the previous cycle for the same vendor.
         """
+        logger.info("get_attendees — cycle_id=%s, seed_from_previous=%s", cycle_id, seed_from_previous)
         current_attendees = self._attendees.get_for_cycle(cycle_id)
         if current_attendees:
+            logger.info("get_attendees: found %d existing attendees for cycle %s", len(current_attendees), cycle_id)
             return current_attendees
 
         if not seed_from_previous:
@@ -179,6 +184,7 @@ class SchedulingService:
             self._attendees.insert(new_record)
             new_attendees.append(new_record)
 
+        logger.info("get_attendees: seeded %d attendees from previous cycle into cycle %s", len(new_attendees), cycle_id)
         return new_attendees
 
     def add_attendees(self, cycle_id: str, attendees: list[CycleAttendeeCreate]) -> AgentResponse:
@@ -188,6 +194,7 @@ class SchedulingService:
         # AI_HOOK: LLM could verify that all required roles are covered and
         suggest additional stakeholders based on past cycle records.
         """
+        logger.info("add_attendees — cycle_id=%s, count=%d", cycle_id, len(attendees))
         inserted: list[dict] = []
         for a in attendees:
             record = {
@@ -196,8 +203,10 @@ class SchedulingService:
                 "stakeholder_id": a.stakeholder_id,
                 "name": a.name,
                 "email": a.email,
+                "gmail": getattr(a, "gmail", "") or "",
                 "role": a.role,
                 "organisation": a.organisation,
+                "type": getattr(a, "type", "Internal Stakeholder") or "Internal Stakeholder",
                 "is_key": a.is_key,
                 "invite_status": "PENDING",
                 "availability_submitted": False,
@@ -284,6 +293,7 @@ class SchedulingService:
           - outreach_conversation_id
           - outreach_sent_at
         """
+        logger.info("send_attendance_outreach — cycle_id=%s, graph_service=%s", cycle_id, "present" if graph_service else "None")
         attendees = self._attendees.get_for_cycle(cycle_id)
 
         # Always ensure confirmation_status exists so the UI can track confirmations.
@@ -598,6 +608,7 @@ class SchedulingService:
         # AI_HOOK: LLM could draft a personalised invite email body referencing
         the scorecard cycle, vendor name, and attendee roles.
         """
+        logger.info("approve_slot — cycle_id=%s, slot_id=%s, approved_by=%s, time_zone=%s", cycle_id, slot_id, approved_by, time_zone)
         slot = self._slots.get_by_slot_id(slot_id)
         if not slot:
             return AgentResponse(
@@ -662,6 +673,7 @@ class SchedulingService:
         # AI_HOOK: LLM could generate personalised nudge messages for attendees
         who have a calendar conflict.
         """
+        logger.info("send_invites — cycle_id=%s, slot_id=%s, organiser_id=%s", cycle_id, slot_id, organiser_id)
         slot = self._slots.get_by_slot_id(slot_id)
         if not slot:
             return AgentResponse(
@@ -748,6 +760,7 @@ class SchedulingService:
 
         # AI_HOOK: LLM could draft reminder messages for non-responders.
         """
+        logger.info("get_rsvp_status — cycle_id=%s", cycle_id)
         attendees = self._attendees.get_for_cycle(cycle_id)
         pending = [a for a in attendees if a.get("invite_status") == "PENDING"]
         accepted = [a for a in attendees if a.get("invite_status") == "ACCEPTED"]
@@ -774,6 +787,7 @@ class SchedulingService:
 
     def update_rsvp(self, cycle_id: str, attendee_id: str, status: str) -> Optional[dict]:
         """Update the RSVP status of one attendee (ACCEPTED/DECLINED/PENDING)."""
+        logger.info("update_rsvp — cycle_id=%s, attendee_id=%s, status=%s", cycle_id, attendee_id, status)
         attendee = self._attendees.get_by_attendee_id(attendee_id)
         if attendee is None:
             return None

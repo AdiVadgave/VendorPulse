@@ -4,11 +4,12 @@ GraphService — wrapper around Microsoft Graph API for meeting scheduling.
 Handles:
   • findMeetingTimes — find common availability across attendees
   • createEvent — create online Teams meeting + send invites
-  • lookupUser — resolve email to user ID  
+  • lookupUser — resolve email to user ID
 """
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -16,6 +17,8 @@ try:
     import httpx
 except ImportError:
     httpx = None
+
+logger = logging.getLogger(__name__)
 
 
 class GraphService:
@@ -113,6 +116,10 @@ class GraphService:
                 "error": None or error details
             }
         """
+        logger.info(
+            "find_meeting_times — attendees=%s, range=%s to %s, duration_hours=%s, tz=%s",
+            attendee_emails, date_range_start, date_range_end, duration_hours, time_zone,
+        )
         if not httpx:
             raise ImportError("httpx is required. Install with: pip install httpx")
 
@@ -184,10 +191,14 @@ class GraphService:
                     )
                 
                 if response.status_code != 200:
+                    logger.error("find_meeting_times: Graph API error — status=%d", response.status_code)
                     return self._build_graph_error(response.status_code, result)
-                
+
+                suggestions = result.get("meetingTimeSuggestions", []) if isinstance(result, dict) else []
+                logger.info("find_meeting_times: success — %d suggestions returned", len(suggestions))
                 return result
         except Exception as e:
+            logger.exception("find_meeting_times: request failed — %s", e)
             return {"error": f"Request failed: {str(e)}"}
 
     async def create_event(
@@ -220,6 +231,10 @@ class GraphService:
                 "error": None or error details
             }
         """
+        logger.info(
+            "create_event — subject=%s, attendees=%s, start=%s, duration_hours=%s, tz=%s, online=%s",
+            subject, attendee_emails, start_time, duration_hours, time_zone, is_online_meeting,
+        )
         if not httpx:
             raise ImportError("httpx is required. Install with: pip install httpx")
 
@@ -310,8 +325,10 @@ class GraphService:
                 result = response.json()
                 
                 if response.status_code not in (200, 201):
+                    logger.error("create_event: Graph API error — status=%d", response.status_code)
                     return self._build_graph_error(response.status_code, result)
-                
+
+                logger.info("create_event: success — event_id=%s", result.get("id"))
                 return {
                     "id": result.get("id"),
                     "webLink": result.get("webLink"),
@@ -319,6 +336,7 @@ class GraphService:
                     "iCalUId": result.get("iCalUId"),
                 }
         except Exception as e:
+            logger.exception("create_event: request failed — %s", e)
             return {"error": f"Request failed: {str(e)}"}
 
     async def get_me_profile(self) -> dict:

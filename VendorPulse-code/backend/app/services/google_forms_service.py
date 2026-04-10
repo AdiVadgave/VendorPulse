@@ -47,6 +47,11 @@ QUESTION_MAP: dict[str, str] = {
     "stakeholder engagement": "STAKEHOLDER_ENGAGEMENT",
     "responsiveness": "RESPONSIVENESS",
     "collaboration": "COLLABORATION_ALIGNMENT",
+    "comments on risk": "comment_RISK_COMPLIANCE",
+    "comments on performance": "comment_PERFORMANCE",
+    "comments on commercial": "comment_COMMERCIAL",
+    "comments on relationship": "comment_RELATIONSHIP",
+    "key recommendations": "key_recommendations",
 }
 
 
@@ -55,26 +60,26 @@ class GoogleFormsError(RuntimeError):
 
 
 def _get_forms_service():
-    print("[FORMS-SERVICE] Getting Google Forms service...")
+    logger.info("FORMS-SERVICE: getting Google Forms service")
     creds = get_credentials()
     if creds is None:
-        print("[FORMS-SERVICE] ERROR: No credentials available")
+        logger.error("FORMS-SERVICE: no credentials available")
         raise GoogleFormsError(
             "Google account not authenticated. Visit /auth/google first."
         )
-    print(f"[FORMS-SERVICE] Credentials obtained. Scopes: {creds.scopes}")
+    logger.debug("FORMS-SERVICE: credentials obtained, scopes=%s", creds.scopes)
     svc = build("forms", "v1", credentials=creds)
-    print("[FORMS-SERVICE] Google Forms service built successfully")
+    logger.info("FORMS-SERVICE: Google Forms service built successfully")
     return svc
 
 
 def _load_stored_responses() -> list[dict]:
-    print(f"[FORMS-SERVICE] Loading stored responses from {RESPONSES_PATH}")
+    logger.debug("FORMS-SERVICE: loading stored responses from %s", RESPONSES_PATH)
     if RESPONSES_PATH.exists():
         data = json.loads(RESPONSES_PATH.read_text(encoding="utf-8"))
-        print(f"[FORMS-SERVICE] Loaded {len(data)} stored responses")
+        logger.debug("FORMS-SERVICE: loaded %d stored responses", len(data))
         return data
-    print(f"[FORMS-SERVICE] File not found: {RESPONSES_PATH} — returning empty list")
+    logger.debug("FORMS-SERVICE: file not found %s — returning empty list", RESPONSES_PATH)
     return []
 
 
@@ -97,41 +102,57 @@ def _match_question(title: str) -> str | None:
 def fetch_form_responses(form_id: str | None = None) -> list[dict]:
     """Fetch all responses from the Google Form and return parsed records."""
     fid = form_id or settings.google_form_id
-    print(f"[FORMS-FETCH] fetch_form_responses called with form_id={form_id}, resolved fid={fid}")
+    logger.info("FORMS-FETCH: fetch_form_responses called — form_id=%s, resolved fid=%s", form_id, fid)
     if not fid:
         raise GoogleFormsError("GOOGLE_FORM_ID is not configured in .env")
 
     service = _get_forms_service()
 
     # First, get the form schema to map questionId → field key
-    print(f"[FORMS-FETCH] Fetching form schema for formId={fid}...")
+    logger.info("FORMS-FETCH: fetching form schema for formId=%s", fid)
     try:
         form = service.forms().get(formId=fid).execute()
-        print(f"[FORMS-FETCH] Form schema retrieved: title='{form.get('info', {}).get('title', 'N/A')}', items={len(form.get('items', []))}")
+        logger.info("FORMS-FETCH: form schema retrieved — title='%s', items=%d",
+                     form.get("info", {}).get("title", "N/A"), len(form.get("items", [])))
     except Exception as exc:
-        print(f"[FORMS-FETCH] ERROR fetching form schema: {type(exc).__name__}: {exc}")
+        logger.exception("FORMS-FETCH: error fetching form schema: %s", exc)
         raise
 
     question_map: dict[str, str] = {}
     for item in form.get("items", []):
+        # Handle regular questions (questionItem)
         q = item.get("questionItem", {}).get("question", {})
         q_id = q.get("questionId", "")
         title = item.get("title", "")
         mapped = _match_question(title)
-        print(f"[FORMS-FETCH]   Question: title='{title}', q_id={q_id}, mapped_to={mapped}")
+        logger.debug("FORMS-FETCH: question title='%s', q_id=%s, mapped_to=%s", title, q_id, mapped)
         if mapped and q_id:
             question_map[q_id] = mapped
 
-    print(f"[FORMS-FETCH] Question map built: {question_map}")
+        # Handle question groups / grids (questionGroupItem) — each row is a sub-question
+        group = item.get("questionGroupItem")
+        if group:
+            group_title = title  # The group's overall title
+            for row_item in group.get("questions", []):
+                row_q = row_item.get("questionId", "")
+                row_title = row_item.get("rowQuestion", {}).get("title", "")
+                # Try matching the row title first, then fall back to group title
+                row_mapped = _match_question(row_title) or _match_question(group_title)
+                logger.debug("FORMS-FETCH: group row title='%s', q_id=%s, mapped_to=%s",
+                             row_title, row_q, row_mapped)
+                if row_mapped and row_q:
+                    question_map[row_q] = row_mapped
+
+    logger.debug("FORMS-FETCH: question map built — %d mappings", len(question_map))
 
     # Fetch responses
-    print(f"[FORMS-FETCH] Fetching responses for formId={fid}...")
+    logger.info("FORMS-FETCH: fetching responses for formId=%s", fid)
     try:
         resp = service.forms().responses().list(formId=fid).execute()
         raw_responses = resp.get("responses", [])
-        print(f"[FORMS-FETCH] Raw responses received: {len(raw_responses)}")
+        logger.info("FORMS-FETCH: raw responses received — count=%d", len(raw_responses))
     except Exception as exc:
-        print(f"[FORMS-FETCH] ERROR fetching responses: {type(exc).__name__}: {exc}")
+        logger.exception("FORMS-FETCH: error fetching responses: %s", exc)
         raise
 
     parsed: list[dict] = []
@@ -139,7 +160,8 @@ def fetch_form_responses(form_id: str | None = None) -> list[dict]:
         response_id = r.get("responseId", "")
         submitted_at = r.get("lastSubmittedTime", "")
         answers = r.get("answers", {})
-        print(f"[FORMS-FETCH]   Response #{i+1}: id={response_id}, submitted_at={submitted_at}, answer_keys={list(answers.keys())}")
+        logger.debug("FORMS-FETCH: response #%d — id=%s, submitted_at=%s, answer_keys=%s",
+                      i + 1, response_id, submitted_at, list(answers.keys()))
 
         record: dict[str, Any] = {
             "response_id": response_id,
@@ -148,19 +170,21 @@ def fetch_form_responses(form_id: str | None = None) -> list[dict]:
         for q_id, answer_data in answers.items():
             field_key = question_map.get(q_id)
             if not field_key:
-                print(f"[FORMS-FETCH]     Skipping unmapped q_id={q_id}")
                 continue
             # Extract the text answer (handles both text and scale answers)
             text_answers = answer_data.get("textAnswers", {}).get("answers", [])
             if text_answers:
                 value = text_answers[0].get("value", "")
                 record[field_key] = value
-                print(f"[FORMS-FETCH]     {field_key} = {value}")
+            else:
+                # Handle grade/scale answers (used in grid & scale question types)
+                grade = answer_data.get("grade", {})
+                if grade.get("score") is not None:
+                    record[field_key] = str(int(grade["score"]))
 
         parsed.append(record)
-        print(f"[FORMS-FETCH]   Parsed record: {record}")
 
-    print(f"[FORMS-FETCH] Total parsed responses: {len(parsed)}")
+    logger.info("FORMS-FETCH: total parsed responses=%d", len(parsed))
     return parsed
 
 
@@ -174,27 +198,27 @@ def poll_and_store(form_id: str | None = None) -> dict:
             "responses": [...]
         }
     """
-    print(f"[FORMS-POLL] poll_and_store called with form_id={form_id}")
+    logger.info("FORMS-POLL: poll_and_store called — form_id=%s", form_id)
     new_responses = fetch_form_responses(form_id)
-    print(f"[FORMS-POLL] Fetched {len(new_responses)} responses from Google Forms")
+    logger.info("FORMS-POLL: fetched %d responses from Google Forms", len(new_responses))
 
     stored = _load_stored_responses()
-    existing_ids = {r["response_id"] for r in stored}
-    print(f"[FORMS-POLL] Existing stored responses: {len(stored)}, existing IDs: {existing_ids}")
+    existing_map = {r["response_id"]: i for i, r in enumerate(stored)}
 
     new_count = 0
     for resp in new_responses:
-        if resp["response_id"] not in existing_ids:
-            stored.append(resp)
-            existing_ids.add(resp["response_id"])
-            new_count += 1
-            print(f"[FORMS-POLL] New response added: {resp['response_id']}")
+        idx = existing_map.get(resp["response_id"])
+        if idx is not None:
+            # Update existing response with any new/fixed fields
+            stored[idx] = resp
         else:
-            print(f"[FORMS-POLL] Duplicate skipped: {resp['response_id']}")
+            stored.append(resp)
+            existing_map[resp["response_id"]] = len(stored) - 1
+            new_count += 1
+            logger.debug("FORMS-POLL: new response added — id=%s", resp["response_id"])
 
     _save_responses(stored)
-    print(f"[FORMS-POLL] Saved {len(stored)} total responses ({new_count} new)")
-    logger.info("Form poll complete: %d total, %d new", len(stored), new_count)
+    logger.info("FORMS-POLL: saved %d total responses (%d new)", len(stored), new_count)
 
     return {
         "total": len(stored),
@@ -203,17 +227,64 @@ def poll_and_store(form_id: str | None = None) -> dict:
     }
 
 
+def fetch_raw_form_responses(form_id: str | None = None) -> dict:
+    """Fetch raw responses directly from Google Forms API without any parsing/mapping."""
+    fid = form_id or settings.google_form_id
+    logger.info("FORMS-RAW: fetch_raw_form_responses called — form_id=%s, resolved fid=%s", form_id, fid)
+    if not fid:
+        raise GoogleFormsError("GOOGLE_FORM_ID is not configured in .env")
+
+    service = _get_forms_service()
+
+    # Fetch form schema (for reference)
+    logger.info("FORMS-RAW: fetching form schema for formId=%s", fid)
+    try:
+        form = service.forms().get(formId=fid).execute()
+        logger.info("FORMS-RAW: form title='%s', items=%d",
+                     form.get("info", {}).get("title", "N/A"), len(form.get("items", [])))
+    except Exception as exc:
+        logger.exception("FORMS-RAW: error fetching form schema: %s", exc)
+        raise
+
+    # Build question_id -> title lookup for convenience
+    question_titles = {}
+    for item in form.get("items", []):
+        q = item.get("questionItem", {}).get("question", {})
+        q_id = q.get("questionId", "")
+        title = item.get("title", "")
+        if q_id:
+            question_titles[q_id] = title
+
+    # Fetch raw responses
+    logger.info("FORMS-RAW: fetching responses for formId=%s", fid)
+    try:
+        resp = service.forms().responses().list(formId=fid).execute()
+        raw_responses = resp.get("responses", [])
+        logger.info("FORMS-RAW: raw responses received — count=%d", len(raw_responses))
+    except Exception as exc:
+        logger.exception("FORMS-RAW: error fetching responses: %s", exc)
+        raise
+
+    return {
+        "form_id": fid,
+        "form_title": form.get("info", {}).get("title", ""),
+        "question_titles": question_titles,
+        "total": len(raw_responses),
+        "responses": raw_responses,
+    }
+
+
 def get_responses_for_cycle(cycle_id: str) -> list[dict]:
     """Return all stored responses that match a given cycle_id."""
-    print(f"[FORMS-SERVICE] get_responses_for_cycle called with cycle_id={cycle_id}")
+    logger.info("FORMS-SERVICE: get_responses_for_cycle — cycle_id=%s", cycle_id)
     stored = _load_stored_responses()
     matched = [r for r in stored if r.get("cycle_id") == cycle_id]
-    print(f"[FORMS-SERVICE] Matched {len(matched)} out of {len(stored)} for cycle_id={cycle_id}")
+    logger.info("FORMS-SERVICE: matched %d out of %d for cycle_id=%s", len(matched), len(stored), cycle_id)
     return matched
 
 
 def get_all_stored_responses() -> list[dict]:
-    print("[FORMS-SERVICE] get_all_stored_responses called")
+    logger.info("FORMS-SERVICE: get_all_stored_responses called")
     result = _load_stored_responses()
-    print(f"[FORMS-SERVICE] Returning {len(result)} total responses")
+    logger.info("FORMS-SERVICE: returning %d total responses", len(result))
     return result

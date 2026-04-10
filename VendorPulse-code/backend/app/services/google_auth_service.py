@@ -13,22 +13,14 @@ import os
 from pathlib import Path
 from typing import Any
 
+from app.config import settings
+
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 
 from app.config import settings
-
-# Allow HTTP redirect URIs for local development (localhost).
-# In production, use HTTPS and remove this.
-if settings.google_redirect_uri.startswith("http://localhost"):
-    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
-    print(f"[AUTH-ENV] OAUTHLIB_INSECURE_TRANSPORT = 1 (redirect_uri={settings.google_redirect_uri})")
-
-print(f"[AUTH-ENV] google_client_id = {settings.google_client_id[:20]}...")
-print(f"[AUTH-ENV] google_project_id = {settings.google_project_id}")
-print(f"[AUTH-ENV] google_redirect_uri = {settings.google_redirect_uri}")
-print(f"[AUTH-ENV] SCOPES will be: gmail.send, forms.responses.readonly, forms.body.readonly")
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +30,16 @@ SCOPES = [
     "https://www.googleapis.com/auth/forms.responses.readonly",
     "https://www.googleapis.com/auth/forms.body.readonly",
 ]
+
+# Allow HTTP redirect URIs for local development (localhost).
+# In production, use HTTPS and remove this.
+if settings.google_redirect_uri.startswith("http://localhost"):
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+    logger.info("AUTH-ENV: OAUTHLIB_INSECURE_TRANSPORT=1 (redirect_uri=%s)", settings.google_redirect_uri)
+
+logger.info("AUTH-ENV: google_client_id=%s..., project=%s, redirect_uri=%s",
+            settings.google_client_id[:20], settings.google_project_id, settings.google_redirect_uri)
+logger.debug("AUTH-ENV: SCOPES=%s", SCOPES)
 
 TOKEN_PATH = settings.data_dir / "google_token.json"
 
@@ -59,19 +61,20 @@ def _client_config() -> dict[str, Any]:
             "redirect_uris": [settings.google_redirect_uri],
         }
     }
-    print(f"[AUTH-CONFIG] client_config built — client_id={config['web']['client_id'][:20]}..., token_uri={config['web']['token_uri']}, redirect_uris={config['web']['redirect_uris']}")
+    logger.debug("AUTH-CONFIG: client_config built — client_id=%s..., redirect_uris=%s",
+                 config["web"]["client_id"][:20], config["web"]["redirect_uris"])
     return config
 
 
 def build_oauth_flow() -> Flow:
     """Create a Google OAuth2 flow for the consent redirect."""
-    print("[AUTH-FLOW] Building OAuth flow...")
+    logger.info("AUTH-FLOW: building OAuth flow")
     flow = Flow.from_client_config(
         _client_config(),
         scopes=SCOPES,
         redirect_uri=settings.google_redirect_uri,
     )
-    print(f"[AUTH-FLOW] Flow created — redirect_uri={settings.google_redirect_uri}, scopes={SCOPES}")
+    logger.info("AUTH-FLOW: flow created — redirect_uri=%s", settings.google_redirect_uri)
     return flow
 
 
@@ -84,61 +87,58 @@ def start_oauth_flow() -> tuple[str, str]:
         prompt="consent",
     )
     _pending_flows[state] = flow
-    print(f"[AUTH] Cached flow for state={state}")
+    logger.info("AUTH: cached flow for state=%s", state)
     return auth_url, state
 
 
 def exchange_code_for_token(code: str, state: str | None = None) -> Credentials:
     """Exchange the authorization code for credentials and persist them."""
-    print(f"[AUTH-EXCHANGE] Starting token exchange...")
-    print(f"[AUTH-EXCHANGE] Code (first 20 chars): {code[:20]}...")
+    logger.info("AUTH-EXCHANGE: starting token exchange")
 
     # Reuse the original Flow that generated the auth URL (has the PKCE
     # code_verifier).  Fall back to a fresh flow if state is missing.
     flow = _pending_flows.pop(state, None) if state else None
     if flow is None:
-        print("[AUTH-EXCHANGE] WARNING: no cached flow found, creating fresh one")
+        logger.warning("AUTH-EXCHANGE: no cached flow found, creating fresh one")
         flow = build_oauth_flow()
 
     flow.oauth2session._state = None  # type: ignore[attr-defined]
-    print("[AUTH-EXCHANGE] Session state set to None (bypassing state check)")
 
     os.environ.pop("OAUTHLIB_RELAX_TOKEN_SCOPE", None)
 
     token_uri = flow.oauth2session.auto_refresh_url or "https://oauth2.googleapis.com/token"
-    print(f"[AUTH-EXCHANGE] Token URI: {token_uri}")
-    print(f"[AUTH-EXCHANGE] Calling flow.fetch_token(code=...)...")
+    logger.debug("AUTH-EXCHANGE: token_uri=%s", token_uri)
 
     try:
         flow.fetch_token(code=code)
-        print(f"[AUTH-EXCHANGE] fetch_token succeeded!")
+        logger.info("AUTH-EXCHANGE: fetch_token succeeded")
     except Exception as exc:
-        print(f"[AUTH-EXCHANGE] fetch_token FAILED: {type(exc).__name__}: {exc}")
+        logger.exception("AUTH-EXCHANGE: fetch_token FAILED: %s", exc)
         raise
 
     creds = flow.credentials
-    print(f"[AUTH-EXCHANGE] Credentials obtained — token present: {bool(creds.token)}, refresh_token present: {bool(creds.refresh_token)}")
-    print(f"[AUTH-EXCHANGE] Token (first 20 chars): {creds.token[:20] if creds.token else 'None'}...")
+    logger.info(
+        "AUTH-EXCHANGE: credentials obtained — token_present=%s, refresh_token_present=%s",
+        bool(creds.token), bool(creds.refresh_token),
+    )
 
     _save_token(creds)
-    print(f"[AUTH-EXCHANGE] Token saved to {TOKEN_PATH}")
-    logger.info("Google authentication successful")
+    logger.info("AUTH-EXCHANGE: token saved to %s", TOKEN_PATH)
     return creds
 
 
 def get_credentials() -> Credentials | None:
     """Load saved credentials, refreshing if expired. Returns None if
     the user has not authenticated yet."""
-    print(f"[AUTH-CREDS] Loading credentials from {TOKEN_PATH}")
+    logger.debug("AUTH-CREDS: loading credentials from %s", TOKEN_PATH)
     if not TOKEN_PATH.exists():
-        print("[AUTH-CREDS] Token file not found — not authenticated")
+        logger.debug("AUTH-CREDS: token file not found — not authenticated")
         return None
 
     try:
         creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
     except Exception as exc:
-        logger.warning("Corrupt token file — re-auth required")
-        print(f"[AUTH-CREDS] Failed to load token file: {exc}")
+        logger.warning("AUTH-CREDS: corrupt token file — re-auth required: %s", exc)
         return None
 
     # Check that the stored token has ALL required scopes
@@ -146,35 +146,31 @@ def get_credentials() -> Credentials | None:
     required_scopes = set(SCOPES)
     missing = required_scopes - stored_scopes
     if missing:
-        print(f"[AUTH-CREDS] Token missing scopes: {missing}. Re-auth required.")
-        print(f"[AUTH-CREDS] Stored scopes: {stored_scopes}")
-        print(f"[AUTH-CREDS] Required scopes: {required_scopes}")
-        logger.warning("Token missing scopes %s — re-auth required", missing)
+        logger.warning("AUTH-CREDS: token missing scopes %s — re-auth required (stored=%s)", missing, stored_scopes)
         # Delete the stale token so user is prompted to re-authenticate
         try:
             TOKEN_PATH.unlink()
-            print("[AUTH-CREDS] Deleted stale token file")
+            logger.info("AUTH-CREDS: deleted stale token file")
         except Exception:
             pass
         return None
 
     if creds.valid:
-        print("[AUTH-CREDS] Credentials valid")
+        logger.debug("AUTH-CREDS: credentials valid")
         return creds
 
     if creds.expired and creds.refresh_token:
-        print("[AUTH-CREDS] Token expired, attempting refresh...")
+        logger.info("AUTH-CREDS: token expired, attempting refresh")
         try:
             creds.refresh(Request())
             _save_token(creds)
-            print("[AUTH-CREDS] Token refreshed successfully")
+            logger.info("AUTH-CREDS: token refreshed successfully")
             return creds
         except Exception as exc:
-            logger.warning("Token refresh failed — re-auth required")
-            print(f"[AUTH-CREDS] Token refresh failed: {exc}")
+            logger.warning("AUTH-CREDS: token refresh failed — re-auth required: %s", exc)
             return None
 
-    print("[AUTH-CREDS] Credentials not valid and cannot refresh")
+    logger.warning("AUTH-CREDS: credentials not valid and cannot refresh")
     return None
 
 

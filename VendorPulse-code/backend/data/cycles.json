@@ -1,62 +1,33 @@
 [
   {
-    "cycle_id": "c_94b73728",
+    "cycle_id": "c_5358c22b",
     "vendor_id": "v_custom",
-    "vendor_name": "zensar",
+    "vendor_name": "test 12",
     "quarter": "Q1",
     "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-09T09:37:16.495109+00:00",
-    "updated_at": "2026-04-09T09:37:50.607181+00:00"
+    "workflow_state": "SCORECARD_REQUEST_SENT",
+    "created_at": "2026-04-09T18:22:25.634426+00:00",
+    "updated_at": "2026-04-09T18:51:20.067110+00:00",
+    "scorecard_dispatched_at": "2026-04-09T18:51:20.067110+00:00",
+    "scorecard_dispatched_to": [
+      "anupkesarwani3537@gmail.com",
+      "kanishkpunekar54@gmail.com"
+    ]
   },
   {
-    "cycle_id": "c_a0edf5d5",
-    "vendor_id": "v1",
-    "vendor_name": "NovaTech Services",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "MEETING_SCHEDULED",
-    "created_at": "2026-03-10T08:00:00Z",
-    "updated_at": "2026-04-02T10:19:02.445103+00:00"
-  },
-  {
-    "cycle_id": "c_44ce9222",
+    "cycle_id": "c_3378f049",
     "vendor_id": "v_custom",
-    "vendor_name": "Zensar",
+    "vendor_name": "Zensar-test",
     "quarter": "Q1",
     "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-08T12:15:59.832240+00:00",
-    "updated_at": "2026-04-08T12:18:41.999832+00:00"
-  },
-  {
-    "cycle_id": "c_22fb7b79",
-    "vendor_id": "v1",
-    "vendor_name": "NovaTech Services",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-09T05:50:35.221810+00:00",
-    "updated_at": "2026-04-09T05:51:07.082091+00:00"
-  },
-  {
-    "cycle_id": "c_443b5a79",
-    "vendor_id": "v1",
-    "vendor_name": "NovaTech Services",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
-    "created_at": "2026-04-09T06:52:30.812868+00:00",
-    "updated_at": "2026-04-09T06:52:30.812868+00:00"
-  },
-  {
-    "cycle_id": "c_18283d29",
-    "vendor_id": "v1",
-    "vendor_name": "NovaTech Services",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-09T07:20:41.269033+00:00",
-    "updated_at": "2026-04-09T07:28:21.607240+00:00"
+    "workflow_state": "SCORECARD_REQUEST_SENT",
+    "created_at": "2026-04-10T05:04:50.226531+00:00",
+    "updated_at": "2026-04-10T05:06:15.319570+00:00",
+    "scorecard_dispatched_at": "2026-04-10T05:06:15.319570+00:00",
+    "scorecard_dispatched_to": [
+      "adivadgave16@gmail.com",
+      "anupkesarwani3537@gmail.com",
+      "kanishkpunekar54@gmail.com"
+    ]
   }
 ]

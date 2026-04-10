@@ -8,9 +8,12 @@ For Gmail, use an App Password (recommended) with SMTP over TLS.
 
 from __future__ import annotations
 
+import logging
 import smtplib
 from dataclasses import dataclass
 from email.mime.text import MIMEText
+
+logger = logging.getLogger(__name__)
 
 
 class EmailSendError(RuntimeError):
@@ -45,6 +48,8 @@ class EmailService:
 
     def send_text_email(self, *, to_email: str, subject: str, text: str) -> None:
         from_email = self._config.from_email or self._config.username
+        logger.info("send_text_email — to=%s, subject=%s, host=%s:%d",
+                     to_email, subject, self._config.host, self._config.port)
 
         msg = MIMEText(text, _subtype="plain", _charset="utf-8")
         msg["Subject"] = subject
@@ -64,5 +69,7 @@ class EmailService:
                     server.ehlo()
                     server.login(self._config.username, self._config.password)
                     server.sendmail(from_email, [to_email], msg.as_string())
+            logger.info("send_text_email success — to=%s", to_email)
         except Exception as exc:  # noqa: BLE001
+            logger.error("send_text_email failed — to=%s, error=%s", to_email, exc)
             raise EmailSendError(f"Failed to send email to '{to_email}': {exc}") from exc

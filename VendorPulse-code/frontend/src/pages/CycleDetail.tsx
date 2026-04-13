@@ -999,9 +999,7 @@ function MeetingTab({
         mostConcerning="Communication"
         recurringIssueCount={0}
         predictedChallenges={[
-          'February SLA incident dispute — vendor likely to challenge score',
-          'AI pilot scope change — formal contract amendment required',
-          'Pricing CPI clause interpretation — 8% vs 5% cap',
+          
         ]}
       />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

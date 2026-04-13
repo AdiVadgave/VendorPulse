@@ -46,7 +46,7 @@ export default function ChangeHighlightsPanel({ deltas, whatChangedBullets, insi
   return (
     <div className="space-y-4">
       {/* AI Summary — collapsible */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+      {/* <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
         <button
           onClick={() => setSummaryOpen(!summaryOpen)}
           className="w-full p-5 pb-3 flex items-center gap-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
@@ -76,7 +76,7 @@ export default function ChangeHighlightsPanel({ deltas, whatChangedBullets, insi
             </ul>
           </div>
         )}
-      </div>
+      </div> */}
 
       {/* Score deltas table — collapsible */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">

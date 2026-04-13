@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { CalendarPlus, Users, Clock, CheckCircle2, ExternalLink, Search } from 'lucide-react'
-import { findAlignmentTimes, scheduleAlignmentMeeting } from '@/lib/alignmentApi'
+import { useState, useEffect, useCallback } from 'react'
+import { CalendarPlus, Users, Clock, CheckCircle2, ExternalLink, Search, Plus, X, UserPlus, Trash2 } from 'lucide-react'
+import { findAlignmentTimes, scheduleAlignmentMeeting, getAlignmentMeeting, getAlignmentAttendees, addAlignmentAttendee, removeAlignmentAttendee } from '@/lib/alignmentApi'
 import { getTokenOwnerOrganizerEmail } from '@/lib/schedulingApi'
 import SlotCard from '@/components/modules/scheduling/SlotCard'
 import type { SlotProposal } from '@/types/scheduling.types'
+import type { CycleAttendee } from '@/types/scheduling.types'
 
 export interface AlignmentMeetingResult {
   teamsUrl: string | null
@@ -26,6 +27,67 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
   const [scheduleLoading, setScheduleLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [timeZone, setTimeZone] = useState<'IST' | 'UTC' | 'GMT'>('IST')
+
+  // Internal attendees state
+  const [internalAttendees, setInternalAttendees] = useState<CycleAttendee[]>([])
+  const [attendeesLoading, setAttendeesLoading] = useState(false)
+
+  // Add attendee form state
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newRole, setNewRole] = useState('VMO_COORDINATOR')
+  const [newOrg, setNewOrg] = useState('')
+  const [addLoading, setAddLoading] = useState(false)
+  const [removeLoading, setRemoveLoading] = useState<string | null>(null)
+
+  // State persistence check
+  const [persistenceChecked, setPersistenceChecked] = useState(false)
+
+  // Fetch internal attendees on mount
+  const fetchAttendees = useCallback(async () => {
+    setAttendeesLoading(true)
+    try {
+      const res = await getAlignmentAttendees(cycleId)
+      setInternalAttendees(res.attendees)
+    } catch {
+      // Fallback: attendees endpoint may not be available
+    } finally {
+      setAttendeesLoading(false)
+    }
+  }, [cycleId])
+
+  // Check for existing meeting on mount (state persistence)
+  useEffect(() => {
+    if (persistenceChecked) return
+    if (meetingResult) {
+      setPersistenceChecked(true)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await getAlignmentMeeting(cycleId)
+        if (!cancelled && res.meeting) {
+          onMeetingScheduled({
+            teamsUrl: res.meeting.teams_meeting_url,
+            webLink: res.meeting.web_link,
+            attendeeCount: res.meeting.attendee_count,
+          })
+        }
+      } catch {
+        // Backend offline or no meeting — that's fine
+      } finally {
+        if (!cancelled) setPersistenceChecked(true)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [cycleId, meetingResult, onMeetingScheduled, persistenceChecked])
+
+  // Fetch attendees on mount
+  useEffect(() => {
+    fetchAttendees()
+  }, [fetchAttendees])
 
   async function handleFindTimes() {
     if (!dateStart || !dateEnd) return
@@ -82,6 +144,40 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
     }
   }
 
+  async function handleAddAttendee() {
+    if (!newName.trim() || !newEmail.trim()) return
+    setAddLoading(true)
+    try {
+      const res = await addAlignmentAttendee(cycleId, {
+        name: newName.trim(),
+        email: newEmail.trim(),
+        role: newRole,
+        organisation: newOrg.trim(),
+      })
+      setInternalAttendees(prev => [...prev, res.attendee])
+      setNewName('')
+      setNewEmail('')
+      setNewOrg('')
+      setShowAddForm(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to add attendee')
+    } finally {
+      setAddLoading(false)
+    }
+  }
+
+  async function handleRemoveAttendee(attendeeId: string) {
+    setRemoveLoading(attendeeId)
+    try {
+      await removeAlignmentAttendee(cycleId, attendeeId)
+      setInternalAttendees(prev => prev.filter(a => a.attendee_id !== attendeeId))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to remove attendee')
+    } finally {
+      setRemoveLoading(null)
+    }
+  }
+
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
       <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
@@ -93,29 +189,132 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
 
       <div className="p-5 space-y-4">
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Schedule a meeting for stakeholders to discuss score differences and alignment points before the vendor call.
+          Schedule a meeting for internal stakeholders to discuss score differences and alignment points before the vendor call.
         </p>
 
-        {/* Meeting details */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
-            <div className="flex items-center gap-2 mb-1.5">
+        {/* Internal Attendees list with management */}
+        <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
               <Users size={13} className="text-slate-400" />
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                Attendees
+                Internal Stakeholder Attendees ({internalAttendees.length})
               </span>
             </div>
-            <p className="text-sm text-slate-700 dark:text-slate-300">All internal stakeholders</p>
+            {!meetingResult && (
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="flex items-center gap-1 text-xs text-violet-600 dark:text-violet-400 hover:text-violet-700 font-medium"
+              >
+                {showAddForm ? <X size={12} /> : <UserPlus size={12} />}
+                {showAddForm ? 'Cancel' : 'Add'}
+              </button>
+            )}
           </div>
-          <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
-            <div className="flex items-center gap-2 mb-1.5">
-              <Clock size={13} className="text-slate-400" />
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                Duration
-              </span>
+
+          {attendeesLoading ? (
+            <p className="text-xs text-slate-400">Loading attendees...</p>
+          ) : internalAttendees.length > 0 ? (
+            <div className="space-y-1.5">
+              {internalAttendees.map(a => (
+                <div key={a.attendee_id} className="flex items-center justify-between group">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-[10px] font-semibold text-violet-600 dark:text-violet-400">
+                      {a.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{a.name}</span>
+                      <span className="text-[10px] text-slate-400 ml-1.5">{a.role}</span>
+                      {a.is_key && (
+                        <span className="ml-1.5 text-[9px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1 py-0.5 rounded font-semibold">
+                          KEY
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {!meetingResult && (
+                    <button
+                      onClick={() => handleRemoveAttendee(a.attendee_id)}
+                      disabled={removeLoading === a.attendee_id}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-500 disabled:opacity-30"
+                      title="Remove attendee"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
-            <p className="text-sm text-slate-700 dark:text-slate-300">30 minutes (recommended)</p>
+          ) : (
+            <p className="text-xs text-slate-400">No internal stakeholders found for this cycle.</p>
+          )}
+
+          {/* Vendor exclusion note */}
+          <p className="text-[10px] text-slate-400 mt-2 italic">
+            Only internal stakeholders are included. Vendor attendees are excluded from alignment meetings.
+          </p>
+
+          {/* Add attendee form */}
+          {showAddForm && (
+            <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                  className="text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                >
+                  <option value="VMO_COORDINATOR">VMO Coordinator</option>
+                  <option value="EGB_CHAIR">EGB Chair</option>
+                  <option value="INTERNAL_LEAD">Internal Lead</option>
+                  <option value="TECHNICAL_LEAD">Technical Lead</option>
+                  <option value="COMMERCIAL_LEAD">Commercial Lead</option>
+                  <option value="VENDOR_MANAGER">Vendor Manager</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Organisation (optional)"
+                  value={newOrg}
+                  onChange={(e) => setNewOrg(e.target.value)}
+                  className="text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+              </div>
+              <button
+                onClick={handleAddAttendee}
+                disabled={!newName.trim() || !newEmail.trim() || addLoading}
+                className="flex items-center gap-1.5 text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed rounded px-3 py-1.5 transition-colors"
+              >
+                <Plus size={12} />
+                {addLoading ? 'Adding...' : 'Add Attendee'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Duration info */}
+        <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Clock size={13} className="text-slate-400" />
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              Duration
+            </span>
           </div>
+          <p className="text-sm text-slate-700 dark:text-slate-300">30 minutes (recommended)</p>
         </div>
 
         {/* Agenda preview */}

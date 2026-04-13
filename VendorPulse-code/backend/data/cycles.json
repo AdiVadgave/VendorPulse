@@ -10,68 +10,41 @@
     "updated_at": "2026-04-13T04:42:49.811099+00:00"
   },
   {
-    "cycle_id": "c_1674c62b",
-    "vendor_id": "v_2a544e09",
-    "vendor_name": "Zensar2",
+    "cycle_id": "c_1ef88978",
+    "vendor_id": "v_05392e0d",
+    "vendor_name": "TCS",
     "quarter": "Q1",
     "year": 2026,
-    "workflow_state": "SCORECARD_REQUEST_SENT",
-    "created_at": "2026-04-13T04:56:50.863307+00:00",
-    "updated_at": "2026-04-13T05:00:41.462065+00:00",
-    "scorecard_dispatched_at": "2026-04-13T05:00:41.462065+00:00",
+    "workflow_state": "SCORECARD_COMPILED",
+    "created_at": "2026-04-13T06:32:34.605043+00:00",
+    "updated_at": "2026-04-13T06:36:56.521755+00:00",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YTYzNjZlYTctMTg5Yi00ZjliLTg4YzktZTU0Njc5NWQwYTUy%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2efgAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "teams_meeting_event_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2efgAAAA==",
+    "teams_meeting_scheduled_at": "2026-04-13T06:34:45.942524+00:00",
+    "scorecard_dispatched_at": "2026-04-13T06:35:56.428816+00:00",
     "scorecard_dispatched_to": [
-      "anupkesarwani3537@gmail.com",
-      "kanishkpune54@gmail.com",
-      "adivadgave16@gmail.com"
-    ]
-  },
-  {
-    "cycle_id": "c_5ba1ebaf",
-    "vendor_id": "v_a18323dc",
-    "vendor_name": "zensar3",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "SCORECARD_REQUEST_SENT",
-    "created_at": "2026-04-13T05:04:48.939777+00:00",
-    "updated_at": "2026-04-13T05:05:54.534980+00:00",
-    "scorecard_dispatched_at": "2026-04-13T05:05:54.534980+00:00",
-    "scorecard_dispatched_to": [
-      "anupkesarwani3537@gmail.com",
-      "adivadgave16@gmail.com",
-      "kanishkpunekar54@gmail.com"
-    ]
-  },
-  {
-    "cycle_id": "c_dc171151",
-    "vendor_id": "v_fe990977",
-    "vendor_name": "Zensar4",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "VENDOR_PREP",
-    "created_at": "2026-04-13T05:46:21.726276+00:00",
-    "updated_at": "2026-04-13T05:52:27.510435+00:00",
-    "scorecard_dispatched_at": "2026-04-13T05:47:49.921850+00:00",
-    "scorecard_dispatched_to": [
-      "anupkesarwani3537@gmail.com",
       "kanishkpunekar54@gmail.com",
-      "adivadgave16@gmail.com"
+      "adivadgave16@gmail.com",
+      "anupkesarwani3537@gmail.com"
     ]
   },
   {
-    "cycle_id": "c_ed96b4eb",
-    "vendor_id": "v_3e22bc3e",
-    "vendor_name": "z5",
+    "cycle_id": "c_6348ccbd",
+    "vendor_id": "v_6e075041",
+    "vendor_name": "Zensar5",
     "quarter": "Q1",
     "year": 2026,
     "workflow_state": "ARCHIVED",
-    "created_at": "2026-04-13T05:58:08.932239+00:00",
-    "updated_at": "2026-04-13T06:05:57.064101+00:00",
-    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_ZDY4MzViOWQtMDkzOC00MTZjLWJhNDYtYTg4N2ZmZTI0ZWVm%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2efAAAAA%3D%3D&exvsurl=1&path=/calendar/item",
-    "teams_meeting_event_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2efAAAAA==",
-    "teams_meeting_scheduled_at": "2026-04-13T05:59:10.971602+00:00",
-    "scorecard_dispatched_at": "2026-04-13T05:59:17.984357+00:00",
+    "created_at": "2026-04-13T06:46:13.194394+00:00",
+    "updated_at": "2026-04-13T07:09:51.522227+00:00",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YWQ0NjAxMzUtMWMxNy00ZWQ5LWJlMjYtY2Q1MTE0MzFhZjIz%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2efwAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "teams_meeting_event_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2efwAAAA==",
+    "teams_meeting_scheduled_at": "2026-04-13T06:51:17.363199+00:00",
+    "scorecard_dispatched_at": "2026-04-13T06:53:38.181089+00:00",
     "scorecard_dispatched_to": [
+      "anupkesarwani3537@gmail.com",
       "adivadgave16@gmail.com",
       "kanishkpunekar54@gmail.com"
     ]

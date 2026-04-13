@@ -4,7 +4,7 @@
  */
 import { apiFetch } from './api'
 import type { ExtractedAction } from '@/types/alignment.types'
-import type { SlotProposal } from '@/types/scheduling.types'
+import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 
 // ── Response shape ──────────────────────────────────────────────────────────
 
@@ -103,6 +103,75 @@ export async function scheduleAlignmentMeeting(
         start_time: startTime,
         duration_minutes: durationMinutes,
         time_zone: timeZone,
+      }),
+    }
+  )
+}
+
+// ── Alignment Meeting State (persistence) ──────────────────────────────────
+
+export interface AlignmentMeetingState {
+  meeting: {
+    event_id: string
+    teams_meeting_url: string | null
+    web_link: string | null
+    attendee_count: number
+    status: string
+    time_slot: { date: string; startTime: string; endTime: string } | null
+    title: string
+  } | null
+}
+
+export async function getAlignmentMeeting(
+  cycleId: string
+): Promise<AlignmentMeetingState> {
+  return apiFetch<AlignmentMeetingState>(
+    `/api/cycles/${cycleId}/alignment/meeting`
+  )
+}
+
+// ── Internal Attendees ─────────────────────────────────────────────────────
+
+export interface AlignmentAttendeesResponse {
+  attendees: CycleAttendee[]
+  count: number
+}
+
+export async function getAlignmentAttendees(
+  cycleId: string
+): Promise<AlignmentAttendeesResponse> {
+  return apiFetch<AlignmentAttendeesResponse>(
+    `/api/cycles/${cycleId}/alignment/attendees`
+  )
+}
+
+export async function addAlignmentAttendee(
+  cycleId: string,
+  attendee: { name: string; email: string; role?: string; organisation?: string; is_key?: boolean }
+): Promise<{ attendee: CycleAttendee; message: string }> {
+  return apiFetch<{ attendee: CycleAttendee; message: string }>(
+    `/api/cycles/${cycleId}/alignment/attendees/add`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        cycle_id: cycleId,
+        ...attendee,
+      }),
+    }
+  )
+}
+
+export async function removeAlignmentAttendee(
+  cycleId: string,
+  attendeeId: string
+): Promise<{ message: string; attendee_id: string }> {
+  return apiFetch<{ message: string; attendee_id: string }>(
+    `/api/cycles/${cycleId}/alignment/attendees/remove`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        cycle_id: cycleId,
+        attendee_id: attendeeId,
       }),
     }
   )

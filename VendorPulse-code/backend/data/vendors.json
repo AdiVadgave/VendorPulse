@@ -94,5 +94,17 @@
     "name": "z5",
     "category": "IT Infrastructure",
     "status": "active"
+  },
+  {
+    "vendor_id": "v_05392e0d",
+    "name": "TCS",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_6e075041",
+    "name": "Zensar5",
+    "category": "IT Infrastructure",
+    "status": "active"
   }
 ]

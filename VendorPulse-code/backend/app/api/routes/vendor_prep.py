@@ -1,16 +1,20 @@
 """
 Module D — Vendor Prep agent routes.
 
-POST /api/cycles/{cycleId}/vendor-prep/brief       Generate vendor brief from scorecard
-POST /api/cycles/{cycleId}/vendor-prep/pushback     Draft 3 response options for a pushback item
+POST /api/cycles/{cycleId}/vendor-prep/brief            Generate vendor brief from scorecard
+POST /api/cycles/{cycleId}/vendor-prep/pushback          Draft 3 response options for a pushback item
+POST /api/cycles/{cycleId}/vendor-prep/brief/approve     Approve a generated vendor brief
+POST /api/cycles/{cycleId}/vendor-prep/pushback/approve  Approve a selected pushback response
 """
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
-from app.dependencies import get_vendor_prep_agent
+from app.dependencies import get_vendor_prep_agent, get_agent_run_repo
 from app.models.common import AgentResponse
 from app.models.vendor_prep import GenerateBriefRequest, HandlePushbackRequest
 
@@ -80,3 +84,63 @@ def handle_pushback(
     )
     logger.info("VENDOR-PREP: pushback handled — status=%s", response.status)
     return response
+
+
+# ── Approval endpoints ──────────────────────────────────────────────────────
+
+
+class ApproveRequest(BaseModel):
+    run_id: str
+    approved_by: str = "coordinator"
+
+
+@router.post("/brief/approve")
+def approve_brief(cycleId: str, payload: ApproveRequest):
+    """Mark a generated vendor brief as approved."""
+    logger.info("VENDOR-PREP: approve brief — cycleId=%s, run_id=%s", cycleId, payload.run_id)
+
+    repo = get_agent_run_repo()
+    record = repo.get_by_run_id(payload.run_id)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Agent run '{payload.run_id}' not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    repo.update_by_id("run_id", payload.run_id, {
+        "approval_status": "APPROVED",
+        "approved_by": payload.approved_by,
+        "approved_at": now,
+    })
+
+    logger.info("VENDOR-PREP: brief approved — run_id=%s, by=%s", payload.run_id, payload.approved_by)
+    return {
+        "status": "approved",
+        "run_id": payload.run_id,
+        "approved_by": payload.approved_by,
+        "approved_at": now,
+    }
+
+
+@router.post("/pushback/approve")
+def approve_pushback_response(cycleId: str, payload: ApproveRequest):
+    """Mark a selected pushback response as approved."""
+    logger.info("VENDOR-PREP: approve pushback — cycleId=%s, run_id=%s", cycleId, payload.run_id)
+
+    repo = get_agent_run_repo()
+    record = repo.get_by_run_id(payload.run_id)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Agent run '{payload.run_id}' not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    repo.update_by_id("run_id", payload.run_id, {
+        "approval_status": "APPROVED",
+        "approved_by": payload.approved_by,
+        "approved_at": now,
+    })
+
+    logger.info("VENDOR-PREP: pushback approved — run_id=%s, by=%s", payload.run_id, payload.approved_by)
+    return {
+        "status": "approved",
+        "run_id": payload.run_id,
+        "approved_by": payload.approved_by,
+        "approved_at": now,
+    }

@@ -2,14 +2,16 @@ import { useState } from 'react'
 import { Sparkles, Check, Shield, Handshake, AlertOctagon, Lock } from 'lucide-react'
 import type { PushbackItem, PushbackResponse } from '@/types/vendor-prep.types'
 import { PUSHBACK_CATEGORY_LABELS } from '@/types/vendor-prep.types'
+import { generatePushbackResponses } from '@/lib/vendorPrepApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { AgentStatus } from '@/types/agent.types'
 import { cn } from '@/utils/cn'
 
 interface Props {
+  cycleId: string
   items: PushbackItem[]
   responses: Record<string, PushbackResponse[]>
-  onGenerate: (pushbackId: string) => void
+  onGenerate: (pushbackId: string, responses: PushbackResponse[]) => void
   onSelectResponse: (pushbackId: string, responseId: string) => void
 }
 
@@ -20,25 +22,45 @@ const STANCE_CONFIG = {
 }
 
 function PushbackCard({
+  cycleId,
   item,
   responses,
   onGenerate,
   onSelect,
 }: {
+  cycleId: string
   item: PushbackItem
   responses: PushbackResponse[]
-  onGenerate: () => void
+  onGenerate: (responses: PushbackResponse[]) => void
   onSelect: (id: string) => void
 }) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(responses.length > 0 ? 'complete' : 'idle')
   const [selected, setSelected] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  function handleGenerate() {
+  async function handleGenerate() {
     setAgentStatus('running')
-    setTimeout(() => {
-      setAgentStatus('complete')
-      onGenerate()
-    }, 1400)
+    setError(null)
+    try {
+      const response = await generatePushbackResponses(
+        cycleId,
+        item.pushback_id,
+        item.category,
+        item.description,
+        item.raised_by,
+        item.needs_legal_review
+      )
+      if (response.status === 'success' && response.data) {
+        onGenerate(response.data.responses ?? [])
+        setAgentStatus('complete')
+      } else {
+        setError(response.summary || 'Failed to generate responses')
+        setAgentStatus('idle')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to reach backend')
+      setAgentStatus('idle')
+    }
   }
 
   function handleSelect(id: string) {
@@ -108,7 +130,7 @@ function PushbackCard({
           })}
         </div>
       ) : (
-        <div className="px-5 py-4">
+        <div className="px-5 py-4 space-y-2">
           <button
             onClick={handleGenerate}
             disabled={agentStatus === 'running'}
@@ -117,13 +139,18 @@ function PushbackCard({
             <Sparkles size={12} />
             {agentStatus === 'running' ? 'Drafting responses...' : 'Generate 3 Response Options'}
           </button>
+          {error && (
+            <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-export default function PushbackResponseCards({ items, responses, onGenerate, onSelectResponse }: Props) {
+export default function PushbackResponseCards({ cycleId, items, responses, onGenerate, onSelectResponse }: Props) {
   if (items.length === 0) {
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center">
@@ -142,9 +169,10 @@ export default function PushbackResponseCards({ items, responses, onGenerate, on
       {items.map((item) => (
         <PushbackCard
           key={item.pushback_id}
+          cycleId={cycleId}
           item={item}
           responses={responses[item.pushback_id] ?? []}
-          onGenerate={() => onGenerate(item.pushback_id)}
+          onGenerate={(generated) => onGenerate(item.pushback_id, generated)}
           onSelect={(rid) => onSelectResponse(item.pushback_id, rid)}
         />
       ))}

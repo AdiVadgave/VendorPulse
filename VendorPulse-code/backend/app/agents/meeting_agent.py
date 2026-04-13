@@ -84,6 +84,8 @@ class MeetingAgent(BaseAgent):
 
         if action == "generate_minutes":
             return self._deterministic_generate_minutes(context)
+        if action == "parse_transcript":
+            return self._deterministic_parse_transcript(context)
         if action == "extract_actions":
             return self._deterministic_extract_actions(context)
         if action == "get_meeting_context":
@@ -131,6 +133,50 @@ class MeetingAgent(BaseAgent):
             "warnings": [],
             "next_actions": ["APPROVE_MINUTES"],
             "requires_approval": True,
+        }
+
+    def _deterministic_parse_transcript(self, context: dict) -> dict:
+        """Parse a raw meeting transcript into structured notes using LLM or deterministic fallback."""
+        params = context.get("params", {})
+        meeting_id = params.get("meeting_id", "")
+        transcript = params.get("transcript", "")
+
+        if self._llm and self._llm.is_enabled:
+            prompt = (
+                "Parse the following meeting transcript into structured notes.\n"
+                "For each notable statement, classify it as EXACTLY ONE of these five values "
+                "(uppercase, no slashes, no alternatives, no other words): "
+                "QUESTION, OBJECTION, DECISION, APPRECIATION, ACTION.\n"
+                "Do not invent new categories. Skip statements that don't fit any of the five.\n\n"
+                f"Transcript:\n{transcript}\n\n"
+                "Return a JSON array of objects, each with:\n"
+                f"  note_id (generate a short id like 'n1','n2'...), meeting_id (use '{meeting_id}'),\n"
+                "  note_type (MUST be one of: QUESTION, OBJECTION, DECISION, APPRECIATION, ACTION),\n"
+                "  content (the substance of the statement), raised_by (speaker name),\n"
+                "  timestamp (HH:MM from the transcript if available, else empty string).\n"
+                "Return ONLY the JSON array, no markdown or explanation."
+            )
+            raw = self._llm.call_simple(prompt, system=MEETING_SYSTEM_PROMPT, max_tokens=2048)
+            logger.info("PARSE-TRANSCRIPT: LLM raw response (%d chars): %s", len(raw), raw[:500])
+            try:
+                notes = json.loads(_strip_markdown_json(raw))
+                if not isinstance(notes, list):
+                    notes = notes.get("notes", [])
+                logger.info("PARSE-TRANSCRIPT: parsed %d notes", len(notes))
+            except json.JSONDecodeError as e:
+                logger.warning("PARSE-TRANSCRIPT: JSON parse failed: %s", e)
+                notes = _build_fallback_parsed_notes(transcript, meeting_id)
+        else:
+            notes = _build_fallback_parsed_notes(transcript, meeting_id)
+
+        notes = _normalize_parsed_notes(notes, meeting_id)
+
+        return {
+            "summary": f"Parsed {len(notes)} notes from transcript.",
+            "data": {"notes": notes},
+            "warnings": [],
+            "next_actions": ["GENERATE_MINUTES"],
+            "requires_approval": False,
         }
 
     def _deterministic_extract_actions(self, context: dict) -> dict:
@@ -189,6 +235,67 @@ def _strip_markdown_json(text: str) -> str:
     if m:
         return m.group(1).strip()
     return text.strip()
+
+
+VALID_NOTE_TYPES = {"QUESTION", "OBJECTION", "DECISION", "APPRECIATION", "ACTION"}
+
+
+def _coerce_note_type(raw_type: str, content: str = "") -> str:
+    """Map a possibly-invalid LLM note_type to one of the five allowed values."""
+    if not isinstance(raw_type, str):
+        raw_type = ""
+    candidate = raw_type.strip().upper()
+
+    if candidate in VALID_NOTE_TYPES:
+        return candidate
+
+    # Handle compound/slash/alternative forms (e.g. "RESPONSE/EXPLANATION",
+    # "QUESTION OR COMMENT"); pick the first allowed token that appears.
+    tokens = re.split(r"[\s/|,;&\-]+", candidate)
+    for tok in tokens:
+        if tok in VALID_NOTE_TYPES:
+            return tok
+
+    # Substring heuristics for stems like "OBJECT", "APPREC", "DECIS", "ACT", "QUEST"
+    stems = [
+        ("ACTION", ("ACTION", "TODO", "TASK", "FOLLOW")),
+        ("DECISION", ("DECIS", "AGREED", "RESOLVED", "APPROVED")),
+        ("OBJECTION", ("OBJECT", "CONCERN", "DISAGREE", "DISPUTE", "ISSUE", "RISK")),
+        ("APPRECIATION", ("APPREC", "THANK", "PRAISE", "RECOGNI")),
+        ("QUESTION", ("QUEST", "ASK", "CLARIF", "INQUIR")),
+    ]
+    haystack = f"{candidate} {content.upper()}"
+    for valid, stem_list in stems:
+        if any(stem in haystack for stem in stem_list):
+            return valid
+
+    # Last resort — route uncategorised statements into QUESTION so they still
+    # appear in the Q&A log rather than blowing up Pydantic validation.
+    return "QUESTION"
+
+
+def _normalize_parsed_notes(notes: list[dict], meeting_id: str) -> list[dict]:
+    """Ensure every note returned from parse-transcript satisfies the MeetingNote schema."""
+    normalized: list[dict] = []
+    for idx, note in enumerate(notes, start=1):
+        if not isinstance(note, dict):
+            continue
+        original = note.get("note_type", "")
+        coerced = _coerce_note_type(original, note.get("content", ""))
+        if coerced != original:
+            logger.info(
+                "PARSE-TRANSCRIPT: coerced note_type %r -> %r",
+                original, coerced,
+            )
+        normalized.append({
+            "note_id": note.get("note_id") or f"n{idx}",
+            "meeting_id": note.get("meeting_id") or meeting_id,
+            "note_type": coerced,
+            "content": note.get("content", ""),
+            "raised_by": note.get("raised_by", "Unknown") or "Unknown",
+            "timestamp": note.get("timestamp", "") or "",
+        })
+    return normalized
 
 
 def _group_notes_by_type(notes: list[dict]) -> dict[str, list[dict]]:
@@ -263,3 +370,55 @@ def _build_fallback_minutes(
         ],
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def _build_fallback_parsed_notes(transcript: str, meeting_id: str) -> list[dict]:
+    """Deterministic transcript parser — uses keyword heuristics when LLM is unavailable."""
+    lines = [ln.strip() for ln in transcript.strip().splitlines() if ln.strip()]
+    notes: list[dict] = []
+    counter = 1
+
+    action_kw = ("action:", "action item:", "todo:")
+    decision_kw = ("decision:", "agreed:", "resolved:")
+    question_kw = ("?",)
+    objection_kw = ("dispute", "disagree", "object", "concern", "issue")
+    appreciation_kw = ("thank", "appreciate", "well done", "recogni")
+
+    for line in lines:
+        # Try to extract speaker and timestamp from "[HH:MM]" or "Name [HH:MM]:"
+        speaker = "Unknown"
+        timestamp = ""
+        content = line
+
+        m = re.match(r"^(.+?)\s*\[(\d{1,2}:\d{2})\]\s*:\s*(.+)$", line)
+        if m:
+            speaker = m.group(1).strip()
+            timestamp = m.group(2)
+            content = m.group(3).strip()
+
+        lower = content.lower()
+
+        if any(lower.startswith(kw) for kw in action_kw):
+            note_type = "ACTION"
+        elif any(lower.startswith(kw) for kw in decision_kw):
+            note_type = "DECISION"
+        elif any(kw in lower for kw in objection_kw):
+            note_type = "OBJECTION"
+        elif any(kw in lower for kw in appreciation_kw):
+            note_type = "APPRECIATION"
+        elif any(content.rstrip().endswith(kw) for kw in question_kw):
+            note_type = "QUESTION"
+        else:
+            continue  # Skip lines that don't match any category
+
+        notes.append({
+            "note_id": f"n{counter}",
+            "meeting_id": meeting_id,
+            "note_type": note_type,
+            "content": content,
+            "raised_by": speaker,
+            "timestamp": timestamp,
+        })
+        counter += 1
+
+    return notes

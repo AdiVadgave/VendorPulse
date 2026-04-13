@@ -1,14 +1,9 @@
 import { useState } from 'react'
 import { FileText, Sparkles, Plus } from 'lucide-react'
 import type { ExtractedAction } from '@/types/alignment.types'
+import { extractAlignmentActions } from '@/lib/alignmentApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { AgentStatus } from '@/types/agent.types'
-
-const DEMO_EXTRACTED: ExtractedAction[] = [
-  { action_id: 'n1', description: 'Align on AI automation proposal scope — schedule follow-up with Priya and Alex before vendor prep call', owner: 'Alex Thompson', due_date: '2026-03-28', source: 'alignment', status: 'OPEN' },
-  { action_id: 'n2', description: 'Prepare factual data to support SLA compliance score discussion with vendor', owner: 'Priya Sharma', due_date: '2026-03-26', source: 'alignment', status: 'OPEN' },
-  { action_id: 'n3', description: 'Review Q4 innovation KPI commitments from contract — confirm which were delivered vs outstanding', owner: "James O'Brien", due_date: '2026-03-25', source: 'alignment', status: 'OPEN' },
-]
 
 const DEMO_NOTES = `Alex: We need to agree on the AI automation pilot scope before the vendor prep call. Priya had concerns about roadmap alignment that need to be resolved first.
 
@@ -19,23 +14,36 @@ James: I'll pull the Q4 innovation KPI contract commitments by Thursday — we n
 All: Agreed on March 28 for the vendor prep call. Alex to send calendar invite.`
 
 interface Props {
+  cycleId: string
   onActionsExtracted: (actions: ExtractedAction[]) => void
 }
 
-export default function NotesInputPanel({ onActionsExtracted }: Props) {
+export default function NotesInputPanel({ cycleId, onActionsExtracted }: Props) {
   const [notes, setNotes] = useState('')
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
   const [extracted, setExtracted] = useState<ExtractedAction[]>([])
   const [newItem, setNewItem] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
-  function handleExtract() {
+  async function handleExtract() {
     if (!notes.trim()) return
     setAgentStatus('running')
-    setTimeout(() => {
-      setAgentStatus('complete')
-      setExtracted(DEMO_EXTRACTED)
-      onActionsExtracted(DEMO_EXTRACTED)
-    }, 1600)
+    setError(null)
+    try {
+      const response = await extractAlignmentActions(cycleId, notes)
+      if (response.status === 'success' && response.data) {
+        const actions = response.data.actions ?? []
+        setExtracted(actions)
+        onActionsExtracted(actions)
+        setAgentStatus('complete')
+      } else {
+        setError(response.summary || 'Failed to extract actions')
+        setAgentStatus('idle')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to reach backend')
+      setAgentStatus('idle')
+    }
   }
 
   function handleDemo() {
@@ -95,6 +103,11 @@ export default function NotesInputPanel({ onActionsExtracted }: Props) {
           <Sparkles size={14} />
           {agentStatus === 'running' ? 'Extracting actions...' : 'Extract Action Items'}
         </button>
+        {error && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
       </div>
 
       {/* Extracted actions preview */}

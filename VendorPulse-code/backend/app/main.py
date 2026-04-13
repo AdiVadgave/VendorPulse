@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import google_auth, graph_scheduling, meeting_agent, meetings, scheduling, scorecard, users, vendor_prep, vendors
+from app.api.routes import alignment, analytics, google_auth, graph_scheduling, meeting_agent, meetings, scheduling, scorecard, scorecard_agent, users, vendor_prep, vendors
 from app.config import settings
 from app.core.logging_config import setup_logging
 from app.middleware.request_logging import RequestLoggingMiddleware
@@ -59,8 +59,11 @@ app.include_router(graph_scheduling.router)
 app.include_router(google_auth.router)
 app.include_router(scorecard.router)
 app.include_router(vendors.router)
+app.include_router(alignment.router)
 app.include_router(vendor_prep.router)
 app.include_router(meeting_agent.router)
+app.include_router(scorecard_agent.router)
+app.include_router(analytics.router)
 
 logger.info("VendorPulse backend initialized — routers registered, middleware active")
 
@@ -98,8 +101,21 @@ def health():
             "rsvp": "GET|PUT /api/cycles/{cycleId}/scheduling/rsvp",
             "vendorPrepBrief": "POST /api/cycles/{cycleId}/vendor-prep/brief",
             "vendorPrepPushback": "POST /api/cycles/{cycleId}/vendor-prep/pushback",
+            "vendorPrepBriefApprove": "POST /api/cycles/{cycleId}/vendor-prep/brief/approve",
+            "vendorPrepPushbackApprove": "POST /api/cycles/{cycleId}/vendor-prep/pushback/approve",
             "meetingMinutes": "POST /api/cycles/{cycleId}/meeting/minutes",
             "meetingExtractActions": "POST /api/cycles/{cycleId}/meeting/extract-actions",
             "meetingParseTranscript": "POST /api/cycles/{cycleId}/meeting/parse-transcript",
+            "meetingMinutesApprove": "POST /api/cycles/{cycleId}/meeting/minutes/approve",
+            "scorecardValidate": "POST /api/cycles/{cycleId}/scorecard/validate",
+            "scorecardOutliers": "POST /api/cycles/{cycleId}/scorecard/outliers",
+            "scorecardReminder": "POST /api/cycles/{cycleId}/scorecard/reminder",
+            "alignmentScoreDiff": "POST /api/cycles/{cycleId}/alignment/score-diff",
+            "alignmentFlags": "POST /api/cycles/{cycleId}/alignment/flags",
+            "alignmentWhatChanged": "POST /api/cycles/{cycleId}/alignment/what-changed",
+            "analyticsMultiCycle": "POST /api/analytics/multi-cycle-scores",
+            "analyticsRecurring": "POST /api/analytics/recurring-issues",
+            "analyticsLeadershipBrief": "POST /api/analytics/leadership-brief",
+            "analyticsTrajectory": "POST /api/analytics/vendor-trajectory",
         },
     }

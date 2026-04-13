@@ -169,6 +169,50 @@ def get_cycle(cycleId: str, cycle_repo=Depends(get_cycle_repo)):
     return {"cycle": cycle}
 
 
+@router.post("/api/cycles/{cycleId}/workflow-state")
+def set_workflow_state(
+    cycleId: str,
+    payload: dict = Body(...),
+    cycle_repo=Depends(get_cycle_repo),
+):
+    """
+    Fast-forward a cycle's workflow_state to the requested target (forward-only).
+
+    The frontend drives workflow progress for modules C–E (alignment, vendor prep,
+    meeting) which have no dedicated backend routes. This endpoint lets the client
+    persist that progress server-side so the state survives localStorage clears,
+    browser switches, and fresh machines.
+
+    Body: {"target": "<WORKFLOW_STATE>"}
+    - If the cycle is already at or past `target`, this is a no-op (200).
+    - Backward transitions are rejected (409).
+    """
+    target = payload.get("target")
+    if not target or target not in WORKFLOW_STATES:
+        raise HTTPException(status_code=400, detail=f"Invalid or missing 'target'. Must be one of {WORKFLOW_STATES}")
+
+    cycle = _get_cycle_or_404(cycleId, cycle_repo)
+    current = cycle.get("workflow_state", "CYCLE_CREATED")
+    current_idx = WORKFLOW_STATES.index(current) if current in WORKFLOW_STATES else 0
+    target_idx = WORKFLOW_STATES.index(target)
+
+    if target_idx < current_idx:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot regress workflow: cycle is already at '{current}', requested '{target}'.",
+        )
+
+    if target_idx == current_idx:
+        return {"cycle": cycle, "message": "No change"}
+
+    # Walk forward one step at a time so transition history stays consistent.
+    updated = cycle
+    for _ in range(target_idx - current_idx):
+        updated = workflow_engine.advance(updated, cycle_repo)
+    logger.info("set_workflow_state — cycleId=%s, %s -> %s", cycleId, current, target)
+    return {"cycle": updated, "message": f"Advanced {current} -> {target}"}
+
+
 @router.delete("/api/cycles/{cycleId}")
 def delete_cycle(
     cycleId: str,

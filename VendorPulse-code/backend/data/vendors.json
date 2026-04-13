@@ -52,5 +52,47 @@
     "name": "mattel",
     "category": "IT Infrastructure",
     "status": "active"
+  },
+  {
+    "vendor_id": "v_8435a046",
+    "name": "Pepsi",
+    "category": "FMCG",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_38b202ce",
+    "name": "Dell",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_3a6207cc",
+    "name": "s1",
+    "category": "FMCG",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_2a544e09",
+    "name": "Zensar2",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_a18323dc",
+    "name": "zensar3",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_fe990977",
+    "name": "Zensar4",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_3e22bc3e",
+    "name": "z5",
+    "category": "IT Infrastructure",
+    "status": "active"
   }
 ]

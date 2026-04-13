@@ -1,17 +1,20 @@
 """
 Module E — Meeting Agent routes.
 
-POST /api/cycles/{cycleId}/meeting/minutes          Generate meeting minutes from notes
-POST /api/cycles/{cycleId}/meeting/extract-actions   Extract action items from minutes text
-POST /api/cycles/{cycleId}/meeting/parse-transcript  Parse a transcript into structured notes
+POST /api/cycles/{cycleId}/meeting/minutes           Generate meeting minutes from notes
+POST /api/cycles/{cycleId}/meeting/extract-actions    Extract action items from minutes text
+POST /api/cycles/{cycleId}/meeting/parse-transcript   Parse a transcript into structured notes
+POST /api/cycles/{cycleId}/meeting/minutes/approve    Approve generated meeting minutes
 """
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
-from app.dependencies import get_meeting_agent
+from app.dependencies import get_meeting_agent, get_agent_run_repo
 from app.models.common import AgentResponse
 from app.models.meeting_agent import GenerateMinutesRequest, ParseTranscriptRequest
 
@@ -112,3 +115,37 @@ def parse_transcript(
     )
     logger.info("MEETING-AGENT: transcript parsed — status=%s", response.status)
     return response
+
+
+# ── Approval endpoint ───────────────────────────────────────────────────────
+
+
+class ApproveMinutesRequest(BaseModel):
+    run_id: str
+    approved_by: str = "coordinator"
+
+
+@router.post("/minutes/approve")
+def approve_minutes(cycleId: str, payload: ApproveMinutesRequest):
+    """Mark generated meeting minutes as approved and finalised."""
+    logger.info("MEETING-AGENT: approve minutes — cycleId=%s, run_id=%s", cycleId, payload.run_id)
+
+    repo = get_agent_run_repo()
+    record = repo.get_by_run_id(payload.run_id)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Agent run '{payload.run_id}' not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    repo.update_by_id("run_id", payload.run_id, {
+        "approval_status": "APPROVED",
+        "approved_by": payload.approved_by,
+        "approved_at": now,
+    })
+
+    logger.info("MEETING-AGENT: minutes approved — run_id=%s, by=%s", payload.run_id, payload.approved_by)
+    return {
+        "status": "approved",
+        "run_id": payload.run_id,
+        "approved_by": payload.approved_by,
+        "approved_at": now,
+    }

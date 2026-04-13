@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { FileText, Sparkles } from 'lucide-react'
 import type { MeetingNote } from '@/types/meeting.types'
+import { parseTranscript } from '@/lib/meetingApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { AgentStatus } from '@/types/agent.types'
-import { MOCK_MEETING_NOTES } from '@/mock/meeting.mock'
 
 interface Props {
+  cycleId: string
   onParsed: (notes: MeetingNote[]) => void
 }
 
@@ -27,17 +28,29 @@ Emma Davies [10:52]: Decision: The pricing dispute is escalated to Zensar Commer
 
 Alex Thompson [10:58]: Action: I'll schedule the joint incident review for the February SLA event within the next 7 days.`
 
-export default function TranscriptInput({ onParsed }: Props) {
+export default function TranscriptInput({ cycleId, onParsed }: Props) {
   const [transcript, setTranscript] = useState('')
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
+  const [error, setError] = useState<string | null>(null)
 
-  function handleParse() {
+  async function handleParse() {
     if (!transcript.trim()) return
     setAgentStatus('running')
-    setTimeout(() => {
-      setAgentStatus('complete')
-      onParsed(MOCK_MEETING_NOTES)
-    }, 2000)
+    setError(null)
+    try {
+      const meetingId = `mtg-${cycleId}`
+      const response = await parseTranscript(cycleId, meetingId, transcript)
+      if (response.status === 'success' && response.data) {
+        setAgentStatus('complete')
+        onParsed(response.data.notes ?? [])
+      } else {
+        setError(response.summary || 'Failed to parse transcript')
+        setAgentStatus('idle')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to reach backend')
+      setAgentStatus('idle')
+    }
   }
 
   return (
@@ -76,6 +89,11 @@ export default function TranscriptInput({ onParsed }: Props) {
         <Sparkles size={14} />
         {agentStatus === 'running' ? 'Parsing transcript...' : 'Parse Transcript'}
       </button>
+      {error && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+          {error}
+        </p>
+      )}
     </div>
   )
 }

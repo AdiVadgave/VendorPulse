@@ -29,3 +29,27 @@ class CycleRepository(BaseRepository):
             cycle_id,
             {"scorecard_dispatched_at": dispatched_at, "scorecard_dispatched_to": emails},
         )
+
+    def mark_teams_meeting_scheduled(
+        self,
+        cycle_id: str,
+        *,
+        teams_meeting_url: Optional[str],
+        web_link: Optional[str],
+        event_id: Optional[str],
+        scheduled_at: str,
+    ) -> Optional[dict]:
+        """Persist the Graph-returned Teams meeting metadata on the cycle.
+
+        Lets the frontend rehydrate the "Start Meeting" link after a page refresh.
+        """
+        return self.update_by_id(
+            "cycle_id",
+            cycle_id,
+            {
+                "teams_meeting_url": teams_meeting_url,
+                "teams_meeting_web_link": web_link,
+                "teams_meeting_event_id": event_id,
+                "teams_meeting_scheduled_at": scheduled_at,
+            },
+        )

@@ -74,6 +74,34 @@ export async function completeAttendanceConfirmation(
   return res.cycle
 }
 
+/**
+ * Fast-forward the backend cycle's workflow_state to `target`.
+ *
+ * Used by the frontend store after any local advance to keep the backend in
+ * sync, so progress survives localStorage clears and cross-device use.
+ * Backward transitions are rejected server-side; no-ops when already at/past.
+ */
+export async function setBackendWorkflowState(
+  cycleId: string,
+  target: string
+): Promise<GovernanceCycle | null> {
+  try {
+    const res = await apiFetch<{ cycle: GovernanceCycle }>(
+      `/api/cycles/${cycleId}/workflow-state`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target }),
+      }
+    )
+    return res.cycle ?? null
+  } catch {
+    // Backend offline or cycle not backend-persisted (e.g. mock) — local state
+    // remains the source of truth via localStorage.
+    return null
+  }
+}
+
 export function getPreferredOrganizerEmail(attendees: CycleAttendee[]): string | null {
   const coordinator = attendees.find((attendee) => attendee.role === 'VMO_COORDINATOR')
   if (coordinator?.email) return coordinator.email

@@ -5,6 +5,8 @@ import type { WorkflowState } from '@/utils/constants'
 import { WORKFLOW_STATES } from '@/utils/constants'
 import type { GovernanceCycle } from '@/types/cycle.types'
 import { MOCK_CYCLES } from '@/mock/cycles.mock'
+import { getMockCycleById } from '@/mock/cycles.mock'
+import { setBackendWorkflowState } from '@/lib/schedulingApi'
 
 function workflowIndex(state: WorkflowState | undefined): number {
   if (!state) return -1
@@ -79,13 +81,31 @@ export const useCycleStore = create<CycleStore>()(
         return get().cycles.find((c) => c.cycle_id === cycleId)?.workflow_state ?? 'CYCLE_CREATED'
       },
 
-      advanceWorkflow: (cycleId, newState) =>
-        set((s) => ({
-          cycles: s.cycles.map((c) =>
-            c.cycle_id === cycleId ? { ...c, workflow_state: newState } : c
-          ),
-          workflowStates: { ...s.workflowStates, [cycleId]: newState },
-        })),
+      advanceWorkflow: (cycleId, newState) => {
+        let didAdvance = false
+        let resolvedState: WorkflowState | undefined
+        set((s) => {
+          // Forward-only: never regress a cycle that has already reached a later state.
+          // Without this guard, late-arriving callbacks (e.g. the compiled-scorecard
+          // auto-fetch firing after a refresh on a POST_MEETING_COMPLETE cycle) would
+          // overwrite the persisted progress with an earlier state.
+          const nextState = pickMostAdvanced(s.workflowStates[cycleId], newState)
+          resolvedState = nextState
+          if (s.workflowStates[cycleId] === nextState) return s
+          didAdvance = true
+          return {
+            cycles: s.cycles.map((c) =>
+              c.cycle_id === cycleId ? { ...c, workflow_state: nextState } : c
+            ),
+            workflowStates: { ...s.workflowStates, [cycleId]: nextState },
+          }
+        })
+        // Sync to backend in the background so progress survives localStorage clears
+        // and cross-device use. Skip mock cycles — they don't exist server-side.
+        if (didAdvance && resolvedState && !getMockCycleById(cycleId)) {
+          void setBackendWorkflowState(cycleId, resolvedState)
+        }
+      },
 
       addCycle: (cycle) =>
         set((s) => ({

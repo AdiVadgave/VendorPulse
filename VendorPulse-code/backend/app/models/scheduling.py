@@ -173,3 +173,9 @@ class Cycle(BaseModel):
     updated_at: str
     scorecard_dispatched_at: Optional[str] = None
     scorecard_dispatched_to: Optional[list[str]] = None
+    # Populated when the vendor meeting invite is sent via Graph.
+    # Used by the Meeting tab's "Start Meeting" button to open the Teams meeting.
+    teams_meeting_url: Optional[str] = None
+    teams_meeting_web_link: Optional[str] = None
+    teams_meeting_event_id: Optional[str] = None
+    teams_meeting_scheduled_at: Optional[str] = None

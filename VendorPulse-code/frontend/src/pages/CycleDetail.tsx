@@ -501,6 +501,7 @@ export default function CycleDetail() {
         {activeTab === 'alignment' && (
           <AlignmentTab
             cycle={cycle}
+            cycleId={cycle.cycle_id}
             actions={alignmentActions}
             compiledScores={compiledScores}
             compiledScorecard={compiledScorecard}
@@ -824,9 +825,10 @@ function ScorecardTab({
 
 /* ── Alignment Tab ────────────────────────────────────────── */
 function AlignmentTab({
-  cycle, actions, onActionsExtracted, compiledScores, compiledScorecard,
+  cycle, cycleId, actions, onActionsExtracted, compiledScores, compiledScorecard,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
+  cycleId: string
   actions: ExtractedAction[]
   onActionsExtracted: (a: ExtractedAction[]) => void
   compiledScores: CompiledCategoryScore[] | null

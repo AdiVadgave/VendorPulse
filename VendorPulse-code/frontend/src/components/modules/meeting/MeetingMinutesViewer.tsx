@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { FileText, Sparkles, Copy, CheckCircle2 } from 'lucide-react'
+import { FileText, Sparkles, Copy, CheckCircle2, Send, Users } from 'lucide-react'
 import type { MeetingMinutes } from '@/types/meeting.types'
 import type { MeetingNote } from '@/types/meeting.types'
-import { generateMeetingMinutes, approveMinutes } from '@/lib/meetingApi'
+import { generateMeetingMinutes, approveMinutes, sendMeetingMinutes } from '@/lib/meetingApi'
+import type { SendMinutesRecipient } from '@/lib/meetingApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
@@ -25,6 +26,9 @@ export default function MeetingMinutesViewer({ cycleId, notes, vendorName, quart
   const [error, setError] = useState<string | null>(null)
   const [runId, setRunId] = useState<string | null>(null)
   const [isApproving, setIsApproving] = useState(false)
+  const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+  const [sentRecipients, setSentRecipients] = useState<SendMinutesRecipient[]>([])
+  const [sendError, setSendError] = useState<string | null>(null)
 
   async function handleGenerate() {
     setAgentStatus('running')
@@ -85,6 +89,20 @@ export default function MeetingMinutesViewer({ cycleId, notes, vendorName, quart
     setTimeout(() => setCopied(false), 2000)
   }
 
+  async function handleSend() {
+    if (!minutes || !runId) return
+    setSendStatus('sending')
+    setSendError(null)
+    try {
+      const result = await sendMeetingMinutes(cycleId, runId, minutes, vendorName, quarter, year)
+      setSentRecipients(result.sent_to)
+      setSendStatus('sent')
+    } catch (e) {
+      setSendError(e instanceof Error ? e.message : 'Failed to send minutes')
+      setSendStatus('failed')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
@@ -124,18 +142,62 @@ export default function MeetingMinutesViewer({ cycleId, notes, vendorName, quart
         ) : (
           <div className="space-y-4">
             {approved && (
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 font-medium">
-                  <CheckCircle2 size={15} />
-                  Minutes approved
-                </span>
-                <button
-                  onClick={handleCopy}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors"
-                >
-                  {copied ? <CheckCircle2 size={12} /> : <Copy size={12} />}
-                  {copied ? 'Copied!' : 'Copy to Clipboard'}
-                </button>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                    <CheckCircle2 size={15} />
+                    Minutes approved &amp; finalised
+                  </span>
+                  <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors"
+                  >
+                    {copied ? <CheckCircle2 size={12} /> : <Copy size={12} />}
+                    {copied ? 'Copied!' : 'Copy to Clipboard'}
+                  </button>
+                </div>
+
+                {/* Send to stakeholders */}
+                {sendStatus === 'idle' || sendStatus === 'failed' ? (
+                  <div className="space-y-1.5">
+                    <button
+                      onClick={handleSend}
+                      disabled={sendStatus === 'sending'}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      <Send size={14} />
+                      Send Minutes to Internal Stakeholders
+                    </button>
+                    {sendStatus === 'failed' && sendError && (
+                      <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+                        {sendError}
+                      </p>
+                    )}
+                  </div>
+                ) : sendStatus === 'sending' ? (
+                  <div className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                    <div className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm text-emerald-700 dark:text-emerald-400">Sending minutes...</span>
+                  </div>
+                ) : (
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-4 py-3 space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+                      <CheckCircle2 size={15} />
+                      Sent to {sentRecipients.length} internal stakeholder{sentRecipients.length !== 1 ? 's' : ''}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {sentRecipients.map((r) => (
+                        <span
+                          key={r.email}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-xs rounded-full"
+                        >
+                          <Users size={10} />
+                          {r.name || r.email}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

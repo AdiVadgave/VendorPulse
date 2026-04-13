@@ -92,3 +92,39 @@ export async function approveMinutes(
     }
   )
 }
+
+// ── Send Minutes ───────────────────────────────────────────────────────────
+
+export interface SendMinutesRecipient {
+  name: string
+  email: string
+}
+
+export interface SendMinutesResult {
+  status: string
+  run_id: string
+  sent_to: SendMinutesRecipient[]
+  count: number
+  message_id: string
+  sent_at: string
+}
+
+export async function sendMeetingMinutes(
+  cycleId: string,
+  runId: string,
+  minutes: MeetingMinutes,
+  vendorName: string,
+  quarter: string,
+  year: number
+): Promise<SendMinutesResult> {
+  return apiFetch<SendMinutesResult>(
+    `/api/cycles/${cycleId}/meeting/minutes/send`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        run_id: runId,
+        minutes: { ...minutes, vendor_name: vendorName, quarter, year },
+      }),
+    }
+  )
+}

@@ -1,4 +1,4 @@
-﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock, Sparkles } from 'lucide-react'
+﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { SlotProposal } from '@/types/scheduling.types'
 import { SCHEDULING_CONFIG } from '@/config/scheduling.config'
@@ -96,15 +96,13 @@ export default function SlotCard({
     })
   }
 
-  const attendancePct =
-    slot.total_attendees > 0
-      ? Math.round((slot.attendance_count / slot.total_attendees) * 100)
-      : 0
+  const freeCount = slot.attending.length
+  const tentativeCount = slot.tentative?.length ?? 0
 
   return (
     <div
       className={cn(
-        'bg-white dark:bg-slate-900 border rounded-xl p-5 transition-all',
+        'bg-white dark:bg-slate-900 border rounded-xl p-5 transition-all h-full flex flex-col',
         cfg.border,
         cfg.ring
       )}
@@ -167,34 +165,27 @@ export default function SlotCard({
         </div>
       </div>
 
-      {/* AI rationale */}
-      {slot.ranking_rationale && (
-        <p className="mb-4 text-xs italic text-slate-500 dark:text-slate-400 flex items-start gap-1.5">
-          <Sparkles size={11} className="shrink-0 mt-0.5 text-indigo-400" />
-          {slot.ranking_rationale}
-        </p>
-      )}
-
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2.5 text-center">
-          <p className="text-lg font-bold text-slate-900 dark:text-white">
-            {slot.attendance_count}
-            <span className="text-xs text-slate-400">/{slot.total_attendees}</span>
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Attending</p>
-        </div>
+      <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2.5 text-center">
           <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-            {attendancePct}%
+            {freeCount}
+            <span className="text-xs font-normal text-slate-400">/{slot.total_attendees}</span>
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Coverage</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Free</p>
         </div>
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2.5 text-center">
-          <p className="text-lg font-bold text-slate-900 dark:text-white">
-            {slot.conflict_count}
+          <p
+            className={cn(
+              'text-lg font-bold',
+              tentativeCount > 0
+                ? 'text-amber-600 dark:text-amber-400'
+                : 'text-slate-900 dark:text-white'
+            )}
+          >
+            {tentativeCount}
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Conflicts</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Tentative</p>
         </div>
       </div>
 
@@ -283,7 +274,7 @@ export default function SlotCard({
         onClick={() => onApprove(slot.slot_id)}
         disabled={isProcessing}
         className={cn(
-          'w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors',
+          'mt-auto w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors',
           isProcessing && 'opacity-60 cursor-not-allowed'
         )}
       >

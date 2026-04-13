@@ -1,41 +1,62 @@
 import { useState } from 'react'
 import { FileText, Sparkles, Plus } from 'lucide-react'
 import type { ExtractedAction } from '@/types/alignment.types'
+import { extractAlignmentActions } from '@/lib/alignmentApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { AgentStatus } from '@/types/agent.types'
 
-const DEMO_EXTRACTED: ExtractedAction[] = [
-  { action_id: 'n1', description: 'Align on AI automation proposal scope — schedule follow-up with Priya and Alex before vendor prep call', owner: 'Alex Thompson', due_date: '2026-03-28', source: 'alignment', status: 'OPEN' },
-  { action_id: 'n2', description: 'Prepare factual data to support SLA compliance score discussion with vendor', owner: 'Priya Sharma', due_date: '2026-03-26', source: 'alignment', status: 'OPEN' },
-  { action_id: 'n3', description: 'Review Q4 innovation KPI commitments from contract — confirm which were delivered vs outstanding', owner: "James O'Brien", due_date: '2026-03-25', source: 'alignment', status: 'OPEN' },
-]
+const DEMO_NOTES = `Strategic Vendor Governance Council — Q2 Planning Session
+Date: April 10, 2024 | Attendees: Alex (Procurement Lead), Priya (Engineering), James (Finance), Sandra (Legal), Rachel (Security & Compliance), David (Operations), Marcus (Zensar CSM), Lena (Zensar Engineering Lead)
 
-const DEMO_NOTES = `Alex: We need to agree on the AI automation pilot scope before the vendor prep call. Priya had concerns about roadmap alignment that need to be resolved first.
+Alex opened by noting that the April 3rd follow-up was postponed due to Zensar's delayed SLA dispute response, which was received on March 21st — three days past the agreed March 18th deadline. Sandra flagged this as a contract compliance issue and will formally log it in the vendor performance register by end of week. Marcus apologized and cited internal legal review delays.
 
-Priya: I'll prepare the data analysis to support our SLA compliance score position. There's a factual dispute likely coming from NovaTech on the February incident.
+Sandra presented the revised SLA notification language drafted post-March meeting. James raised a concern that the new language inadvertently removes the 48-hour cure period that currently protects Zensar. Marcus confirmed this was unintentional and Lena will work with Sandra directly to reconcile the language — both parties will aim to sign off on the final version no later than April 25th.
 
-James: I'll pull the Q4 innovation KPI contract commitments by Thursday — we need to know which ones were actually delivered before the meeting.
+Rachel introduced a new agenda item: Zensar's SOC 2 Type II certification is expiring on May 31st. She needs confirmation from Lena that renewal is in progress and an estimated completion date before Rachel can update the vendor risk register. Lena confirmed renewal is underway but could not give a date on the spot — she will follow up with Rachel directly by April 15th.
 
-All: Agreed on March 28 for the vendor prep call. Alex to send calendar invite.`
+James presented the penalty analysis for delayed Q4 innovation KPIs. The contract specifies a 5% service credit per missed milestone, meaning Zensar owes a $42,000 credit against the next invoice. Marcus disputed the calculation, claiming the bulk export API delay was caused by a dependency on Shell's internal API team, not Zensar. James and Marcus agreed to a working session to review the timeline evidence. James will pull the relevant Jira tickets and email chain history before that session. The working session should happen before April 19th.
+
+David raised an operational concern: the Zensar integration currently has no documented runbook for failover procedures. This creates an incident response risk. Lena agreed to provide a draft failover runbook within three weeks. David will review it and provide feedback within five business days of receipt.
+
+Priya confirmed the AI automation pilot scope document was shared on March 20th as planned. However, Shell's engineering team identified two open technical dependencies — single sign-on integration and data residency compliance — that need Zensar's input before Shell's engineering can begin. Lena will provide written responses to both dependency questions by April 17th. If responses are not received by then, Priya will escalate to Alex to invoke the contractual response SLA.
+
+Rachel also noted that the last penetration test was conducted fourteen months ago — Shell's security policy requires annual testing. She will initiate the vendor pen test scheduling process and coordinate with Lena to agree on a testing window. They should have a testing date confirmed within two weeks.
+
+Alex closed by saying the next governance council meeting will be scheduled for the second week of May. He will send a Doodle poll to all attendees by April 12th to confirm availability. Sandra reminded the group that the contract renewal window opens June 1st and Shell's team needs at least six weeks to prepare — meaning the renewal strategy document must be ready by April 20th. Alex agreed to own the first draft.
+
+ `
 
 interface Props {
+  cycleId: string
   onActionsExtracted: (actions: ExtractedAction[]) => void
 }
 
-export default function NotesInputPanel({ onActionsExtracted }: Props) {
+export default function NotesInputPanel({ cycleId, onActionsExtracted }: Props) {
   const [notes, setNotes] = useState('')
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
   const [extracted, setExtracted] = useState<ExtractedAction[]>([])
   const [newItem, setNewItem] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
-  function handleExtract() {
+  async function handleExtract() {
     if (!notes.trim()) return
     setAgentStatus('running')
-    setTimeout(() => {
-      setAgentStatus('complete')
-      setExtracted(DEMO_EXTRACTED)
-      onActionsExtracted(DEMO_EXTRACTED)
-    }, 1600)
+    setError(null)
+    try {
+      const response = await extractAlignmentActions(cycleId, notes)
+      if (response.status === 'success' && response.data) {
+        const actions = response.data.actions ?? []
+        setExtracted(actions)
+        onActionsExtracted(actions)
+        setAgentStatus('complete')
+      } else {
+        setError(response.summary || 'Failed to extract actions')
+        setAgentStatus('idle')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to reach backend')
+      setAgentStatus('idle')
+    }
   }
 
   function handleDemo() {
@@ -74,7 +95,7 @@ export default function NotesInputPanel({ onActionsExtracted }: Props) {
               onClick={handleDemo}
               className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline"
             >
-              Load demo notes
+              Load Transcript
             </button>
           </div>
         </div>
@@ -95,6 +116,11 @@ export default function NotesInputPanel({ onActionsExtracted }: Props) {
           <Sparkles size={14} />
           {agentStatus === 'running' ? 'Extracting actions...' : 'Extract Action Items'}
         </button>
+        {error && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
       </div>
 
       {/* Extracted actions preview */}

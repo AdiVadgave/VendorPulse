@@ -50,36 +50,7 @@ export const MOCK_VENDOR_BRIEF: VendorBrief = {
 }
 
 export const MOCK_PUSHBACK_ITEMS: PushbackItem[] = [
-  {
-    pushback_id: 'pb1',
-    cycle_id: 'c1',
-    category: 'DATA_DISPUTE',
-    description: 'The February SLA incident was caused by a Zensar network outage, not a vendor failure. The 4-hour response clock should not have started until network was restored.',
-    raised_by: 'Raj Patel',
-    needs_legal_review: false,
-    status: 'OPEN',
-    created_at: '2026-03-25T11:00:00Z',
-  },
-  {
-    pushback_id: 'pb2',
-    cycle_id: 'c1',
-    category: 'SCOPE_DISAGREEMENT',
-    description: 'The AI automation pilot scope was agreed verbally by Zensar IT lead in Q3 2025 but is not reflected in the formal contract. NovaTech invested significant resources based on that verbal agreement.',
-    raised_by: 'Lisa Wang',
-    needs_legal_review: true,
-    status: 'OPEN',
-    created_at: '2026-03-25T11:30:00Z',
-  },
-  {
-    pushback_id: 'pb3',
-    cycle_id: 'c1',
-    category: 'PROCESS_CONCERN',
-    description: 'Pricing increase reflects CPI indexation clause in Section 7.4 of the MSA — this should not require additional justification.',
-    raised_by: 'David Kim',
-    needs_legal_review: false,
-    status: 'OPEN',
-    created_at: '2026-03-25T12:00:00Z',
-  },
+  
 ]
 
 export const MOCK_PUSHBACK_RESPONSES: Record<string, PushbackResponse[]> = {

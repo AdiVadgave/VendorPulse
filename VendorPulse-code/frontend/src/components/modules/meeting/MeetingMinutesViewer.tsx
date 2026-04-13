@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { FileText, Sparkles, Copy, CheckCircle2 } from 'lucide-react'
+import { FileText, Sparkles, Copy, CheckCircle2, Send, Users } from 'lucide-react'
 import type { MeetingMinutes } from '@/types/meeting.types'
 import type { MeetingNote } from '@/types/meeting.types'
+import { generateMeetingMinutes, approveMinutes, sendMeetingMinutes } from '@/lib/meetingApi'
+import type { SendMinutesRecipient } from '@/lib/meetingApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
-import { MOCK_MEETING_MINUTES } from '@/mock/meeting.mock'
 
 interface Props {
+  cycleId: string
   notes: MeetingNote[]
   vendorName: string
   quarter: string
@@ -15,26 +17,54 @@ interface Props {
   onApproved: () => void
 }
 
-export default function MeetingMinutesViewer({ notes, vendorName, quarter, year, onApproved }: Props) {
+export default function MeetingMinutesViewer({ cycleId, notes, vendorName, quarter, year, onApproved }: Props) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
   const [minutes, setMinutes] = useState<MeetingMinutes | null>(null)
   const [showApproval, setShowApproval] = useState(false)
   const [approved, setApproved] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [runId, setRunId] = useState<string | null>(null)
+  const [isApproving, setIsApproving] = useState(false)
+  const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+  const [sentRecipients, setSentRecipients] = useState<SendMinutesRecipient[]>([])
+  const [sendError, setSendError] = useState<string | null>(null)
 
-  function handleGenerate() {
+  async function handleGenerate() {
     setAgentStatus('running')
-    setTimeout(() => {
-      setMinutes(MOCK_MEETING_MINUTES)
-      setAgentStatus('awaiting_approval')
-      setShowApproval(true)
-    }, 2200)
+    setError(null)
+    try {
+      const meetingId = notes[0]?.meeting_id ?? `mtg-${cycleId}`
+      const attendees = [...new Set(notes.map((n) => n.raised_by))]
+      const response = await generateMeetingMinutes(cycleId, meetingId, notes, attendees)
+      if (response.status === 'success' && response.data) {
+        setMinutes(response.data.minutes)
+        setRunId(response.run_id ?? null)
+        setAgentStatus('awaiting_approval')
+        setShowApproval(true)
+      } else {
+        setError(response.summary || 'Failed to generate minutes')
+        setAgentStatus('idle')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to reach backend')
+      setAgentStatus('idle')
+    }
   }
 
-  function handleApprove() {
+  async function handleApprove() {
+    setIsApproving(true)
+    try {
+      if (runId) {
+        await approveMinutes(cycleId, runId)
+      }
+    } catch {
+      // Approval persisting failed — still approve locally so UI isn't stuck
+    }
     setShowApproval(false)
     setAgentStatus('complete')
     setApproved(true)
+    setIsApproving(false)
     onApproved()
   }
 
@@ -59,6 +89,20 @@ export default function MeetingMinutesViewer({ notes, vendorName, quarter, year,
     setTimeout(() => setCopied(false), 2000)
   }
 
+  async function handleSend() {
+    if (!minutes || !runId) return
+    setSendStatus('sending')
+    setSendError(null)
+    try {
+      const result = await sendMeetingMinutes(cycleId, runId, minutes, vendorName, quarter, year)
+      setSentRecipients(result.sent_to)
+      setSendStatus('sent')
+    } catch (e) {
+      setSendError(e instanceof Error ? e.message : 'Failed to send minutes')
+      setSendStatus('failed')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
@@ -76,33 +120,84 @@ export default function MeetingMinutesViewer({ notes, vendorName, quarter, year,
         </div>
 
         {!minutes ? (
-          <button
-            onClick={handleGenerate}
-            disabled={notes.length === 0 || agentStatus === 'running'}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <Sparkles size={14} />
-            {notes.length === 0
-              ? 'Add meeting notes first'
-              : agentStatus === 'running'
-                ? 'Generating minutes...'
-                : 'Generate Meeting Minutes'}
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={handleGenerate}
+              disabled={notes.length === 0 || agentStatus === 'running'}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Sparkles size={14} />
+              {notes.length === 0
+                ? 'Add meeting notes first'
+                : agentStatus === 'running'
+                  ? 'Generating minutes...'
+                  : 'Generate Meeting Minutes'}
+            </button>
+            {error && (
+              <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
+          </div>
         ) : (
           <div className="space-y-4">
             {approved && (
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 font-medium">
-                  <CheckCircle2 size={15} />
-                  Minutes approved
-                </span>
-                <button
-                  onClick={handleCopy}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors"
-                >
-                  {copied ? <CheckCircle2 size={12} /> : <Copy size={12} />}
-                  {copied ? 'Copied!' : 'Copy to Clipboard'}
-                </button>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                    <CheckCircle2 size={15} />
+                    Minutes approved &amp; finalised
+                  </span>
+                  <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors"
+                  >
+                    {copied ? <CheckCircle2 size={12} /> : <Copy size={12} />}
+                    {copied ? 'Copied!' : 'Copy to Clipboard'}
+                  </button>
+                </div>
+
+                {/* Send to stakeholders */}
+                {sendStatus === 'idle' || sendStatus === 'failed' ? (
+                  <div className="space-y-1.5">
+                    <button
+                      onClick={handleSend}
+                      disabled={sendStatus === 'sending'}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      <Send size={14} />
+                      Send Minutes to Internal Stakeholders
+                    </button>
+                    {sendStatus === 'failed' && sendError && (
+                      <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+                        {sendError}
+                      </p>
+                    )}
+                  </div>
+                ) : sendStatus === 'sending' ? (
+                  <div className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                    <div className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm text-emerald-700 dark:text-emerald-400">Sending minutes...</span>
+                  </div>
+                ) : (
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-4 py-3 space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+                      <CheckCircle2 size={15} />
+                      Sent to {sentRecipients.length} internal stakeholder{sentRecipients.length !== 1 ? 's' : ''}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {sentRecipients.map((r) => (
+                        <span
+                          key={r.email}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-xs rounded-full"
+                        >
+                          <Users size={10} />
+                          {r.name || r.email}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -193,6 +288,7 @@ export default function MeetingMinutesViewer({ notes, vendorName, quarter, year,
             </div>
           }
           approveLabel="Approve & Finalise"
+          isProcessing={isApproving}
           onApprove={handleApprove}
           onCancel={() => { setShowApproval(false); if (agentStatus === 'awaiting_approval') setAgentStatus('idle') }}
         />

@@ -25,7 +25,7 @@ from app.dependencies import get_cycle_repo, get_attendee_repo, get_slot_repo, g
 from app.services.graph_service import GraphService
 from app.services.llm_service import LLMService
 from app.utils.demo_attendees import get_attendee_name
-from app.utils.prompts import SLOT_RATIONALE_PROMPT, CONFLICT_NUDGE_SYSTEM_PROMPT
+from app.utils.prompts import CONFLICT_NUDGE_SYSTEM_PROMPT
 from pydantic import BaseModel, Field
 
 router = APIRouter(tags=["graph-scheduling"])
@@ -598,25 +598,6 @@ def find_meeting_times_graph(
     if workflow_engine.can_transition(cycle.get("workflow_state", ""), "AVAILABILITY_COLLECTED"):
         workflow_engine.advance(cycle, cycle_repo, now)
 
-    # AI augmentation: annotate top 3 slots with a plain-English rationale sentence.
-    # Falls back silently if LLM is disabled or the call fails.
-    if llm_svc.is_enabled:
-        for sp in slot_proposals[:3]:
-            try:
-                context_str = (
-                    f"Time: {sp['proposed_time']}, "
-                    f"Attending: {len(sp['attending'])}/{sp['total_attendees']}, "
-                    f"Conflicts: {sp['conflict_count']}, "
-                    f"Tentative: {len(sp.get('tentative', []))}, "
-                    f"Score: {sp['rank_score']}"
-                )
-                sp["ranking_rationale"] = llm_svc.call_simple(
-                    context_str, system=SLOT_RATIONALE_PROMPT,
-                    max_tokens=settings.scheduling_llm_rationale_max_tokens,
-                )
-            except Exception:
-                pass  # fall back silently — rationale stays absent
-
     response_payload = {
         "message": (
             f"Found {len(slot_proposals)} real meeting slots via Graph"
@@ -828,6 +809,16 @@ def send_meeting_invite_graph(
     now = datetime.now(timezone.utc).isoformat()
     if workflow_engine.can_transition(cycle.get("workflow_state", ""), "MEETING_SCHEDULED"):
         workflow_engine.transition_to(cycle, "MEETING_SCHEDULED", cycle_repo, now)
+
+    # Persist the Graph-returned Teams meeting metadata so the Meeting tab's
+    # "Start Meeting" button can open the join URL even after a page refresh.
+    cycle_repo.mark_teams_meeting_scheduled(
+        cycleId,
+        teams_meeting_url=result.get("onlineMeetingUrl"),
+        web_link=result.get("webLink"),
+        event_id=result.get("id"),
+        scheduled_at=now,
+    )
 
     # AI augmentation: generate a short personalised message for each attendee
     # who had a conflict on the approved slot, so the coordinator can send

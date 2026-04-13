@@ -38,7 +38,6 @@ import {
 } from '@/mock/alignment.mock'
 import {
   MOCK_PUSHBACK_ITEMS,
-  MOCK_PUSHBACK_RESPONSES,
   MOCK_VENDOR_BRIEF,
 } from '@/mock/vendor-prep.mock'
 import {
@@ -199,6 +198,12 @@ export default function CycleDetail() {
 
   // --- Module C state ---
   const [alignmentActions, setAlignmentActions] = useState<ExtractedAction[]>([])
+  const [alignmentSlots, setAlignmentSlots] = useState<SlotProposal[]>([])
+  const [alignmentMeetingResult, setAlignmentMeetingResult] = useState<{
+    teamsUrl: string | null
+    webLink: string | null
+    attendeeCount: number
+  } | null>(null)
 
   // --- Module D state ---
   const [vendorBrief, setVendorBrief] = useState<VendorBrief | null>(
@@ -206,11 +211,14 @@ export default function CycleDetail() {
   )
   const [, setBriefApproved] = useState(cycle?.workflow_state === 'POST_MEETING_COMPLETE')
   const [pushbackItems, setPushbackItems] = useState<PushbackItem[]>(MOCK_PUSHBACK_ITEMS)
-  const [pushbackResponses, setPushbackResponses] = useState<Record<string, PushbackResponse[]>>(MOCK_PUSHBACK_RESPONSES)
+  const [pushbackResponses, setPushbackResponses] = useState<Record<string, PushbackResponse[]>>({})
 
   // --- Module E state ---
   const [meetingNotes, setMeetingNotes] = useState<MeetingNote[]>(
     cycle?.workflow_state === 'POST_MEETING_COMPLETE' ? MOCK_MEETING_NOTES : []
+  )
+  const [vendorMeetingTeamsUrl, setVendorMeetingTeamsUrl] = useState<string | null>(
+    cycle?.teams_meeting_url ?? null
   )
   const [minutesApproved, setMinutesApproved] = useState(false)
   const [allActions, setAllActions] = useState(
@@ -226,6 +234,12 @@ export default function CycleDetail() {
   // On mount, fetch the cycle from the backend for API-created cycles.
   // This rehydrates the Zustand store after a page refresh so that workflow_state,
   // scheduling phase, and scorecard dispatch state are all restored correctly.
+  //
+  // IMPORTANT: all UI-derivation (active tab, scheduling phase, scorecard flags)
+  // must use the MERGED state (local persisted ∨ backend) — never the raw backend
+  // state. Otherwise a cycle the user has advanced locally (e.g. to
+  // POST_MEETING_COMPLETE) would snap back to whatever stale state the backend
+  // holds and side-effects like the scorecard auto-fetch would regress it.
   useEffect(() => {
     if (isMockCycle || !cycleId) return
     setIsLoadingCycle(true)
@@ -233,12 +247,21 @@ export default function CycleDetail() {
       .then((backendCycle) => {
         if (!backendCycle) return
         upsertCycle(backendCycle)
-        const state = backendCycle.workflow_state
+        // Rehydrate the Teams meeting URL so the Meeting tab's "Start Meeting" button
+        // survives page refresh once an invite has been sent.
+        if (backendCycle.teams_meeting_url) {
+          setVendorMeetingTeamsUrl(backendCycle.teams_meeting_url)
+        }
+        // Read the merged state *after* the upsert so we honor any locally-advanced progress.
+        const localState = useCycleStore.getState().workflowStates[cycleId]
+        const state = (localState ?? backendCycle.workflow_state) as WorkflowState
         const idx = WORKFLOW_STATES.indexOf(state)
         setSchedulingPhase(getInitialSchedulingPhase(state))
+        // Preserve the user's last tab if it's still reachable at the merged state.
+        // Only override if an explicit ?tab= was provided, or if no valid tab is already selected.
         if (requestedTab && idx >= TAB_MIN_STATE_INDEX[requestedTab]) {
           setActiveTab(requestedTab)
-        } else {
+        } else if (!savedLastTab || idx < TAB_MIN_STATE_INDEX[savedLastTab]) {
           setActiveTab(getDefaultTabFromState(state))
         }
         if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_REQUEST_SENT')) setScorecardDispatched(true)
@@ -360,9 +383,8 @@ export default function CycleDetail() {
     setPushbackItems((prev) => prev.map((p) => (p.pushback_id === id ? { ...p, status } : p)))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function handleGeneratePushbackResponses(_id: string) {
-    // Responses already seeded via mock
+  function handleGeneratePushbackResponses(pushbackId: string, generated: PushbackResponse[]) {
+    setPushbackResponses((prev) => ({ ...prev, [pushbackId]: generated }))
   }
 
   function handleSelectPushbackResponse(pushbackId: string, responseId: string) {
@@ -480,6 +502,7 @@ export default function CycleDetail() {
             onSlotSelected={setSelectedSlotId}
             onSlotTimeZoneSelected={setSelectedSlotTimeZone}
             isMockCycle={isMockCycle}
+            onTeamsMeetingUrlCaptured={setVendorMeetingTeamsUrl}
             onScorecardProceed={() => {
               advanceWorkflow(cycle!.cycle_id, 'SCORECARD_REQUEST_SENT')
               changeTab('scorecard')
@@ -501,10 +524,15 @@ export default function CycleDetail() {
 
         {activeTab === 'alignment' && (
           <AlignmentTab
+            cycleId={cycle.cycle_id}
             cycle={cycle}
             actions={alignmentActions}
             compiledScores={compiledScores}
             compiledScorecard={compiledScorecard}
+            alignmentSlots={alignmentSlots}
+            alignmentMeetingResult={alignmentMeetingResult}
+            onAlignmentSlotsFound={setAlignmentSlots}
+            onAlignmentMeetingScheduled={setAlignmentMeetingResult}
             onActionsExtracted={(extracted) => {
               setAlignmentActions(extracted)
               setAllActions((prev) => {
@@ -520,9 +548,9 @@ export default function CycleDetail() {
 
         {activeTab === 'vendor-prep' && (
           <VendorPrepTab
+            cycleId={cycle.cycle_id}
             cycle={cycle}
             vendorBrief={vendorBrief}
-            compiledScorecard={compiledScorecard}
             onBriefGenerated={setVendorBrief}
             onBriefApproved={() => {
               setBriefApproved(true)
@@ -539,9 +567,11 @@ export default function CycleDetail() {
 
         {activeTab === 'meeting' && (
           <MeetingTab
+            cycleId={cycle.cycle_id}
             cycle={cycle}
             meetingNotes={meetingNotes}
             minutesApproved={minutesApproved}
+            teamsMeetingUrl={vendorMeetingTeamsUrl}
             onNoteAdd={handleNoteAdd}
             onTranscriptParsed={handleTranscriptParsed}
             onMinutesApproved={handleMinutesApproved}
@@ -629,7 +659,7 @@ function SchedulingTab({
   cycle, schedulingPhase, attendees, slots, selectedSlot, onPhaseChange,
   onAttendeesUpdated, onSlotsReceived, onSlotSelected,
   selectedSlotTimeZone, onSlotTimeZoneSelected,
-  isMockCycle, onScorecardProceed,
+  isMockCycle, onScorecardProceed, onTeamsMeetingUrlCaptured,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   schedulingPhase: SchedulingPhase
@@ -644,6 +674,7 @@ function SchedulingTab({
   onSlotTimeZoneSelected: (tz: 'IST' | 'UTC' | 'GMT') => void
   isMockCycle: boolean
   onScorecardProceed: () => void
+  onTeamsMeetingUrlCaptured: (url: string | null) => void
 }) {
   const currentPhaseIndex = PHASE_ORDER.indexOf(schedulingPhase)
   return (
@@ -733,8 +764,9 @@ function SchedulingTab({
               onSlotSelected(null)
               onPhaseChange('slot_ranking')
             }}
-            onInviteSent={() => {
-              // Meeting URL returned from Graph can be logged or used, but skipped here to simplify UI
+            onInviteSent={(teamsMeetingUrl) => {
+              // Persist the Teams join URL so the Meeting tab can open it via "Start Meeting".
+              onTeamsMeetingUrlCaptured(teamsMeetingUrl)
               // For mock cycles seed pre-built RSVP data; for new cycles keep attendees as-is
               if (isMockCycle) {
                 onAttendeesUpdated(MOCK_ATTENDEES_RSVP)
@@ -823,13 +855,19 @@ function ScorecardTab({
 
 /* ── Alignment Tab ────────────────────────────────────────── */
 function AlignmentTab({
-  cycle, actions, onActionsExtracted, compiledScores, compiledScorecard,
+  cycleId, cycle, actions, onActionsExtracted, compiledScores, compiledScorecard,
+  alignmentSlots, alignmentMeetingResult, onAlignmentSlotsFound, onAlignmentMeetingScheduled,
 }: {
+  cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   actions: ExtractedAction[]
   onActionsExtracted: (a: ExtractedAction[]) => void
   compiledScores: CompiledCategoryScore[] | null
   compiledScorecard?: CompiledScorecard | null
+  alignmentSlots: SlotProposal[]
+  alignmentMeetingResult: { teamsUrl: string | null; webLink: string | null; attendeeCount: number } | null
+  onAlignmentSlotsFound: (slots: SlotProposal[]) => void
+  onAlignmentMeetingScheduled: (result: { teamsUrl: string | null; webLink: string | null; attendeeCount: number }) => void
 }) {
   // Prefer building comparisons directly from the 2-column compiled scorecard
   // (uses real internal_avg / vendor_avg values). Legacy path kept as fallback.
@@ -874,8 +912,14 @@ function AlignmentTab({
       )}
       <AlignmentFlagsPanel flags={flags} />
       <FaceOffModelEditor positions={MOCK_FACE_OFF} />
-      <ScheduleAlignmentMeeting />
-      <NotesInputPanel onActionsExtracted={onActionsExtracted} />
+      <ScheduleAlignmentMeeting
+        cycleId={cycleId}
+        slots={alignmentSlots}
+        meetingResult={alignmentMeetingResult}
+        onSlotsFound={onAlignmentSlotsFound}
+        onMeetingScheduled={onAlignmentMeetingScheduled}
+      />
+      <NotesInputPanel cycleId={cycleId} onActionsExtracted={onActionsExtracted} />
       {actions.length > 0 && (
         <ActionLog
           actions={actions.map(a => ({ ...a, cycle_ref: `${cycle.vendor_name} ${cycle.quarter} ${cycle.year}` }))}
@@ -887,32 +931,35 @@ function AlignmentTab({
 
 /* ── Vendor Prep Tab ──────────────────────────────────────── */
 function VendorPrepTab({
-  cycle, vendorBrief, compiledScorecard, onBriefGenerated, onBriefApproved,
+  cycleId, cycle, vendorBrief, onBriefGenerated, onBriefApproved,
   pushbackItems, pushbackResponses, onPushbackAdd, onGenerateResponses, onSelectResponse, onPushbackStatusChange,
 }: {
+  cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   vendorBrief: VendorBrief | null
-  compiledScorecard?: CompiledScorecard | null
   onBriefGenerated: (b: VendorBrief) => void
   onBriefApproved: () => void
   pushbackItems: PushbackItem[]
   pushbackResponses: Record<string, PushbackResponse[]>
   onPushbackAdd: (item: Omit<PushbackItem, 'pushback_id' | 'cycle_id' | 'created_at'>) => void
-  onGenerateResponses: (id: string) => void
+  onGenerateResponses: (id: string, responses: PushbackResponse[]) => void
   onSelectResponse: (pid: string, rid: string) => void
   onPushbackStatusChange: (id: string, s: PushbackItem['status']) => void
 }) {
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <VendorBriefPanel
+        cycleId={cycleId}
         vendorName={cycle.vendor_name}
+        quarter={cycle.quarter}
+        year={cycle.year}
         brief={vendorBrief}
-        compiledScorecard={compiledScorecard}
         onBriefGenerated={onBriefGenerated}
         onBriefApproved={onBriefApproved}
       />
       <PushbackInput onAdd={onPushbackAdd} />
       <PushbackResponseCards
+        cycleId={cycleId}
         items={pushbackItems}
         responses={pushbackResponses}
         onGenerate={onGenerateResponses}
@@ -929,11 +976,13 @@ function VendorPrepTab({
 
 /* ── Meeting Tab ──────────────────────────────────────────── */
 function MeetingTab({
-  cycle, meetingNotes, minutesApproved, onNoteAdd, onTranscriptParsed, onMinutesApproved, allActions, onActionStatusChange,
+  cycleId, cycle, meetingNotes, minutesApproved, teamsMeetingUrl, onNoteAdd, onTranscriptParsed, onMinutesApproved, allActions, onActionStatusChange,
 }: {
+  cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   meetingNotes: MeetingNote[]
   minutesApproved: boolean
+  teamsMeetingUrl: string | null
   onNoteAdd: (n: Omit<MeetingNote, 'note_id' | 'meeting_id'>) => void
   onTranscriptParsed: (notes: MeetingNote[]) => void
   onMinutesApproved: () => void
@@ -950,16 +999,15 @@ function MeetingTab({
         mostConcerning="Communication"
         recurringIssueCount={0}
         predictedChallenges={[
-          'February SLA incident dispute — vendor likely to challenge score',
-          'AI pilot scope change — formal contract amendment required',
-          'Pricing CPI clause interpretation — 8% vs 5% cap',
+          
         ]}
       />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <LiveCapturePanel notes={meetingNotes} onAdd={onNoteAdd} />
-        <TranscriptInput onParsed={onTranscriptParsed} />
+        <LiveCapturePanel notes={meetingNotes} onAdd={onNoteAdd} teamsMeetingUrl={teamsMeetingUrl} />
+        <TranscriptInput cycleId={cycleId} onParsed={onTranscriptParsed} />
       </div>
       <MeetingMinutesViewer
+        cycleId={cycleId}
         notes={meetingNotes}
         vendorName={cycle.vendor_name}
         quarter={cycle.quarter}

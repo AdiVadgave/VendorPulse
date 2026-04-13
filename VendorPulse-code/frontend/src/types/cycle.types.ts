@@ -20,6 +20,10 @@ export interface GovernanceCycle {
   scorecard_dispatched_to?: string[] | null
   scorecard_dispatched?: boolean
   meeting_scheduled?: boolean
+  teams_meeting_url?: string | null
+  teams_meeting_web_link?: string | null
+  teams_meeting_event_id?: string | null
+  teams_meeting_scheduled_at?: string | null
 }
 
 export type StakeholderRole =

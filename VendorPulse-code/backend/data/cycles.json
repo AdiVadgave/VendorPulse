@@ -1,47 +1,52 @@
 [
   {
-    "cycle_id": "c_3263169f",
-    "vendor_id": "v_90f8956e",
-    "vendor_name": "zensar",
+    "cycle_id": "c_5151b33c",
+    "vendor_id": "v3",
+    "vendor_name": "Meridian IT",
     "quarter": "Q1",
     "year": 2026,
-    "workflow_state": "ATTENDEE_REFRESH_SENT",
-    "created_at": "2026-04-10T08:45:38.096556+00:00",
-    "updated_at": "2026-04-10T08:45:45.478985+00:00"
+    "workflow_state": "AVAILABILITY_COLLECTED",
+    "created_at": "2026-04-13T04:42:08.642043+00:00",
+    "updated_at": "2026-04-13T04:42:49.811099+00:00"
   },
   {
-    "cycle_id": "c_e7a648c4",
-    "vendor_id": "v_35989bd9",
-    "vendor_name": "Zensar-test",
+    "cycle_id": "c_1ef88978",
+    "vendor_id": "v_05392e0d",
+    "vendor_name": "TCS",
     "quarter": "Q1",
     "year": 2026,
-    "workflow_state": "SCORECARD_REQUEST_SENT",
-    "created_at": "2026-04-10T09:17:16.307264+00:00",
-    "updated_at": "2026-04-10T09:21:20.151840+00:00",
-    "scorecard_dispatched_at": "2026-04-10T09:21:20.151840+00:00",
+    "workflow_state": "SCORECARD_COMPILED",
+    "created_at": "2026-04-13T06:32:34.605043+00:00",
+    "updated_at": "2026-04-13T06:36:56.521755+00:00",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YTYzNjZlYTctMTg5Yi00ZjliLTg4YzktZTU0Njc5NWQwYTUy%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2efgAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "teams_meeting_event_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2efgAAAA==",
+    "teams_meeting_scheduled_at": "2026-04-13T06:34:45.942524+00:00",
+    "scorecard_dispatched_at": "2026-04-13T06:35:56.428816+00:00",
     "scorecard_dispatched_to": [
       "kanishkpunekar54@gmail.com",
+      "adivadgave16@gmail.com",
       "anupkesarwani3537@gmail.com"
     ]
   },
   {
-    "cycle_id": "c_1807c2c4",
-    "vendor_id": "v_90f8956e",
-    "vendor_name": "zensar",
+    "cycle_id": "c_6348ccbd",
+    "vendor_id": "v_6e075041",
+    "vendor_name": "Zensar5",
     "quarter": "Q1",
     "year": 2026,
-    "workflow_state": "MEETING_SCHEDULED",
-    "created_at": "2026-04-10T11:21:57.475792+00:00",
-    "updated_at": "2026-04-10T11:28:17.785555+00:00"
-  },
-  {
-    "cycle_id": "c_0557c83f",
-    "vendor_id": "v_0b0bce16",
-    "vendor_name": "mattel",
-    "quarter": "Q1",
-    "year": 2026,
-    "workflow_state": "AVAILABILITY_COLLECTED",
-    "created_at": "2026-04-10T12:39:52.365964+00:00",
-    "updated_at": "2026-04-10T12:40:43.332808+00:00"
+    "workflow_state": "ARCHIVED",
+    "created_at": "2026-04-13T06:46:13.194394+00:00",
+    "updated_at": "2026-04-13T07:09:51.522227+00:00",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YWQ0NjAxMzUtMWMxNy00ZWQ5LWJlMjYtY2Q1MTE0MzFhZjIz%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2efwAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "teams_meeting_event_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2efwAAAA==",
+    "teams_meeting_scheduled_at": "2026-04-13T06:51:17.363199+00:00",
+    "scorecard_dispatched_at": "2026-04-13T06:53:38.181089+00:00",
+    "scorecard_dispatched_to": [
+      "anupkesarwani3537@gmail.com",
+      "adivadgave16@gmail.com",
+      "kanishkpunekar54@gmail.com"
+    ]
   }
 ]

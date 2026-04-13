@@ -178,5 +178,51 @@
     "role": "VENDOR_MANAGER",
     "organisation": "Derivco VMO",
     "avatar": "AB"
+  },
+  {
+    "userId": "u21",
+    "name": "Hrushikesh Sardesai",
+    "email": "hrushikesh.sardesai@zensar.com",
+    "gmail": "",
+    "role": "",
+    "organisation": "",
+    "avatar": "HS"
+  },
+  {
+    "userId": "u22",
+    "name": "Rituraj Patil",
+    "email": "rituraj.patil@zensar.com",
+    "gmail": "",
+    "role": "",
+    "organisation": "",
+    "avatar": "RP"
+  },
+  {
+    "userId": "u23",
+    "name": "Richa Sankpal",
+    "email": "richa.sankpal@zensar.com",
+    "gmail": "",
+    "role": "",
+    "organisation": "",
+    "avatar": "RS"
+  },
+  {
+    "userId": "u24",
+    "name": "Gaurav Shukla",
+    "email": "gaurav.shukla1@zensar.com",
+    "gmail": "",
+    "role": "",
+    "organisation": "",
+    "avatar": "GS"
+  },
+  {
+    "userId": "u25",
+    "name": "Shilpa Prabhu",
+    "email": "shilpa.prabhu@zensar.com",
+    "gmail": "",
+    "role": "",
+    "organisation": "",
+    "avatar": "SP"
   }
+
 ]

@@ -156,3 +156,73 @@ def get_scheduling_agent(cycle_id: str | None = None):
         llm_svc=get_llm_service() if settings.enable_llm else None,
         agent_run_repo=get_agent_run_repo(),
     )
+
+
+def _fetch_compiled_scorecard(cycle_id: str) -> dict:
+    """
+    Reusable scorecard fetcher for the VendorPrepAgent.
+    Calls the same logic as GET /api/scorecard/compiled/{cycle_id}.
+    """
+    from app.api.routes.scorecard import get_compiled_scorecard
+    return get_compiled_scorecard(cycle_id)
+
+
+def get_vendor_prep_agent(cycle_id: str | None = None):
+    """Returns a VendorPrepAgent wired with all dependencies."""
+    from app.agents.vendor_prep_agent import VendorPrepAgent
+
+    return VendorPrepAgent(
+        scorecard_fetcher=_fetch_compiled_scorecard,
+        cycle_id=cycle_id,
+        llm_svc=get_llm_service() if settings.enable_llm else None,
+        agent_run_repo=get_agent_run_repo(),
+    )
+
+
+def get_meeting_agent(cycle_id: str | None = None):
+    """Returns a MeetingAgent wired with all dependencies."""
+    from app.agents.meeting_agent import MeetingAgent
+
+    return MeetingAgent(
+        meeting_repo=get_meeting_repo(),
+        cycle_id=cycle_id,
+        llm_svc=get_llm_service() if settings.enable_llm else None,
+        agent_run_repo=get_agent_run_repo(),
+    )
+
+
+def get_scorecard_agent(cycle_id: str | None = None):
+    """Returns a ScorecardAgent wired with all dependencies."""
+    from app.agents.scorecard_agent import ScorecardAgent
+
+    return ScorecardAgent(
+        scorecard_fetcher=_fetch_compiled_scorecard,
+        cycle_id=cycle_id,
+        llm_svc=get_llm_service() if settings.enable_llm else None,
+        agent_run_repo=get_agent_run_repo(),
+    )
+
+
+def get_alignment_agent(cycle_id: str | None = None):
+    """Returns an AlignmentAgent wired with all dependencies."""
+    from app.agents.alignment_agent import AlignmentAgent
+
+    return AlignmentAgent(
+        scorecard_fetcher=_fetch_compiled_scorecard,
+        cycle_id=cycle_id,
+        llm_svc=get_llm_service() if settings.enable_llm else None,
+        agent_run_repo=get_agent_run_repo(),
+    )
+
+
+def get_memory_agent(cycle_id: str | None = None):
+    """Returns a MemoryAgent wired with all dependencies."""
+    from app.agents.memory_agent import MemoryAgent
+
+    return MemoryAgent(
+        cycle_repo=get_cycle_repo(),
+        scorecard_fetcher=_fetch_compiled_scorecard,
+        cycle_id=cycle_id,
+        llm_svc=get_llm_service() if settings.enable_llm else None,
+        agent_run_repo=get_agent_run_repo(),
+    )

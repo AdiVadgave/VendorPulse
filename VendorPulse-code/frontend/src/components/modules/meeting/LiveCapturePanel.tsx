@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Radio } from 'lucide-react'
+import { ExternalLink, Plus, Radio } from 'lucide-react'
 import type { MeetingNote, NoteType } from '@/types/meeting.types'
 import { NOTE_TYPE_LABELS, NOTE_TYPE_COLORS } from '@/types/meeting.types'
 import { cn } from '@/utils/cn'
@@ -7,15 +7,25 @@ import { cn } from '@/utils/cn'
 interface Props {
   notes: MeetingNote[]
   onAdd: (note: Omit<MeetingNote, 'note_id' | 'meeting_id'>) => void
+  teamsMeetingUrl?: string | null
 }
 
 const NOTE_TYPES: NoteType[] = ['QUESTION', 'OBJECTION', 'DECISION', 'APPRECIATION', 'ACTION']
 
-export default function LiveCapturePanel({ notes, onAdd }: Props) {
+export default function LiveCapturePanel({ notes, onAdd, teamsMeetingUrl }: Props) {
   const [selectedType, setSelectedType] = useState<NoteType>('QUESTION')
   const [content, setContent] = useState('')
   const [raisedBy, setRaisedBy] = useState('')
   const [isLive, setIsLive] = useState(false)
+
+  function handleStartMeeting() {
+    // Mirrors the "Open Teams Meeting" flow from the Internal Alignment tab — open
+    // the Graph-returned join URL in a new tab before flipping into LIVE capture mode.
+    if (!isLive && teamsMeetingUrl) {
+      window.open(teamsMeetingUrl, '_blank', 'noopener,noreferrer')
+    }
+    setIsLive((prev) => !prev)
+  }
 
   function handleAdd() {
     if (!content.trim()) return
@@ -38,15 +48,22 @@ export default function LiveCapturePanel({ notes, onAdd }: Props) {
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Live Capture</h3>
         </div>
         <button
-          onClick={() => setIsLive(!isLive)}
+          onClick={handleStartMeeting}
           className={cn(
             'flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-colors',
             isLive
               ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
               : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
           )}
+          title={!isLive && teamsMeetingUrl ? 'Opens the Teams meeting in a new tab' : undefined}
         >
-          <span className={cn('w-1.5 h-1.5 rounded-full', isLive ? 'bg-red-500 animate-pulse' : 'bg-slate-400')} />
+          {isLive ? (
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+          ) : teamsMeetingUrl ? (
+            <ExternalLink size={11} />
+          ) : (
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+          )}
           {isLive ? 'LIVE' : 'Start Meeting'}
         </button>
       </div>

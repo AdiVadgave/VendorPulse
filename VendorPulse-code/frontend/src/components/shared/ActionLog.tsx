@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle2, Clock, AlertCircle, Filter } from 'lucide-react'
+import { CheckCircle2, Clock, AlertCircle, Filter, CheckCheck } from 'lucide-react'
 import { format } from 'date-fns'
 import type { ExtractedAction } from '@/types/alignment.types'
 import { cn } from '@/utils/cn'
@@ -43,6 +43,16 @@ export default function ActionLog({ actions, showCycleRef = false, onStatusChang
 
   const openCount = actions.filter((a) => a.status === 'OPEN').length
   const inProgressCount = actions.filter((a) => a.status === 'IN_PROGRESS').length
+  const hasUnclosed = openCount + inProgressCount > 0
+
+  const handleMarkAllClosed = () => {
+    if (!onStatusChange) return
+    actions.forEach((a) => {
+      if (a.status !== 'CLOSED') {
+        onStatusChange(a.action_id, 'CLOSED')
+      }
+    })
+  }
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -53,7 +63,18 @@ export default function ActionLog({ actions, showCycleRef = false, onStatusChang
             {openCount} open · {inProgressCount} in progress · {actions.length - openCount - inProgressCount} closed
           </p>
         </div>
-        <Filter size={15} className="text-slate-400" />
+        <div className="flex items-center gap-2">
+          {onStatusChange && hasUnclosed && (
+            <button
+              onClick={handleMarkAllClosed}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+            >
+              <CheckCheck size={14} />
+              Mark All Completed
+            </button>
+          )}
+          <Filter size={15} className="text-slate-400" />
+        </div>
       </div>
 
       {/* Filters */}

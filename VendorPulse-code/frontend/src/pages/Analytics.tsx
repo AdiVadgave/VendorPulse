@@ -198,9 +198,7 @@ export default function Analytics() {
         <div className="lg:col-span-2">
           <TrendLineChart trend={selectedTrend} selectedCategory={selectedCategory} />
         </div>
-        <div>
-          <RadarChartComponent data={radarData} vendorName={vendorOption.name} />
-        </div>
+        
       </div>
 
       {/* ── Stakeholder vs Vendor gap ─────────────────────────────── */}

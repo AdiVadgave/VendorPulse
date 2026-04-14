@@ -27,6 +27,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
   const [scheduleLoading, setScheduleLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [timeZone, setTimeZone] = useState<'IST' | 'UTC' | 'GMT'>('IST')
+  const [durationMinutes, setDurationMinutes] = useState(30)
 
   // Internal attendees state
   const [internalAttendees, setInternalAttendees] = useState<CycleAttendee[]>([])
@@ -100,7 +101,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
         setFindLoading(false)
         return
       }
-      const response = await findAlignmentTimes(cycleId, organiserEmail, dateStart, dateEnd, 0.5, timeZone)
+      const response = await findAlignmentTimes(cycleId, organiserEmail, dateStart, dateEnd, durationMinutes / 60, timeZone)
       onSlotsFound(response.slot_proposals)
       if (response.slot_proposals.length === 0) {
         setError(response.message || 'No available slots found in the selected range.')
@@ -129,7 +130,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
         organiserEmail,
         slotId,
         slot.proposed_time,
-        slot.duration_minutes ?? 30,
+        slot.duration_minutes ?? durationMinutes,
         timeZone
       )
       onMeetingScheduled({
@@ -306,7 +307,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
           )}
         </div>
 
-        {/* Duration info */}
+        {/* Duration selector */}
         <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
           <div className="flex items-center gap-2 mb-1.5">
             <Clock size={13} className="text-slate-400" />
@@ -314,7 +315,22 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
               Duration
             </span>
           </div>
-          <p className="text-sm text-slate-700 dark:text-slate-300">30 minutes (recommended)</p>
+          {meetingResult ? (
+            <p className="text-sm text-slate-700 dark:text-slate-300">{durationMinutes} minutes</p>
+          ) : (
+            <select
+              value={durationMinutes}
+              onChange={(e) => setDurationMinutes(Number(e.target.value))}
+              className="w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            >
+              <option value={15}>15 minutes</option>
+              <option value={30}>30 minutes (recommended)</option>
+              <option value={45}>45 minutes</option>
+              <option value={60}>60 minutes</option>
+              <option value={90}>90 minutes</option>
+              <option value={120}>120 minutes</option>
+            </select>
+          )}
         </div>
 
         {/* Agenda preview */}

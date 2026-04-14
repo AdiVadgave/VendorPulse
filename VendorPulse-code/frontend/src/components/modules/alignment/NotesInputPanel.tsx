@@ -29,9 +29,10 @@ Alex closed by saying the next governance council meeting will be scheduled for 
 interface Props {
   cycleId: string
   onActionsExtracted: (actions: ExtractedAction[]) => void
+  onNotesChange?: (notes: string) => void
 }
 
-export default function NotesInputPanel({ cycleId, onActionsExtracted }: Props) {
+export default function NotesInputPanel({ cycleId, onActionsExtracted, onNotesChange }: Props) {
   const [notes, setNotes] = useState('')
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
   const [extracted, setExtracted] = useState<ExtractedAction[]>([])
@@ -61,6 +62,7 @@ export default function NotesInputPanel({ cycleId, onActionsExtracted }: Props) 
 
   function handleDemo() {
     setNotes(DEMO_NOTES)
+    onNotesChange?.(DEMO_NOTES)
   }
 
   function addManualAction() {
@@ -102,7 +104,7 @@ export default function NotesInputPanel({ cycleId, onActionsExtracted }: Props) 
 
         <textarea
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          onChange={(e) => { setNotes(e.target.value); onNotesChange?.(e.target.value) }}
           placeholder="Paste your internal alignment call notes here. Claude will extract structured action items — owner, description, and due date where mentioned..."
           rows={7}
           className="w-full text-sm text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-600 placeholder-slate-400 dark:placeholder-slate-500"

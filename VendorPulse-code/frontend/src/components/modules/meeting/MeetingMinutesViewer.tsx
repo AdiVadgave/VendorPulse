@@ -113,7 +113,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, vendorName, quart
             </div>
             <div>
               <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Meeting Minutes</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{vendorName} {quarter} {year} · Claude-generated</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{vendorName} {quarter} {year}</p>
             </div>
           </div>
           <AgentStatusBadge status={agentStatus} />

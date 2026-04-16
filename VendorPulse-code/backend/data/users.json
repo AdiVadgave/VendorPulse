@@ -140,7 +140,7 @@
     "email": "anup.kesarwani@zensar.com",
     "gmail": "anupkesarwani3537@gmail.com",
     "role": "INTERNAL_LEAD",
-    "organisation": "Zensar VMO",
+    "organisation": "Shell ",
     "avatar": "AK"
   },
   {
@@ -158,7 +158,7 @@
     "email": "aditya.vadgave@zensar.com",
     "gmail": "adivadgave16@gmail.com",
     "role": "VENDOR_MANAGER",
-    "organisation": "Zensar VMO",
+    "organisation": "Shell ",
     "avatar": "AV"
   },
   {
@@ -167,7 +167,7 @@
     "email": "v.kulkarni3@zensar.com",
     "gmail": "vivekkulkarni@gmail.com",
     "role": "VENDOR_MANAGER",
-    "organisation": "Zensar VMO",
+    "organisation": "Zensar ",
     "avatar": "VK"
   },
   {
@@ -176,7 +176,7 @@
     "email": "abhishek.biyani@zensar.com",
     "gmail": "",
     "role": "VENDOR_MANAGER",
-    "organisation": "Derivco VMO",
+    "organisation": "Zensar VMO",
     "avatar": "AB"
   },
   {
@@ -214,15 +214,6 @@
     "role": "",
     "organisation": "",
     "avatar": "GS"
-  },
-  {
-    "userId": "u25",
-    "name": "Shilpa Prabhu",
-    "email": "shilpa.prabhu@zensar.com",
-    "gmail": "",
-    "role": "",
-    "organisation": "",
-    "avatar": "SP"
   }
 
 ]

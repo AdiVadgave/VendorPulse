@@ -37,7 +37,7 @@ export default function PushbackInput({ onAdd }: Props) {
       <div className="flex items-center gap-2 mb-4">
         <AlertTriangle size={15} className="text-red-400" />
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Add Vendor Pushback / Objection
+          Add Vendor Disagreement (Pushback / Objection)
         </h3>
       </div>
 

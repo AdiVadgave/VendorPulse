@@ -5,20 +5,34 @@ import { extractAlignmentActions } from '@/lib/alignmentApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { AgentStatus } from '@/types/agent.types'
 
-const DEMO_NOTES = `Alex: We need to agree on the AI automation pilot scope before the vendor prep call. Priya had concerns about roadmap alignment that need to be resolved first.
+const DEMO_NOTES = `Strategic Vendor Governance Council — Q2 Planning Session
+Date: April 10, 2024 | Attendees: Alex (Procurement Lead), Priya (Engineering), James (Finance), Sandra (Legal), Rachel (Security & Compliance), David (Operations), Marcus (Zensar CSM), Lena (Zensar Engineering Lead)
 
-Priya: I'll prepare the data analysis to support our SLA compliance score position. There's a factual dispute likely coming from NovaTech on the February incident.
+Alex opened by noting that the April 3rd follow-up was postponed due to Zensar's delayed SLA dispute response, which was received on March 21st — three days past the agreed March 18th deadline. Sandra flagged this as a contract compliance issue and will formally log it in the vendor performance register by end of week. Marcus apologized and cited internal legal review delays.
 
-James: I'll pull the Q4 innovation KPI contract commitments by Thursday — we need to know which ones were actually delivered before the meeting.
+Sandra presented the revised SLA notification language drafted post-March meeting. James raised a concern that the new language inadvertently removes the 48-hour cure period that currently protects Zensar. Marcus confirmed this was unintentional and Lena will work with Sandra directly to reconcile the language — both parties will aim to sign off on the final version no later than April 25th.
 
-All: Agreed on March 28 for the vendor prep call. Alex to send calendar invite.`
+Rachel introduced a new agenda item: Zensar's SOC 2 Type II certification is expiring on May 31st. She needs confirmation from Lena that renewal is in progress and an estimated completion date before Rachel can update the vendor risk register. Lena confirmed renewal is underway but could not give a date on the spot — she will follow up with Rachel directly by April 15th.
+
+James presented the penalty analysis for delayed Q4 innovation KPIs. The contract specifies a 5% service credit per missed milestone, meaning Zensar owes a $42,000 credit against the next invoice. Marcus disputed the calculation, claiming the bulk export API delay was caused by a dependency on Shell's internal API team, not Zensar. James and Marcus agreed to a working session to review the timeline evidence. James will pull the relevant Jira tickets and email chain history before that session. The working session should happen before April 19th.
+
+David raised an operational concern: the Zensar integration currently has no documented runbook for failover procedures. This creates an incident response risk. Lena agreed to provide a draft failover runbook within three weeks. David will review it and provide feedback within five business days of receipt.
+
+Priya confirmed the AI automation pilot scope document was shared on March 20th as planned. However, Shell's engineering team identified two open technical dependencies — single sign-on integration and data residency compliance — that need Zensar's input before Shell's engineering can begin. Lena will provide written responses to both dependency questions by April 17th. If responses are not received by then, Priya will escalate to Alex to invoke the contractual response SLA.
+
+Rachel also noted that the last penetration test was conducted fourteen months ago — Shell's security policy requires annual testing. She will initiate the vendor pen test scheduling process and coordinate with Lena to agree on a testing window. They should have a testing date confirmed within two weeks.
+
+Alex closed by saying the next governance council meeting will be scheduled for the second week of May. He will send a Doodle poll to all attendees by April 12th to confirm availability. Sandra reminded the group that the contract renewal window opens June 1st and Shell's team needs at least six weeks to prepare — meaning the renewal strategy document must be ready by April 20th. Alex agreed to own the first draft.
+
+ `
 
 interface Props {
   cycleId: string
   onActionsExtracted: (actions: ExtractedAction[]) => void
+  onNotesChange?: (notes: string) => void
 }
 
-export default function NotesInputPanel({ cycleId, onActionsExtracted }: Props) {
+export default function NotesInputPanel({ cycleId, onActionsExtracted, onNotesChange }: Props) {
   const [notes, setNotes] = useState('')
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
   const [extracted, setExtracted] = useState<ExtractedAction[]>([])
@@ -48,6 +62,7 @@ export default function NotesInputPanel({ cycleId, onActionsExtracted }: Props) 
 
   function handleDemo() {
     setNotes(DEMO_NOTES)
+    onNotesChange?.(DEMO_NOTES)
   }
 
   function addManualAction() {
@@ -82,14 +97,14 @@ export default function NotesInputPanel({ cycleId, onActionsExtracted }: Props) 
               onClick={handleDemo}
               className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline"
             >
-              Load demo notes
+              Load Transcript
             </button>
           </div>
         </div>
 
         <textarea
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          onChange={(e) => { setNotes(e.target.value); onNotesChange?.(e.target.value) }}
           placeholder="Paste your internal alignment call notes here. Claude will extract structured action items — owner, description, and due date where mentioned..."
           rows={7}
           className="w-full text-sm text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-600 placeholder-slate-400 dark:placeholder-slate-500"

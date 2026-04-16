@@ -869,6 +869,8 @@ function AlignmentTab({
   onAlignmentSlotsFound: (slots: SlotProposal[]) => void
   onAlignmentMeetingScheduled: (result: { teamsUrl: string | null; webLink: string | null; attendeeCount: number }) => void
 }) {
+  const [alignmentNotesText, setAlignmentNotesText] = useState('')
+  const [, setAlignmentMinutesApproved] = useState(false)
   // Prefer building comparisons directly from the 2-column compiled scorecard
   // (uses real internal_avg / vendor_avg values). Legacy path kept as fallback.
   const comparisons = compiledScorecard
@@ -919,7 +921,24 @@ function AlignmentTab({
         onSlotsFound={onAlignmentSlotsFound}
         onMeetingScheduled={onAlignmentMeetingScheduled}
       />
-      <NotesInputPanel cycleId={cycleId} onActionsExtracted={onActionsExtracted} />
+      <NotesInputPanel cycleId={cycleId} onActionsExtracted={onActionsExtracted} onNotesChange={setAlignmentNotesText} />
+      {/* {alignmentNotesText.trim() && (
+        <MeetingMinutesViewer
+          cycleId={cycleId}
+          notes={[{
+            note_id: `alignment-notes-${cycleId}`,
+            meeting_id: `alignment-mtg-${cycleId}`,
+            note_type: 'DECISION' as const,
+            content: alignmentNotesText,
+            raised_by: 'Internal Stakeholders',
+            timestamp: new Date().toISOString(),
+          }]}
+          vendorName={cycle.vendor_name}
+          quarter={cycle.quarter}
+          year={cycle.year}
+          onApproved={() => setAlignmentMinutesApproved(true)}
+        />
+      )} */}
       {actions.length > 0 && (
         <ActionLog
           actions={actions.map(a => ({ ...a, cycle_ref: `${cycle.vendor_name} ${cycle.quarter} ${cycle.year}` }))}
@@ -999,9 +1018,7 @@ function MeetingTab({
         mostConcerning="Communication"
         recurringIssueCount={0}
         predictedChallenges={[
-          'February SLA incident dispute — vendor likely to challenge score',
-          'AI pilot scope change — formal contract amendment required',
-          'Pricing CPI clause interpretation — 8% vs 5% cap',
+          
         ]}
       />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

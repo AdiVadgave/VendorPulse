@@ -92,7 +92,13 @@ class Settings(BaseSettings):
     google_form_id: str = ""
     google_form_url: str = "https://forms.gle/zeMdJ8uvFkryFDTr6"
 
-   
+    # Google Forms prefill entry IDs (e.g. "entry.123456789").
+    # When set, the dispatch email links go to a prefilled form so reviewers
+    # don't have to re-type these fields. Get the IDs from the form's
+    # "Get pre-filled link" feature. Empty = no prefill (reviewer types it).
+    google_form_prefill_cycle_id_entry: str = ""
+    google_form_prefill_email_entry: str = ""
+    google_form_prefill_vendor_entry: str = ""
 
     # Scorecard polling
     scorecard_poll_interval_seconds: int = 90

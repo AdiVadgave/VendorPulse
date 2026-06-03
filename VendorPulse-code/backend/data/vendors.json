@@ -18,8 +18,20 @@
     "status": "active"
   },
   {
-    "vendor_id": "v_9f2e323c",
+    "vendor_id": "v_7d08f426",
+    "name": "Zensar",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_d4f81220",
     "name": "abc",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_8d7116a0",
+    "name": "zensar2",
     "category": "IT Infrastructure",
     "status": "active"
   }

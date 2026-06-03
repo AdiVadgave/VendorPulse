@@ -60,7 +60,6 @@ import CompiledScorecardTable from '@/components/modules/scorecard/CompiledScore
 
 import ChangeHighlightsPanel from '@/components/modules/alignment/ChangeHighlightsPanel'
 import AlignmentFlagsPanel from '@/components/modules/alignment/AlignmentFlagsPanel'
-import ScoreComparisonPanel from '@/components/modules/alignment/ScoreComparisonPanel'
 import FaceOffModelEditor from '@/components/modules/alignment/FaceOffModelEditor'
 import ScheduleAlignmentMeeting from '@/components/modules/alignment/ScheduleAlignmentMeeting'
 import NotesInputPanel from '@/components/modules/alignment/NotesInputPanel'
@@ -909,9 +908,6 @@ function AlignmentTab({
         whatChangedBullets={whatChangedBullets}
         insights={insights.length > 0 ? insights : undefined}
       />
-      {comparisons.length > 0 && (
-        <ScoreComparisonPanel comparisons={comparisons} />
-      )}
       <AlignmentFlagsPanel flags={flags} />
       <FaceOffModelEditor positions={MOCK_FACE_OFF} />
       <ScheduleAlignmentMeeting

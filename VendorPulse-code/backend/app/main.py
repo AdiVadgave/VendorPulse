@@ -10,6 +10,9 @@ Serves:
 """
 from __future__ import annotations
 
+import truststore
+truststore.inject_into_ssl()
+
 import logging
 from datetime import datetime, timezone
 

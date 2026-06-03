@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 
 from app.config import settings
-from app.dependencies import get_cycle_repo
+from app.dependencies import get_attendee_repo, get_cycle_repo, get_user_repo
 from app.core.workflow_engine import workflow_engine, WORKFLOW_STATES
 from app.services.gmail_service import GmailSendError, build_scorecard_email, send_html_email
 from app.services.google_auth_service import is_authenticated
@@ -111,13 +111,43 @@ def dispatch_scorecard_emails(payload: DispatchRequest):
 
     form_url = payload.form_url or settings.google_form_url
     logger.info("SCORECARD-DISPATCH: using form_url=%s", form_url)
+
+    # Resolve each payload email to the attendee's personal Gmail (preferred) so
+    # the form email reaches a Google account — corporate addresses (e.g. @zensar.com)
+    # often can't receive from a personal Gmail account due to org policies.
+    attendee_repo = get_attendee_repo()
+    user_repo = get_user_repo()
+    cycle_attendees = attendee_repo.get_for_cycle(payload.cycle_id)
+    by_email = {(a.get("email") or "").lower(): a for a in cycle_attendees}
+
+    def resolve_gmail(corp_email: str) -> str:
+        record = by_email.get(corp_email.lower())
+        if not record:
+            return corp_email
+        gmail = (record.get("gmail") or "").strip()
+        if gmail:
+            return gmail
+        user_id = record.get("user_id")
+        if user_id:
+            user = user_repo.get_by_user_id(user_id)
+            if user and (user.get("gmail") or "").strip():
+                return user["gmail"].strip()
+        return corp_email
+
     results: list[DispatchResult] = []
     sent_count = 0
 
     for attendee in payload.attendees:
-        logger.info("SCORECARD-DISPATCH: building email for %s (%s)", attendee.name, attendee.email)
+        delivery_email = resolve_gmail(attendee.email)
+        if delivery_email != attendee.email:
+            logger.info("SCORECARD-DISPATCH: routing %s -> %s (gmail)", attendee.email, delivery_email)
+        else:
+            logger.info("SCORECARD-DISPATCH: no gmail on file for %s, using corporate address", attendee.email)
+
+        logger.info("SCORECARD-DISPATCH: building email for %s (%s)", attendee.name, delivery_email)
         email_data = build_scorecard_email(
             attendee_name=attendee.name,
+            attendee_email=delivery_email,
             vendor_name=payload.vendor_name,
             cycle_id=payload.cycle_id,
             quarter=payload.quarter,
@@ -126,29 +156,29 @@ def dispatch_scorecard_emails(payload: DispatchRequest):
         )
 
         try:
-            logger.info("SCORECARD-DISPATCH: sending email to %s...", attendee.email)
+            logger.info("SCORECARD-DISPATCH: sending email to %s...", delivery_email)
             result = send_html_email(
-                to_email=attendee.email,
+                to_email=delivery_email,
                 subject=email_data["subject"],
                 html_body=email_data["html_body"],
                 text_body=email_data["text_body"],
             )
-            logger.info("SCORECARD-DISPATCH: email sent to %s, message_id=%s", attendee.email, result.get("id"))
+            logger.info("SCORECARD-DISPATCH: email sent to %s, message_id=%s", delivery_email, result.get("id"))
             results.append(
                 DispatchResult(
                     attendee=attendee.name,
-                    email=attendee.email,
+                    email=delivery_email,
                     status="sent",
                     message_id=result.get("id"),
                 )
             )
             sent_count += 1
         except GmailSendError as exc:
-            logger.error("SCORECARD-DISPATCH: failed to send to %s: %s", attendee.email, exc)
+            logger.error("SCORECARD-DISPATCH: failed to send to %s: %s", delivery_email, exc)
             results.append(
                 DispatchResult(
                     attendee=attendee.name,
-                    email=attendee.email,
+                    email=delivery_email,
                     status="failed",
                     error=str(exc),
                 )

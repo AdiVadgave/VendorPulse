@@ -79,7 +79,7 @@ export default function ChangeHighlightsPanel({ deltas, whatChangedBullets, insi
       </div> */}
 
       {/* Score deltas table — collapsible */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+      {/* <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
         <button
           onClick={() => setDeltasOpen(!deltasOpen)}
           className="w-full px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
@@ -160,7 +160,7 @@ export default function ChangeHighlightsPanel({ deltas, whatChangedBullets, insi
             )
           })}
         </div>}
-      </div>
+      </div> */}
 
       {/* AI Insights — collapsible */}
       {insights && insights.length > 0 && (

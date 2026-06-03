@@ -5,6 +5,9 @@ Usage:
     python run.py                  # development (auto-reload)
     python run.py --no-reload      # production-style
 """
+import truststore
+truststore.inject_into_ssl()
+
 import argparse
 import logging
 

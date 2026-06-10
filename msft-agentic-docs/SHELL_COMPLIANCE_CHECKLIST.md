@@ -66,5 +66,6 @@
 |---|-------------|---------|--------|
 | D1 | **Quality & security assessment of AI-assisted/generated code** | 3.3 (AI Builders) | Route the Foundry PoC branch (`poc/scheduling-foundry-responses`) and any agent code through Shell's code-review + security-assessment process. |
 | D2 | **AI application security best practices** | 3.5.1.b.4 | Standard SAST/dependency scanning in CI; pin exact SDK versions. |
+| D3 | **Agent prompt-hardening checklist** applied to every ported agent | 3.6.6 / 3.6.3 / 3.5.3 | Ground data-citing prompts (no invented metrics), stamp timestamps/IDs in code, strict output schema, gate side-effecting tools, encode hard exclusions deterministically. Full checklist in [MAF_TEAM_ONBOARDING.md §8](MAF_TEAM_ONBOARDING.md#8-porting-the-remaining-agents--prompt-hardening-checklist). Derived from PoC findings A/B (issue #13). |
 
 > **Compliance implication for the MAF-SDK-vs-Responses-direct decision (issue #13 #2):** controls B1, B8, B10 (HITL, content filtering, OTel) are **built into the Microsoft Agent Framework SDK / Foundry-managed runtime**. Using them shifts those controls onto a Shell-sanctioned, pre-assessed platform and **shrinks the custom-code surface that must pass D1/D2**. This tilts the *production* bet toward MAF SDK / Foundry-managed, even though the Responses-direct PoC proved feasibility fastest.

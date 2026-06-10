@@ -350,6 +350,26 @@ When you move to the **MAF SDK** path: `pip install agent-framework` (pin the ex
 
 ---
 
+## 8. Porting the remaining agents — prompt-hardening checklist
+
+The Scheduling + VendorPrep PoCs surfaced concrete failure modes. Apply this checklist to **every** agent still to port (Scorecard, Alignment, Meeting, Memory) so the same fixes land consistently. Each item maps to a Shell IRM control.
+
+| ✅ | Check | Why / origin | IRM |
+|----|-------|--------------|-----|
+| ☐ | **Strict output schema in the prompt** — specify the exact flat keys `summary, data, warnings, next_actions, requires_approval` (lower_snake_case); "return ONLY raw JSON, no markdown/fences, no wrapper object." | Scheduling: gpt-4o wrapped JSON in ```fences``` + nested PascalCase, dropping `warnings`/`next_actions`. | 3.5.3 |
+| ☐ | **Robust parsing** — tool-loop agents inherit `BaseAgent._finalize_model_text` (fence-strip + unwrap + case-insensitive). One-shot agents must strip fences too before `json.loads`. | Same finding; defence-in-depth even with a strict prompt. | — |
+| ☐ | **Ground every data-citing prompt** — pass the *actual* source data (scores, notes, transcript) into the prompt and instruct: "cite ONLY the data provided; do NOT invent or estimate any metrics, percentages, names, or dates." | VendorPrep Finding A: a "factual" rebuttal fabricated "12%/15%" figures absent from the scorecard. | **3.6.6** |
+| ☐ | **Stamp timestamps & IDs in code, never the LLM** — generate `generated_at`, UUIDs, run_ids deterministically; drop them from the model's requested keys. | VendorPrep Finding B: the model back-dated `generated_at` to 2023. | 3.6.6 |
+| ☐ | **Encode hard exclusions deterministically** — e.g. legal-review items get **no** AI draft; check the flag in code *before* calling the LLM, not via a prompt instruction. | VendorPrep legal-exclusion pattern. | 3.5.5 / 3.6 |
+| ☐ | **Gate side-effecting tools** — set `gated_tools` for anything that emails / books / writes externally; they're withheld from the model + refused by the dispatcher; the real action fires from the deterministic route after approval. Drafts set `requires_approval=true`. | Scheduling `send_invites`/`approve_slot`; e.g. Meeting's `send_minutes`. | **3.6.3** |
+| ☐ | **Keep business logic deterministic** — scores, rankings, validations, state transitions are code; the LLM only produces prose. | Core architecture principle. | 3.6.6 |
+| ☐ | **Verify the envelope after porting** — run the agent and confirm `summary / warnings / next_actions / requires_approval` populate correctly (not dumped into a raw blob). | Scheduling parsing regression. | — |
+| ☐ | **AI-use transparency** — any agent output shown to a user carries the "AI-generated — pending approval" label. | EU AI Act / IRM transparency. | 3.5.3 |
+
+> **Per-agent watch-items:** `Meeting` has a `send_minutes` (Gmail) side effect → **must** be in `gated_tools`. `Scorecard` does no LLM generation → little to harden, but keep validation deterministic. `Memory` is one-shot → ground its trend claims in stored ARCHIVED data only.
+
+---
+
 ### Where to go next
 - Conceptual design → [SOLUTION_ARCHITECTURE.md](SOLUTION_ARCHITECTURE.md)
 - Azure hosting / identity / security → [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md)

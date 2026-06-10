@@ -163,9 +163,24 @@ class LLMService:
         return self._client.responses.create(**kwargs)
 
     def call_simple(self, prompt: str, system: str = "", max_tokens: int = 1024) -> str:
-        """Simple text-in, text-out call without tools."""
+        """
+        Simple text-in, text-out call without tools.
+
+        On the Foundry path this uses the **Responses API** (`responses.create`) so
+        one-shot agents (VendorPrep, Memory, Meeting) go through Foundry's single
+        entry point too; otherwise it uses Chat Completions.
+        """
         if not self.is_enabled:
             raise RuntimeError("LLM is not enabled.")
+
+        if self._use_responses:
+            response = self._client.responses.create(
+                model=self._model,
+                input=prompt,
+                instructions=system or "You are a helpful assistant.",
+                max_output_tokens=max_tokens,
+            )
+            return getattr(response, "output_text", "") or ""
 
         response = self._client.chat.completions.create(
             model=self._model,

@@ -117,6 +117,11 @@ class VendorPrepAgent(BaseAgent):
         else:
             brief = _build_fallback_brief(scorecard)
 
+        # Timestamps are stamped deterministically — never trust the LLM to generate
+        # them (it fabricates/back-dates them). See Shell IRM 3.6.6 (hallucination).
+        if isinstance(brief, dict):
+            brief["generated_at"] = datetime.now(timezone.utc).isoformat()
+
         return {
             "summary": f"Vendor brief generated for {vendor_name}.",
             "data": {"brief": brief},
@@ -142,7 +147,10 @@ class VendorPrepAgent(BaseAgent):
             }
 
         if self._llm and self._llm.is_enabled:
-            prompt = _build_pushback_prompt(pushback_id, category, description)
+            # Ground the "factual" stance in real data so the model cannot invent
+            # metrics to present to the vendor (Shell IRM 3.6.6 hallucination).
+            scorecard = self._fetch_scorecard(self.cycle_id)
+            prompt = _build_pushback_prompt(pushback_id, category, description, scorecard)
             raw = self._llm.call_simple(prompt, system=VENDOR_PREP_SYSTEM_PROMPT, max_tokens=1536)
             try:
                 responses = json.loads(_strip_markdown_json(raw))
@@ -197,21 +205,29 @@ def _build_brief_prompt(scorecard: dict, vendor_name: str, cycle_id: str) -> str
         "  overall_score (float 0-5), overall_trend (improving|declining|stable),\n"
         "  category_ratings (array of {category, score, rationale, trend}),\n"
         "  key_concerns (max 5 strings), positive_areas (max 5 strings),\n"
-        "  open_actions (int), generated_at (ISO timestamp).\n"
-        "Base all scores on the actual data above — never fabricate.\n"
+        "  open_actions (int).\n"
+        "Base ALL scores and figures strictly on the data above — do NOT invent or "
+        "estimate any numbers, percentages, or dates. (generated_at is set by the system.)\n"
         "Return ONLY the JSON, no markdown or explanation."
     )
 
 
-def _build_pushback_prompt(pushback_id: str, category: str, description: str) -> str:
+def _build_pushback_prompt(
+    pushback_id: str, category: str, description: str, scorecard: dict | None = None
+) -> str:
+    evidence = json.dumps((scorecard or {}).get("categories", []), indent=2)
     return (
         f"A vendor has raised a pushback (ID: {pushback_id}).\n"
         f"Category: {category}\n"
         f"Description: {description}\n\n"
+        f"Scorecard evidence (the ONLY data you may cite):\n{evidence}\n\n"
         "Draft 3 response options with different stances:\n"
-        "1. factual — data-driven rebuttal using scorecard evidence\n"
+        "1. factual — data-driven rebuttal citing ONLY the scorecard evidence above\n"
         "2. neutral — acknowledge the concern, seek middle ground\n"
         "3. escalation — firm position citing contractual/SLA obligations\n\n"
+        "CRITICAL: do NOT invent, estimate, or fabricate any metrics, percentages, or "
+        "figures. Cite only numbers present in the evidence above; if a specific number "
+        "is not provided, speak qualitatively instead.\n\n"
         "Return a JSON array of 3 objects, each with:\n"
         "  response_id (generate a UUID), pushback_id, stance, content, is_selected (false).\n"
         "Keep each response 2-4 sentences, professional and non-confrontational.\n"

@@ -56,10 +56,22 @@ Rules:
 - Flag any key attendee conflicts and suggest alternatives.
 - Always present ranked options to the coordinator — never book without explicit approval.
 - Use professional, concise language in all generated content.
-- Return structured JSON in your final response matching the AgentResponse schema.
 
 Available tools: get_attendee_list, simulate_responses, rank_slots,
                  approve_slot, send_invites, get_rsvp_status.
+
+Final response format (STRICT):
+Return ONLY raw JSON — no markdown, no code fences, no prose outside the object.
+Use exactly this flat schema (these key names, lower_snake_case):
+{
+  "summary": "<one or two sentence plain-language summary>",
+  "data": { ... structured details (attendees, ranked slots, rsvp counts, etc.) ... },
+  "warnings": ["<any issues, e.g. unresponsive attendees or conflicts>"],
+  "next_actions": ["<UPPER_SNAKE_CASE action keys, e.g. APPROVE_SLOT, SEND_INVITES>"],
+  "requires_approval": <true if a human must approve before any external action, else false>
+}
+Set requires_approval to true whenever the next step would send invites or take any
+external action. Do not nest the object under another key.
 """
 
 # ---------------------------------------------------------------------------

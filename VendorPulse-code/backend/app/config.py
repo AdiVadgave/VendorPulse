@@ -68,7 +68,7 @@ class Settings(BaseSettings):
 
     # AI / LLM — set ENABLE_LLM=true and fill in provider credentials in .env
     enable_llm: bool = False
-    ai_provider: str = "azure"          # "azure" or "openai"
+    ai_provider: str = "azure"          # "azure" | "openai" | "foundry"
 
     # Azure OpenAI
     azure_openai_api_key: str = ""
@@ -79,6 +79,18 @@ class Settings(BaseSettings):
     # Standard OpenAI (fallback)
     openai_api_key: str = ""
     llm_model: str = "gpt-4o"
+
+    # ── Microsoft Foundry (ai.azure.com) — Shape-2 PoC ───────────────────────
+    # Set AI_PROVIDER=foundry to route the agent layer through a Foundry project
+    # via the Responses API, authenticated with Entra ID (DefaultAzureCredential,
+    # falling back to an interactive browser login on dev boxes without the CLI).
+    # Endpoint format: https://<resource>.services.ai.azure.com/api/projects/<project>
+    foundry_project_endpoint: str = ""
+    foundry_model: str = ""             # deployed model/deployment name (e.g. gpt-4o)
+    azure_tenant_id: str = ""           # optional — pin the Entra tenant for login
+    # When the Foundry client is active, drive the agent loop with the Responses
+    # API (Foundry's single entry point) instead of Chat Completions.
+    use_responses_api: bool = True
 
     # Microsoft Graph API
     graph_access_token: str = ""

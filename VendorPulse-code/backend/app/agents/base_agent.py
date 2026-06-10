@@ -133,7 +133,10 @@ class BaseAgent(ABC):
 
         try:
             if settings.enable_llm and self._llm is not None:
-                result = self._tool_calling_loop(user_message)
+                if getattr(self._llm, "use_responses", False):
+                    result = self._tool_calling_loop_responses(user_message)
+                else:
+                    result = self._tool_calling_loop(user_message)
             else:
                 result = self._deterministic_run(user_message, ctx)
 
@@ -221,26 +224,191 @@ class BaseAgent(ABC):
         }
 
     def _extract_final_result(self, message: Any) -> dict:
-        """Parse GPT-4o's final text response as JSON, or wrap as raw output."""
-        text = message.content or ""
-        if text:
-            try:
-                return json.loads(text)
-            except (json.JSONDecodeError, ValueError):
-                return {
-                    "summary": text,
-                    "data": {"raw_output": text},
-                    "warnings": [],
-                    "next_actions": [],
-                    "requires_approval": False,
-                }
+        """Parse the model's final text response into the AgentResponse envelope."""
+        return self._finalize_model_text(message.content or "")
+
+    # ------------------------------------------------------------------
+    # Final-text → envelope parsing (shared by both tool-calling loops)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _strip_code_fences(text: str) -> str:
+        """Strip a leading ```json / ``` fence and trailing ``` if present."""
+        t = text.strip()
+        if not t.startswith("```"):
+            return t
+        t = t[3:]
+        newline = t.find("\n")
+        if newline != -1:
+            first_line = t[:newline].strip()
+            # Drop an optional language tag (e.g. "json") on the opening fence line.
+            if first_line == "" or first_line.isalpha():
+                t = t[newline + 1:]
+        if t.rstrip().endswith("```"):
+            t = t.rstrip()[:-3]
+        return t.strip()
+
+    @staticmethod
+    def _coerce_envelope(parsed: Any, fallback_text: str) -> dict:
+        """
+        Map a parsed JSON object onto the flat AgentResponse envelope, tolerating
+        a single wrapper key (e.g. {"AgentResponse": {...}}) and case differences.
+        """
+        if not isinstance(parsed, dict):
+            return {
+                "summary": fallback_text,
+                "data": parsed,
+                "warnings": [],
+                "next_actions": [],
+                "requires_approval": False,
+            }
+
+        # Unwrap a single top-level wrapper like {"AgentResponse": {...}}.
+        if len(parsed) == 1:
+            only_key = next(iter(parsed))
+            inner = parsed[only_key]
+            if isinstance(inner, dict) and only_key.lower().replace("_", "").replace(
+                " ", ""
+            ) in ("agentresponse", "response"):
+                parsed = inner
+
+        low = {str(k).lower(): v for k, v in parsed.items()}
+
+        def pick(*names: str, default: Any = None) -> Any:
+            for n in names:
+                if n in low:
+                    return low[n]
+            return default
+
+        summary = pick("summary")
+        data = pick("data")
+        # If the model nested its payload under "summary" (object), treat it as data.
+        if data is None and isinstance(summary, (dict, list)):
+            data = summary
+        summary_text = summary if isinstance(summary, str) else (pick("status") or "Completed.")
+
         return {
-            "summary": "Agent completed with no text output.",
-            "data": {},
-            "warnings": [],
-            "next_actions": [],
-            "requires_approval": False,
+            "summary": summary_text,
+            "data": data,
+            "warnings": pick("warnings", default=[]) or [],
+            "next_actions": pick("next_actions", "nextactions", default=[]) or [],
+            "requires_approval": bool(pick("requires_approval", "requiresapproval", default=False)),
         }
+
+    def _finalize_model_text(self, text: str) -> dict:
+        """Strip fences, parse JSON, and coerce to the envelope; fall back to raw text."""
+        if not text:
+            return {
+                "summary": "Agent completed with no text output.",
+                "data": {},
+                "warnings": [],
+                "next_actions": [],
+                "requires_approval": False,
+            }
+        cleaned = self._strip_code_fences(text)
+        try:
+            parsed = json.loads(cleaned)
+        except (json.JSONDecodeError, ValueError):
+            return {
+                "summary": text,
+                "data": {"raw_output": text},
+                "warnings": [],
+                "next_actions": [],
+                "requires_approval": False,
+            }
+        return self._coerce_envelope(parsed, fallback_text=text)
+
+    # ------------------------------------------------------------------
+    # Responses API tool-calling loop (Microsoft Foundry / AI_PROVIDER=foundry)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _to_responses_tools(chat_tools: list[dict]) -> list[dict]:
+        """
+        Convert Chat Completions tool defs to Responses API format.
+
+        Chat:      {"type":"function","function":{"name","description","parameters"}}
+        Responses: {"type":"function","name","description","parameters"}
+
+        This lets each agent's get_tools() stay unchanged across both code paths.
+        """
+        out: list[dict] = []
+        for t in chat_tools:
+            fn = t.get("function", t)
+            out.append(
+                {
+                    "type": "function",
+                    "name": fn.get("name"),
+                    "description": fn.get("description", ""),
+                    "parameters": fn.get("parameters", {"type": "object", "properties": {}}),
+                }
+            )
+        return out
+
+    def _tool_calling_loop_responses(self, user_message: str) -> dict:
+        """
+        Implements the tool-calling loop against the Responses API.
+
+        Mirrors _tool_calling_loop() but uses responses.create + previous_response_id
+        for server-side conversation state. execute_tool() and get_tools() are reused
+        verbatim, so per-agent behaviour and the app-layer approval gate are identical.
+        """
+        tools = self._to_responses_tools(self.get_tools())
+        instructions = self.get_system_prompt()
+
+        # First turn: send the user message. Subsequent turns: send only tool outputs
+        # and chain via previous_response_id.
+        next_input: Any = user_message
+        previous_response_id: Optional[str] = None
+
+        max_iterations = 10
+        for _ in range(max_iterations):
+            response = self._llm.call_responses(
+                input=next_input,
+                tools=tools,
+                instructions=instructions,
+                previous_response_id=previous_response_id,
+            )
+
+            function_calls = [
+                item
+                for item in (response.output or [])
+                if getattr(item, "type", None) == "function_call"
+            ]
+
+            if not function_calls:
+                return self._extract_final_result_responses(response)
+
+            # Execute each tool call and feed the outputs back on the next turn.
+            tool_outputs: list[dict] = []
+            for call in function_calls:
+                try:
+                    tool_input = json.loads(call.arguments or "{}")
+                except (json.JSONDecodeError, ValueError):
+                    tool_input = {}
+                tool_result = self.execute_tool(call.name, tool_input)
+                tool_outputs.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": call.call_id,
+                        "output": tool_result,
+                    }
+                )
+
+            next_input = tool_outputs
+            previous_response_id = response.id
+
+        return {
+            "summary": "Agent completed after reaching max iterations.",
+            "data": {},
+            "warnings": ["Agent reached max iterations (10)."],
+            "next_actions": ["APPROVE_SLOT"],
+            "requires_approval": True,
+        }
+
+    def _extract_final_result_responses(self, response: Any) -> dict:
+        """Parse the Responses-API final text into the AgentResponse envelope."""
+        return self._finalize_model_text(getattr(response, "output_text", "") or "")
 
     # ------------------------------------------------------------------
     # Response construction

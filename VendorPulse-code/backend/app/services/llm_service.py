@@ -25,12 +25,16 @@ class LLMService:
         self._enabled = settings.enable_llm
         self._client: Any = None
         self._model: str = ""
+        # When True, drive agents via the Responses API instead of Chat Completions.
+        self._use_responses: bool = False
 
         if not self._enabled:
             return
 
         try:
-            if settings.ai_provider == "azure":
+            if settings.ai_provider == "foundry":
+                self._init_foundry_client()
+            elif settings.ai_provider == "azure":
                 from openai import AzureOpenAI  # type: ignore[import]
 
                 self._client = AzureOpenAI(
@@ -45,15 +49,60 @@ class LLMService:
                 self._client = OpenAI(api_key=settings.openai_api_key)
                 self._model = settings.llm_model
 
-        except ImportError:
+        except ImportError as exc:
             raise RuntimeError(
-                "LLM is enabled but the 'openai' package is not installed. "
-                "Run: pip install openai"
+                "LLM is enabled but a required package is not installed. "
+                f"({exc}) Run: pip install openai azure-ai-projects azure-identity"
             )
+
+    def _init_foundry_client(self) -> None:
+        """
+        Build an OpenAI-compatible client backed by a Microsoft Foundry project.
+
+        Auth uses DefaultAzureCredential (picks up Managed Identity / az CLI / azd /
+        Az PowerShell / env vars) and falls back to an interactive browser login so a
+        dev box without the Azure CLI can still authenticate. The returned client
+        targets the Foundry project's /openai/v1 surface and supports the Responses API.
+        """
+        from azure.identity import (  # type: ignore[import]
+            ChainedTokenCredential,
+            DefaultAzureCredential,
+            InteractiveBrowserCredential,
+        )
+        from azure.ai.projects import AIProjectClient  # type: ignore[import]
+
+        if not settings.foundry_project_endpoint:
+            raise RuntimeError(
+                "AI_PROVIDER=foundry but FOUNDRY_PROJECT_ENDPOINT is not set in .env"
+            )
+
+        tenant = settings.azure_tenant_id or None
+        browser = (
+            InteractiveBrowserCredential(tenant_id=tenant)
+            if tenant
+            else InteractiveBrowserCredential()
+        )
+        credential = ChainedTokenCredential(DefaultAzureCredential(), browser)
+
+        project = AIProjectClient(
+            endpoint=settings.foundry_project_endpoint, credential=credential
+        )
+        self._client = project.get_openai_client()
+        self._model = settings.foundry_model or settings.azure_openai_deployment_name
+        self._use_responses = bool(settings.use_responses_api)
 
     @property
     def is_enabled(self) -> bool:
         return self._enabled and self._client is not None
+
+    @property
+    def use_responses(self) -> bool:
+        """True when agents should use the Responses API loop instead of Chat Completions."""
+        return self._use_responses
+
+    @property
+    def model(self) -> str:
+        return self._model
 
     def call(
         self,
@@ -77,6 +126,41 @@ class LLMService:
             tools=tools,
             tool_choice="auto",
         )
+
+    def call_responses(
+        self,
+        input: Any,
+        tools: list[dict],
+        instructions: str = "",
+        previous_response_id: str | None = None,
+        max_output_tokens: int = 4096,
+    ) -> Any:
+        """
+        Call the Responses API with tool-calling support (Foundry's single entry point).
+
+        `input` is either the initial input (string / message list) or, on follow-up
+        turns, a list of `function_call_output` items. `previous_response_id` chains
+        turns server-side so we don't resend the full transcript each iteration.
+        Tools must be in Responses format: {"type":"function","name","description","parameters"}.
+        """
+        if not self.is_enabled:
+            raise RuntimeError(
+                "LLM is not enabled. Set ENABLE_LLM=true and provider credentials in .env"
+            )
+
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "input": input,
+            "tools": tools,
+            "tool_choice": "auto",
+            "max_output_tokens": max_output_tokens,
+        }
+        if instructions:
+            kwargs["instructions"] = instructions
+        if previous_response_id:
+            kwargs["previous_response_id"] = previous_response_id
+
+        return self._client.responses.create(**kwargs)
 
     def call_simple(self, prompt: str, system: str = "", max_tokens: int = 1024) -> str:
         """Simple text-in, text-out call without tools."""

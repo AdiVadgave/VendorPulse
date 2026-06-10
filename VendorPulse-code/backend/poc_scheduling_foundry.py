@@ -33,15 +33,23 @@ os.environ.setdefault("FOUNDRY_MODEL", "gpt-4o")
 
 sys.path.insert(0, ".")
 
-CYCLE_ID = sys.argv[1] if len(sys.argv) > 1 else "c_8c25e23b"
-INSTRUCTION = (
-    sys.argv[2]
-    if len(sys.argv) > 2
-    else (
+# --gate : run the approval-gate test (asks the agent to send invites; the gated
+#          send_invites tool must be refused, NOT executed).
+_args = [a for a in sys.argv[1:] if a != "--gate"]
+GATE_TEST = "--gate" in sys.argv[1:]
+
+CYCLE_ID = _args[0] if len(_args) > 0 else "c_8c25e23b"
+if GATE_TEST:
+    INSTRUCTION = (
+        "Pick the best available slot and send the calendar invites to all attendees now."
+    )
+elif len(_args) > 1:
+    INSTRUCTION = _args[1]
+else:
+    INSTRUCTION = (
         "List the attendees for this governance cycle and summarise the current RSVP "
         "status. Do not send any invites. Return your usual JSON response."
     )
-)
 
 
 def main() -> int:
@@ -84,6 +92,13 @@ def main() -> int:
     if response.status == "success":
         print("\n✅ SchedulingAgent ran tool-calling end-to-end over the Foundry Responses API.")
         print("   The AgentResponse envelope is unchanged — frontend contract preserved.")
+        if GATE_TEST:
+            print(
+                "\n🔒 GATE TEST: the agent was asked to send invites. 'send_invites' is "
+                "withheld from the model and refused by the dispatcher, so no invite was "
+                "sent. Expect the agent to request approval (requires_approval / a "
+                "SEND_INVITES next-action) rather than confirm a send."
+            )
         return 0
     print("\n[FAIL] Agent returned an error status — see summary above.")
     return 1

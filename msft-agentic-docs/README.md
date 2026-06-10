@@ -2,9 +2,10 @@
 
 > **Document type:** Architecture package (index)
 > **System:** VendorPulse — Vendor Governance Cycle Automation Platform
+> **Client:** Shell — all AI work must satisfy **Shell IRM 3.492** (NIST AI RMF / ISO 42001) + the **EU AI Act**. See [SHELL_COMPLIANCE_CHECKLIST.md](SHELL_COMPLIANCE_CHECKLIST.md).
 > **Scope:** Rebuilding the agent layer on the **Microsoft Agent Framework (MAF)** Python SDK, while preserving the deterministic core and human-approval gate. We run the SDK in our own process today; **Microsoft Foundry Hosted Agents** is a now-viable hosting option (see §3).
-> **Audience:** Engineers, technical leads, enterprise architecture & security reviewers
-> **Status:** Proposed (target state) — pending PoC go/no-go
+> **Audience:** Engineers, technical leads, enterprise architecture & security reviewers. **New to MAF? Start with [MAF_TEAM_ONBOARDING.md](MAF_TEAM_ONBOARDING.md).**
+> **Status:** Proposed (target state). **Phase-0 PoC done (June 2026):** Foundry project verified, `SchedulingAgent` ported to the Foundry Responses API, approval gate closed — tracked in GitHub issue #13. Hosting/SDK decision (see §3) pending.
 > **Last refreshed:** June 2026 — aligned to MAF 1.x post-GA API (≈1.8) and the BUILD 2026 / Microsoft Foundry rebrand. Pin the exact SDK version at build time; the API has churned through 1.3 / 1.6 / 1.8 since the April 2026 GA.
 
 ---
@@ -14,8 +15,10 @@
 | Doc | Purpose |
 |-----|---------|
 | **README.md** (this file) | Orientation, decisions, why MAF, migration scope, top-level diagrams |
+| [MAF_TEAM_ONBOARDING.md](MAF_TEAM_ONBOARDING.md) | **Start here if new to MAF** — explains the framework + the new architecture from scratch, with diagrams |
 | [SOLUTION_ARCHITECTURE.md](SOLUTION_ARCHITECTURE.md) | Logical design — components, the MAF agent layer, workflow state machine, the approval-gate sequence, dual execution path |
 | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) | Physical design — Azure topology, identity (Entra ID / MSAL / Managed Identity), data, CI/CD, environments, security |
+| [SHELL_COMPLIANCE_CHECKLIST.md](SHELL_COMPLIANCE_CHECKLIST.md) | Shell IRM 3.492 + EU AI Act controls mapped to the build; blocking procedural prerequisites |
 
 All diagrams are authored in **Mermaid** and render natively in GitHub, VS Code (with a Mermaid extension), and most Markdown viewers.
 
@@ -133,17 +136,18 @@ flowchart TB
 
 ## 7. Migration phases & effort
 
-| Phase | Work | Effort |
-|-------|------|--------|
-| 0. Spike / PoC | One agent (Scheduling) on MAF `Agent` + **`OpenAIChatClient` routed to Azure/Foundry** + one approval round; **re-verify** the historical bugs #4411 / #4376 against the rc6+ client rewrite (they may no longer reproduce) | ~1.5 weeks |
-| 1. Foundation | MAF base abstraction, `AgentResponse` adapter, preserve deterministic fallback, `agent_runs` hook | 3–4 days |
-| 2. Port 6 agents | Mechanical per-agent port + verification | 7–9 days |
-| 3. Observability | OpenTelemetry → Azure Monitor (**largely free** — OTel is on by default since 1.6.0; wire the exporter + correlation IDs) | 1–2 days |
-| 4. Regression | Manual (no automated suite) — approval gate, deterministic path, frontend contract | 3–5 days |
-| 5. Deploy + docs | Topology, identity, buffer | 2–3 days |
-| **Total** | | **~5–6 weeks (1 dev)** |
+| Phase | Work | Effort | Status |
+|-------|------|--------|--------|
+| −1. **Shell compliance prerequisites** (blocking) | AI Registry + ServiceNow registration, IRM risk assessment / IAQ, EU AI Act class, Shell.AI + TRB approval, IDT-managed hosting — see [checklist §A](SHELL_COMPLIANCE_CHECKLIST.md) | parallel; has lead time | ⛔ not started |
+| 0. Spike / PoC | One agent (Scheduling) on Foundry + **Responses API** + tool-calling + approval gate; re-verify bugs #4411 / #4376 | ~1.5 weeks | ✅ **done** (via Foundry SDK direct; MAF-SDK variant still open — see §3) |
+| 1. Foundation | MAF base abstraction, `AgentResponse` adapter, preserve deterministic fallback, `agent_runs` hook | 3–4 days | ⬜ |
+| 2. Port 6 agents | Mechanical per-agent port + verification | 7–9 days | ⬜ (1/6 scheduling done on Responses-direct) |
+| 3. Observability | OpenTelemetry → Azure Monitor (**largely free** — OTel is on by default since 1.6.0; wire the exporter + correlation IDs) | 1–2 days | ⬜ |
+| 4. Regression | Manual (no automated suite) — approval gate, deterministic path, frontend contract | 3–5 days | ⬜ |
+| 5. Deploy + docs | Topology, identity, buffer | 2–3 days | ⬜ |
+| **Total** | | **~5–6 weeks (1 dev)** | |
 
-**Go/no-go gate:** the Phase-0 PoC must prove tool-gating + HITL approval work against the **`OpenAIChatClient` (Azure/Foundry routing)** via the **Responses API**. Clean fallback if blocked: keep side-effects deterministic and outside the agent (current design).
+**Go/no-go gate — ✅ MET (June 2026):** the Phase-0 PoC proved tool-calling + the approval gate over the Foundry **Responses API** (read tools, `simulate_responses → rank_slots` chaining, side-effecting tools withheld + refused). It used the **Foundry SDK directly**, *not yet* the MAF `Agent` class — that's the remaining decision in §3. Clean fallback if MAF is blocked: stay on the proven Responses-direct path with side-effects deterministic and outside the agent.
 
 ---
 
@@ -151,8 +155,9 @@ flowchart TB
 
 | Risk | Source | Mitigation |
 |------|--------|-----------|
-| Duplicate `tool_calls` → HTTP 400 | MAF GitHub issue **#4411** (OpenAIChatClient + approval) | **Re-verify** against the rc6+ Azure-client rewrite (Feb–Mar 2026) — may be resolved; `InMemoryHistoryProvider(load_messages=False)` workaround; fallback = app-layer gate |
-| Responses API behaviours (`store=False`, etc.) | MAF GitHub issue **#4376** | Re-test on current SDK — the **Responses API is now Foundry's single entry point**, so design *for* it rather than around it; pin tested SDK version |
+| **Compliance prerequisites not started** | Shell IRM 3.4 / 3.3 (registration, IAQ, Shell.AI + TRB) | **Highest-priority blocker** — start the IRM conversation now (lead time); nothing deploys at Shell without it. See [checklist §A](SHELL_COMPLIANCE_CHECKLIST.md). |
+| Duplicate `tool_calls` → HTTP 400 | MAF GitHub issue **#4411** (OpenAIChatClient + approval) | Re-verify against the rc6+ client rewrite; **PoC's `previous_response_id` chaining worked** (suggests not reproducing on the Responses path); fallback = app-layer gate |
+| Responses API behaviours (`store=False`, etc.) | MAF GitHub issue **#4376** | **PoC validated multi-turn chaining on the Responses API** — design *for* it (now Foundry's single entry point); pin tested SDK version |
 | API churn since 1.0 (real) | 1.0 GA April 2026 → breaking changes through **1.3 / 1.6 / 1.8** (June 2026): `ChatAgent`→`Agent`, `approval_mode` string→`ApprovalMode` enum, tool `**kwargs`→`FunctionInvocationContext`, settings no longer auto-load `.env` | Pin **exact** SDK version; thin adapter isolates blast radius; budget for an upgrade pass per release |
 | `Prompt agents` ≠ prompt ownership | Foundry managed-runtime tier owns instruction assembly | Use **SDK-in-process** or **Hosted Agents** (your own code), never Prompt agents, for the governance use case |
 | Hosted Agents still preview | BUILD 2026 public preview | Keep SDK-in-process as the shippable baseline; treat Hosted Agents as an opt-in hosting upgrade |
@@ -162,6 +167,9 @@ flowchart TB
 
 ## 9. Related documents
 
-- Current build: [`VendorPulse-code/docs/TECHNICAL_ARCHITECTURE.md`](../VendorPulse-code/docs/TECHNICAL_ARCHITECTURE.md)
+- [MAF_TEAM_ONBOARDING.md](MAF_TEAM_ONBOARDING.md) — **new to MAF? start here** (framework + architecture from scratch)
 - [SOLUTION_ARCHITECTURE.md](SOLUTION_ARCHITECTURE.md) — logical design + diagrams
 - [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) — physical design + diagrams
+- [SHELL_COMPLIANCE_CHECKLIST.md](SHELL_COMPLIANCE_CHECKLIST.md) — Shell IRM / EU AI Act controls + prerequisites
+- Current build: [`VendorPulse-code/docs/TECHNICAL_ARCHITECTURE.md`](../VendorPulse-code/docs/TECHNICAL_ARCHITECTURE.md)
+- PoC tracking: GitHub issue #13 (findings + go/no-go to-do)

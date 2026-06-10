@@ -1,7 +1,8 @@
 # VendorPulse on Microsoft Agent Framework — Deployment Architecture
 
-> **Companion docs:** [README](README.md) · [Solution Architecture](SOLUTION_ARCHITECTURE.md)
+> **Companion docs:** [README](README.md) · [MAF Onboarding](MAF_TEAM_ONBOARDING.md) · [Solution Architecture](SOLUTION_ARCHITECTURE.md) · [Shell Compliance Checklist](SHELL_COMPLIANCE_CHECKLIST.md)
 > **Scope:** Physical hosting, identity, data, network, CI/CD, and environments for the MAF target state on Azure.
+> **Client:** Shell — production must run on **Shell IDT-managed** Azure/Foundry and clear the compliance prerequisvites first (see §9 + the compliance checklist). This is mandatory, not advisory (IRM 3.5.1.b.2 / 3.3).
 
 ---
 
@@ -230,6 +231,10 @@ flowchart TB
 | CORS | Restrict to known origins (current `["*"]` is dev-only) |
 | Data residency | Pin Azure OpenAI + Postgres to an **approved region**; confirm no-training assurance in DPA |
 | Audit | `agent_runs` + OTel traces with correlation IDs; never log secrets/tokens |
+| Data classification | Classify scorecards (likely **Commercially Sensitive**) + attendee PII (**GDPR**); confirm no "Most Confidential"/SOX/export-controlled data (out of scope for this platform) — IRM scope / 3.5.6 |
+| AI transparency | Surface a visible "AI-generated — pending approval" notice in the UI (IRM 3.5.3 / EU AI Act) |
+
+> All controls above map to **Shell IRM 3.492** — see [SHELL_COMPLIANCE_CHECKLIST.md](SHELL_COMPLIANCE_CHECKLIST.md) §B for the control-by-control mapping.
 
 ---
 
@@ -252,7 +257,8 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    P0["PoC: Scheduling agent<br/>on MAF + Azure OpenAI<br/>(local/dev)"]
+    PC["⛔ Shell compliance prereqs<br/>AI Registry · IAQ · Shell.AI + TRB<br/>(parallel, has lead time)"]
+    P0["✅ PoC: Scheduling agent<br/>on Foundry Responses API<br/>(done — issue #13)"]
     P1["Stand up dev infra<br/>(IaC: Bicep/Terraform)"]
     P2["Migrate persistence<br/>JSON → Postgres"]
     P3["Identity: Entra app reg<br/>+ MSAL + Managed Identity"]
@@ -260,10 +266,12 @@ flowchart LR
     P5["Staging + regression"]
     P6["Prod (manual approval)"]
 
+    PC -.->|"must clear before prod"| P6
     P0 --> P1 --> P2 --> P3 --> P4 --> P5 --> P6
 
-    style P0 fill:#fde68a,stroke:#b45309,color:#000
+    style PC fill:#fee2e2,stroke:#b91c1c,color:#000
+    style P0 fill:#bbf7d0,stroke:#15803d,color:#000
     style P6 fill:#bbf7d0,stroke:#15803d,color:#000
 ```
 
-Infra defined as code (Bicep or Terraform) so dev/staging/prod are reproducible. The PoC (P0) is the go/no-go gate before any Azure infra spend.
+Infra defined as code (Bicep or Terraform) so dev/staging/prod are reproducible. **P0 (PoC) is done** — it proved the go/no-go on the Foundry Responses API before any Azure infra spend. The **Shell compliance prerequisites (PC)** run in parallel and **must clear before production** (IRM 3.4 / 3.3) — they are not a technical step and have external lead time, so start them now.

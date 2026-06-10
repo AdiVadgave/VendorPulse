@@ -1,7 +1,8 @@
 # VendorPulse on Microsoft Agent Framework — Solution Architecture
 
-> **Companion docs:** [README](README.md) · [Deployment Architecture](DEPLOYMENT_ARCHITECTURE.md)
+> **Companion docs:** [README](README.md) · [MAF Onboarding](MAF_TEAM_ONBOARDING.md) · [Deployment Architecture](DEPLOYMENT_ARCHITECTURE.md) · [Shell Compliance Checklist](SHELL_COMPLIANCE_CHECKLIST.md)
 > **Scope:** Logical / component design of the target state. Physical hosting is in the Deployment doc.
+> **Client:** Shell — design choices below are mapped to Shell IRM 3.492 controls where relevant (see §8 + the compliance checklist).
 
 ---
 
@@ -176,6 +177,8 @@ The `WorkflowEngine` is the **single source of truth** for allowed transitions. 
 
 ## 5. The human-approval gate (sequence) — the critical pattern
 
+> **Shell IRM 3.6.3.b.2** (near-verbatim): *"Implement human oversight and consent for privileged actions — for instance, sharing of output through email, embed a step where a human approves before sending the information."* This gate is the direct implementation. **Status:** the side-effecting tools (`send_invites`, `approve_slot`) are now withheld from the model and refused inside an agent run (PoC, GitHub issue #13); the real action fires only from the deterministic route after approval.
+
 VendorPulse's gate is **asynchronous and out-of-band**: the agent run completes producing a *draft*, a human approves later, and the external action fires from a separate deterministic route. This is preserved unchanged; MAF's in-run `approval_mode` is a secondary safeguard.
 
 ```mermaid
@@ -294,12 +297,14 @@ As of BUILD 2026, Microsoft Foundry Agent Service is a **three-tier spectrum**, 
 | **Config** | `pydantic-settings` from `.env` → moves to Key Vault refs + Managed Identity in prod (see Deployment doc) |
 | **Security** | LLM emits text only; decisions deterministic; output human-gated; secrets vaulted |
 | **Auditability** | Every run logged with input/output payloads + trace IDs correlating HTTP ↔ agent ↔ model call |
+| **Compliance (Shell)** | Maps to **IRM 3.492** + EU AI Act: human approval (3.6.3), deterministic core vs hallucination (3.6.6), auditability (3.5.5), IDT-managed Azure/Foundry + Shell.AI/TRB approval (3.3 / 3.5.1), AI-use transparency notice (3.5.3), Entra SSO/RBAC (3.6.2). Full mapping + blocking prerequisites in [SHELL_COMPLIANCE_CHECKLIST.md](SHELL_COMPLIANCE_CHECKLIST.md) |
 
 ---
 
 ## 9. Open items before build
 
-1. PoC must confirm tool-gating + HITL on the **`OpenAIChatClient` (Azure/Foundry routing)** via the Responses API; **re-verify** the historical bugs #4411 / #4376 against the rc6+ client rewrite — they may already be fixed.
+0. **Shell compliance prerequisites (blocking):** AI Registry + ServiceNow registration, IRM risk assessment / IAQ, EU AI Act classification, Shell.AI + TRB approval, IDT-managed hosting. Start in parallel — these have lead time. See [SHELL_COMPLIANCE_CHECKLIST.md §A](SHELL_COMPLIANCE_CHECKLIST.md).
+1. ✅ **PoC complete (June 2026):** tool-calling + the approval gate proven over the Foundry **Responses API** (GitHub issue #13); `previous_response_id` chaining worked, so #4376 didn't reproduce. **Open decision:** adopt the **MAF SDK** (`agent_framework.Agent`) or keep the **Responses-direct** path the PoC used (compliance lens favours MAF for production — fewer hand-rolled controls to security-review).
 2. Pin **exact** MAF SDK version. The API has genuinely churned post-GA (`ChatAgent`→`Agent`, `ChatMessage`→`Message`, `approval_mode` string→`ApprovalMode` enum, tool `**kwargs`→`FunctionInvocationContext`, `pydantic-settings` removed → call `load_dotenv()` + `load_settings()` explicitly). Budget an upgrade pass per minor release.
 3. Decide whether `MemoryAgent`/`MeetingAgent` one-shot paths become MAF agents or stay a simple single-call path (they are single-prompt, not multi-step — may not need the agent loop).
 4. Evaluate the **Agent Harness** (context compaction + memory/file/task providers) — it may replace plumbing in Phase 1, and **CodeAct** for multi-tool turns if latency/token cost matters.

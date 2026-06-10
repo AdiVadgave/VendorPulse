@@ -61,6 +61,11 @@ class BaseAgent(ABC):
 
     agent_name: str = "base_agent"
 
+    # Tools that perform external side effects and must NOT be executed inside an
+    # agent run. They are withheld from the model and refused by the dispatcher;
+    # they only fire from the deterministic route path after a human approves.
+    gated_tools: set[str] = set()
+
     def __init__(
         self,
         cycle_id: Optional[str] = None,
@@ -152,6 +157,43 @@ class BaseAgent(ABC):
             return error_response
 
     # ------------------------------------------------------------------
+    # Tool gating (app-layer approval gate)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _tool_name(tool: dict) -> Optional[str]:
+        """Extract a tool's name from either Chat Completions or Responses format."""
+        fn = tool.get("function", tool)
+        return fn.get("name")
+
+    def _model_facing_tools(self) -> list[dict]:
+        """get_tools() minus gated (side-effecting) tools — what the model may call."""
+        if not self.gated_tools:
+            return self.get_tools()
+        return [t for t in self.get_tools() if self._tool_name(t) not in self.gated_tools]
+
+    def _dispatch_tool(self, tool_name: str, tool_input: dict) -> str:
+        """
+        Execute a model-requested tool, refusing gated ones.
+
+        Gated tools are already withheld from the model; this is a hard backstop in
+        case the model fabricates a call. The deterministic route path calls
+        execute_tool() directly and is intentionally NOT gated (that IS the approval).
+        """
+        if tool_name in self.gated_tools:
+            return json.dumps(
+                {
+                    "status": "approval_required",
+                    "message": (
+                        f"'{tool_name}' performs an external action and was NOT executed. "
+                        "It requires explicit human approval via the dedicated route. "
+                        "Surface it to the coordinator and set requires_approval=true."
+                    ),
+                }
+            )
+        return self.execute_tool(tool_name, tool_input)
+
+    # ------------------------------------------------------------------
     # LLM tool-calling loop
     # ------------------------------------------------------------------
 
@@ -162,7 +204,7 @@ class BaseAgent(ABC):
         Runs until the model returns finish_reason='stop' or max iterations reached.
         Each tool_calls block is dispatched to execute_tool().
         """
-        tools = self.get_tools()
+        tools = self._model_facing_tools()
         system = self.get_system_prompt()
         messages: list[dict] = [
             {"role": "system", "content": system},
@@ -201,7 +243,7 @@ class BaseAgent(ABC):
                 # Execute each tool and append results
                 for tc in choice.message.tool_calls:
                     tool_input = json.loads(tc.function.arguments)
-                    tool_result = self.execute_tool(tc.function.name, tool_input)
+                    tool_result = self._dispatch_tool(tc.function.name, tool_input)
                     messages.append(
                         {
                             "role": "tool",
@@ -353,7 +395,7 @@ class BaseAgent(ABC):
         for server-side conversation state. execute_tool() and get_tools() are reused
         verbatim, so per-agent behaviour and the app-layer approval gate are identical.
         """
-        tools = self._to_responses_tools(self.get_tools())
+        tools = self._to_responses_tools(self._model_facing_tools())
         instructions = self.get_system_prompt()
 
         # First turn: send the user message. Subsequent turns: send only tool outputs
@@ -386,7 +428,7 @@ class BaseAgent(ABC):
                     tool_input = json.loads(call.arguments or "{}")
                 except (json.JSONDecodeError, ValueError):
                     tool_input = {}
-                tool_result = self.execute_tool(call.name, tool_input)
+                tool_result = self._dispatch_tool(call.name, tool_input)
                 tool_outputs.append(
                     {
                         "type": "function_call_output",

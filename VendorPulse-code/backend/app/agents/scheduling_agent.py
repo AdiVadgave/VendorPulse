@@ -30,6 +30,10 @@ if TYPE_CHECKING:
 class SchedulingAgent(BaseAgent):
     agent_name = "scheduling_agent"
 
+    # External side effects — withheld from the model and refused inside an agent
+    # run. They fire only from their deterministic routes after a human approves.
+    gated_tools = {"approve_slot", "send_invites"}
+
     def __init__(
         self,
         scheduling_svc: "SchedulingService",

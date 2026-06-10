@@ -1,0 +1,488 @@
+From: <Saved by Blink>
+Snapshot-Content-Location: http://127.0.0.1:5500/msft-agentic-docs/Solution.html
+Subject: 
+Date: Mon, 6 Apr 2026 17:24:15 +0530
+MIME-Version: 1.0
+Content-Type: multipart/related;
+	type="text/html";
+	boundary="----MultipartBoundary--MAFt4rg3tArch1tectur3Zensar6LcY6iQzHz----"
+
+
+------MultipartBoundary--MAFt4rg3tArch1tectur3Zensar6LcY6iQzHz----
+Content-Type: text/html
+Content-ID: <frame-MAFTARGET01D424DD1D8F495095EB44D0@mhtml.blink>
+Content-Transfer-Encoding: quoted-printable
+Content-Location: http://127.0.0.1:5500/msft-agentic-docs/Solution.html
+
+<!DOCTYPE html><html><head><meta http-equiv=3D"Content-Type" content=3D"tex=
+t/html; charset=3DUTF-8"><link rel=3D"stylesheet" type=3D"text/css" href=3D=
+"cid:css-maf-9a89-4210-a655-8814c0a66c2e@mhtml.blink" />
+</head>
+<body>
+
+<h1>VendorPulse =E2=80=94 Solution Architecture (Microsoft Agent Framework =
+Target State)</h1>
+<p class=3D"subtitle">Agentic AI Platform on <b>Microsoft Agent Framework</=
+b> (self-hosted SDK) + <b>Azure OpenAI</b> =C2=B7 Shell EGB / QBR Governanc=
+e Cycle Automation =C2=B7 Zensar Technologies</p>
+
+<!-- LAYER 1: ACTORS -->
+<div class=3D"layer l-actors">
+  <div class=3D"layer-title">Layer 1 =E2=80=94 Actors &amp; Personas</div>
+  <div class=3D"row">
+    <div class=3D"box b-blue">Governance Lead<div class=3D"sub">Approver =
+=C2=B7 reviews every AI draft<br>at the ApprovalPanel gate</div></div>
+    <div class=3D"box b-blue">Internal Stakeholders<div class=3D"sub">RSVP =
+=C2=B7 scorecards<br>alignment notes</div></div>
+    <div class=3D"box b-blue">Vendor Attendees<div class=3D"sub">QBR meetin=
+g<br>pushback responses</div></div>
+    <div class=3D"box b-blue">IT / Security<div class=3D"sub">Entra ID admi=
+n consent<br>data residency =C2=B7 RBAC</div></div>
+  </div>
+</div>
+
+<div class=3D"arrow">=E2=96=BC</div>
+
+<!-- LAYER 2: UI PLATFORM -->
+<div class=3D"layer l-ui">
+  <div class=3D"layer-title">Layer 2 =E2=80=94 VendorPulse Platform UI (Rea=
+ct SPA =E2=80=94 unchanged)</div>
+  <div class=3D"row">
+    <div class=3D"box b-purple">Dashboard<div class=3D"sub">Active cycles o=
+verview<br>Start New Cycle CTA<br>Vendor quick access</div></div>
+    <div class=3D"box b-purple" style=3D"flex:4">Cycle Workspace (Tabbed)<d=
+iv class=3D"sub">Overview =C2=B7 Scheduling (A) =C2=B7 Scorecard (B) =C2=B7=
+ Alignment (C) =C2=B7 Vendor Prep (D) =C2=B7 Meeting (E) =C2=B7 Actions<br>=
+Workflow Progress Bar always visible =C2=B7 Tab locked to workflow_state =
+=C2=B7 ApprovalPanel before every send</div></div>
+    <div class=3D"box b-purple">Analytics Dashboard<div class=3D"sub">Modul=
+e F<br>Trend charts<br>Leadership brief</div></div>
+  </div>
+  <div class=3D"row" style=3D"margin-top:6px">
+    <div class=3D"box b-purple" style=3D"flex:1">Auth: Entra ID OIDC<div cl=
+ass=3D"sub">SSO login =C2=B7 bearer JWT to API</div></div>
+    <div class=3D"box b-purple" style=3D"flex:1">State: Zustand<div class=
+=3D"sub">useCycleStore =C2=B7 useUIStore</div></div>
+    <div class=3D"box b-purple" style=3D"flex:1">API wrappers<div class=3D"=
+sub">lib/api.ts =C2=B7 per-module typed clients =E2=80=94 consume AgentResp=
+onse</div></div>
+  </div>
+</div>
+
+<div class=3D"arrow">=E2=96=BC</div>
+
+<!-- LAYER 3: WORKFLOW ENGINE -->
+<div class=3D"layer l-workflow">
+  <div class=3D"layer-title">Layer 3 =E2=80=94 Governance Workflow Engine =
+=E2=80=94 State Machine (Deterministic =C2=B7 No LLM =C2=B7 unchanged)</div>
+  <div class=3D"wf-states">
+    <span class=3D"wf-state">CYCLE_CREATED</span><span class=3D"wf-arr">=E2=
+=86=92</span>
+    <span class=3D"wf-state">ATTENDEE_REFRESH_SENT</span><span class=3D"wf-=
+arr">=E2=86=92</span>
+    <span class=3D"wf-state">AVAILABILITY_COLLECTED</span><span class=3D"wf=
+-arr">=E2=86=92</span>
+    <span class=3D"wf-state">MEETING_SCHEDULED</span><span class=3D"wf-arr"=
+>=E2=86=92</span>
+    <span class=3D"wf-state">SCORECARD_REQUEST_SENT</span><span class=3D"wf=
+-arr">=E2=86=92</span>
+    <span class=3D"wf-state">SCORECARD_COLLECTION</span><span class=3D"wf-a=
+rr">=E2=86=92</span>
+    <span class=3D"wf-state">SCORECARD_COMPILED</span><span class=3D"wf-arr=
+">=E2=86=92</span>
+    <span class=3D"wf-state">INTERNAL_ALIGNMENT</span><span class=3D"wf-arr=
+">=E2=86=92</span>
+    <span class=3D"wf-state">VENDOR_PREP</span><span class=3D"wf-arr">=E2=
+=86=92</span>
+    <span class=3D"wf-state">MEETING_IN_PROGRESS</span><span class=3D"wf-ar=
+r">=E2=86=92</span>
+    <span class=3D"wf-state">POST_MEETING_COMPLETE</span><span class=3D"wf-=
+arr">=E2=86=92</span>
+    <span class=3D"wf-state">ARCHIVED</span>
+  </div>
+  <div class=3D"row" style=3D"margin-top:6px">
+    <div class=3D"box b-red" style=3D"flex:1">Forward-only transitions<div =
+class=3D"sub">can_transition() enforced before every agent run =C2=B7 viola=
+tions =E2=86=92 HTTP 409</div></div>
+    <div class=3D"box b-red" style=3D"flex:1">Prerequisite checks<div class=
+=3D"sub">Cannot brief vendor before scorecard compiled<br>Cannot generate m=
+inutes before notes exist</div></div>
+    <div class=3D"box b-slate" style=3D"flex:2">Human-in-the-loop gates (ap=
+p layer)<div class=3D"sub">Every AI "send" action pauses at ApprovalPanel =
+=E2=86=92 Lead approves =E2=86=92 dispatched by a separate deterministic ro=
+ute. The agent only drafts =E2=80=94 never acts.</div></div>
+  </div>
+</div>
+
+<div class=3D"arrow">=E2=96=BC</div>
+
+<!-- LAYER 4: MODULES -->
+<div class=3D"layer l-modules">
+  <div class=3D"layer-title">Layer 4 =E2=80=94 Six Governance Modules (A =
+=E2=80=93 F =E2=80=94 unchanged)</div>
+  <div class=3D"mod-grid">
+    <div class=3D"mod-box">
+      <div class=3D"mod-title">Module A</div>
+      <div class=3D"mod-sub">Scheduling</div>
+      <ul>
+        <li>Attendee list refresh</li>
+        <li>Availability check</li>
+        <li>Slot ranking (hard/soft)</li>
+        <li>Invite generation</li>
+        <li>RSVP confirmation tracking</li>
+        <li>Auto-nudge non-responders</li>
+      </ul>
+    </div>
+    <div class=3D"mod-box">
+      <div class=3D"mod-title">Module B</div>
+      <div class=3D"mod-sub">Scorecard</div>
+      <ul>
+        <li>Scorecard dispatch</li>
+        <li>Reminder escalation T-5/T-2/T</li>
+        <li>Validation: range + comments</li>
+        <li>Outlier detection (1.5=CF=83)</li>
+        <li>Compilation + averaging</li>
+        <li>Compiled scorecard table</li>
+      </ul>
+    </div>
+    <div class=3D"mod-box">
+      <div class=3D"mod-title">Module C</div>
+      <div class=3D"mod-sub">Alignment</div>
+      <ul>
+        <li>Score diff vs prior cycle</li>
+        <li>Alignment flag (spread =E2=89=A51.5)</li>
+        <li>AI: change summary</li>
+        <li>Notes =E2=86=92 action extraction</li>
+        <li>Face-off model editor</li>
+        <li>Action log (shared)</li>
+      </ul>
+    </div>
+    <div class=3D"mod-box">
+      <div class=3D"mod-title">Module D</div>
+      <div class=3D"mod-sub">Vendor Prep</div>
+      <ul>
+        <li>AI: vendor brief generation</li>
+        <li>Pushback input form</li>
+        <li>AI: 3 response options</li>
+        <li>Factual / Neutral / Escalation</li>
+        <li>Unresolved item tracker</li>
+        <li>Legal flag =E2=86=92 escalate</li>
+      </ul>
+    </div>
+    <div class=3D"mod-box">
+      <div class=3D"mod-title">Module E</div>
+      <div class=3D"mod-sub">Meeting</div>
+      <ul>
+        <li>Pre-meeting trend brief</li>
+        <li>Live note capture (5 types)</li>
+        <li>Transcript paste + parse</li>
+        <li>AI: meeting minutes</li>
+        <li>AI: action extraction</li>
+        <li>Merged action log</li>
+      </ul>
+    </div>
+    <div class=3D"mod-box">
+      <div class=3D"mod-title">Module F</div>
+      <div class=3D"mod-sub">Analytics</div>
+      <ul>
+        <li>4-cycle historical store</li>
+        <li>Trend line chart</li>
+        <li>Radar: current vs prior</li>
+        <li>Cross-vendor bar chart</li>
+        <li>Recurring issue alerts (=E2=89=A52 cycles)</li>
+        <li>AI: leadership brief</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class=3D"arrow">=E2=96=BC</div>
+
+<!-- LAYER 5: ORCHESTRATOR -->
+<div class=3D"layer l-orch">
+  <div class=3D"layer-title">Layer 5 =E2=80=94 MAF Agent Orchestrator <span=
+ class=3D"badge-new">CHANGED</span> =E2=80=94 Builds a ChatAgent per module=
+ =C2=B7 adapts MAF output to the AgentResponse contract</div>
+  <div class=3D"row">
+    <div class=3D"box b-cyan" style=3D"flex:2">AgentOrchestrator<div class=
+=3D"sub">resolve_agent(module, action) =C2=B7 validate_workflow_state() =C2=
+=B7 ChatAgent.run(cycle_id, context)<br>handle_approval_gate() =C2=B7 log_t=
+o_agent_runs() =C2=B7 emit OpenTelemetry span</div></div>
+    <div class=3D"box b-cyan" style=3D"flex:3">AgentResponse Adapter (prese=
+rved contract)<div class=3D"sub">{ status =C2=B7 agent =C2=B7 summary =C2=
+=B7 data =C2=B7 warnings =C2=B7 next_actions =C2=B7 requires_approval =C2=
+=B7 run_id }<br>MAF result mapped to this exact shape =E2=80=94 frontend ne=
+ver changes</div></div>
+    <div class=3D"box b-red">Audit Trail<div class=3D"sub">agent_runs table=
+<br>+ OTel trace IDs<br>input + output + status</div></div>
+  </div>
+</div>
+
+<div class=3D"arrow">=E2=96=BC</div>
+
+<!-- LAYER 6: AGENTS -->
+<div class=3D"layer l-agents">
+  <div class=3D"layer-title">Layer 6 =E2=80=94 MAF ChatAgent Layer <span cl=
+ass=3D"badge-new">CHANGED</span> =E2=80=94 Each agent: instructions + @tool=
+ functions + structured output =C2=B7 side-effect tools use approval_mode</=
+div>
+  <div class=3D"ag-grid">
+    <div class=3D"ag-box ag-det">
+      <div class=3D"ag-title">Scheduling Agent</div>
+      <span class=3D"ag-tag" style=3D"background:#dbeafe;color:#1e40af;bord=
+er:1px solid #3b82f6">Deterministic core</span>
+      <ul>
+        <li>rank_slots (algorithm)</li>
+        <li>Hard: organiser + exec</li>
+        <li>Soft: majority vote</li>
+        <li>send_invites =E2=86=92 approval_mode</li>
+      </ul>
+    </div>
+    <div class=3D"ag-box ag-det">
+      <div class=3D"ag-title">Scorecard Agent</div>
+      <span class=3D"ag-tag" style=3D"background:#dbeafe;color:#1e40af;bord=
+er:1px solid #3b82f6">Deterministic</span>
+      <ul>
+        <li>Validation rules engine</li>
+        <li>Outlier: std deviation</li>
+        <li>Averaging + compilation</li>
+        <li>Reminder orchestration</li>
+      </ul>
+    </div>
+    <div class=3D"ag-box ag-llm">
+      <div class=3D"ag-title">Alignment Agent</div>
+      <span class=3D"ag-tag" style=3D"background:#dcfce7;color:#166534;bord=
+er:1px solid #22c55e">LLM: summary</span>
+      <ul>
+        <li>Score diff (deterministic)</li>
+        <li>Spread flag (deterministic)</li>
+        <li>LLM: change summary</li>
+        <li>LLM: action extraction</li>
+      </ul>
+    </div>
+    <div class=3D"ag-box ag-llm">
+      <div class=3D"ag-title">Vendor Prep Agent</div>
+      <span class=3D"ag-tag" style=3D"background:#dcfce7;color:#166534;bord=
+er:1px solid #22c55e">LLM: brief + drafts</span>
+      <ul>
+        <li>LLM: vendor brief</li>
+        <li>LLM: 3 response options</li>
+        <li>Pushback categorisation</li>
+        <li>Legal flag (deterministic)</li>
+      </ul>
+    </div>
+    <div class=3D"ag-box ag-llm">
+      <div class=3D"ag-title">Meeting Agent</div>
+      <span class=3D"ag-tag" style=3D"background:#dcfce7;color:#166534;bord=
+er:1px solid #22c55e">LLM: minutes</span>
+      <ul>
+        <li>Transcript parsing</li>
+        <li>LLM: meeting minutes</li>
+        <li>LLM: action extraction</li>
+        <li>send_minutes =E2=86=92 approval_mode</li>
+      </ul>
+    </div>
+    <div class=3D"ag-box ag-llm">
+      <div class=3D"ag-title">Memory Agent</div>
+      <span class=3D"ag-tag" style=3D"background:#dcfce7;color:#166534;bord=
+er:1px solid #22c55e">LLM: brief</span>
+      <ul>
+        <li>Trend aggregation (det.)</li>
+        <li>Recurring issues (det.)</li>
+        <li>LLM: leadership brief</li>
+        <li>Trajectory: =E2=86=91 =E2=86=94 =E2=86=93</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class=3D"arrow">=E2=96=BC</div>
+
+<!-- LAYER 7: INTELLIGENCE / RUNTIME -->
+<div class=3D"layer l-intel">
+  <div class=3D"layer-title">Layer 7 =E2=80=94 Microsoft Agent Framework Ru=
+ntime &amp; Intelligence Services <span class=3D"badge-new">CHANGED</span><=
+/div>
+  <div class=3D"intel-grid">
+    <div class=3D"box b-amber">MAF SDK (Python)<div class=3D"sub">v1.0 (Apr=
+ 2026)<br>ChatAgent + @tool registration<br>Tool-calling loop (framework-ow=
+ned)<br>approval_mode HITL</div></div>
+    <div class=3D"box b-amber">Azure OpenAI<div class=3D"sub">Chat Completi=
+ons deployment<br>GA chat model (gpt-4o)<br>Structured JSON output<br>Priva=
+te Endpoint</div></div>
+    <div class=3D"box b-amber">Deterministic Services<div class=3D"sub">slo=
+t_ranking =C2=B7 validation<br>score_diff =C2=B7 analytics<br>Pure rules =
+=E2=80=94 no LLM</div></div>
+    <div class=3D"box b-amber">Observability (OTel)<div class=3D"sub">MAF n=
+ative OpenTelemetry<br>=E2=86=92 Azure Monitor / App Insights<br>trace HTTP=
+ =E2=86=94 agent =E2=86=94 model</div></div>
+  </div>
+</div>
+
+<div class=3D"arrow">=E2=96=BC</div>
+
+<!-- LAYER 8: DATA -->
+<div class=3D"layer l-data">
+  <div class=3D"layer-title">Layer 8 =E2=80=94 Data &amp; Storage Layer <sp=
+an class=3D"badge-new">CHANGED</span></div>
+  <div class=3D"data-grid">
+    <div class=3D"box b-sky">Azure PostgreSQL<div class=3D"sub">Flexible Se=
+rver<br>replaces JSON files<br>via BaseRepository seam<br>AAD auth (Managed=
+ Identity)</div></div>
+    <div class=3D"box b-sky">Governance Tables<div class=3D"sub">vendors =
+=C2=B7 governance_cycles<br>stakeholders =C2=B7 cycle_attendees<br>scorecar=
+ds =C2=B7 meetings<br>meeting_notes =C2=B7 action_items</div></div>
+    <div class=3D"box b-sky">Audit Store<div class=3D"sub">agent_runs (full=
+ payloads)<br>retention + purge policy<br>per-cycle erasure path</div></div>
+    <div class=3D"box b-lime">Repositories (DB Access)<div class=3D"sub">On=
+e repo per domain entity<br>Async queries<br>Clean separation from routes<b=
+r>Only layer touching storage</div></div>
+  </div>
+</div>
+
+<div class=3D"arrow">=E2=96=BC</div>
+
+<!-- LAYER 9: PLATFORM & INTEGRATIONS -->
+<div class=3D"layer l-ext">
+  <div class=3D"layer-title">Layer 9 =E2=80=94 Azure Platform &amp; Microso=
+ft 365 Integrations <span class=3D"badge-new">NEW</span></div>
+  <div class=3D"ext-grid">
+    <div class=3D"box b-violet">Microsoft Entra ID<div class=3D"sub">User S=
+SO (OIDC + RBAC)<br>App registration (app-only)<br>Admin-consented Graph pe=
+rms</div></div>
+    <div class=3D"box b-violet">Microsoft Graph<div class=3D"sub">Calendars=
+.ReadWrite (Teams)<br>Mail.Send (Outlook)<br>User.Read.All<br>via MSAL clie=
+nt-credentials</div></div>
+    <div class=3D"box b-violet">Azure Key Vault<div class=3D"sub">Secrets +=
+ refs<br>Managed Identity access<br>no secrets in config</div></div>
+    <div class=3D"box b-violet">Hosting<div class=3D"sub">Container Apps (F=
+astAPI+MAF)<br>Static Web Apps (SPA)<br>Front Door + WAF =C2=B7 VNet</div><=
+/div>
+  </div>
+</div>
+
+</body></html>
+
+------MultipartBoundary--MAFt4rg3tArch1tectur3Zensar6LcY6iQzHz----
+Content-Type: text/css
+Content-Transfer-Encoding: quoted-printable
+Content-Location: cid:css-maf-9a89-4210-a655-8814c0a66c2e@mhtml.blink
+
+@charset "utf-8";
+
+* { box-sizing: border-box; margin: 0px; padding: 0px; font-family: "Segoe =
+UI", Arial, sans-serif; }
+body { background: rgb(248, 250, 252); padding: 24px; }
+h1 { text-align: center; font-size: 20px; color: rgb(30, 41, 59); margin-bo=
+ttom: 4px; }
+.subtitle { text-align: center; font-size: 13px; color: rgb(100, 116, 139);=
+ margin-bottom: 20px; }
+.layer { border-radius: 6px; border: 2px solid; margin-bottom: 10px; paddin=
+g: 10px 12px; }
+.layer-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text=
+-transform: uppercase; margin-bottom: 8px; text-align: center; }
+.row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+.box { border-radius: 5px; border: 1.5px solid; padding: 8px 10px; font-siz=
+e: 12px; font-weight: 600; text-align: center; flex: 1 1 0%; display: flex;=
+ flex-direction: column; align-items: center; justify-content: center; gap:=
+ 3px; min-height: 56px; max-width: 100%; }
+.box .sub { font-size: 10px; font-weight: 400; color: rgb(71, 85, 105); lin=
+e-height: 1.5; text-align: center; }
+.arrow { text-align: center; font-size: 18px; color: rgb(148, 163, 184); ma=
+rgin: 2px 0px; line-height: 1; }
+.badge { display: inline-block; font-size: 10px; font-weight: 700; border-r=
+adius: 3px; padding: 1px 6px; margin-top: 3px; }
+.badge-new { display: inline-block; font-size: 9px; font-weight: 800; lette=
+r-spacing: 0.5px; border-radius: 3px; padding: 1px 6px; margin-left: 6px; b=
+ackground: rgb(254, 240, 138); color: rgb(133, 77, 14); border: 1px solid r=
+gb(202, 138, 4); vertical-align: middle; }
+.l-actors { border-color: rgb(59, 130, 246); background: rgb(239, 246, 255)=
+; }
+.l-actors .layer-title { color: rgb(29, 78, 216); }
+.l-ui { border-color: rgb(139, 92, 246); background: rgb(245, 243, 255); }
+.l-ui .layer-title { color: rgb(109, 40, 217); }
+.l-workflow { border-color: rgb(239, 68, 68); background: rgb(254, 242, 242=
+); }
+.l-workflow .layer-title { color: rgb(153, 27, 27); }
+.l-modules { border-color: rgb(34, 197, 94); background: rgb(240, 253, 244)=
+; }
+.l-modules .layer-title { color: rgb(21, 128, 61); }
+.l-orch { border-color: rgb(6, 182, 212); background: rgb(236, 254, 255); }
+.l-orch .layer-title { color: rgb(14, 116, 144); }
+.l-agents { border-color: rgb(16, 185, 129); background: rgb(240, 253, 244)=
+; }
+.l-agents .layer-title { color: rgb(6, 95, 70); }
+.l-intel { border-color: rgb(245, 158, 11); background: rgb(255, 251, 235);=
+ }
+.l-intel .layer-title { color: rgb(146, 64, 14); }
+.l-data { border-color: rgb(14, 165, 233); background: rgb(240, 249, 255); }
+.l-data .layer-title { color: rgb(3, 105, 161); }
+.l-ext { border-color: rgb(168, 85, 247); background: rgb(250, 245, 255); }
+.l-ext .layer-title { color: rgb(126, 34, 206); }
+.b-blue { background: rgb(219, 234, 254); border-color: rgb(59, 130, 246); =
+color: rgb(30, 64, 175); }
+.b-purple { background: rgb(237, 233, 254); border-color: rgb(139, 92, 246)=
+; color: rgb(91, 33, 182); }
+.b-red { background: rgb(254, 226, 226); border-color: rgb(239, 68, 68); co=
+lor: rgb(153, 27, 27); }
+.b-cyan { background: rgb(207, 250, 254); border-color: rgb(6, 182, 212); c=
+olor: rgb(14, 116, 144); }
+.b-amber { background: rgb(254, 243, 199); border-color: rgb(245, 158, 11);=
+ color: rgb(120, 53, 15); }
+.b-sky { background: rgb(224, 242, 254); border-color: rgb(14, 165, 233); c=
+olor: rgb(7, 89, 133); }
+.b-violet { background: rgb(237, 233, 254); border-color: rgb(168, 85, 247)=
+; color: rgb(107, 33, 168); }
+.b-slate { background: rgb(241, 245, 249); border-color: rgb(100, 116, 139)=
+; color: rgb(51, 65, 85); }
+.b-lime { background: rgb(247, 254, 231); border-color: rgb(132, 204, 22); =
+color: rgb(54, 83, 20); }
+.mod-grid { display: grid; grid-template-columns: repeat(6, minmax(160px, 1=
+fr)); gap: 8px; align-items: start; }
+.mod-box { border-radius: 5px; border: 1.5px solid rgb(34, 197, 94); backgr=
+ound: rgb(220, 252, 231); padding: 8px 7px; font-size: 11px; }
+.mod-title { font-weight: 700; font-size: 12px; color: rgb(22, 101, 52); ma=
+rgin-bottom: 3px; text-align: center; }
+.mod-sub { font-size: 10px; color: rgb(4, 120, 87); background: rgb(187, 24=
+7, 208); border-radius: 3px; padding: 1px 5px; display: inline-block; margi=
+n-bottom: 5px; font-weight: 600; }
+.mod-box ul { padding-left: 14px; color: rgb(55, 65, 81); line-height: 1.7;=
+ margin-top: 4px; }
+.ag-grid { display: grid; grid-template-columns: repeat(6, minmax(160px, 1f=
+r)); gap: 8px; align-items: start; }
+.ag-box { border-radius: 5px; padding: 8px 7px; font-size: 11px; border: 1.=
+5px solid; }
+.ag-title { font-weight: 700; font-size: 12px; margin-bottom: 3px; text-ali=
+gn: center; }
+.ag-llm { background: rgb(220, 252, 231); border-color: rgb(34, 197, 94); c=
+olor: rgb(22, 101, 52); }
+.ag-det { background: rgb(219, 234, 254); border-color: rgb(59, 130, 246); =
+color: rgb(30, 64, 175); }
+.ag-tag { font-size: 10px; font-weight: 600; border-radius: 3px; padding: 1=
+px 5px; display: inline-block; margin-bottom: 4px; }
+.ag-box ul { padding-left: 14px; line-height: 1.7; margin-top: 4px; }
+.wf-states { display: flex; align-items: center; gap: 0px; flex-wrap: wrap;=
+ margin: 6px 0px; justify-content: center; }
+.wf-state { background: rgb(254, 226, 226); border: 1.5px solid rgb(239, 68=
+, 68); color: rgb(153, 27, 27); font-size: 10px; font-weight: 700; padding:=
+ 3px 7px; border-radius: 4px; white-space: nowrap; }
+.wf-arr { color: rgb(239, 68, 68); font-size: 13px; padding: 0px 2px; }
+.intel-grid { display: grid; grid-template-columns: repeat(4, minmax(180px,=
+ 1fr)); gap: 8px; align-items: stretch; }
+.data-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, =
+1fr)); gap: 8px; align-items: stretch; }
+.ext-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1=
+fr)); gap: 8px; align-items: stretch; }
+@media (max-width: 1200px) {
+  .mod-grid, .ag-grid { grid-template-columns: repeat(3, minmax(200px, 1fr)=
+); }
+  .data-grid, .ext-grid { grid-template-columns: repeat(2, minmax(200px, 1f=
+r)); }
+}
+@media (max-width: 760px) {
+  .mod-grid, .ag-grid, .intel-grid, .data-grid, .ext-grid { grid-template-c=
+olumns: 1fr; }
+  body { padding: 14px; }
+}
+
+------MultipartBoundary--MAFt4rg3tArch1tectur3Zensar6LcY6iQzHz------

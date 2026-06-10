@@ -1,0 +1,228 @@
+--- TABLE ---
+CHANGE REQUEST | CHANGE REQUEST
+Part I – REQUEST | Part I – REQUEST
+Reference Number: Shell Fleet Operations (L3/SRE Operations Team) | Date : 4/11/2025
+Change Requested By 	Shell
+Zensar | Prepared By : 
+--- END TABLE ---
+[Heading 1] Objective:
+[Normal] Shell currently runs vendor governance cycles (QBRs / EGBs) as a largely manual exercise, coordinators chase availability over email, scorecards arrive piecemeal across inboxes, alignment meetings recap the same recurring issues, and post-meeting minutes are inconsistent quarter on quarter. ZenVendorPulse is an agentic AI platform that automates the orchestration end-to-end while keeping every outbound action (emails, invites, briefs, minutes) under human approval. The proof-of-concept already demonstrates the six-stage workflow against a Gmail/Google-Forms-based mock environment. This document set scopes the work to lift that POC into a Shell-grade production deployment hosted in Shell's Azure tenant, integrated with Outlook + Teams, and removed entirely from Google's stack.
+[Heading 1] 1. Scope/Capabilities Description
+[Normal] Deploy the already developed POC onto Shell's tenant delivering six vendor-governance capabilities:
+--- TABLE ---
+Capability | What it does
+A: Meeting Scheduling & Coordination | Proposes and books EGB/QBR meetings via Graph, coordinating Shell and vendor attendees through the service mailbox.
+B: Scorecard Input & Validation | Collects and validates 1-5 ratings across 4 categories / 16 parameters: Risk & Compliance, Performance, Commercial, Relationship.
+C: Internal Alignment Calls Support | Prepares Shell-side alignment materials, consolidating scorecards and surfacing discussion points ahead of vendor engagement.
+D: Vendor Prep Call Support | Drafts vendor pushbacks in three stances (Factual, Neutral, Escalation) under a legal-review guardrail.
+E: EGB/QBR Combined Meeting Support | Runs the combined governance meeting, capturing decisions, actions and minutes for human approval.
+F: Cross-Cycle Memory & Trend Analysis | Retains prior-cycle data to track vendor performance trends and recurring themes across governance cycles.
+--- END TABLE ---
+[Heading 1] 2. Features of the Agent
+[Normal] •  Deterministic-first, AI-second: LLM writes only human-readable text
+[Normal] •  Human-approval gate on every outbound action
+[Normal] •  12-state, forward-only workflow with full audit trail
+[Normal] •  Entra ID SSO with role-based access control (four roles)
+[Normal] •  Microsoft Graph app-only certificate auth for mail, calendar, Teams
+[Normal] •  All messaging from a single dedicated service mailbox
+[Normal] •  Native in-app scorecard form (1-5; 4 categories, 16 parameters)
+[Normal] •  Outlook-friendly email templates rendering on desktop, OWA, mobile
+[Normal] •  Provider-abstracted LLM: Anthropic Claude or Azure OpenAI, config-switchable
+[Normal] •  Full audit trail streamed to App Insights / Log Analytics
+[Normal] •  End-to-end observability across application and platform
+[Normal] •  Graph rate-limiting (429 handling) and LLM monthly token budgets
+[Normal] •  Graceful degradation when external services are unavailable
+[Normal] •  All secrets held in Azure Key Vault
+[Normal] •  Single-tenant deployment within Shell's Azure / Microsoft 365 estate
+[Heading 1] 3. Out of Scope
+[List Paragraph] No Shell-wide vendor-master, SAP Ariba or Coupa integration (pilot uses CSV/Excel import)
+[List Paragraph] No contract-management capability
+[List Paragraph] No finance, spend or SAP integration
+[List Paragraph] No native mobile application (web-only)
+[List Paragraph] No multi-language support (English only)
+[List Paragraph] Performance/load testing at scale not yet conducted
+[List Paragraph] No third-party penetration testing completed
+[List Paragraph] No customer-managed keys (CMK) support
+[List Paragraph] No cross-region disaster recovery (DR)
+[List Paragraph] No SAP/Ariba integration
+[List Paragraph] No Teams transcript ingestion
+[List Paragraph] No Power Automate integration
+[Heading 1] 4. High Level Timeline
+[Normal] Four working weeks (20 working days), sprint-paced: three weeks of development (Weeks 1-3) followed by a deployment and defect-warranty week (Week 4), with all Shell access pre-mobilised before Day 1.
+--- TABLE ---
+Phase | Duration | Key Outcomes/Deliverables | Pre-Requisites/Ask from Shell
+Phase 0 (Pre-mobilization)  | Before Day 1 | Shell provisions Entra ID app registrations (NonProd + Prod) and admin consent on Graph application permissions
+Service mailbox vendorpulse-svc@shell.com provisioned by Shell with Application Access Policy scoped to the app
+Azure infrastructure provisioned by Shell (Postgres Flexible Server, Key Vault, App Service Plan, App Insights / Log Analytics, Container Registry, Front Door)
+LLM provider chosen and contract established by Shell (Anthropic or Azure OpenAI) with API key deposited in Key Vault
+DNS hostnames and TLS certificates provisioned by Shell for Prod and NonProd
+Source repository and CI/CD pipeline provisioned by Shell with Zensar engineers added and service connection for deployment configured | Refer Section 6, point 5
+Week 1 –  Foundations, Migration &
+Design Alignment
+ | Day 1-5 | JSON to Postgres migration completed
+Key Vault integration implemented
+Google / Gmail / Forms removed
+Entra SSO and RBAC configured
+Graph app-only certificate set up
+Day-2 design checkpoint conducted
+Module A live
+Design frozen Friday
+ | 
+Week 2 – Development & Module Testing | Day 6-10 | All six agents completed
+Scorecard implemented in chosen mode
+Shell branding applied
+Outlook templates configured
+Admin module completed
+Code freeze Friday
+ | 
+Week 3 – Development,
+Stabilization & UAT | Days 11-15 | Hardening and stabilization activities completed
+UAT is performed by Shell VMO team
+Observability setup and runbook documented
+Zensar team fixes the defects raised during UAT phase
+Release readiness , prepare the build list | Shell VMO team to perform UAT testing 
+Week 4 - Deployment & Warranty | Days 16-20 | Shell IT Security sign-off obtained
+CAB approval completed
+Production cutover and go-live executed
+Pilot vendor cycle kick-off
+Coordinator training and handover completed
+Defect-warranty support begins
+ | 
+--- END TABLE ---
+[Heading 1] 5. Assumptions
+[Normal] •  Shell provides all pre-mobilization access, hardware & software before Day 1
+[Normal] •  The POC functionality is approved as-is; only the integration and platform will be re-engineered.
+[Normal] •  English-only, web-only, single-tenant delivery
+[Normal] •  All attendees reside within or are invitable from Shell M365
+[Normal] •  LLM provider chosen and contracted before Day 1
+[Normal] •  Scorecard taxonomy locked at the Day-2 design checkpoint.
+[Normal] •  Shell names three UAT coordinators and pre-agrees one pilot vendor.
+[Normal] •  Design frozen at the end of Week 1.
+[Heading 1] 6. Dependencies
+[Normal] The four-week plan assumes Shell provisions all items below before Day 1; any gap blocks the dependent capability and risks the schedule.
+--- TABLE ---
+ | Category | Items
+1 | Shell Identity / Entra | 2 app registrations (NonProd and Prod)
+Certificate credentials for each app registration
+Graph application-permission admin consent for the following permissions: 
+Mail.Send
+Calendars.ReadWrite
+OnlineMeetings.ReadWrite.All
+User.Read.All
+MailboxSettings.Read
+Group.Read.All
+Mail.Read / Mail.ReadWrite (if email-reply scorecard is enabled)
+OIDC client configuration with redirect URIs
+Entra security groups for 4 app roles
+Exchange Application Access Policy scoping the service mailbox
+Conditional Access exemption for the service principal
+
+2 | Microsoft 365 messaging & calendar | Service mailbox (e.g. vendorpulse-svc@shell.com) with E3/E5 licence
+Mailbox storage and retention policy configuration
+Teams meeting policy for the service mailbox
+External/guest meeting policy for vendor attendees
+Litmus / Email-on-Acid for email-render QA
+
+3 | Azure infrastructure | Azure subscription with deploy access
+Resource groups for environment separation
+App Service Plan (P1v3 for prod / B2 for nonprod)
+PostgreSQL Flexible Server with HA for prod
+Key Vault for secrets management
+Front Door with WAF (Web Application Firewall)
+App Insights and Log Analytics for monitoring
+DNS/CNAME configuration with TLS certificate
+Private endpoints and VNet integration
+Managed Identity role assignments
+Outbound NAT/egress allow-listing to Graph and LLM endpoints
+Azure Policy and tagging compliance enforcement
+
+4 | LLM provider | Anthropic enterprise account with DPA (zero-retention / no-training / EU compliance)
+Anthropic API key stored in Key Vault
+Monthly token budget configured for Anthropic account
+OR Azure OpenAI quota with GPT-4o-class chat deployment
+Azure OpenAI key stored in Key Vault
+
+5 | Shell delivery tooling | Developer laptops with full local dev setup (Python 3.11+, Node.js, Docker, Git) and admin rights
+Approved IDE (VS Code or JetBrains) with extensions
+Claude Code / Claude for Work licences and Anthropic API developer key
+Source-control and CI/CD (Azure DevOps or GitHub Enterprise) with branch protection and CI/CD service principal
+Azure Container Registry
+Static analysis tool (SonarQube)
+Secret scanning (TruffleHog / GitLeaks)
+Container scanning (Trivy / Snyk)
+Dependabot / Renovate for dependency management
+Litmus / Email-on-Acid for email testing
+Optional Playwright / BrowserStack for automated browser testing
+Network access, VPN and device-compliance to reach Shell tenant, repo and non-prod Graph
+
+ |                                                                                                                                                                                    | 
+--- END TABLE ---
+[Heading 1] 7. Risks
+--- TABLE ---
+ | Risk | Impact | Mitigation
+1 | Timely provision of infra, complete access and software licenses including AI licenses by Shell | Schedule delay | Shell to confirm infra/access/licenses upfront, owners assigned
+2 | External-attendee policy blocks vendor invites
+ | Vendor meetings cannot be scheduled
+ | Confirm external/guest meeting policy pre-Day 1
+
+--- END TABLE ---
+[Heading 1] 8. Technology Stack
+--- TABLE ---
+Application Component | Technology / Service
+Frontend | React (TypeScript)
+Backend / Agents | Python 3.11+
+Database | PostgreSQL Flexible Server (Azure)
+Identity & Auth | Entra ID SSO (OIDC), app-only certificate auth
+Messaging & Calendar | Microsoft Graph API (Mail, Calendar, Teams)
+Service Mailbox | Example - vendorpulse-svc@shell.com (M365 E3/E5)
+LLM Provider | Anthropic Claude (Sonnet 4.6) or Azure OpenAI (GPT 5.5) (config-switchable)
+Secret Management | Azure Key Vault
+Containerization | Azure Container Registry + App Service Plan (P1v3 prod / B2 nonprod)
+Observability | Azure App Insights + Log Analytics
+CDN / WAF | Azure Front Door with WAF
+CI/CD | Azure DevOps or GitHub Enterprise
+Code Quality | SonarQube + TruffleHog/GitLeaks + Trivy/Snyk
+Browser Support | Chrome, Edge (web-only, English-only)
+--- END TABLE ---
+--- TABLE ---
+Environment | Type | Azure Tier | Region | Availability
+NonProd | Development / UAT | B2 App Service, standard Postgres | Shell-designated | Before Day 1
+Prod | Production | P1v3 App Service, Postgres HA | Shell-designated | Before Week 3
+--- END TABLE ---
+[Heading 1] 9. Acceptance Criteria
+[List Paragraph] Foundation Setup (Week 1) — Identity & Access: Entra ID SSO login functional with RBAC enforced across all four app roles. Verified by Zensar and confirmed by Shell IT before end of Week 1.
+[List Paragraph] UAT Sign-off (Week 3) — Quality: All P1 and P2 defects identified during UAT must be resolved and closed. No P1 issues to remain open at the point of UAT sign-off. Any open P3 defects must have explicit approval from Shell VMO to carry forward.
+[List Paragraph] Go-Live (Week 4) — Infrastructure: Production system live in Shell's Azure tenant (App Service, PostgreSQL, Key Vault, Front Door, App Insights all running in Prod environment). Sign-off required from Shell IT prior to cutover.
+[List Paragraph] Go-Live (Week 4) — Security: Shell IT Security sign-off obtained on application security posture. CAB approval completed prior to production cutover. No go-live to proceed without both approvals in place.
+[List Paragraph] Post Go-Live (Week 4) — Pilot: One complete EGB/QBR vendor governance cycle progressed through all six workflow stages (A: Scheduling → B: Scorecard → C: Alignment → D: Vendor Prep → E: Combined Meeting → F: Trend Analysis) without any P1 issues. Sign-off from Shell VMO coordinator.
+[List Paragraph] Go-Live (Week 4) — Handover: Runbook v1.0 delivered to Shell IT Operations and all documentation committed to the Shell-designated source repository. Handover deemed complete only upon written acknowledgement from Shell IT Operations.
+--- TABLE ---
+Part II – RESPONSE TO REQUEST | Part II – RESPONSE TO REQUEST
+Date : 4/11/2025 | Date : 4/11/2025
+Response By 	Customer
+Zensar | Prepared By : Vinish Pillai
+New changes starting from November ’25 Onwards
+
+6.3 Year 2 [Nov 25 to Feb 26] Payment Details: 
+  Data Entry for Manual Vouchers -From 1st November 2025 to 28th February 2026
+
+Cumulative Charges over the Contract period. 
+
+ | New changes starting from November ’25 Onwards
+
+6.3 Year 2 [Nov 25 to Feb 26] Payment Details: 
+  Data Entry for Manual Vouchers -From 1st November 2025 to 28th February 2026
+
+Cumulative Charges over the Contract period. 
+
+
+This CR changes are related to SOW against Shell Managed L2/L3 Services for Emerald MTSP project dated 10-July -2025 | This CR changes are related to SOW against Shell Managed L2/L3 Services for Emerald MTSP project dated 10-July -2025
+Vinish Pillai
+Name and Signature of Authorized Representative of Responding Party
+
+ | Vinish Pillai
+Name and Signature of Authorized Representative of Responding Party
+
+
+ | 
+--- END TABLE ---

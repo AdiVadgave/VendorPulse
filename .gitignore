@@ -93,3 +93,7 @@ dev artifacts/VendorPulse-Demo-Script.md
 dev artifacts/demo-qa-cheatsheet.md
 dev artifacts/slide-script.md
 dev artifacts/build_deck.py
+
+# Shell INTERNAL / CONFIDENTIAL source documents — never commit (IRM 3.6.1 data-leakage)
+msft-agentic-docs/*.pdf
+msft-agentic-docs/*.mhtml

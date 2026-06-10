@@ -5,7 +5,7 @@
 > **Client:** Shell — all AI work must satisfy **Shell IRM 3.492** (NIST AI RMF / ISO 42001) + the **EU AI Act**. See [SHELL_COMPLIANCE_CHECKLIST.md](SHELL_COMPLIANCE_CHECKLIST.md).
 > **Scope:** Rebuilding the agent layer on the **Microsoft Agent Framework (MAF)** Python SDK, while preserving the deterministic core and human-approval gate. We run the SDK in our own process today; **Microsoft Foundry Hosted Agents** is a now-viable hosting option (see §3).
 > **Audience:** Engineers, technical leads, enterprise architecture & security reviewers. **New to MAF? Start with [MAF_TEAM_ONBOARDING.md](MAF_TEAM_ONBOARDING.md).**
-> **Status:** Proposed (target state). **Phase-0 PoC done (June 2026):** Foundry project verified, `SchedulingAgent` ported to the Foundry Responses API, approval gate closed — tracked in GitHub issue #13. Hosting/SDK decision (see §3) pending.
+> **Status:** Proposed (target state). **Phase-0 PoC done (June 2026):** Foundry verified; `SchedulingAgent` + `VendorPrepAgent` ported to the Foundry Responses API (2/6 agents, both execution shapes); approval gate closed — tracked in GitHub issue #13. **Decision made (June 2026): build production on the MAF SDK**, keeping the proven Responses-direct path as fallback (compliance rationale in §3 / [checklist D3](SHELL_COMPLIANCE_CHECKLIST.md)).
 > **Last refreshed:** June 2026 — aligned to MAF 1.x post-GA API (≈1.8) and the BUILD 2026 / Microsoft Foundry rebrand. Pin the exact SDK version at build time; the API has churned through 1.3 / 1.6 / 1.8 since the April 2026 GA.
 
 ---

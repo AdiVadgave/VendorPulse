@@ -71,7 +71,7 @@
     "type": "Internal Stakeholder",
     "is_key": true,
     "invite_status": "PENDING",
-    "availability_submitted": false,
+    "availability_submitted": true,
     "user_id": "u16"
   },
   {
@@ -86,7 +86,7 @@
     "type": "Vendor",
     "is_key": true,
     "invite_status": "PENDING",
-    "availability_submitted": false,
+    "availability_submitted": true,
     "user_id": "u17"
   },
   {
@@ -101,7 +101,7 @@
     "type": "Internal Stakeholder",
     "is_key": true,
     "invite_status": "PENDING",
-    "availability_submitted": false,
+    "availability_submitted": true,
     "user_id": "u18"
   },
   {

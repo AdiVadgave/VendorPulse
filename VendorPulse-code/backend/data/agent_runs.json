@@ -1288,5 +1288,159 @@
     "approval_status": "APPROVED",
     "approved_by": "coordinator",
     "approved_at": "2026-06-03T09:22:09.421677+00:00"
+  },
+  {
+    "run_id": "6a0f204f-db05-4f60-ada7-fa28183fa7dc",
+    "agent_name": "scheduling_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"get_attendee_list\"}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"scheduling_agent\", \"summary\": \"Completed action 'get_attendee_list'.\", \"data\": [{\"attendee_id\": \"att_2ed1a7c2\", \"cycle_id\": \"c_8c25e23b\", \"stakeholder_id\": \"s_1776143348679\", \"name\": \"Anup Kesarwani\", \"email\": \"anup.kesarwani@zensar.com\", \"gmail\": \"anupkesarwani3537@gmail.com\", \"role\": \"VMO_COORDINATOR\", \"organisation\": \"Zensar VMO\", \"type\": \"Internal Stakeholder\", \"is_key\": true, \"invite_status\": \"PENDING\", \"availability_submitted\": false, \"user_id\": \"u16\"}, {\"attendee_id\": \"att_1c69b287\", \"cycle_id\": \"c_8c25e23b\", \"stakeholder_id\": \"s_1776143356086\", \"name\": \"Kanishk Punekar\", \"email\": \"kanishk.punekar@zensar.com\", \"gmail\": \"kanishkpunekar54@gmail.com\", \"role\": \"VMO_COORDINATOR\", \"organisation\": \"Zensar IDT\", \"type\": \"Vendor\", \"is_key\": true, \"invite_status\": \"PENDING\", \"availability_submitted\": false, \"user_id\": \"u17\"}, {\"attendee_id\": \"att_9554b4b4\", \"cycle_id\": \"c_8c25e23b\", \"stakeholder_id\": \"s_1776143373638\", \"name\": \"Aditya Vadgave\", \"email\": \"aditya.vadgave@zensar.com\", \"gmail\": \"adivadgave16@gmail.com\", \"role\": \"VMO_COORDINATOR\", \"organisation\": \"Zensar VMO\", \"type\": \"Internal Stakeholder\", \"is_key\": true, \"invite_status\": \"PENDING\", \"availability_submitted\": false, \"user_id\": \"u18\"}], \"warnings\": [], \"next_actions\": [], \"requires_approval\": false, \"run_id\": \"6a0f204f-db05-4f60-ada7-fa28183fa7dc\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T06:09:20.938699+00:00"
+  },
+  {
+    "run_id": "0ecff66e-2dea-4e4d-ab3a-5e4cf63ae1b8",
+    "agent_name": "scheduling_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"List the attendees for this governance cycle and summarise the current RSVP status. Do not send any invites. Return your usual JSON response.\", \"context\": {}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"scheduling_agent\", \"summary\": \"There are 3 attendees for this governance cycle; all RSVPs are currently pending.\", \"data\": {\"attendees\": [{\"name\": \"Anup Kesarwani\", \"email\": \"anup.kesarwani@zensar.com\", \"organisation\": \"Zensar VMO\", \"role\": \"VMO_COORDINATOR\", \"type\": \"Internal Stakeholder\", \"is_key\": true}, {\"name\": \"Kanishk Punekar\", \"email\": \"kanishk.punekar@zensar.com\", \"organisation\": \"Zensar IDT\", \"role\": \"VMO_COORDINATOR\", \"type\": \"Vendor\", \"is_key\": true}, {\"name\": \"Aditya Vadgave\", \"email\": \"aditya.vadgave@zensar.com\", \"organisation\": \"Zensar VMO\", \"role\": \"VMO_COORDINATOR\", \"type\": \"Internal Stakeholder\", \"is_key\": true}], \"rsvp_status\": {\"accepted\": [], \"pending\": [\"Anup Kesarwani\", \"Kanishk Punekar\", \"Aditya Vadgave\"], \"declined\": [], \"total\": 3}}, \"warnings\": [\"3 attendee(s) have not submitted RSVPs or availability: Anup Kesarwani, Kanishk Punekar, Aditya Vadgave\"], \"next_actions\": [\"FOLLOW_UP_PENDING\"], \"requires_approval\": false, \"run_id\": \"0ecff66e-2dea-4e4d-ab3a-5e4cf63ae1b8\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T06:12:29.695336+00:00"
+  },
+  {
+    "run_id": "8086c5f6-e034-4dd2-985e-3e9959bf6932",
+    "agent_name": "scheduling_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"Pick the best available slot and send the calendar invites to all attendees now.\", \"context\": {}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"scheduling_agent\", \"summary\": \"No valid slots were found for the given date range and attendees.\", \"data\": {\"attendee_list\": [{\"name\": \"Anup Kesarwani\", \"role\": \"VMO_COORDINATOR\", \"organisation\": \"Zensar VMO\", \"is_key\": true, \"availability_submitted\": true}, {\"name\": \"Kanishk Punekar\", \"role\": \"VMO_COORDINATOR\", \"organisation\": \"Zensar IDT\", \"is_key\": true, \"availability_submitted\": true}, {\"name\": \"Aditya Vadgave\", \"role\": \"VMO_COORDINATOR\", \"organisation\": \"Zensar VMO\", \"is_key\": true, \"availability_submitted\": true}]}, \"warnings\": [\"Check that the organiser and executive sponsor have availability in the date range.\"], \"next_actions\": [\"UPDATE_AVAILABILITY\"], \"requires_approval\": false, \"run_id\": \"8086c5f6-e034-4dd2-985e-3e9959bf6932\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T06:14:46.757590+00:00"
+  },
+  {
+    "run_id": "606a9d9f-607d-44f0-b551-fd972a5b42bf",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"generate_vendor_brief\", \"params\": {\"vendor_name\": \"NovaTech\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"vendor_prep_agent\", \"summary\": \"3 response options drafted for pushback 'y'.\", \"data\": {\"pushback_id\": \"y\", \"responses\": [{\"response_id\": \"aba14289-0dfa-443a-86c6-3c95fe4b2f7a\", \"pushback_id\": \"y\", \"stance\": \"factual\", \"content\": \"Based on the scorecard data, the metrics indicate the current assessment is data-supported. We can review specific data points together.\", \"is_selected\": false}, {\"response_id\": \"eda344fe-9982-4dd5-9a30-f0942881e031\", \"pushback_id\": \"y\", \"stance\": \"neutral\", \"content\": \"We acknowledge this concern and propose a joint review to find common ground on the assessment criteria.\", \"is_selected\": false}, {\"response_id\": \"f75db9f8-3b1e-44ab-8ae2-4032c49b8661\", \"pushback_id\": \"y\", \"stance\": \"escalation\", \"content\": \"Per our service agreement, the current scores reflect documented performance. We recommend a formal review meeting to address discrepancies.\", \"is_selected\": false}]}, \"warnings\": [], \"next_actions\": [\"SELECT_RESPONSE\"], \"requires_approval\": true, \"run_id\": \"606a9d9f-607d-44f0-b551-fd972a5b42bf\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T08:51:45.219569+00:00"
+  },
+  {
+    "run_id": "606a9d9f-607d-44f0-b551-fd972a5b42bf",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"handle_pushback\", \"params\": {\"pushback_id\": \"x\", \"description\": \"d\", \"needs_legal_review\": true}}}",
+    "output_payload": "{}",
+    "status": "PENDING",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T08:51:46.724673+00:00"
+  },
+  {
+    "run_id": "606a9d9f-607d-44f0-b551-fd972a5b42bf",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"handle_pushback\", \"params\": {\"pushback_id\": \"y\", \"description\": \"d\", \"needs_legal_review\": false}}}",
+    "output_payload": "{}",
+    "status": "PENDING",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T08:51:46.795006+00:00"
+  },
+  {
+    "run_id": "7a9c9ccd-7aac-4dba-82c2-e0cfa6407c71",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"generate_vendor_brief\", \"params\": {\"vendor_name\": \"NovaTech\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"vendor_prep_agent\", \"summary\": \"3 response options drafted for pushback 'pb_perf_02'.\", \"data\": {\"pushback_id\": \"pb_perf_02\", \"responses\": [{\"response_id\": \"d4f1b67e-9a3a-45c9-b304-9e0f67e1e1a3\", \"pushback_id\": \"pb_perf_02\", \"stance\": \"factual\", \"content\": \"Based on the scorecard data, your delivery-quality score is calculated from the percentage of on-time deliveries and the defect rate observed over the last quarter. The score of 72% reflects repeated delays in shipments and a defect rate of 15%, both of which deviate from the agreed SLA thresholds. We are happy to share the detailed metrics if further clarification is needed.\", \"is_selected\": false}, {\"response_id\": \"8542a989-4cf0-4b6f-b44b-55594adf2b83\", \"pushback_id\": \"pb_perf_02\", \"stance\": \"neutral\", \"content\": \"We understand your concern regarding the delivery-quality score and appreciate your feedback. While the score of 72% does reflect specific areas of improvement identified through our metrics, we are open to revisiting the data together to ensure mutual alignment. Let us know a convenient time to discuss this in detail.\", \"is_selected\": false}, {\"response_id\": \"fe3725bb-0767-4c6a-b25d-368338e44b64\", \"pushback_id\": \"pb_perf_02\", \"stance\": \"escalation\", \"content\": \"The delivery-quality score of 72% was derived directly from performance metrics outlined in our SLA, which includes on-time delivery rates and defect percentage. These standards were agreed upon during contract finalization and remain binding. We strongly encourage you to address these recurring issues to ensure future compliance.\", \"is_selected\": false}]}, \"warnings\": [], \"next_actions\": [\"SELECT_RESPONSE\"], \"requires_approval\": true, \"run_id\": \"7a9c9ccd-7aac-4dba-82c2-e0cfa6407c71\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T08:53:02.096656+00:00"
+  },
+  {
+    "run_id": "7a9c9ccd-7aac-4dba-82c2-e0cfa6407c71",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"handle_pushback\", \"params\": {\"pushback_id\": \"pb_legal_01\", \"description\": \"Vendor disputes the SLA penalty clause.\", \"category\": \"CONTRACTUAL\", \"needs_legal_review\": true}}}",
+    "output_payload": "{}",
+    "status": "PENDING",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T08:53:20.189852+00:00"
+  },
+  {
+    "run_id": "7a9c9ccd-7aac-4dba-82c2-e0cfa6407c71",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"handle_pushback\", \"params\": {\"pushback_id\": \"pb_perf_02\", \"description\": \"Vendor claims the delivery-quality score is unfairly low.\", \"category\": \"PERFORMANCE\", \"needs_legal_review\": false}}}",
+    "output_payload": "{}",
+    "status": "PENDING",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T08:53:20.299461+00:00"
+  },
+  {
+    "run_id": "1907bfb2-f5c6-44d5-8c91-5eea6df541e5",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"generate_vendor_brief\", \"params\": {\"vendor_name\": \"NovaTech\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"vendor_prep_agent\", \"summary\": \"3 response options drafted for pushback 'pb_perf_02'.\", \"data\": {\"pushback_id\": \"pb_perf_02\", \"responses\": [{\"response_id\": \"c6f3e7e7-3d67-4b6a-9e7a-8b5d244c1a43\", \"pushback_id\": \"pb_perf_02\", \"stance\": \"factual\", \"content\": \"Based on the most recent scorecard, the delivery-quality score reflects measurable issues including a 12% late delivery rate and a 15% increase in quality-related returns over the past quarter. These metrics were gathered directly from operational data and confirmed during the review period.\", \"is_selected\": false}, {\"response_id\": \"aa1fdecc-729d-4dd7-b8c8-2088f4a02e7e\", \"pushback_id\": \"pb_perf_02\", \"stance\": \"neutral\", \"content\": \"We understand your concern regarding the delivery-quality score and appreciate your dedication to performance. To address this, we propose a detailed review of the underlying data with your team to ensure transparency and explore opportunities for improvement.\", \"is_selected\": false}, {\"response_id\": \"f3b2cc6a-06b1-48d6-af76-1f64346da8c5\", \"pushback_id\": \"pb_perf_02\", \"stance\": \"escalation\", \"content\": \"The delivery-quality score adheres strictly to the agreed contractual expectations and SLA metrics. Persistent issues such as late deliveries and quality returns, documented at 12% and 15% respectively, directly impact compliance and were accurately reflected in the scorecard.\", \"is_selected\": false}]}, \"warnings\": [], \"next_actions\": [\"SELECT_RESPONSE\"], \"requires_approval\": true, \"run_id\": \"1907bfb2-f5c6-44d5-8c91-5eea6df541e5\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T08:57:28.466958+00:00"
+  },
+  {
+    "run_id": "1907bfb2-f5c6-44d5-8c91-5eea6df541e5",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"handle_pushback\", \"params\": {\"pushback_id\": \"pb_legal_01\", \"description\": \"Vendor disputes the SLA penalty clause.\", \"category\": \"CONTRACTUAL\", \"needs_legal_review\": true}}}",
+    "output_payload": "{}",
+    "status": "PENDING",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T08:57:48.601502+00:00"
+  },
+  {
+    "run_id": "1907bfb2-f5c6-44d5-8c91-5eea6df541e5",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"handle_pushback\", \"params\": {\"pushback_id\": \"pb_perf_02\", \"description\": \"Vendor claims the delivery-quality score is unfairly low.\", \"category\": \"PERFORMANCE\", \"needs_legal_review\": false}}}",
+    "output_payload": "{}",
+    "status": "PENDING",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T08:57:48.858986+00:00"
+  },
+  {
+    "run_id": "2e066e9f-9578-4d43-9850-27b6d0882f87",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"generate_vendor_brief\", \"params\": {\"vendor_name\": \"NovaTech\"}}}",
+    "output_payload": "{\"status\": \"success\", \"agent\": \"vendor_prep_agent\", \"summary\": \"3 response options drafted for pushback 'y'.\", \"data\": {\"pushback_id\": \"y\", \"responses\": [{\"response_id\": \"7b443561-ddbb-4c66-9258-421d5833642a\", \"pushback_id\": \"y\", \"stance\": \"factual\", \"content\": \"Based on the scorecard data, the metrics indicate the current assessment is data-supported. We can review specific data points together.\", \"is_selected\": false}, {\"response_id\": \"facaefd6-798a-4a92-a0ac-56e2bd56c601\", \"pushback_id\": \"y\", \"stance\": \"neutral\", \"content\": \"We acknowledge this concern and propose a joint review to find common ground on the assessment criteria.\", \"is_selected\": false}, {\"response_id\": \"5c56c50c-1f1c-4101-9b09-cfa2a165cb86\", \"pushback_id\": \"y\", \"stance\": \"escalation\", \"content\": \"Per our service agreement, the current scores reflect documented performance. We recommend a formal review meeting to address discrepancies.\", \"is_selected\": false}]}, \"warnings\": [], \"next_actions\": [\"SELECT_RESPONSE\"], \"requires_approval\": true, \"run_id\": \"2e066e9f-9578-4d43-9850-27b6d0882f87\"}",
+    "status": "SUCCESS",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T09:09:16.769762+00:00"
+  },
+  {
+    "run_id": "2e066e9f-9578-4d43-9850-27b6d0882f87",
+    "agent_name": "vendor_prep_agent",
+    "cycle_id": "c_8c25e23b",
+    "input_payload": "{\"user_message\": \"\", \"context\": {\"action\": \"handle_pushback\", \"params\": {\"pushback_id\": \"y\", \"description\": \"d\", \"needs_legal_review\": false}}}",
+    "output_payload": "{}",
+    "status": "PENDING",
+    "triggered_by": "USER",
+    "error_message": null,
+    "created_at": "2026-06-10T09:09:20.352318+00:00"
   }
 ]

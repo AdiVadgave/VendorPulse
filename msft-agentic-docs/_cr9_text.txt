@@ -1,0 +1,2136 @@
+===== PAGE 1 =====
+CHANGE REQUEST 
+Part I – REQUEST 
+Reference Number : Shell Fleet Operations (L3/SRE 
+Operations Team) 
+Date :  6/4/2026 
+Change Requested By  Shell 
+                                                            Zensar 
+Prepared By: Jaydev Warrier X 
+===== PAGE 2 =====
+EGB/QBR Process Automation 
+Shell currently runs vendor governance cycles (QBRs / EGBs) as a largely manual exercise, coordinators chase 
+availability over email, scorecards arrive piecemeal across inboxes, alignment meetings recap the same recurring 
+issues, and post-meeting minutes are inconsistent quarter on quarter. VendorPulse is an agentic AI platform that 
+automates the orchestration end-to-end while keeping every outbound action (emails, invites, briefs, minutes) under 
+human approval. The proof-of-concept already demonstrates the six-stage workflow against a Gmail/Google-Forms-
+based mock environment. This document set scopes the work to lift that POC into a Shell-grade production 
+deployment hosted in Shell's Azure tenant, integrated with Outlook + Teams, and removed entirely from Google's 
+stack. 
+ 
+Description of Changes:  
+a) Meeting Scheduling and Coordination 
+b) Scorecard Input Collection and Validation  
+c) Internal Alignment Calls Support  
+d) Vendor Prep Call Support  
+e) EGB/QBR Combined Meeting Support  
+Cross-Cycle Memory and Trend Analysis  
+ 
+Capabilities/Features of the Agent: 
+ 
+Capability 
+Attendee refresh + RSVP tracking 
+Slot ranking + Teams invite 
+Scorecard dispatch + reminder escalation 
+Score compilation + outlier detection 
+Alignment doc + face-off model 
+Vendor brief + pushback handling 
+Meeting minutes + action extraction 
+Leadership brief / analytics 
+ 
+Out of Scope: 
+• Not building a Shell -wide vendor master integration. VendorPulse maintains its own vendor list, seeded from Shell -
+provided CSV/Excel for the pilot. A SAP Ariba / Coupa integration is a follow-on phase. 
+• Not building a contract-management feature. VendorPulse references contract terms in the alignment/brief stage but 
+does not store contracts. 
+• Not building a finance / spend integration. Spend data is referenced manually in scorecards; an SAP integration is out 
+of scope for the first release. 
+• Not building a mobile app. Web-only, optimised for Shell's standard desktop browser stack. 
+• Not multi-language at launch. English UI only; Phase 2 candidate. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+===== PAGE 3 =====
+High Level Timeline: 
+ 
+Activities Duration 
+Week 1 — Foundations, Migration & Design 
+Alignment 5 days 
+Week 2 — Functional completion 5 days 
+Week 3 — Hardening, UAT, Pilot Go-Live 5 days 
+Week 4 — Warrant (Post Production Support) 5 days 
+ 
+Assumptions 
+ 
+Dependencies 
+ 
+Risks 
+ 
+Acceptance Criteria 
+ 
+ 
+ 
+ 
+ 
+Name and Signature of Authorized Representative of Requesting Party 
+ 
+ 
+===== PAGE 4 =====
+Change Request – Detailed Scope, Delivery Plan, Dependencies & 
+Risks 
+The following pages provide the full detail behind the change summarised in Part I above, 
+covering scope, the four-week delivery plan (three development weeks plus a deployment and 
+defect-warranty week), every dependency, the complete risk register, and acceptance criteria. 
+1. Description of Changes 
+VendorPulse will deliver the six capabilities (A-F) proven in the proof-of-concept, re-engineered 
+onto a Shell-owned production platform. The functional behaviour validated in the POC is 
+accepted as the baseline; this Change Request re-engineers the integration and platform layer 
+beneath it. Three architectural invariants are preserved without alteration across all six 
+capabilities: (1) the twelve-state, forward-only workflow state machine (CYCLE_CREATED -> 
+ATTENDEE_REFRESH_SENT -> AVAILABILITY_COLLECTED -> 
+MEETING_SCHEDULED -> SCORECARD_REQUEST_SENT -> 
+SCORECARD_COLLECTION -> SCORECARD_COMPILED -> INTERNAL_ALIGNMENT 
+-> VENDOR_PREP -> MEETING_IN_PROGRESS -> POST_MEETING_COMPLETE -> 
+ARCHIVED); (2) the human-approval gate, whereby no email, invite, brief or set of minutes 
+leaves the system without explicit coordinator approval in the UI; and (3) the "deterministic-first, 
+AI-second" principle, whereby all business-critical logic (slot ranking, score validation, outlier 
+detection, workflow transitions and audit) is deterministic Python, and the LLM is used solely to 
+generate human-readable text (briefs, minutes, summaries and draft email bodies) that a person 
+reviews before any action is taken. 
+The single largest change common to capabilities A, B, C and E is the complete removal of the 
+consumer Google stack used in the POC (the Gmail API operating from a developer's personal 
+Google account, and the public Google Form polled every ~90 seconds) and its replacement with 
+Microsoft Graph, Teams and Outlook operating from a dedicated Shell service mailbox under 
+app-only certificate authentication, together with a native in-app scorecard form. The LLM 
+provider sits behind a single abstraction so the choice between the Anthropic Claude API 
+(recommended) and Azure OpenAI is a configuration setting, not a code change. The per-
+capability detail below sets out what each capability does, the specific POC-to-production 
+change, the deterministic-versus-AI split, and the approval gate. 
+A. Meeting Scheduling & Coordination 
+This capability refreshes the attendee roster from the Shell directory, sends attendance-
+confirmation outreach to participants, queries candidate times against real Shell mailboxes using 
+the Graph findMeetingTimes endpoint, deterministically ranks the resulting slots, creates the 
+Microsoft Teams meeting and dispatches the calendar invite, and tracks RSVPs. Slot ranking 
+applies a hard constraint that the organiser and the executive sponsor must both be free, with soft 
+scoring on attendance percentage, calendar conflicts and timezone fit. 
+In production, all directory lookups, free/busy queries, meeting creation and invites move to 
+Microsoft Graph using app-only certificate authentication from the Shell service mailbox, 
+replacing the POC's single short-lived delegated bearer token pasted into a .env file. The Teams 
+online meeting and the invite are created through Graph rather than any Google service. Slot 
+ranking, the organiser/sponsor hard constraint, all soft scoring and the RSVP state tracking 
+remain fully deterministic Python; the LLM is not involved in selecting or scoring times. The 
+===== PAGE 5 =====
+only AI contribution is optional polishing of outreach text. The invite is created and sent only 
+after the coordinator approves the proposed slot and message in the UI; until then no calendar 
+action is taken. 
+B. Scorecard Input Collection & Validation 
+This capability issues personalised scorecard requests to key stakeholders, collects their ratings 
+on a 1-5 scale across four categories and sixteen parameters (Risk & Compliance, Performance, 
+Commercial, Relationship), runs escalating reminders for non-responders, validates the 
+submissions deterministically, and compiles the internal-stakeholder-versus-vendor scorecard. 
+Validation enforces the 1-5 range, requires a mandatory comment for extreme scores of 1 or 5, 
+and flags statistical outliers at approximately 1.5 standard deviations. 
+The POC collected responses through a public Google Form polled on a timer; in production this 
+is removed entirely and replaced by a native in-app form persisted in Azure PostgreSQL, giving 
+Shell full ownership of the data and removing the external dependency and polling latency. 
+Scorecard request emails and reminders are issued via Graph mail from the service mailbox 
+rather than Gmail. All validation logic (range checking, mandatory-comment enforcement, ~1.5-
+sigma outlier flagging) and the compilation of the comparative scorecard remain deterministic; 
+the LLM performs no part of scorecard scoring or validation. As no outbound communication is 
+involved in collection itself, the approval gate applies to the request and reminder emails, which 
+the coordinator approves before dispatch. 
+C. Internal Alignment Calls Support 
+This capability supports the internal alignment call by computing score deltas against the 
+previous cycle, flagging categories where the internal and vendor views diverge by a spread of 
+1.5 or more, drafting a narrative explanation of what changed, extracting action items from raw 
+alignment-meeting notes, and scheduling an internal-only Teams alignment meeting. 
+In production the internal alignment meeting is scheduled via Microsoft Graph as a Teams 
+meeting from the service mailbox, replacing any POC-era external scheduling. The delta 
+calculation and the divergence flagging (spread >= 1.5) are deterministic. The LLM is used only 
+to draft the "what changed" narrative and to extract candidate action items from unstructured 
+notes; both outputs are presented to the coordinator for review and editing, and the alignment 
+meeting invite is issued only after coordinator approval. 
+D. Vendor Prep Call Support 
+This capability prepares the team for the vendor preparation call. It generates an AI vendor brief 
+covering the overall score and trend, per-category ratings, key concerns, positive areas and open 
+actions, and drafts three distinct response stances (Factual, Neutral and Escalation) for each 
+anticipated vendor pushback item, while tracking unresolved items through the cycle. 
+The vendor brief and the three-stance response drafts are LLM-generated human-readable text; 
+the underlying scores, trends and open-action data they summarise are produced 
+deterministically. A deterministic guardrail suppresses AI drafting entirely for any item flagged 
+for legal review, so that no machine-generated response is offered on legally sensitive matters. 
+This capability is internal-facing and produces no outbound communication of its own; the brief 
+and drafts are advisory material that the coordinator and prep team review and adapt. As with all 
+capabilities, any item that subsequently results in an outbound message is subject to the human-
+===== PAGE 6 =====
+approval gate. In production this capability runs against data held in Azure PostgreSQL and the 
+chosen enterprise LLM under a zero-retention, no-training, EU-residency DPA. 
+E. EGB/QBR Combined Meeting Support 
+This capability supports the combined EGB/QBR meeting itself. It produces a pre-meeting 
+facilitator briefing, captures live notes during the meeting under five types (Question, Objection, 
+Decision, Appreciation, Action), parses a pasted transcript into structured notes, generates formal 
+meeting minutes, extracts action items, and distributes the approved minutes to internal 
+stakeholders. 
+The production change is that approved minutes are distributed via Graph mail from the Shell 
+service mailbox, replacing the POC's use of the Gmail API from a personal account. The LLM 
+parses the transcript into structured notes and drafts the facilitator briefing and the formal 
+minutes; the five-type note classification, the action-item register and the workflow state advance 
+remain deterministic. The minutes are explicitly held behind the human-approval gate: the 
+coordinator reviews and approves the generated minutes before they are distributed, and no 
+minutes are sent automatically. Note that ingestion of live Microsoft Teams transcripts is out of 
+scope for the first release; transcripts are pasted in for parsing. 
+F. Cross-Cycle Memory & Trend Analysis 
+This capability provides longitudinal intelligence across cycles. It surfaces multi-cycle score 
+trends, detects recurring issues (defined as a category remaining below threshold for two or more 
+consecutive cycles), classifies each vendor's trajectory as improving, stable or declining, 
+produces an executive leadership brief, and generates a cross-vendor comparison. 
+All trend computation, recurring-issue detection and trajectory classification are deterministic 
+and run over the cycle history now held in Azure PostgreSQL rather than the flat JSON files 
+used in the POC; persisting history in a managed database is the principal production change for 
+this capability and is what makes cross-cycle memory reliable at Shell scale. The LLM 
+contributes only the human-readable executive leadership brief. This capability is read-only and 
+analytical and produces no outbound communication, so it raises no new approval-gate or 
+external-integration surface; any leadership brief shared externally would follow the standard 
+approval gate. 
+2. Capabilities / Features of the Agent 
+In addition to the six functional modules described elsewhere in this proposal, VendorPulse 
+provides a set of cross-cutting, system-wide capabilities that define the production platform. 
+These are the traits that distinguish the Shell-grade production system from the proof-of-concept: 
+how it authenticates, how it integrates with Microsoft 365, how it applies AI safely, and how it 
+remains governed, auditable and operable by Shell IT Ops. The functional behaviour of Modules 
+A–F is accepted as the baseline; the capabilities set out below describe the enterprise platform 
+layer that will host that behaviour. Two of these capabilities are forward-looking build targets 
+correctly aligned to the production design but not yet present in the POC code — the 
+recommended Anthropic Claude provider path and the 4-category / 16-parameter scorecard 
+taxonomy — and each is called out below so that a technical reviewer comparing this proposal to 
+the current repository sees no gap between what is claimed and what exists today. 
+Security & Identity 
+===== PAGE 7 =====
+•  Entra ID Single Sign-On: users authenticate through Shell's Entra ID (Azure AD) using 
+OIDC. There are no application-managed passwords; access follows Shell's existing identity, 
+Conditional Access and MFA posture. 
+•  Role-based access control: four application roles — VMO coordinator, VMO admin, 
+executive sponsor and viewer — are mapped to Entra security groups, so access is 
+administered through Shell's standard group membership processes. 
+•  App-only service identity: the platform acts against Microsoft 365 as a dedicated service 
+principal using certificate-based credentials (no user-delegated or pasted bearer tokens), with 
+all secrets and certificates held in Azure Key Vault and retrieved via Managed Identity. 
+•  Least-privilege scoping: Graph mail and calendar permissions are constrained to the single 
+service mailbox (e.g. vendorpulse-svc@shell.com) by an Exchange Application Access 
+Policy, so the service identity cannot reach any other Shell mailbox. 
+•  Single-tenant isolation: the system is deployed solely within Shell's Azure subscription and 
+Microsoft 365 tenant; it is not multi-tenant and stores no Shell data outside Shell's boundary. 
+Integration 
+•  Microsoft Graph for all messaging and scheduling: attendance outreach, scorecard requests, 
+candidate-time discovery (findMeetingTimes), Teams online meeting creation, invites, RSVP 
+tracking and minutes distribution all run through Graph from the service mailbox. The Google 
+/ Gmail / Google-Forms stack is removed entirely. 
+•  Native in-app scorecard form: scorecard input (1–5 scale across the target structure of four 
+categories and sixteen parameters — Risk & Compliance, Performance, Commercial, 
+Relationship) is captured in an in-app form and persisted in Azure PostgreSQL, replacing the 
+externally hosted form. This 4-category / 16-parameter taxonomy is the target structure 
+validated and locked at the Day-2 design checkpoint; it supersedes the POC's interim category 
+set (the current code defines five categories — Delivery Quality, SLA Compliance, 
+Innovation, Communication, Value for Money), so the final taxonomy is confirmed with Shell 
+before build rather than assumed. 
+•  Outlook / Exchange-native email: outbound email uses table-based HTML templates with 
+inline styles and a plain-text fallback, validated for acceptable rendering on Outlook desktop, 
+OWA and mobile. 
+•  Teams meetings: scheduling and internal-alignment meetings are created as Teams online 
+meetings via Graph, consistent with Shell's collaboration platform. 
+•  Provider-abstracted LLM: a single LLMProvider abstraction sits in front of the model. The 
+recommended Anthropic Claude provider (with enterprise zero-retention / no-training / EU-
+residency DPA) is implemented behind this existing abstraction as part of this CR — the POC 
+abstraction currently targets Azure OpenAI / OpenAI only and has no Anthropic client — and 
+the production build adds the recommended Claude path under the enterprise DPA. Azure 
+OpenAI (gpt-4o-class) is retained as a config-only alternative, and switching providers 
+remains configuration-only thereafter with no code change. 
+AI & Determinism 
+•  Deterministic-first, AI-second: all business-critical logic — slot ranking, score validation, 
+statistical outlier detection (~1.5 sigma), workflow transitions and audit — is implemented in 
+deterministic Python. Outcomes are reproducible and explainable, and do not depend on 
+===== PAGE 8 =====
+model behaviour. (The outlier threshold and the alignment divergence threshold of spread ≥ 
+1.5 are explicit constants in code.) 
+•  AI confined to text generation: the LLM is used only to produce human-readable text — 
+vendor briefs, meeting minutes, 'what changed' narratives, summaries and draft email bodies 
+— never to make governance decisions or take actions. 
+•  Tool-calling for structured output: agents use the model's tool-calling interface so outputs 
+are structured and validated against schemas, rather than free-form text that must be parsed. 
+The recommended Anthropic Claude provider is added behind the existing LLMProvider 
+abstraction as part of this CR; the POC abstraction currently targets Azure OpenAI / OpenAI, 
+and the production build adds the recommended Claude path under the enterprise DPA — 
+switching remains config-only thereafter. 
+•  Human-approval gate: every AI-generated artefact (invite text, briefs, response stances, 
+minutes) is surfaced for explicit coordinator approval before any external action is taken; 
+nothing is sent automatically. 
+•  AI guardrails: drafting is suppressed for items flagged for legal review; LLM features can 
+be disabled by configuration; and token budgets bound spend per cycle. 
+•  Graceful degradation: if the LLM provider is unavailable, the deterministic workflow 
+continues to function — coordinators can proceed manually, and AI-assisted text is simply 
+unavailable rather than blocking the cycle. 
+Governance & Audit 
+•  12-state forward-only workflow: cycles progress through a linear, forward-only state 
+machine (CYCLE_CREATED → ATTENDEE_REFRESH_SENT → 
+AVAILABILITY_COLLECTED → MEETING_SCHEDULED → 
+SCORECARD_REQUEST_SENT → SCORECARD_COLLECTION → 
+SCORECARD_COMPILED → INTERNAL_ALIGNMENT → VENDOR_PREP → 
+MEETING_IN_PROGRESS → POST_MEETING_COMPLETE → ARCHIVED). Invalid 
+transitions are rejected. 
+•  Audited transitions and actions: every state transition and every outbound action is 
+recorded. The audit model spans agent_runs (each AI invocation and its inputs/outputs), 
+external_calls (each Graph / LLM call) and security_events. 
+•  Append-only trail mirrored to Log Analytics: the audit trail is designed to be append-only 
+and is mirrored to Azure Log Analytics, providing a durable, queryable record for governance 
+and investigation. Two caveats apply for honesty: (i) the POC baseline has no automated test 
+suite — only ad-hoc integration scripts exist — so the append-only and end-to-end 
+auditability behaviour is asserted by design and will be validated during Week-3 hardening 
+and UAT under this CR, not inherited as proven; and (ii) immutability and retention 
+guarantees are realised through the production storage and Log Analytics retention 
+configuration, which is set as part of the build. 
+•  Human accountability: because approval is mandatory before any outbound action, each 
+external communication is attributable to a named coordinator and timestamped in the trail. 
+•  Data-handling note: the audit log (agent_runs) contains vendor names and scorecard 
+comments. Because agent_runs stores this content, residency and retention for it are 
+confirmed under the LLM DPA and Shell's retention policy, and Legal/Privacy sign-off on 
+this data handling is a go-live precondition (see Dependencies and Risks). Until that sign-off 
+===== PAGE 9 =====
+is obtained, auditability of agent_runs against Shell's retention/residency policy is asserted by 
+design rather than validated. 
+Audit store Captures 
+agent_runs Each AI invocation — agent, inputs, generated text 
+output, model/provider, token usage. Contains vendor 
+names and scorecard comments; residency/retention 
+governed by the LLM DPA + Shell retention policy, 
+pending Legal/Privacy go-live sign-off. 
+external_calls Each outbound integration call — Microsoft Graph and 
+LLM endpoints — with correlation ID and outcome. 
+security_events Authentication, authorisation and access-control events 
+for security review. 
+ 
+Operations 
+•  Hosting: Azure App Service (Linux containers) behind Azure Front Door + WAF, within 
+Shell's Azure subscription. 
+•  Persistence: Azure Database for PostgreSQL Flexible Server (zone-redundant / HA in 
+production) replaces the POC's flat JSON files; schema managed via Alembic migrations. 
+•  Observability: Application Insights and Log Analytics provide telemetry, with correlation 
+IDs propagated across requests and external calls for end-to-end traceability. 
+•  Resilience: retry with backoff on Graph 429/5xx responses protects against throttling; rate 
+limiting and token-budget guards bound resource and LLM consumption. 
+•  Secrets management: all keys, certificates and connection strings are held in Azure Key 
+Vault and accessed via Managed Identity — no secrets in configuration files or source 
+control. 
+•  Quality and validation under a compressed timeline: the POC carries no automated test suite 
+(only ad-hoc Graph integration scripts), so this CR adds targeted automated coverage during 
+Week 2–3 and validates the platform-layer capabilities — audit append-only behaviour, 
+RBAC, app-only Graph auth and email rendering — through structured UAT with three 
+named VMO coordinators in Week 3 before cutover. 
+•  Operability and handover: a system-health view, audit-log viewer, LLM budget panel and a 
+runbook (v1.0) are delivered so Shell IT Ops can run the platform as BAU after handover. 
+3. Out of Scope 
+The first production release of VendorPulse is deliberately scoped to deliver the six governance 
+capabilities (Modules A–F) end-to-end as a Shell-owned, Shell-grade system within the four-
+week plan and a single pilot vendor cycle. To safeguard that timeline and outcome, the items 
+below are explicitly out of scope for this release. Their exclusion does not reflect a technical 
+constraint of the platform; each is a deliberate sequencing decision. Items are organised into (1) 
+core functional exclusions and (2) capabilities deferred to the warranty period or a subsequent 
+statement of work (SOW). 
+Core Functional Exclusions (First Release) 
+Excluded item Rationale 
+Shell-wide vendor-master / SAP Ariba / Coupa 
+integration 
+Integration to enterprise procurement masters is a 
+discovery- and security-heavy activity that cannot be 
+absorbed in the three development weeks. For the pilot, 
+===== PAGE 10 =====
+Excluded item Rationale 
+the vendor master is populated via CSV/Excel import; 
+system integration is a defined follow-on phase. 
+Contract-management feature Contract terms are referenced for context only; they are 
+not stored, versioned, or analysed within VendorPulse. A 
+contract repository introduces document-management and 
+retention obligations outside this release's intent. 
+Finance / spend / SAP integration No connection to SAP or spend systems is built. Spend 
+figures are referenced manually within scorecards, 
+keeping the pilot free of finance-system data flows and 
+their associated controls. 
+Mobile native application The release is web-only and optimised for the desktop 
+browser, matching the VMO coordinator working pattern. 
+A native iOS/Android app is not required for the pilot and 
+would dilute delivery focus. 
+Multi-language user interface The UI is English only at launch, consistent with the pilot 
+user group. Localisation/translation is deferred until a 
+multi-region rollout is confirmed. 
+ 
+Deferred to Warranty / Phase 2 
+The following are recognised as valuable but are intentionally deferred to the warranty period or 
+a subsequent SOW. Where appropriate, a reduced form is delivered at launch (noted below); the 
+full capability is a candidate for the warranty period or a subsequent statement of work. 
+Quality assurance & security 
+•  Performance / load testing at scale — functional verification and UAT are in scope; 
+sustained-load and scale testing are deferred to the warranty period or a subsequent SOW. 
+•  Third-party penetration test — a Shell internal security review and sign-off are performed at 
+launch; an independent third-party penetration test is deferred to the warranty period or a 
+subsequent SOW. 
+•  Formal accessibility audit — automated accessibility checks only at launch; a formal 
+manual WCAG audit is deferred to the warranty period or a subsequent SOW. 
+•  No automated regression suite exists in the POC baseline; a comprehensive automated test 
+suite is a Phase-2 investment, mitigated at launch by focused UAT and the four-week defect-
+warranty period. 
+Resilience & key management 
+•  Multi-vendor parallel onboarding — the pilot covers one vendor cycle; concurrent multi-
+vendor onboarding is deferred. 
+•  Cross-region disaster recovery and a DR drill — single-region production at launch; cross-
+region DR and a formal DR exercise are deferred. 
+•  Customer-managed keys (CMK) — at launch, encryption uses Azure platform-managed 
+keys via Key Vault (Shell's stated default); CMK is deferred and can be enabled in a later 
+phase on Shell request, consistent with the open key-management decision noted in the 
+Assumptions section. Enabling CMK is a configuration change rather than a re-architecture. 
+Access, devices & enablement 
+•  VPN / BYOD / mobile-device compatibility testing — not validated in this release (web-
+only, managed-desktop assumption). 
+•  Training beyond the three pilot VMO coordinators — only the three named coordinators 
+receive training and recorded handover at launch; wider rollout training is deferred. 
+===== PAGE 11 =====
+Future functional capabilities 
+•  Microsoft Teams transcript ingestion — Module E parses a pasted transcript at launch; 
+automated ingestion of native Teams transcripts is deferred. 
+•  Power Automate / external-workflow integration — no orchestration into external Shell 
+workflow tooling at launch. 
+•  Embedded in-app help / guided tooltips — covered by the runbook and coordinator training 
+at launch; in-app help is deferred. 
+•  AI-assisted contract analysis — explicitly excluded, consistent with contract management 
+being out of scope for the first release. 
+Any item above may be re-prioritised into a subsequent phase via the normal change-control 
+route. Requests to bring deferred items into the current four-week engagement would consume 
+the timeline buffer and would be handled through re-baselining rather than absorbed silently. 
+4. High Level Timeline 
+VendorPulse moves from proof-of-concept to a Shell-grade production system on a compressed 
+four-week (20 working-day) plan, executed inside Shell's Microsoft Azure and Microsoft 365 
+tenant. The plan is sprint-paced rather than phased: Weeks 1-3 are development, and Week 4 is 
+dedicated to security sign-off, production deployment and the start of defect-warranty support. It 
+is preceded by a Shell-led pre-mobilisation window and assumes Shell has completed all access 
+provisioning before Day 1; there is no Phase-0 buffer inside the engagement, so any provisioning 
+slippage translates directly into schedule risk. 
+Phase Duration Key Outcome 
+Pre-mobilisation Before Day 1 (during contract 
+negotiation; long-lead items ~4-6 
+weeks ahead) 
+All Shell-side prerequisites in place: 
+Entra app registrations + Graph 
+admin consent, service mailbox + 
+Exchange Application Access Policy, 
+Azure subscription / RGs / 
+PostgreSQL / Key Vault / App 
+Service / Front Door / App Insights, 
+LLM provider contract + key, DNS + 
+TLS, repo + CI/CD. 
+Week 1 (Days 1-5) - Development 5 working days Foundations, migration and design 
+alignment; Day-2 design checkpoint; 
+Module A end-to-end on real Graph; 
+design frozen by Friday. 
+Week 2 (Days 6-10) - Development 5 working days Functional completion of all six 
+agents (A-F); Shell-branded UI; 
+admin and audit modules; hardening; 
+code freeze Friday. 
+Week 3 (Days 11-15) - Development 5 working days Hardening, stabilisation and UAT 
+with three named coordinators; 
+P1/P2/P3 defect triage and fixes; 
+observability and runbook. Exit with 
+a release candidate and UAT P1/P2 
+defects closed - no production go-live 
+this week. 
+Week 4 (Days 16-20) - Deployment 
+& Warranty 
+5 working days Shell IT Security review and sign-off; 
+CAB approval; production 
+cutover/go-live; pilot vendor cycle 
+kick-off; coordinator training and 
+===== PAGE 12 =====
+Phase Duration Key Outcome 
+handover; defect-warranty support 
+begins. 
+ 
+Pre-mobilisation (before Day 1) 
+Pre-mobilisation runs in parallel with contract negotiation and is owned by Shell. It is a hard 
+precondition for the Day-1 start. Two items are long poles and must be initiated approximately 
+four to six weeks ahead: Entra ID admin consent on Graph application permissions (typically a 
+2-4 week security review) and the LLM enterprise contract and DPA (typically 4-8 weeks). 
+During this window Shell provisions Entra app registrations and admin consent, the dedicated 
+service mailbox and its Exchange Application Access Policy, the Azure subscription, resource 
+groups, PostgreSQL Flexible Server, Key Vault, App Service, Front Door and App Insights, the 
+LLM provider contract and key, DNS and TLS, and the source-control and CI/CD platform with 
+Zensar engineers onboarded. 
+Week 1 (Days 1-5) - Foundations, Migration & Design Alignment (Development) 
+Week 1 re-engineers the integration and platform layer beneath the accepted POC functional 
+baseline, and locks the design. By Friday, Module A runs end-to-end on real Microsoft Graph 
+and the design is frozen. 
+•  Branch and scrub POC secrets from Git history; rotate all secrets. 
+•  Migrate flat JSON persistence to Azure PostgreSQL (asyncpg, Alembic, ~15 tables). 
+•  Wire Azure Key Vault with Managed Identity for secret retrieval. 
+•  Remove all Google / Gmail / Google-Forms code entirely. 
+•  Implement Entra ID OIDC Single Sign-On and role-based access control (VMO 
+coordinator, VMO admin, executive sponsor, viewer). 
+•  Refactor GraphService to app-only certificate authentication (MSAL client-credentials, 
+/users/{id} endpoints, retry/backoff on 429/5xx). 
+•  Day-2 Design Alignment Checkpoint: lock ~12 decisions including the scorecard 
+mechanism, scorecard taxonomy, brief/minutes output formats, vendor master source and 
+approval routing. 
+•  Module A (Scheduling & Coordination) delivered end-to-end on real Graph by Friday. 
+•  GATE - Design freeze at end of Week 1: later changes route to the defect or Phase-2 path. 
+Week 2 (Days 6-10) - Functional Completion (Development) 
+Week 2 completes functional delivery across all six capabilities, applies Shell branding and the 
+admin/audit tooling, and hardens the platform. The week closes with a code freeze. 
+•  All six agents (A-F) working end-to-end. 
+•  Scorecard collection operating in the chosen mode (native in-app form recommended), 
+persisted in PostgreSQL. 
+•  Shell-branded UI applied. 
+•  Outlook-friendly HTML email templates (table-based layout, inline styles, plain-text 
+fallback). 
+•  Admin module: vendor master, user-role view, LLM budget panel, audit-log viewer, system 
+health. 
+•  Hardening: rate limiting, token-budget guards, correlation IDs. 
+===== PAGE 13 =====
+•  GATE - Code freeze on Friday (Day 10). 
+Week 3 (Days 11-15) - Hardening, Stabilisation & UAT (Development) 
+Week 3 stabilises the release and runs user acceptance testing with the named VMO 
+coordinators. Code remains frozen (defect fixes only). There is no production go-live this week; 
+the week exits with a tested release candidate ready for the Week-4 deployment. 
+•  UAT with three named VMO coordinators. 
+•  Defect triage across P1/P2/P3, with P1 defects resolved same-day; daily defect burn-down. 
+•  Regression and smoke testing of deterministic logic (slot ranking, validation, workflow 
+transitions). 
+•  Observability, alerting and the operational runbook completed. 
+•  GATE - UAT sign-off at end of Week 3: all P1/P2 UAT defects closed; release candidate 
+approved for deployment. 
+Week 4 (Days 16-20) - Security Sign-off, Deployment & Defect-Warranty Support 
+Week 4 takes the approved release candidate into production under change control and begins 
+warranty support. Shell IT Security signs off, the Change Advisory Board approves the cutover, 
+the system goes live, the pilot vendor cycle starts, coordinators are trained and the engagement is 
+handed over to Shell IT Operations. Defect-warranty support begins immediately after go-live. 
+•  Shell IT Security review and sign-off on Graph permission scopes, Application Access 
+Policy, RBAC, audit posture (early Week 4). 
+•  CAB (Change Advisory Board) approval of the production change. 
+•  Production cutover / go-live: DNS change, deployment slot-swap, 60-minute observation 
+window. 
+•  Pilot vendor cycle kick-off in production, pair-shadowed by the Zensar Tech Lead. 
+•  Coordinator training (recorded) and handover: runbook v1.0, documentation and the design 
+decision log committed to Shell's repository. 
+•  Defect-warranty support begins: Zensar fixes P1/P2 defects (P1 same-day where feasible) 
+while Shell IT Ops runs business-as-usual; the warranty period and its end dates are agreed at 
+handover. 
+Quality Gates 
+Gate Timing Purpose 
+Day-2 Design Alignment Checkpoint Week 1, Day 2 Lock ~12 design decisions (scorecard 
+mechanism, taxonomy, output 
+formats, vendor master source, 
+approval routing). 
+Design freeze End of Week 1 (Day 5) Freeze scope; later changes go to 
+defect or Phase-2 path. 
+Code freeze End of Week 2 (Day 10) No further feature development; 
+stabilisation only. 
+UAT sign-off End of Week 3 (Day 15) UAT complete with all P1/P2 defects 
+closed; release candidate approved 
+for deployment. 
+Security sign-off Week 4 Shell IT Security approval prior to 
+cutover. 
+CAB approval + production cutover Week 4 Change Advisory Board approval; 
+DNS/slot-swap cutover with 60-min 
+observation; pilot cycle kick-off. 
+ 
+===== PAGE 14 =====
+Team Composition 
+The Zensar delivery team is 100% allocated with no planned leave through the three 
+development weeks (Weeks 1-3), with deployment and defect-warranty support delivered in 
+Week 4, reflecting the compressed schedule. 
+Role Count 
+Delivery Manager 1 
+Solution Architect 1 
+Tech Lead 1 
+Backend Engineers 2 
+Frontend Engineers 2 
+QA Engineer 1 
+DevOps / Cloud Engineer 1 
+ 
+Shell provides supporting roles across the engagement: Executive Sponsor (~2h/week), Product 
+Owner / VMO lead (daily), IT Architecture and IT Security liaisons, Entra ID admin, 
+Exchange/Messaging admin, Azure Cloud admin, DBA, Networking, Procurement, 
+Legal/Privacy, three named VMO coordinators for UAT, and Brand/Comms. 
+5. Assumptions 
+This Change Request and its compressed four-week (20 working-day) delivery plan rest on the 
+assumptions set out below. The plan is sprint-paced rather than phased and contains no Phase-0 
+mobilisation buffer; accordingly, each assumption is stated together with why it matters and the 
+consequence if it does not hold. Where an assumption fails, the most likely outcomes are 
+schedule slippage, a reduction in pilot scope, or a re-baselining of the plan. 
+Access and Pre-Mobilisation 
+Assumption Why it matters / impact if not held 
+Shell completes ALL pre-mobilisation access 
+provisioning before Day 1 — Entra ID app registrations 
+(NonProd + Prod) with certificate credentials and admin 
+consent on the required Graph application permissions; 
+the dedicated service mailbox (e.g. vendorpulse-
+svc@shell.com) with its Exchange Application Access 
+Policy; the Azure subscription, resource groups, 
+PostgreSQL Flexible Server, Key Vault, App Service, 
+Front Door/WAF and App Insights; the LLM provider 
+contract and key; DNS and public TLS; and the repository 
+with CI/CD. 
+The plan assumes Day 1 begins with a fully provisioned 
+landing zone. There is no Phase-0 buffer to absorb 
+provisioning. If access is incomplete, Week 1 foundation 
+and migration work cannot start on schedule, Module A 
+cannot reach real Graph by the Friday milestone, and the 
+four-week timeline slips day-for-day. 
+Long-lead approvals are initiated 4-6 weeks ahead of Day 
+1, in parallel with contract negotiation — specifically 
+Entra application admin consent (2-4 week security 
+review, the critical long pole) and the LLM enterprise 
+contract with DPA (4-8 weeks). 
+These items have external review cycles that cannot be 
+compressed inside the delivery window. If they are not 
+started early, admin consent or the signed DPA arrives 
+mid-delivery, blocking Graph-dependent modules (A, B, 
+E) and LLM features (C, D, E, F) respectively. 
+Shell IT Security accepts certificate-based credentials for 
+the app-only Graph service principal (rather than 
+mandating a client secret). This is the assumed 
+authentication model for the entire Graph integration. 
+App-only certificate auth via MSAL client-credentials is 
+load-bearing for all Graph-dependent modules (A, B, C, 
+E). The assumption is treated as 'yes'; if a client secret is 
+mandated instead, GraphService authentication is re-
+configured accordingly. This is a low-effort 
+reconfiguration but must be confirmed during pre-
+mobilisation so the Week-1 GraphService refactor 
+proceeds on the agreed model without rework. 
+===== PAGE 15 =====
+Assumption Why it matters / impact if not held 
+Zensar engineers are granted the network/VPN access and 
+device-compliance posture needed to reach Shell's Azure 
+tenant, repository and non-prod Graph from their laptops, 
+and are added as guests to the source-control/CI-CD 
+platform. 
+Without connectivity and repo access, engineers cannot 
+deploy, integrate or test against real services. Velocity 
+assumed in the plan is unachievable and the schedule 
+slips. 
+ 
+Team and Capacity 
+Assumption Why it matters / impact if not held 
+The Zensar team — 1 Delivery Manager, 1 Solution 
+Architect, 1 Tech Lead, 2 Backend, 2 Frontend, 1 QA, 1 
+DevOps/Cloud — is 100% allocated to this CR with no 
+planned leave through the three development weeks 
+(Weeks 1-3), with deployment and warranty support in 
+Week 4. 
+The plan is staffed to capacity with no slack. Any 
+unplanned absence removes a critical skill for that 
+workstream and is difficult to recover within the window; 
+sustained absence forces re-prioritisation or re-baseline. 
+AI-assisted (pair-programming) delivery tooling — 
+developer laptops with admin rights and a full local 
+environment, an approved IDE (VS Code or JetBrains), 
+and Claude Code / Claude for Work licences plus an 
+Anthropic API developer key — is available to every 
+engineer from Day 1. 
+The compressed schedule depends on AI-assisted 
+development velocity. If laptops, IDE approval or Claude 
+Code licences are not in place, that velocity is lost and the 
+four-week plan slips. 
+Named Shell-side roles (Executive Sponsor, Product 
+Owner/VMO lead, IT Architecture and Security liaisons, 
+Entra/Exchange/Azure admins, DBA, Networking, 
+Procurement, Legal/Privacy, Brand/Comms) are available 
+at the cadence stated in the plan. 
+Several activities (admin consent, Application Access 
+Policy, security sign-off, branding) require timely Shell-
+side action. Unavailability of any single role can stall a 
+dependency on its critical path. 
+ 
+Scope and Pilot Shape 
+Assumption Why it matters / impact if not held 
+The pilot covers ONE vendor governance cycle. Shell pre-
+agrees a single pilot vendor AND provides the 
+corresponding vendor-master data (CSV/Excel for the 
+pilot) in time for the Week-4 pilot-cycle kick-off. 
+Multi-vendor parallel onboarding is out of scope for this 
+release, so a wider pilot would expand UAT, data and 
+coordination effort beyond what the four-week plan can 
+absorb. Separately, the cutover-day pilot cycle cannot start 
+without the agreed vendor and its master data: late or 
+incomplete vendor data delays the Week-4 pilot kick-off 
+and the Week-4 handover, even if the platform itself is 
+live. 
+The existing POC functional behaviour across the six 
+modules (A-F) is accepted as the baseline; only the 
+integration and platform layer is re-engineered. 
+Effort is sized for re-platforming, not for reworking 
+functional logic or the 12-state workflow, the human-
+approval gate, or the deterministic-first business rules. 
+New or changed functional requirements are out of scope 
+and would require re-estimation. 
+The solution is English-only, web-only (desktop browser) 
+and single-tenant (Shell only) at launch. 
+Multi-language UI, mobile/native clients and multi-
+tenancy are out of scope. Introducing any of these 
+expands UI, testing and architecture effort beyond the 
+plan. 
+All meeting attendees are within, or invitable from, Shell's 
+Microsoft 365 tenant, and the service mailbox is permitted 
+to invite external (guest) vendor attendees via Graph. 
+Modules A and E rely on Graph against real Shell 
+mailboxes and Teams meetings. If external-attendee 
+policy blocks vendor invitations, the scheduling and 
+meeting workflows cannot complete end-to-end for the 
+pilot vendor. 
+ 
+Technology and Design Decisions 
+===== PAGE 16 =====
+Assumption Why it matters / impact if not held 
+The LLM provider is chosen and contracted before Day 1 
+(recommended: Anthropic Claude API with enterprise 
+zero-retention / no-training / EU-residency DPA; Azure 
+OpenAI a viable alternative). Both sit behind a single 
+LLMProvider abstraction so switching is config-only. 
+LLM features (C, D, E, F) depend on a contracted 
+endpoint and key in Key Vault. A late decision or 
+unsigned DPA blocks AI text generation and risks data-
+residency non-compliance; the abstraction limits, but does 
+not remove, the impact of a late switch. 
+At launch the system uses Azure platform-managed keys 
+via Key Vault for encryption at rest. Customer-managed 
+keys (CMK) are deferred (Out of Scope for this release) 
+but can be enabled later if Shell requires. The CMK 
+yes/no decision is confirmed in pre-mobilisation, with the 
+working assumption being platform-managed keys for the 
+pilot. 
+This resolves the encryption-key model up front and 
+keeps it consistent with the Out of Scope position. 
+Adopting CMK at launch would add key-management 
+configuration (Key Vault keys, Postgres and storage CMK 
+wiring, key rotation) and additional security review to the 
+Week-1 platform build; deferring it keeps the four-week 
+plan intact while preserving an easy upgrade path. 
+All pre-Day-1 decisions are locked before mobilisation — 
+LLM provider, hosting region, service-mailbox name and 
+email from-identity/display name, database choice, CI/CD 
+platform, vendor-master format (CSV/Excel for the pilot), 
+CMK yes/no, and external-attendee policy — so that the 
+Day-2 design checkpoint only confirms the remaining 
+design-level items (scorecard mechanism and taxonomy, 
+brief/minutes output formats, vendor-master source, 
+approval routing) within its buffer. 
+The Day-2 checkpoint locks roughly a dozen decisions on 
+a fixed timebox. That buffer is sized to confirm design-
+level items only; it assumes the platform-level decisions 
+above are already settled. If those decisions are still open 
+at Day 2, the checkpoint is overloaded, its buffer is 
+exhausted, the Week-1 design freeze is at risk, and a re-
+baseline may follow. 
+The scorecard taxonomy (4 categories / 16 parameters: 
+Risk & Compliance, Performance, Commercial, 
+Relationship) is validated and locked at the Day-2 design 
+checkpoint, and the scorecard mechanism (recommended: 
+native in-app form) is confirmed. 
+Module B build and the Postgres schema depend on a 
+fixed taxonomy and collection mechanism. If these are not 
+locked at Day 2, downstream build and migration are 
+blocked and the Week-1 design freeze is at risk. 
+ 
+Delivery Governance 
+Assumption Why it matters / impact if not held 
+Shell names 3 VMO coordinators for UAT and makes 
+them available in Weeks 3-4. 
+UAT in Week 3 and coordinator training in Week 4 
+depend on these named users. Their unavailability delays 
+defect discovery, sign-off and the Week-4 handover. 
+Design is frozen at the end of Week 1; changes raised 
+after the freeze follow the defect path or are deferred to 
+Phase 2, and code freeze holds at the end of Week 2. 
+The Week-2 functional completion and Week-3 hardening 
+windows assume a stable design and frozen code. Post-
+freeze scope changes consume hardening/UAT time, 
+threatening the Week-4 CAB approval and production 
+cutover. 
+ 
+6. Dependencies 
+The four-week delivery is sprint-paced and carries no Phase-0 buffer. It is therefore contingent 
+on Shell completing the prerequisites below ahead of Day 1 - but with an important nuance the 
+client should plan against: not every dependency is a Day-1 gate. A defined subset are hard 
+go/no-go blockers that must be complete by Monday of Week 1; a smaller set may legitimately 
+remain in progress on Day 1 and are required only by a later, dated milestone (these align with 
+the plan's own Week 4 production-readiness and Week 4 cutover items). The two long-lead items 
+- Microsoft Graph application-permission admin consent (a two-to-four-week security review) 
+and the LLM enterprise contract/DPA (four-to-eight weeks) - must be initiated approximately 
+four to six weeks ahead of mobilisation, during contract negotiation. Each group below lists the 
+item, the accountable owner, a typical lead time, an indicative cost where relevant, and what the 
+delivery cannot start or complete without it. Indicative monthly run cost (consistent with the 
+costed dependencies document already shared with Shell): approximately $450-$650/month for 
+===== PAGE 17 =====
+production Azure, $80-$120/month for non-prod, and a nominal ~$1,000/month LLM token 
+budget. 
+Checklist - What Blocks Day 1 vs. What Is Needed Later 
+Asserting that everything must be in place before Day 1 overstates the bar and contradicts the 
+plan's own Week-4 security and cutover items. The following two-list checklist tells Shell 
+precisely which items are go/no-go on Monday of Week 1 and which may be in progress 
+provided they land by the date shown. 
+Hard Day-1 blockers (must be complete by Monday of Week 1) 
+•  Both Entra app registrations (NonProd + Prod) with certificate credentials in place (I1/I2). 
+•  OIDC client + redirect URIs configured for SSO. 
+•  Entra security groups for the four app roles (VMO coordinator, VMO admin, executive 
+sponsor, viewer). 
+•  Service mailbox provisioned + Exchange Application Access Policy applied. 
+•  Azure subscription + resource groups (nonprod + prod) with deploy access for Zensar. 
+•  Azure Key Vault provisioned. 
+•  Azure Database for PostgreSQL Flexible Server provisioned (target for the Week-1 JSON 
+migration). 
+•  App Service plan (P1v3 prod / B2 nonprod) available. 
+•  LLM provider chosen and procurement initiated (contract/DPA in flight). 
+•  CI/CD repository created with Zensar engineers onboarded as guests and branch protection 
+set. 
+•  Product Owner / VMO lead and IT Architecture liaison named and available. 
+•  Zensar network/VPN/device-compliance posture in place so engineers can reach the tenant, 
+repo and non-prod Graph (hidden long pole - confirm early). 
+May be in progress on Day 1, but required by the date shown 
+•  Graph application-permission admin consent - required for Module A end-to-end on real 
+Graph by the end of Week 1 (Friday, Day 5). Consent in progress on Day 1 is acceptable 
+provided it clears within the week; non-prod development can proceed against mocks/dev 
+scopes meanwhile. 
+•  Conditional Access exemption (or confirmed sign-in path) for the service principal - non-
+prod can bypass via a confirmed sign-in path; required for production by the Week-4 
+security/production-readiness gate. 
+•  Production DNS hostname + public TLS certificate - required for the Week-4 DNS/TLS 
+cutover, not for Day-1 development. 
+•  Vendor-master import (CSV/Excel for the pilot) - required by the Week-4 pilot vendor 
+cycle kick-off. 
+•  Brand / Comms sign-off on Shell-branded email templates - required by Day 8 (Week-2 
+functional completion), since templates are built and rendered that week. 
+1. Shell Identity (Entra ID) 
+Item Owner Lead time Indicative cost Blocks 
+Two app registrations 
+(NonProd + Prod) with 
+certificate-based credentials per 
+Shell Entra ID admin 2-3 days No incremental 
+cost 
+App-only Graph auth; 
+all 
+email/calendar/Teams; 
+===== PAGE 18 =====
+Item Owner Lead time Indicative cost Blocks 
+app. Certificate generated by 
+Shell (preferred) or generated 
+by Zensar and uploaded with 
+the thumbprint returned to 
+Shell; 12-month rotation 
+governed by an Azure 
+Automation auto-renewal 
+pipeline; the certificate is stored 
+as a Key Vault certificate object 
+(not as a plain secret). 
+SSO. HARD Day-1 
+blocker - nothing 
+integration-related can 
+start. Cert lifecycle is a 
+standard security-review 
+question, hence the 
+explicit ownership and 
+rotation commitment. 
+Admin consent on Graph 
+application permissions: 
+Mail.Send, 
+Calendars.ReadWrite, 
+OnlineMeetings.ReadWrite.All, 
+User.Read.All, 
+MailboxSettings.Read, 
+Group.Read.All - LONG 
+POLE. With the recommended 
+native in-app scorecard form, 
+Mail.Read / Mail.ReadWrite 
+are NOT required: the email-
+reply scorecard path and its 
+additional read scopes are 
+avoided, narrowing the 
+consented set to 
+send/calendar/meeting/directory 
+only - a deliberate reduction of 
+the consent surface that 
+strengthens the security case. 
+Shell IT Security + 
+Entra admin 
+2-4 weeks 
+(security 
+review) 
+No incremental 
+cost 
+Modules A & B end-to-
+end on real Graph; 
+directory roster refresh; 
+sending 
+invites/requests/minutes. 
+The single largest 
+schedule risk. May be in 
+progress on Day 1; must 
+clear by end of Week 1. 
+OIDC client + redirect URIs for 
+SSO (per environment) 
+Shell Entra admin 1-2 days No incremental 
+cost 
+Entra ID Single Sign-
+On; any authenticated 
+UI access. HARD Day-
+1 blocker. 
+Entra security groups for the 
+four app roles (VMO 
+coordinator, VMO admin, 
+executive sponsor, viewer) 
+Shell Entra admin 1-2 days No incremental 
+cost 
+RBAC enforcement; 
+role-gated UI and 
+approval routing. 
+HARD Day-1 blocker. 
+Exchange Application Access 
+Policy scoping Mail.Send / 
+Calendars to the single service 
+mailbox 
+Shell 
+Exchange/Messaging 
+admin 
+2-3 days No incremental 
+cost 
+Least-privilege 
+constraint on app-only 
+access; security sign-off. 
+HARD Day-1 blocker - 
+without it the consent is 
+tenant-wide and likely 
+refused. 
+Conditional Access exemption 
+(or confirmed sign-in path) for 
+the service principal 
+Shell IT Security 2-5 days No incremental 
+cost 
+Service-principal Graph 
+calls succeeding; 
+otherwise CA silently 
+blocks outbound 
+mail/calendar. Non-prod 
+can bypass; required for 
+PROD in Week 4. 
+ 
+2. Microsoft 365 Messaging & Calendar 
+===== PAGE 19 =====
+Item Owner Lead time Indicative cost Blocks 
+Dedicated service 
+mailbox (e.g. 
+vendorpulse-
+svc@shell.com) with 
+an M365 E3/E5 
+licence 
+Shell Exchange 
+admin 
+2-5 days ~$23/user/month 
+(E3) or 
+~$57/user/month 
+(E5) 
+From-identity for all 
+outbound Graph mail; 
+calendar host for 
+Teams meetings. 
+HARD Day-1 
+blocker. 
+Mailbox storage 
+allocation + retention 
+policy: ~10 GB 
+allocated to hold 
+cycle history and 
+replies; retention 
+policy auto-archiving 
+sent items after ~1 
+year for compliance 
+Shell Exchange 
+admin / Compliance 
+2-3 days Included in licence Mailbox not 
+throttled/full over 
+multiple cycles; 
+audit-trail and 
+retention compliance. 
+The concrete 10 GB / 
+1-year targets give 
+the Exchange admin 
+a value to provision 
+against. 
+Teams meeting 
+policy permitting the 
+service mailbox to 
+create online 
+meetings via Graph 
+Shell 
+Teams/Exchange 
+admin 
+2-5 days Included in licence Module A and 
+Module C meeting 
+creation; 
+OnlineMeetings 
+provisioning. 
+External/guest 
+meeting-policy 
+confirmation (can the 
+mailbox invite 
+vendor external 
+attendees?) 
+Shell Teams/IT 
+Security 
+3-5 days No incremental cost Inviting vendor 
+(external) attendees 
+to the EGB/QBR; if 
+blocked, Module A 
+cannot include 
+vendors. 
+Litmus / Email-on-
+Acid account for 
+cross-client email-
+render QA 
+Shell or Zensar 
+(procured) 
+1-3 days ~$99/month Verified Outlook 
+desktop/OWA/mobile 
+rendering; acceptance 
+criterion on email 
+render. Needed to 
+validate brand-signed 
+templates (Day 8). 
+ 
+3. Azure Infrastructure 
+Indicative platform run cost: approximately $450-$650/month for production and $80-
+$120/month for non-prod (excluding the LLM token budget, listed in Group 4). 
+Item Owner Lead time Indicative cost Blocks 
+Azure subscription 
+with deploy access 
+for Zensar engineers 
+Shell Azure Cloud 
+admin 
+2-5 days Consumption-based All deployment, IaC, 
+CI/CD. HARD Day-
+1 blocker - no 
+environment can be 
+stood up. 
+Resource groups 
+(nonprod + prod) 
+Shell Azure Cloud 
+admin 
+1 day No incremental cost Environment 
+isolation; all resource 
+provisioning. HARD 
+Day-1 blocker. 
+App Service Plan - 
+P1v3 (prod) and B2 
+(nonprod), Linux 
+containers 
+Shell Azure Cloud 
+admin 
+1-2 days ~$220/month (P1v3 
+prod); B2 nonprod 
+modest 
+Application hosting. 
+HARD Day-1 
+blocker. 
+Azure Database for 
+PostgreSQL Flexible 
+Shell Azure Cloud 
+admin + DBA 
+2-5 days Included in prod 
+estimate 
+JSON-to-Postgres 
+migration (Week 1); 
+all persistence. 
+===== PAGE 20 =====
+Item Owner Lead time Indicative cost Blocks 
+Server (HA/zone-
+redundant for prod) 
+HARD Day-1 
+blocker. 
+Azure Key Vault Shell Azure Cloud 
+admin 
+1-2 days Negligible Secret storage; 
+Managed Identity 
+secret retrieval; 
+certificate object; 
+secret-scrub 
+remediation. HARD 
+Day-1 blocker. 
+Azure Front Door + 
+WAF policy 
+Shell Azure Cloud 
+admin / Networking 
+2-4 days Included in prod 
+estimate 
+Public ingress, edge 
+protection, TLS 
+termination, cutover 
+slot-swap. 
+App Insights + Log 
+Analytics workspace 
+Shell Azure Cloud 
+admin 
+1-2 days Ingestion-based 
+(modest) 
+Observability, alerts, 
+immutable audit trail; 
+Week-3 observability 
+gate. 
+Azure DNS / 
+CNAME + public 
+TLS certificate 
+Shell Networking / 
+Azure admin 
+2-5 days (cert 
+issuance can vary) 
+Negligible / cert cost Public hostname; the 
+Week-4 DNS/TLS 
+cutover. Required in 
+Week 4, not Day 1. 
+Private endpoints + 
+VNet integration 
+Shell Networking 3-7 days Modest Private connectivity 
+to Postgres/Key 
+Vault; security 
+posture. 
+Managed Identity 
+role assignments 
+(Key Vault Secrets 
+User, Postgres 
+grants, Log 
+Analytics) 
+Shell Azure Cloud 
+admin 
+1-2 days No incremental cost Secret-less runtime 
+auth; app start-up. 
+Outbound NAT / 
+egress allow-listing 
+to Microsoft Graph + 
+the LLM endpoints 
+Shell Networking / 
+IT Security 
+3-7 days No incremental cost All Graph calls and 
+all LLM calls from 
+within the VNet. 
+Azure Policy / 
+tagging compliance 
+Shell Azure Cloud 
+admin 
+1-2 days No incremental cost Deployments passing 
+governance; 
+otherwise resources 
+are rejected/flagged. 
+ 
+4. LLM Provider (select one) 
+Item Owner Lead time Indicative cost Blocks 
+Anthropic enterprise 
+account + enterprise 
+DPA (zero-retention, 
+no-training, EU 
+residency) + API key 
+in Key Vault + 
+monthly token 
+budget 
+(RECOMMENDED) 
+Shell Procurement + 
+Legal/Privacy 
+4-8 weeks 
+(contract/DPA) - 
+LONG POLE 
+Nominal 
+~$1,000/month token 
+budget 
+All LLM-generated 
+text (briefs, minutes, 
+summaries, draft 
+email bodies) in 
+Modules C, D, E, F. 
+Strong tool-calling 
+reliability for the 
+agentic pattern; the 
+LLM is abstracted, 
+so the choice is 
+reversible via 
+configuration. 
+Provider choice + 
+===== PAGE 21 =====
+Item Owner Lead time Indicative cost Blocks 
+procurement must be 
+initiated by Day 1. 
+OR Azure OpenAI 
+quota approval + a 
+gpt-4o-class chat 
+deployment (NOT a 
+preview/computer-
+use deployment) + 
+key in Key Vault 
+Shell Azure Cloud 
+admin + Procurement 
+1-3 weeks (quota) Token-consumption 
+based 
+Same LLM features 
+via the alternative 
+provider behind the 
+single LLMProvider 
+abstraction (switch is 
+config-only). 
+ 
+Both options sit behind one LLMProvider abstraction, so the choice is a configuration matter and 
+not a code change. The decision and contract must, however, be settled before Day 1 because the 
+warranty and token-budget guards are configured against the selected provider. 
+5. Zensar-side Delivery Tooling 
+The compressed schedule is predicated on an AI-assisted (pair-programming) delivery method. 
+The tooling below is not optional convenience - it is the productivity assumption underpinning 
+the 20-day plan. If any of the development environment, IDE approval, or Claude Code / 
+Anthropic key items are withheld, AI-assisted velocity is lost and the four-week plan slips. The 
+network/VPN/device-compliance posture is a frequently underestimated long pole and should be 
+confirmed as a hard Day-1 blocker. 
+Item Owner Lead time Indicative cost Blocks 
+Developer laptops for 
+every engineer with full 
+local dev environment 
+(Python 3.11+, Node.js, 
+Docker Desktop, Git) and 
+admin rights 
+Zensar (with Shell 
+device-policy 
+alignment) 
+Before Day 1 Zensar-borne All local 
+development and 
+build. HARD Day-1 
+blocker - without 
+admin rights, 
+Docker/dependency 
+setup is blocked. 
+Approved IDE - VS Code 
+(or JetBrains) with 
+required extensions 
+Zensar / Shell IT 
+approval 
+Before Day 1 Free (VS Code) / 
+licence (JetBrains) 
+Engineer 
+productivity; if not 
+approved, developers 
+cannot use the 
+standard toolchain. 
+HARD Day-1 
+blocker. 
+Claude Code / Claude for 
+Work licences AND an 
+Anthropic API developer 
+key for AI-assisted 
+development 
+Zensar Procurement 
+/ Anthropic 
+Before Day 1 (1-2 
+weeks if new) 
+Claude for Work 
+per-seat + 
+Anthropic dev-key 
+consumption 
+The AI-assisted pair-
+programming the 
+four-week schedule 
+depends on. If 
+absent, delivery 
+velocity is lost and 
+the plan slips. 
+HARD Day-1 
+blocker. 
+Access to source-control 
++ CI/CD platform (Azure 
+DevOps or GitHub 
+Enterprise): engineers 
+added as guests, repo 
+created, branch 
+protection, CI/CD service 
+principal 
+Shell IT / DevOps 3-7 days (guest 
+onboarding can be 
+slow) 
+Per platform licence Day-1 branch & 
+secret-scrub; all 
+commits, pipelines 
+and deployments. 
+HARD Day-1 
+blocker. 
+===== PAGE 22 =====
+Item Owner Lead time Indicative cost Blocks 
+Azure Container Registry Shell Azure Cloud 
+admin 
+1-2 days Negligible Container image 
+build/push; App 
+Service deployment. 
+Static analysis 
+(SonarQube/SonarCloud), 
+secret scanning 
+(TruffleHog/GitLeaks), 
+container scanning 
+(Trivy/Snyk), 
+Dependabot/Renovate 
+Zensar / Shell 
+DevOps 
+2-5 days Per-tool licence 
+(some free tiers) 
+Quality and security 
+gates in CI; secret-
+scrub verification; 
+security sign-off. 
+Litmus / Email-on-Acid 
+(cross-client email QA) 
+Zensar / Shell 1-3 days ~$99/month Outlook render 
+acceptance for email 
+templates. 
+Optional Playwright 
+cloud / BrowserStack 
+Zensar 1-3 days Subscription 
+(optional) 
+Broader UI/cross-
+browser checks 
+(best-effort under 
+timeline). 
+Network access / VPN / 
+device-compliance 
+posture allowing Zensar 
+engineers to reach Shell's 
+Azure tenant, repo and 
+(non-prod) Graph from 
+their laptops 
+Shell IT Security / 
+Networking 
+5-10 days (hidden 
+long pole) 
+No incremental cost Day-1 connectivity 
+to tenant, repo and 
+Graph. HARD Day-1 
+blocker - if 
+unresolved, 
+engineers cannot 
+work against Shell 
+environments at all. 
+ 
+6. People & Commercial (and Pre-Day-1 Decisions) 
+Item Owner Lead time Blocks 
+Executive Sponsor 
+(~2h/week) 
+Shell Named before Day 1 Escalation, CAB 
+sponsorship, sign-offs. 
+Product Owner / VMO lead 
+(daily availability) 
+Shell Named before Day 1 Daily decisions, backlog 
+priority, Day-2 design 
+checkpoint, UAT 
+acceptance. HARD Day-1 
+blocker (named). 
+IT Architecture liaison Shell Named before Day 1 Architecture alignment; 
+design-freeze sign-off. 
+HARD Day-1 blocker 
+(named). 
+IT Security liaison Shell Named before Day 1 Admin consent, 
+Conditional Access, Week-
+4 security sign-off. 
+Entra ID admin Shell Named before Day 1 All identity items in Group 
+1. 
+Exchange / Messaging 
+admin 
+Shell Named before Day 1 Service mailbox, 
+Application Access Policy, 
+Teams meeting policy. 
+Azure Cloud admin Shell Named before Day 1 All infrastructure in Group 
+3. 
+DBA Shell Named before Day 1 Postgres provisioning, 
+grants, HA configuration. 
+Networking Shell Named before Day 1 Front Door/WAF, 
+DNS/TLS, private 
+endpoints, egress allow-
+listing. 
+===== PAGE 23 =====
+Item Owner Lead time Blocks 
+Procurement Shell Named before Day 1 LLM enterprise contract; 
+tooling licences. 
+Legal / Privacy Shell Named before Day 1 DPAs, data residency, 
+PII/audit-retention sign-off 
+(the agent_runs audit log 
+holds vendor names + 
+scorecard comments). 
+3 named VMO 
+coordinators (for UAT) 
+Shell Named before Day 1; 
+active in Weeks 3-4 
+Week-3 UAT, with training 
+and handover in Week 4; 
+pilot acceptance. 
+Brand / Comms Shell Named before Day 1; sign-
+off by Day 8 
+Shell branding assets for 
+the UI and email templates; 
+template sign-off required 
+by Day 8. 
+ 
+Pre-Day-1 decisions that must be locked before mobilisation (the remainder are confirmed at the 
+Day-2 design checkpoint): 
+•  LLM provider (Anthropic Claude recommended, or Azure OpenAI). 
+•  Hosting region (for data-residency alignment). 
+•  Service mailbox name and email from-identity / display name. 
+•  Database choice (Azure PostgreSQL Flexible Server) and customer-managed keys (CMK) 
+yes/no. 
+•  CI/CD platform (Azure DevOps or GitHub Enterprise). 
+•  Scorecard taxonomy (4 categories / 16 parameters) - validated and locked at the Day-2 
+checkpoint. 
+•  Scorecard mechanism (native in-app form recommended; note this avoids the extra 
+Mail.Read / Mail.ReadWrite Graph scopes). 
+•  Vendor master format (CSV/Excel for the pilot; import required by the Week-4 pilot kick-
+off). 
+•  External-attendee meeting policy (can the service mailbox invite vendor externals?). 
+7. Risks 
+Risk Overview 
+The defining characteristic of this engagement is its compressed four-week (20 working-day) 
+sprint with no Phase-0 buffer. The plan is feasible only on the explicit assumption that Shell 
+completes all pre-mobilisation access provisioning - Entra app registrations and admin consent, 
+the service mailbox and Application Access Policy, the full Azure estate (including egress allow-
+listing and private endpoints), the LLM provider contract, DNS/TLS, and repository/CI-CD 
+guest access - before Day 1, and that the Zensar team is 100% allocated with no planned leave. 
+As a consequence, the principal risks to the engagement are not technical-build risks (the six 
+modules are an accepted POC baseline) but dependency-readiness and access risks: any 
+prerequisite that arrives late converts directly into lost delivery days, and on a 20-day plan there 
+is little slack to absorb slippage. 
+Risks are grouped below into five categories: (1) Zensar delivery-tooling and velocity risks; (2) 
+Microsoft identity, Graph and messaging risks; (3) Azure platform, networking and cutover 
+risks; (4) LLM provider and compliance risks; and (5) scope, schedule and quality risks. The 
+===== PAGE 24 =====
+consolidated risk register that follows scores each risk by likelihood and impact, states the agreed 
+mitigation, and names the accountable owner. A note on likelihood ratings: items that are wholly 
+within Zensar's control during pre-mobilisation (developer laptops, IDE approval, Claude Code / 
+Anthropic licences) are rated Low likelihood and are managed as pre-contract go/no-go gates 
+rather than open delivery risks; their impact remains High because, were a gate missed, the AI-
+accelerated plan could not start. 
+Risk Categories 
+1. Zensar delivery-tooling and AI-accelerated velocity 
+The four-week schedule is predicated on AI-assisted (pair-programming) development. If the 
+enabling tooling is not in place on Day 1, delivery velocity is lost and the plan slips immediately 
+- there is no recovery window. These risks are entirely controllable in pre-mobilisation and are 
+therefore treated as go/no-go gates before contract start, which is why they carry Low likelihood 
+despite a High impact. 
+•  Developer laptops: if every engineer is not equipped with a full local dev environment 
+(Python 3.11+, Node.js, Docker Desktop, Git) and admin rights, the team cannot build or run 
+the system from Day 1. Likelihood Low - Zensar-controlled and treated as a pre-contract 
+go/no-go gate. 
+•  IDE approval: if VS Code (or JetBrains) and required extensions are not Shell-approved, 
+engineers lack sanctioned tooling and lose time on workarounds. Likelihood Low - Zensar-
+controlled go/no-go gate. 
+•  Claude Code / Anthropic developer licences: if Claude for Work licences and an Anthropic 
+API developer key are not procured, the AI-assisted development that the compressed 
+schedule depends on is unavailable, and the four-week plan slips. Likelihood Low - Zensar-
+controlled go/no-go gate. 
+•  Network access / VPN / device compliance: if engineers cannot reach Shell's Azure tenant, 
+repo and non-prod Graph from their laptops, no integration work can proceed. 
+•  Source control + CI/CD guest onboarding: if engineers are not added as guests to Azure 
+DevOps / GitHub Enterprise with branch protection and a CI/CD service principal, code 
+cannot be merged or deployed. Guest onboarding is flagged as a 3-7 day item that can be 
+slow, and it blocks the Day-1 branch-and-scrub task as well as all subsequent deployments. 
+2. Microsoft identity, Graph and messaging 
+Modules A (Scheduling) and B (Scorecard), and the outbound actions in C and E, depend 
+entirely on Microsoft Graph app-only authentication from the service mailbox. The Entra admin-
+consent process is the single longest lead-time item (a 2-4 week security review) and is the 
+critical path for the whole engagement. Crucially, admin consent and the mailbox-scoping 
+Application Access Policy are not independent: Shell security is expected to require the 
+Application Access Policy as a precondition for granting tenant-wide app-only Mail.Send / 
+Calendars permissions, so the two must be treated as a single coupled security-review package. 
+•  Graph app-only admin consent (Mail.Send, Calendars.ReadWrite, 
+OnlineMeetings.ReadWrite.All, User.Read.All, MailboxSettings.Read, Group.Read.All) not 
+granted in time: Modules A and B cannot be delivered on real Graph. This is the long pole - it 
+must be started ~4-6 weeks ahead. 
+•  Application Access Policy not offered or not accepted, so tenant-wide app-only consent is 
+refused: if the mailbox-scoped policy is not proposed up front, security may reject the consent 
+===== PAGE 25 =====
+request as too broad, stalling or blocking Modules A & B. The policy and the consent request 
+must be submitted together as a least-privilege package. 
+•  Service mailbox / Application Access Policy not provisioned or mis-scoped: the dedicated 
+vendorpulse-svc mailbox cannot send mail or host Teams meetings (blocking Modules A, B, 
+C and E), or the consent is refused because the scope is too broad. Provision the mailbox with 
+an E3/E5 licence and apply the policy scoping Mail.Send / Calendars in pre-mobilisation. 
+•  Graph certificate not generated, uploaded or rotated in time (or a client-secret used against 
+Shell's stated preference for certificate credentials): app-only Graph auth cannot be 
+established, blocking all email/calendar/Teams traffic. Agree certificate ownership (Shell-
+generated preferred), thumbprint handover, Key Vault certificate storage and a 12-month 
+auto-renewal rotation in pre-mobilisation. 
+•  Graph API throttling (429 / 5xx): findMeetingTimes and mail-send calls intermittently fail; 
+mitigated by the retry/backoff already engineered into GraphService. 
+•  Conditional Access blocking the service principal: the service mailbox cannot authenticate, 
+blocking all outbound A & B actions; requires a CA exemption or a confirmed sign-in path 
+agreed with the Entra admin. 
+•  External / guest meeting policy blocking vendor invites: if the service mailbox cannot invite 
+external vendor attendees, Teams invites for the QBR cannot be issued. 
+3. Azure platform, networking and production cutover 
+•  No SQL schema yet and messy POC SQLite/JSON data: the current POC persists ~13 
+entities as flat JSON/SQLite; these migrate to ~15 PostgreSQL tables (asyncpg, Alembic). 
+The migration and data cleansing overrun Week 1 if data quality is poor; mitigated by scoping 
+cleansing up front, providing defaults for missing fields, and committing to additive-only 
+migrations after the Day-10 code freeze so the schema is effectively frozen. 
+•  Outbound egress / NAT allow-listing to Graph and the LLM endpoints not configured: a 3-
+7 day networking item flagged as a possible hidden long pole. If not in place, all Graph and 
+LLM calls fail from inside the VNet at runtime. Agree the egress allow-list (Graph plus the 
+Anthropic / Azure OpenAI endpoints) with Shell Networking in pre-mobilisation and validate 
+connectivity from non-prod in Week 1. 
+•  Private endpoints / VNet integration to PostgreSQL and Key Vault not in place: the 
+application cannot retrieve secrets via Managed Identity or reach the database at start-up. 
+Provision private endpoints, VNet integration and Managed Identity role assignments in pre-
+mobilisation and smoke-test secret retrieval and DB connectivity on Day 1. 
+•  DNS / TLS cutover failure in Week 4: the production cutover (DNS, slot-swap, 60-minute 
+observation) fails; mitigated by provisioning DNS+TLS in pre-mobilisation and a tested 
+rollback via slot-swap. 
+•  Azure estate incomplete (RGs, Postgres, Key Vault, App Service, Front Door + WAF, App 
+Insights, Managed Identity role assignments, egress allow-listing): foundation work in Week 
+1 cannot complete. 
+4. LLM provider and data compliance 
+•  LLM enterprise contract / DPA / EU-residency not signed: Modules C-F (which use the 
+LLM for briefs, minutes, summaries and draft email bodies) are blocked or non-compliant. 
+Procurement and Legal must start 4-8 weeks ahead. 
+•  Azure OpenAI quota / region approval not granted (if Azure OpenAI is chosen as the 
+provider): the fallback LLM provider is unavailable, eliminating the config-only switch that 
+===== PAGE 26 =====
+the LLMProvider abstraction is meant to deliver. The Microsoft quota request is a 2-4 week 
+process and must be submitted in the chosen region ahead of time, confirming a tool-calling-
+capable gpt-4o-class deployment in West Europe. 
+•  Azure OpenAI deployment misconfigured (a preview or non-chat / computer-use 
+deployment rather than a gpt-4o-class chat deployment): LLM tool-calling fails. 
+•  LLM token-spend overrun: monthly budget exceeded; mitigated by token-budget guards, 
+per-call caps and the admin budget panel. 
+•  PII / data-residency / audit-retention sign-off late: the agent_runs audit log contains vendor 
+names and scorecard comments, so Legal/Privacy sign-off on residency and retention is 
+required before go-live. 
+5. Scope, schedule and quality 
+•  Scorecard taxonomy not locked: Module B build churns; the 4-category / 16-parameter 
+taxonomy must be locked at the Day-2 design checkpoint. 
+•  Scorecard form-platform decision late: the Module B collection mechanism cannot be built; 
+the native in-app form is recommended and should be pre-agreed. 
+•  Day-2 design checkpoint produces too many in-scope changes: the buffer is exhausted and 
+the plan must be re-baselined; mitigated by strict change-control routing non-essentials to 
+Phase 2. 
+•  Post-freeze (Week 2 code-freeze) scope changes: quality and timeline at risk; design is 
+frozen at end of Week 1 and later changes follow the defect or Phase-2 path. 
+•  One major UAT defect pushing cutover past its Week-4 slot: go-live slips; mitigated by 
+same-day P1 triage and a daily defect burn-down. 
+•  Outlook email-rendering issues found late: emails render poorly across Outlook desktop / 
+OWA / mobile; mitigated by table-based inline-style HTML with plain-text fallback and 
+Litmus/Email-on-Acid QA in Week 2. 
+•  Zensar team-member unplanned absence: the no-PTO, 100%-allocation assumption means 
+a single absence is a capacity loss; mitigated by cross-skilling and Tech Lead / Solution 
+Architect cover. 
+•  Late IT-Security objection: a security concern raised near the Week-4 security sign-off can 
+block cutover; mitigated by engaging the Security liaison from Day 1. 
+•  No automated test suite exists today: regression risk under a compressed timeline; mitigated 
+by risk-based manual UAT with the 3 named coordinators and smoke tests on deterministic 
+logic. 
+Consolidated Risk Register 
+Likelihood and Impact are rated High / Medium / Low. Owner indicates the party primarily 
+accountable for the mitigation (Shell role or Zensar role). Zensar-controlled tooling gates 
+(laptops, IDE, AI-assist licences) are rated Low likelihood because they are managed as pre-
+contract go/no-go gates. 
+Risk Likelihood Impact Mitigation Owner 
+Developer laptops 
+not provided with 
+full local dev 
+environment + admin 
+rights 
+Low High Confirm 
+laptop/device 
+readiness as a 
+Zensar-controlled 
+pre-mobilisation 
+go/no-go gate; 
+Zensar Delivery Mgr 
+/ Shell IT 
+===== PAGE 27 =====
+Risk Likelihood Impact Mitigation Owner 
+Zensar-managed 
+devices as fallback 
+subject to Shell 
+device-compliance 
+posture 
+VS Code / approved 
+IDE + extensions not 
+approved 
+Low Medium Lock IDE choice and 
+extension list with 
+Shell IT before Day 
+1; Zensar-controlled 
+go/no-go gate 
+Shell IT / Zensar 
+Delivery Mgr 
+Claude Code / 
+Anthropic developer 
+licences not procured 
+Low High Procure Claude for 
+Work licences + API 
+developer key in pre-
+mobilisation; Zensar-
+controlled go/no-go 
+gate 
+Zensar Delivery Mgr 
+/ Procurement 
+Network access / 
+VPN / device 
+compliance prevents 
+reaching Shell tenant, 
+repo, non-prod Graph 
+Medium High Agree access posture 
+and VPN/BYOD 
+path in pre-
+mobilisation 
+Shell Networking / 
+Security 
+Source-control + 
+CI/CD guest 
+onboarding slow 
+(guests, branch 
+protection, CI/CD 
+SP) 
+Medium High Provision repo guest 
+access, branch 
+protection and CI/CD 
+service principal pre-
+Day-1; treat as Day-1 
+blocker (3-7 day 
+onboarding, can be 
+slow) 
+Shell IT / Zensar 
+DevOps 
+Graph app-only 
+admin consent 
+(Mail.Send / 
+Calendars.ReadWrite 
++ others) not granted 
+in time 
+High High Start admin consent 
+~4-6 wks ahead (2-4 
+wk review, LONG 
+POLE); track daily; 
+mock only for 
+internal demo 
+Shell Entra ID admin 
+/ IT Security 
+Application Access 
+Policy not 
+offered/accepted, so 
+tenant-wide app-only 
+consent is refused 
+Medium High Propose mailbox-
+scoped Application 
+Access Policy from 
+the outset as part of 
+the consent request, 
+demonstrating least-
+privilege; couple the 
+policy and consent as 
+a single security-
+review package 
+Shell IT Security / 
+Exchange admin 
+Service mailbox / 
+Exchange 
+Application Access 
+Policy not 
+provisioned or mis-
+scoped 
+Medium High Provision 
+vendorpulse-svc 
+mailbox + E3/E5 
+licence and apply the 
+Application Access 
+Policy scoping 
+Mail.Send/Calendars 
+in pre-mobilisation; 
+offer the policy up 
+front to satisfy 
+security review 
+Shell Exchange 
+admin 
+===== PAGE 28 =====
+Risk Likelihood Impact Mitigation Owner 
+Graph certificate not 
+generated/uploaded 
+in time, or client-
+secret used against 
+Shell preference 
+Medium High Agree cert ownership 
+(Shell-generated 
+preferred) and 
+thumbprint handover 
+in pre-mobilisation; 
+store as Key Vault 
+cert object; 12-month 
+rotation via auto-
+renewal pipeline 
+Shell Entra ID admin 
+/ Zensar DevOps 
+Microsoft Graph API 
+throttling (429 / 5xx) 
+Medium Medium Retry/backoff 
+engineered in 
+GraphService; 
+correlation IDs; 
+batch requests where 
+possible 
+Zensar Tech Lead 
+Conditional Access 
+blocks the service 
+principal 
+Medium High CA exemption or 
+confirmed sign-in 
+path agreed with 
+Entra admin pre-
+Day-1 
+Shell Entra ID admin 
+External / guest 
+meeting policy 
+blocks vendor invites 
+Medium High Confirm external-
+attendee policy for 
+the service mailbox 
+in pre-mobilisation 
+Shell 
+Exchange/Teams 
+admin 
+Outbound egress / 
+NAT allow-listing to 
+Graph and the LLM 
+endpoints not 
+configured 
+Medium High Agree the egress 
+allow-list (Graph + 
+Anthropic/Azure 
+OpenAI endpoints) 
+with Shell 
+Networking in pre-
+mobilisation; validate 
+connectivity from 
+non-prod in Week 1 
+Shell Networking / 
+Zensar DevOps 
+Private endpoints / 
+VNet integration to 
+Postgres and Key 
+Vault not in place 
+Medium High Provision private 
+endpoints + VNet 
+integration and 
+Managed Identity 
+role assignments in 
+pre-mobilisation; 
+smoke-test secret 
+retrieval and DB 
+connectivity Day 1 
+Shell Networking / 
+Azure admin / Zensar 
+DevOps 
+No SQL schema yet 
++ messy POC 
+SQLite/JSON data 
+(13 entities -> ~15 
+Postgres tables) 
+Medium Medium Alembic schema 
+(~15 tables) + 
+asyncpg planned Day 
+1; data cleansing 
+scoped; defaults for 
+missing fields; 
+additive-only 
+migrations after Day-
+10 code freeze 
+Zensar Backend / 
+Tech Lead 
+Scorecard taxonomy 
+not locked 
+Medium High Lock 4-category / 16-
+parameter taxonomy 
+at the Day-2 design 
+checkpoint 
+Shell Product Owner 
+/ VMO lead 
+Scorecard form-
+platform decision late 
+Medium High Native in-app form 
+recommended and 
+Shell Product Owner 
+/ Zensar SA 
+===== PAGE 29 =====
+Risk Likelihood Impact Mitigation Owner 
+pre-agreed; 
+confirmed at Day-2 
+checkpoint 
+Day-2 design 
+checkpoint produces 
+too many in-scope 
+changes (buffer 
+exhausted) 
+Medium High Strict change-control; 
+route non-essential 
+items to Phase 2 / 
+warranty; formal re-
+baseline if breached 
+Zensar Delivery Mgr 
+/ Shell PO 
+Post-freeze (Week 2) 
+scope changes 
+Medium High Design frozen end of 
+Week 1; later 
+changes follow 
+defect or Phase-2 
+path; change-control 
+board 
+Zensar Delivery Mgr 
+/ Shell PO 
+One major UAT 
+defect pushes cutover 
+past its Week-4 slot 
+Medium High P1 same-day triage; 
+daily defect burn-
+down; CAB 
+contingency slot held 
+Zensar QA / Delivery 
+Mgr 
+Outlook email-
+rendering issues 
+found late 
+Medium Medium Table-based inline-
+style HTML + plain-
+text fallback; Litmus 
+/ Email-on-Acid QA 
+in Week 2 
+Zensar Frontend / 
+QA 
+Zensar team-member 
+unplanned absence 
+(no-PTO assumption) 
+Medium High Cross-skilling; Tech 
+Lead / Solution 
+Architect cover; 
+daily stand-up 
+reprioritisation 
+Zensar Delivery Mgr 
+Late IT-Security 
+objection blocking 
+cutover 
+Medium High Engage Security 
+liaison from Day 1; 
+design review early; 
+Week-4 security 
+sign-off planned 
+Shell IT Security / 
+Zensar SA 
+DNS / TLS cutover 
+failure in Week 4 
+Low High Provision DNS+TLS 
+in pre-mobilisation; 
+slot-swap with 
+rollback; 60-min 
+observation window 
+Shell Networking / 
+Zensar DevOps 
+LLM enterprise 
+contract / DPA / 
+residency not signed 
+Medium High Start contract 4-8 
+wks ahead; 
+LLMProvider 
+abstraction enables 
+config-only switch to 
+Azure OpenAI 
+Shell Procurement / 
+Legal/Privacy 
+Azure OpenAI quota 
+/ region approval not 
+granted (if chosen as 
+provider) 
+Low-Medium Medium Submit the Microsoft 
+quota request in the 
+chosen region 2-4 
+weeks ahead; 
+confirm a tool-
+calling-capable gpt-
+4o-class deployment 
+in West Europe 
+Shell Azure admin / 
+Zensar Tech Lead 
+Azure OpenAI 
+deployment 
+misconfigured 
+(preview / non-chat 
+model) 
+Low Medium Specify a gpt-4o-
+class chat 
+deployment 
+explicitly; validate 
+Shell Azure admin / 
+Zensar Tech Lead 
+===== PAGE 30 =====
+Risk Likelihood Impact Mitigation Owner 
+connectivity in Week 
+1 
+LLM token-spend 
+overrun 
+Medium Medium Token-budget guards 
++ per-call caps; 
+admin LLM budget 
+panel; monthly 
+budget agreed 
+Zensar Tech Lead / 
+Shell PO 
+PII / data-residency / 
+audit-retention sign-
+off late (agent_runs 
+holds vendor names 
++ comments) 
+Medium High Engage 
+Legal/Privacy pre-
+Day-1; EU residency 
+in DPA; retention 
+policy and 
+immutable audit trail 
+agreed 
+Shell Legal/Privacy / 
+IT Security 
+Azure estate 
+incomplete (RGs, 
+Postgres, Key Vault, 
+App Service, Front 
+Door/WAF, App 
+Insights, role 
+assignments, egress 
+allow-listing) 
+Medium High Complete Azure 
+provisioning in pre-
+mobilisation; validate 
+Managed Identity 
+role assignments Day 
+1 
+Shell Azure admin / 
+Zensar DevOps 
+No automated tests 
+exist today (quality 
+risk under 
+compressed timeline) 
+High Medium Risk-based manual 
+UAT with 3 named 
+coordinators; focus 
+on deterministic 
+logic; smoke tests 
+added; defects 
+triaged in warranty 
+Zensar QA 
+ 
+Overall, the residual risk is concentrated in the pre-mobilisation window. If Shell completes the 
+identity (Entra admin consent coupled with the mailbox-scoped Application Access Policy, 
+certificate credentials, service mailbox, Conditional Access), Azure and networking (egress 
+allow-listing, private endpoints, VNet integration), LLM-contract and Zensar-tooling 
+prerequisites before Day 1 as assumed, the engagement carries a manageable risk profile. If any 
+long-lead item - principally Graph admin consent (with its coupled Application Access Policy) 
+and the LLM enterprise contract/DPA - is not initiated 4-6 weeks ahead, the four-week plan 
+cannot hold and a re-baseline will be required. Zensar will maintain this register actively, review 
+it at the daily stand-up, and escalate any red item to the Executive Sponsor and Product Owner 
+the same day. 
+8. Acceptance Criteria 
+This section defines the Definition of Done for the pilot go-live. The Change Request is accepted 
+when every criterion below is met and evidenced in Shell's own Microsoft Azure / Microsoft 365 
+tenant. Acceptance is verified jointly by the Zensar Tech Lead and Solution Architect with 
+Shell's Product Owner (VMO lead) and IT Security liaison during Week-3 UAT and at the Week 
+4 production cutover. Evidence is captured against each item (demonstration, screenshot, log 
+entry, or sign-off record) and retained in the decision log committed to Shell's repository. 
+Platform & Security 
+===== PAGE 31 =====
+Criterion Evidence of acceptance 
+Production environment live System running in Shell's Azure subscription on Azure 
+App Service (Linux containers) behind Azure Front Door 
++ WAF; non-prod and prod resource groups in place. 
+Entra ID SSO A Shell user signs in via Entra ID (Azure AD) OIDC 
+Single Sign-On; no local credentials exist. 
+RBAC enforced The four roles (VMO coordinator, VMO admin, executive 
+sponsor, viewer) are mapped to Entra security groups and 
+correctly gate UI and API access. 
+Secrets management No secrets in code or .env; all secrets resolved from Azure 
+Key Vault via Managed Identity. POC secrets scrubbed 
+from history and rotated. 
+Database Data persisted in Azure Database for PostgreSQL Flexible 
+Server (HA / zone-redundant in prod); JSON-file 
+persistence retired. 
+Observability & audit App Insights + Log Analytics active; correlation IDs flow 
+end-to-end; an immutable audit trail records all actions 
+and approvals. 
+Security sign-off Shell IT Security review completed and signed off in 
+Week 4. 
+ 
+Functional (Modules A-F) 
+All six agents function end-to-end, the 12-state forward-only workflow state machine behaves 
+correctly, and the human-approval gate is enforced on every outbound action (no email, invite, 
+brief or minutes leaves the system without explicit coordinator approval in the UI). 
+Deterministic-first / AI-second is preserved: slot ranking, score validation, outlier detection, 
+workflow transitions and audit are deterministic Python; the LLM only produces human-readable 
+text. 
+Module Acceptance 
+A — Scheduling & Coordination Roster refreshed from the directory; attendance outreach 
+sent; candidate times found via Graph findMeetingTimes 
+against real Shell mailboxes; slots ranked 
+deterministically (organiser + executive sponsor free = 
+hard constraint); Teams meeting created and invite sent 
+via Graph after approval; RSVPs tracked. 
+B — Scorecard Input & Validation Personalised requests issued via Graph mail; responses 
+collected through the native in-app form (1-5 across 4 
+categories / 16 parameters); escalating reminders fire; 
+deterministic validation applied (range, mandatory 
+comment on 1/5, ~1.5-sigma outlier flag); internal-vs-
+vendor scorecard compiled. 
+C — Internal Alignment Score deltas vs previous cycle computed; divergence 
+flagged where spread >= 1.5; LLM drafts the 'what 
+changed' narrative and extracts action items from notes; 
+internal-only Teams alignment meeting scheduled via 
+Graph. 
+D — Vendor Prep AI vendor brief generated (overall score/trend, per-
+category ratings, concerns, positives, open actions); three 
+response stances (Factual / Neutral / Escalation) drafted 
+per pushback item; AI drafting suppressed for items 
+flagged for legal review; unresolved items tracked. 
+E — EGB/QBR Meeting Pre-meeting facilitator briefing produced; live notes 
+captured across the 5 types; pasted transcript parsed into 
+structured notes; formal minutes generated; action items 
+===== PAGE 32 =====
+Module Acceptance 
+extracted; approved minutes distributed to internal 
+stakeholders via Graph mail. 
+F — Cross-Cycle Memory & Trends Multi-cycle score trends, recurring-issue detection 
+(category below threshold for >= 2 consecutive cycles), 
+per-vendor trajectory (improving/stable/declining), 
+executive leadership brief and cross-vendor comparison 
+all available. 
+ 
+Integration (Graph / Teams / Outlook) 
+•  All email, calendar and Teams operations execute via Microsoft Graph using app-only 
+authentication with a certificate (MSAL client-credentials); no user / delegated bearer token is 
+used. 
+•  Outbound mail is sent from the dedicated Shell service mailbox (e.g. vendorpulse-
+svc@shell.com), constrained by the Exchange Application Access Policy. 
+•  The Google / Gmail / Google Forms stack is removed entirely from the codebase and 
+runtime. 
+•  Teams online meetings are created via Graph for both vendor-facing and internal-only 
+meetings; vendor (external) attendees can be invited per the confirmed meeting policy. 
+•  Outlook / Exchange HTML email templates (table-based, inline styles) render acceptably 
+on Outlook desktop, OWA and mobile, with a plain-text fallback; verified via cross-client 
+render QA. 
+•  Graph calls are resilient under load (retry/backoff on 429 and 5xx responses). 
+Operations & Handover 
+•  Admin module complete: vendor master, user-role view, LLM budget panel, audit-log 
+viewer and system-health view. 
+•  Shell branding applied across the UI. 
+•  Observability dashboards, alerts and a runbook are in place; the runbook v1.0 is handed to 
+Shell IT Ops. 
+•  Coordinator training delivered to the 3 named VMO coordinators and recorded. 
+•  Architecture documentation, the decision log and supporting docs are committed to Shell's 
+repository. 
+•  LLM operating within the agreed monthly token budget, with token-budget guards and rate 
+limiting active. 
+Pilot 
+•  One real, pre-agreed pilot vendor cycle is progressing through the workflow in production 
+with no open P1 issues. 
+•  UAT completed with the 3 named VMO coordinators. 
+•  All P1 and P2 UAT defects are closed; P3 defects triaged and scheduled (warranty or Phase 
+2). 
+•  Production cutover completed in Week 4 (DNS update, slot-swap, 60-minute observation 
+window) with CAB approval. 
+Delivery Gates 
+===== PAGE 33 =====
+Acceptance is underpinned by five sequential gates. Each must pass before the next stage 
+proceeds; a missed gate triggers the agreed escalation and, where necessary, re-baselining of 
+remaining scope. 
+Gate Timing Pass condition 
+Design alignment / freeze Day 2 checkpoint; frozen end of 
+Week 1 
+~12 design decisions locked 
+(scorecard mechanism, taxonomy, 
+brief/minutes output formats, vendor 
+master source, approval routing, etc.); 
+Module A demonstrated end-to-end 
+on real Graph by Friday of Week 1. 
+Code freeze End of Week 2 (Day 10) All six agents functional; scorecard 
+collection in the chosen mode; Shell-
+branded UI; Outlook templates; 
+admin module; hardening complete. 
+From this point, defects only — no 
+feature work. 
+Security sign-off Week 4 Shell IT Security review passed; 
+observability, alerts and runbook in 
+place. 
+CAB approval & cutover Week 4 Change Advisory Board approval; 
+production cutover (DNS, slot-swap, 
+60-min observation); pilot vendor 
+cycle kicked off. 
+Handover Week 4 Coordinator training delivered and 
+recorded; runbook v1.0, 
+documentation and decision log 
+handed over. 
+ 
+Warranty Terms 
+Following go-live, a 4-week defect-warranty period applies. During this period Zensar fixes P1 
+and P2 defects (P1 addressed same-day where feasible), while Shell IT Operations runs the 
+system as business-as-usual. P3 defects are scheduled into the warranty backlog or Phase 2 by 
+agreement. Any design or functional change requested after the Week-1 design freeze is routed 
+to the defect path or to a Phase-2 change, and is not treated as part of pilot acceptance. The 
+warranty start and end dates are agreed in writing as part of go-live sign-off. 
+ 
+===== PAGE 34 =====
+ 
+Part II – RESPONSE TO REQUEST 
+Date : 4/11/2025 
+Response By  Customer 
+                                                            Zensar 
+Prepared By : Vinish Pillai 
+New changes starting from November ’25 Onwards 
+ 
+6.3 Year 2 [Nov 25 to Feb 26] Payment Details:  
+Sr No 
+/Month 
+Payment Milestone  Milestone Date  Amount (INR)  
+9 – 12 Provision of Services for Month X 
+of Year 2  
+1st Week of Month  
+X+1  
+INR 10,44,000 
+ 
+ 
+  
+  Data Entry for Manual Vouchers -From 1st November 2025 to 28th February 2026 
+ 
+Cumulative Charges over the Contract period.  
+ Year 2(November 2025 to 
+February 2026 ) Monthly  
+Total Charges ( November 
+2025 to February 2026 ) 
+Yearly 
+Charges 
+ 
+INR 10,44,000 
+ 
+ 
+ 
+INR 41,76,000 
+ 
+ 
+ 
+ 
+ 
+This CR changes are related to SOW against Shell Managed L2/L3 Services for Emerald MTSP project dated 
+10-July -2025 
+Vinish Pillai 
+Name and Signature of Authorized Representative of Responding Party 
+Astrid Robb  
+ 
+ 
+X 

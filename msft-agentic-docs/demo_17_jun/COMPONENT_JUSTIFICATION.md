@@ -2,7 +2,7 @@
 
 ## A justification reference for handling client change requests
 
-> Purpose: when the client proposes removing or swapping a component, this gives you the rationale to push back with confidence — or to agree where it genuinely is flexible. For each component: what it does, why it's required, what breaks if it's removed, and the response to give. The two items flagged for deeper discussion — the **relational database** and the **MAF SDK** — have their own sections.
+> Purpose: when the client proposes removing or swapping a component, this gives you the rationale to push back with confidence — or to agree where it genuinely is flexible. For each component: what it does, why it's required, what breaks if it's removed, and the response to give. The two items flagged for deeper discussion — the **relational database** and the **AI Service (LLM integration)** — have their own sections.
 
 How to use it: lead with the one-line justification, then escalate to "what breaks" only if pushed. Where something is genuinely negotiable, say so — it buys credibility for the parts that aren't.
 
@@ -13,8 +13,8 @@ How to use it: lead with the one-line justification, then escalate to "what brea
 | Component | Required? | One-line justification | If the client wants to cut/change it |
 |---|---|---|---|
 | Relational DB (PostgreSQL) | **Required** | Transactional state, integrity, queryable audit — storage can't do these | See §1. Azure SQL is an acceptable swap; Blob/flat files are not |
-| MAF SDK (agent layer) | **Required (recommended)** | Platform-provided approval, safety, tracing = less hand-rolled code for Shell to review | See §2. Reverting to self-built increases review burden |
-| Front Door + App Gateway + WAF | **Required (WAF non-negotiable)** | One hardened, inspected way in; no public backend | Can simplify to a single edge if internal-only — see §3 |
+| AI Service (LLM integration) | **Required** | Thin internal service calling Foundry GPT-4o directly; draft text only, behind the approval gate | See §2. MAF SDK was evaluated and removed — fewer dependencies, simpler review |
+| Application Gateway + WAF | **Required (WAF non-negotiable)** | One hardened, inspected way in; no public backend | Front Door not used — access is internal-only; see §3 |
 | Two-VM split (App / Backend) | **Recommended** | Separates the user-facing tier from data/integration | Can collapse to one VM to save cost, with reduced isolation |
 | Entra OIDC + RBAC | **Required** | Shell identity, server-side authorization | Not negotiable — it's Shell's own standard |
 | Approval gate (HITL) | **Required** | The core governance control; AI never acts alone | Not negotiable — it's the product's safety model |
@@ -42,6 +42,29 @@ How to use it: lead with the one-line justification, then escalate to "what brea
 
 **What breaks if it's removed:** lost or corrupted state under concurrent use; no referential integrity; no reporting without scanning everything; a weak, hard-to-search audit trail. For a governance product these are not acceptable.
 
+**The tables this creates (the relational schema):** the data normalises into ~16 related tables, each tied back to a cycle by foreign key — which is precisely why a relational store is required:
+
+| Table | Purpose | Key relationships |
+|---|---|---|
+| `vendor` | Vendor master data | — |
+| `cycle` | One governance cycle; holds the 12-state value | FK → vendor |
+| `user` | Internal Shell users and roles | — |
+| `attendee` | Per-cycle attendees (internal + external) | FK → cycle, optional FK → user |
+| `slot_proposal` | Ranked candidate meeting slots | FK → cycle |
+| `meeting` | The scheduled meeting / Teams event | FK → cycle, slot_proposal |
+| `scorecard_template` | Versioned KPI template per cycle | FK → cycle |
+| `kpi` | KPIs/parameters under a template (4 categories) | FK → scorecard_template |
+| `scorecard` | The compiled, locked cycle scorecard | FK → cycle |
+| `score_submission` | Individual KPI scores (vendor + internal) | FK → scorecard, kpi |
+| `alignment` | Internal alignment record | FK → cycle |
+| `vendor_prep` | Vendor-prep record | FK → cycle |
+| `action_item` | Consolidated action register | FK → cycle, owner (user) |
+| `meeting_note` | Captured notes by type (5 types) | FK → meeting |
+| `minutes` | Approved meeting minutes | FK → meeting |
+| `agent_run` | Audit log of every AI Service run / outbound action, with correlation IDs | FK → cycle |
+
+*(Full relationships are in the ER diagram — see the Client Walkthrough appendix and `VendorPulse_Database_ERD.pdf`.)*
+
 **Where we can flex (say this to show reasonableness):**
 - **Azure SQL Database is an acceptable alternative** if that's Shell's data-platform standard — same guarantees, different engine. The application accesses storage through a single repository layer, so switching engines is a contained change, not a rewrite.
 - **Cost is addressable without dropping the DB:** a serverless (Azure SQL) or Burstable (PostgreSQL) tier scales down between cycles.
@@ -52,36 +75,32 @@ How to use it: lead with the one-line justification, then escalate to "what brea
 
 ---
 
-## 2. The MAF SDK (agent layer) — required, vs. reverting to self-implemented agents
+## 2. The AI Service (LLM integration) — required; MAF SDK removed
 
-**Short answer to give:** "We'd keep the Microsoft Agent Framework. Going back to hand-rolled agents means *more* custom, security-sensitive code for Shell to review and weaker built-in controls — the opposite of what helps us through governance."
+**Short answer to give:** "AI is handled by a small in-house AI Service that calls Azure AI Foundry (GPT-4o) directly. It only drafts text, in-tenant, behind the human-approval gate. We evaluated the Microsoft Agent Framework (MAF) and removed it — for our needs it added a fast-moving dependency without enough benefit."
 
-**What it does:** the MAF SDK is how the AI Service's agents are built and run. It provides the agent loop, structured tool-calling, a built-in human-approval mode, content-safety integration, and on-by-default tracing.
+**What it does:** the AI Service is the single internal component that talks to the model. It wraps Azure AI Foundry (GPT-4o) via the Azure OpenAI SDK, builds grounded prompts from deterministic data, and returns **drafted text** (summaries, briefs, minutes, suggestions). It never computes figures and never sends anything — every output is a draft for the approval gate.
 
-**Why it's required (the honest version):**
+**Why a thin AI Service (and why MAF was removed):**
 
-- **It shrinks the code Shell has to security-review.** Approval (HITL), content filtering, and tracing come from the Microsoft-maintained framework instead of being hand-written by us. Less bespoke, security-sensitive code = a smaller, faster code-security review (an IRM concern).
-- **It's a Microsoft-supported, GA framework** running on Foundry — not a bespoke tool loop we have to justify and maintain ourselves.
-- **Consistency.** One structure across every agent, instead of six bespoke call patterns.
-- **It keeps the managed-hosting door open.** The same agent code can later run as a Foundry Hosted Agent (managed compute) with no rewrite — a future option we get for free by choosing MAF.
+- **Fewer dependencies, simpler security review.** A small, readable service making a direct, well-understood API call is easier for Shell to review than a fast-churning agent framework (MAF's API changed repeatedly across releases).
+- **We don't need an agent loop.** Our AI features are single structured calls — "given this context, draft this text" — not multi-step autonomous reasoning. A tool-calling agent framework is more machinery than the workload needs.
+- **No governance control is lost.** The approval gate, the deterministic core, content-safety (Foundry-level filters) and audit logging live in our own code / the platform regardless of MAF — so removing MAF removes a dependency, not a control.
+- **Provider stays abstracted.** The model sits behind an `LLMProvider` abstraction (config-driven), so GPT-4o can be upgraded or swapped without touching application code.
 
-**Being straight about scope (use this, it builds credibility):** most of our AI features are essentially *single structured calls* — "given this context, draft this text" — not heavy autonomous reasoning, and we don't force those into an agent loop. So we're not adopting MAF because we need autonomous agents; we're adopting it for the **governance controls and the supported, consistent structure**.
+**What breaks if it's removed entirely:** no AI drafting — the workflow still runs deterministically (the AI is optional by design), but coordinators lose the drafted briefs, minutes and summaries.
 
-**What reverting to self-implemented agents would cost:**
-- We'd hand-roll the approval gate, content-safety hooks, and tracing ourselves — **more custom code in the security-sensitive path**, exactly what Shell's review scrutinises most.
-- We'd lose the platform-provided controls and the Microsoft support story.
-- We'd close off the Foundry Hosted Agents upgrade path.
-- Net: more effort, more review burden, a weaker governance narrative — a bad trade for a compliance-driven product.
+**Where we can flex:**
+- **Exact model** (GPT-4o / GPT-4.1) is a config choice — pin a GA model.
+- **MAF can be reintroduced later** if we ever need true multi-step agents or Foundry Hosted Agents — the AI Service boundary makes that a contained change. Not needed for the MVP.
 
-**Where we can flex:** the model provider stays abstracted (config-driven), and the simplest single-shot calls can remain simple inside the framework. We are not over-engineering every feature into an agent.
-
-**One-liner:** "MAF isn't force-fit — we use it for the controls and the supported structure, not because everything needs autonomous reasoning. Reverting to self-built agents would put more security-sensitive code in front of your reviewers and remove controls Microsoft already gives us. That's why we'd keep it."
+**One-liner:** "AI is a thin in-house service calling Foundry directly — draft text only, human-approved, in-tenant. We dropped the agent framework because our calls are single-shot, not agentic; it was a churny dependency that added no control we don't already own."
 
 ---
 
 ## 3. The rest of the stack — why each is required
 
-**Edge: Front Door + Application Gateway + WAF.** The single hardened, inspected way in — TLS termination, OWASP rules, origin-lock so no VM is reachable directly, and load balancing. *If removed:* the backend is exposed and unprotected against common web attacks. *Where we can flex:* if access is strictly internal, the global Front Door layer can be dropped and a single **Application Gateway + WAF** used instead — but the **WAF is non-negotiable**.
+**Edge: Application Gateway + WAF.** The single hardened, inspected way in — TLS termination, OWASP rules, origin-lock so no VM is reachable directly, and load balancing. Because all users are internal, we use **Application Gateway + WAF alone — Azure Front Door is not used** (no public-internet CDN needed). *If removed:* the backend is exposed and unprotected against common web attacks. The **WAF is non-negotiable**.
 
 **Two-VM split (App Server / Backend Services).** Separates the user-facing tier (auth, workflow, UI) from the data and integration tier (database, Graph, AI). *If removed:* a single VM works but couples the tiers and reduces isolation. *Where we can flex:* the two VMs can be collapsed into one to save cost in lower environments, accepting reduced separation — a reasonable trade to discuss.
 
@@ -107,7 +126,7 @@ How to use it: lead with the one-line justification, then escalate to "what brea
 
 - **Postgres vs Azure SQL** — align to Shell's data-platform standard.
 - **Database tier** — serverless/burstable to control cost between cycles.
-- **One edge vs two** — drop global Front Door if access is internal-only (keep the WAF).
+- **Edge** — Application Gateway + WAF (Front Door not used, as access is internal-only; the WAF stays either way).
 - **One VM vs two** — collapse the tiers in non-prod to save cost.
 - **Exact GPT model** — config-driven; we standardise on a GA model and can re-evaluate.
 

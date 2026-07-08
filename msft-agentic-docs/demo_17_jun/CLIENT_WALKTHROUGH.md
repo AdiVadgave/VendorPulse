@@ -23,7 +23,7 @@ The architecture diagram is read left to right in 5 zones. Here is what each one
 | # | Zone | What it actually means |
 |---|------|------------------------|
 | 1 | Client | The user's **web browser**. Three kinds of user — VMO Coordinator, Sponsor, Viewer — all log in with their normal Shell account (**Entra SSO**). Nothing is installed on their machine; roles are enforced on the server, not in the browser. |
-| 2 | Edge | **Azure Front Door + Application Gateway + WAF** — the secure front gate. Terminates HTTPS, applies a **Web Application Firewall** (blocks common web attacks), load-balances, and only lets traffic through to our network ("origin-lock"). The backend has no public address. |
+| 2 | Edge | **Azure Application Gateway + WAF** — the secure gateway. Terminates HTTPS, applies a **Web Application Firewall** (blocks common web attacks), load-balances, and only lets traffic through to our network ("origin-lock"). The backend has no public address. (Application Gateway alone, not Front Door — all users are internal, so no public-internet CDN is needed.) |
 | 3 | Shell Azure Subscription (Private VNet) | Shell's own slice of Azure, inside the approved region, holding a private network with **two Azure VMs**. **VM 1 (App Server)** runs the user-facing tier: the React 19 screen, login/permissions (Entra OIDC + RBAC), the 12-state **WorkflowEngine**, and the **approval gate**. **VM 2 (Backend Services)** runs the data/integration tier: the **PostgreSQL** database, the **GraphService**, and the **AI Service** that talks to Foundry. |
 | 4 | Azure PaaS Services | The shared supporting services, reached privately and authenticated with a password-less **Managed Identity**: **Key Vault** (secrets & certificates), **Blob Storage** (minutes/transcripts), **App Insights + Log Analytics** (the OpenTelemetry audit trail), and **Azure AI Foundry (GPT-4o)** — the AI model, running inside Shell's own tenant. |
 | 5 | External | The only things reached outside, over outbound HTTPS through **Shell's egress proxy**: **Microsoft Graph** (send Outlook mail, manage calendars, create Teams meetings) and **Entra ID** (verify who the user is). |
@@ -40,9 +40,9 @@ The sections below walk each zone in more depth, with the "why Shell cares" angl
 
 ---
 
-## Zone 2 — Edge (the front door and the bouncer)
+## Zone 2 — Edge (the secure gateway and the bouncer)
 
-- **Azure Front Door + Application Gateway + WAF** — the single, hardened way in. Front Door is the global entry point and load balancer; Application Gateway is the regional gateway in front of the VNet; the **WAF** (Web Application Firewall) inspects and blocks attacks.
+- **Azure Application Gateway + WAF** — the single, hardened way in. Application Gateway is the regional gateway sitting in front of the VNet; the **WAF** (Web Application Firewall) inspects and blocks attacks. *We use Application Gateway alone — not Azure Front Door — because all users are internal, so there is no need for a global public-internet CDN.*
   - **TLS termination** — all traffic is encrypted (HTTPS).
   - **OWASP rule set** — the WAF blocks the common web attacks (SQL injection, cross-site scripting, etc.).
   - **Origin-lock** — the application only accepts traffic that arrives through this layer; you cannot bypass it and reach a VM directly.
@@ -94,7 +94,7 @@ All external calls leave through the **Shell egress proxy** — the single, gove
 
 ## Data flow in one breath
 
-"Browser signs in with Entra SSO → Front Door + WAF (TLS, OWASP) → Private VNet → VM 1 validates the token and runs the WorkflowEngine and the approval gate → VM 2 persists state to PostgreSQL and, when needed, calls Microsoft Graph and Azure AI Foundry through the egress proxy → secrets come from Key Vault, files from Blob, and every step is traced to App Insights. One private path in; the only thing leaving is Microsoft 365, through one controlled exit."
+"Browser signs in with Entra SSO → Application Gateway + WAF (TLS, OWASP) → Private VNet → VM 1 validates the token and runs the WorkflowEngine and the approval gate → VM 2 persists state to PostgreSQL and, when needed, calls Microsoft Graph and Azure AI Foundry through the egress proxy → secrets come from Key Vault, files from Blob, and every step is traced to App Insights. One private path in; the only thing leaving is Microsoft 365, through one controlled exit."
 
 ---
 
@@ -105,7 +105,7 @@ All external calls leave through the **Shell egress proxy** — the single, gove
 | Does our data leave Shell to reach the AI model? | No. Azure AI Foundry runs inside our tenant; the AI Service reaches it from inside the VNet. Data stays on our network. |
 | Can the AI take actions on its own? | No. The AI Service only returns drafted text. Every action is held at the approval gate and only fires after a human approves. |
 | What is deterministic vs. AI? | All decisions — the 12-state workflow, approvals, persistence — are deterministic code. AI is used only to draft human-readable text. |
-| How is it reachable — any public exposure? | One way in: Front Door + Application Gateway + WAF, origin-locked. The VMs and database have no public endpoint. |
+| How is it reachable — any public exposure? | One way in: Application Gateway + WAF, origin-locked. The VMs and database have no public endpoint. |
 | How do you authenticate to Microsoft 365? | A service-principal certificate stored in Key Vault — no passwords or shared secrets. |
 | Where are secrets? | Key Vault, fetched at runtime via Managed Identity — none in code or config. |
 | Why a relational database, not just storage? | It holds transactional workflow state, enforces integrity across related records, answers queries for dashboards, and gives a queryable audit trail — none of which object storage can do. (See the component-justification note.) |
@@ -117,3 +117,18 @@ All external calls leave through the **Shell egress proxy** — the single, gove
 ## One-line summary to leave them with
 
 "VendorPulse is a single-tenant Shell-Azure application where the business logic is deterministic, AI is limited to drafting text behind a human approval gate, the AI model runs privately inside Shell's own tenant, and the only thing that ever leaves the network is Microsoft 365 — through one controlled, logged egress."
+
+---
+
+## Appendix — Data Model (Entity-Relationship Diagram)
+
+**Why a relational database (and not flat files or object storage):** VendorPulse's data is *related and transactional* — one cycle owns many attendees, slots, scorecard submissions, actions and audit rows, with foreign keys enforcing integrity. This is exactly what object storage (Blob) cannot represent or keep consistent.
+
+- **Referential integrity** — foreign keys keep every score tied to a real KPI and scorecard; no orphaned data.
+- **Transactions & concurrency** — the 12-state workflow and the approval gate update related rows atomically; multiple coordinators never overwrite each other.
+- **Querying & reporting** — Module F's trends, recurring-issue detection and dashboards are simple indexed joins, not full-file scans.
+- **Auditability** — every agent run and outbound action is logged with correlation IDs (Shell IRM 3.492).
+
+Blob Storage remains the right home for large files only — meeting transcripts and generated minutes — referenced from the schema, not used as the system of record.
+
+The full entity-relationship diagram is on the following page.

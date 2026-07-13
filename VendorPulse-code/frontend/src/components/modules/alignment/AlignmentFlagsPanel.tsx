@@ -13,8 +13,6 @@ interface CategoryGroup {
   label: string
   maxSpread: number
   flags: AlignmentFlag[]
-  avgStakeholder: number
-  avgVendor: number
 }
 
 export default function AlignmentFlagsPanel({ flags }: Props) {
@@ -25,7 +23,7 @@ export default function AlignmentFlagsPanel({ flags }: Props) {
     return (
       <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-center">
         <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
-          No alignment flags — Stakeholder and Vendor scores are within acceptable range.
+          No alignment flags — internal teams are aligned on the scores.
         </p>
       </div>
     )
@@ -45,8 +43,6 @@ export default function AlignmentFlagsPanel({ flags }: Props) {
       label: CATEGORY_LABELS[cat],
       maxSpread: Math.max(...catFlags.map((f) => f.spread)),
       flags: catFlags,
-      avgStakeholder: catFlags.reduce((s, f) => s + (f.high_stakeholder === 'Stakeholder' ? f.high_score : f.low_score), 0) / catFlags.length,
-      avgVendor: catFlags.reduce((s, f) => s + (f.high_stakeholder === 'Vendor' ? f.high_score : f.low_score), 0) / catFlags.length,
     }
   }).sort((a, b) => b.maxSpread - a.maxSpread)
 
@@ -62,7 +58,7 @@ export default function AlignmentFlagsPanel({ flags }: Props) {
       >
         <AlertTriangle size={15} className="text-amber-500" />
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Alignment Flags — Internal Stakeholder vs Vendor Gaps
+          Alignment Flags — Cross-Team Score Divergence
         </h3>
         <span className="ml-auto flex items-center gap-2">
           <span className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
@@ -103,21 +99,8 @@ export default function AlignmentFlagsPanel({ flags }: Props) {
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">
-                  {/* Stakeholder vs Vendor at category level */}
-                  <div className="flex items-center gap-2">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-2.5 py-1.5 text-center min-w-[4.5rem]">
-                      <p className="text-[10px] text-blue-500 dark:text-blue-400 font-medium">Stakeholder</p>
-                      <p className="text-base font-bold text-blue-700 dark:text-blue-400">{group.avgStakeholder.toFixed(1)}</p>
-                    </div>
-                    <span className="text-slate-300 dark:text-slate-600 text-xs">vs</span>
-                    <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg px-2.5 py-1.5 text-center min-w-[4.5rem]">
-                      <p className="text-[10px] text-orange-500 dark:text-orange-400 font-medium">Vendor</p>
-                      <p className="text-base font-bold text-orange-700 dark:text-orange-400">{group.avgVendor.toFixed(1)}</p>
-                    </div>
-                  </div>
-
-                  <span className="text-xs bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 px-1.5 py-0.5 rounded font-medium">
-                    Max gap: 0.5 pts
+                  <span className="text-xs bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 px-2 py-0.5 rounded font-medium">
+                    Max gap: {group.maxSpread.toFixed(1)} pts
                   </span>
                 </div>
               </button>

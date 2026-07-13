@@ -6,7 +6,7 @@ import type {
   CategoryComparison,
   AlignmentInsight,
 } from '@/types/alignment.types'
-import type { CompiledCategoryScore, CompiledScorecard } from '@/types/scorecard.types'
+import type { CompiledCategoryScore, CompiledScorecard, WeightedScorecard } from '@/types/scorecard.types'
 import { SCORECARD_STRUCTURE, CATEGORY_LABELS } from '@/types/scorecard.types'
 
 /* ── Score Deltas vs Previous Cycle (Q4 2025) ──────────────── */
@@ -374,6 +374,115 @@ export function generateAlignmentInsights(
   insights.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
 
   return insights
+}
+
+/* ══════════════════════════════════════════════════════════════
+ * Weighted scorecard (internal-only) — Alignment is about where the
+ * internal TEAMS diverge and where consolidated scores are low. There is no
+ * vendor self-report to compare against.
+ * ══════════════════════════════════════════════════════════════ */
+
+/** Flags where internal teams disagree on a measure (cross-team divergence). */
+export function buildFlagsFromWeighted(w: WeightedScorecard): AlignmentFlag[] {
+  const flags: AlignmentFlag[] = []
+  let id = 0
+  for (const cat of w.categories) {
+    for (const m of cat.measures) {
+      const entries = w.teams
+        .map((t) => ({ label: t.team || t.name || t.email, score: m.team_scores[t.attendee_id] }))
+        .filter((e): e is { label: string; score: number } => e.score != null)
+      if (entries.length < 2) continue
+      const high = entries.reduce((a, b) => (b.score > a.score ? b : a))
+      const low = entries.reduce((a, b) => (b.score < a.score ? b : a))
+      const spread = high.score - low.score
+      if (spread >= 1) {
+        id++
+        flags.push({
+          flag_id: `af-w-${id}`,
+          category: cat.key,
+          parameter_key: m.key,
+          parameter_label: m.label,
+          spread,
+          high_stakeholder: high.label,
+          high_score: high.score,
+          low_stakeholder: low.label,
+          low_score: low.score,
+          prompt_question: `Teams disagree on ${m.label}: ${high.label} rated ${high.score}, ${low.label} rated ${low.score} — agree the internal position before the vendor meeting.`,
+        })
+      }
+    }
+  }
+  return flags.sort((a, b) => b.spread - a.spread)
+}
+
+/** Insights: low consolidated scores + notable cross-team divergence. */
+export function buildInsightsFromWeighted(w: WeightedScorecard): AlignmentInsight[] {
+  const insights: AlignmentInsight[] = []
+  let id = 0
+  for (const cat of w.categories) {
+    if (cat.category_average != null && cat.category_average < 3) {
+      id++
+      insights.push({
+        insight_id: `iw-${id}`,
+        type: 'low_score',
+        category: cat.key,
+        message: `${cat.label}: consolidated ${cat.category_average.toFixed(1)}/5 — below target; prepare an improvement ask for the vendor.`,
+        severity: 'warning',
+      })
+    }
+    for (const m of cat.measures) {
+      if (m.average != null && m.average < 3) {
+        id++
+        insights.push({
+          insight_id: `iw-${id}`,
+          type: 'low_score',
+          category: cat.key,
+          parameter_key: m.key,
+          parameter_label: m.label,
+          message: `${m.label}: consolidated ${m.average.toFixed(1)}/5 — flag for the vendor discussion.`,
+          severity: 'warning',
+        })
+      }
+      const scores = w.teams.map((t) => m.team_scores[t.attendee_id]).filter((s): s is number => s != null)
+      if (scores.length >= 2) {
+        const spread = Math.max(...scores) - Math.min(...scores)
+        if (spread >= 1) {
+          id++
+          insights.push({
+            insight_id: `iw-${id}`,
+            type: 'high_variance',
+            category: cat.key,
+            parameter_key: m.key,
+            parameter_label: m.label,
+            message: `${m.label}: internal teams differ by ${spread.toFixed(1)} pts — align on the position first.`,
+            severity: spread >= 2 ? 'critical' : 'warning',
+          })
+        }
+      }
+    }
+  }
+  const order = { critical: 0, warning: 1, info: 2 } as const
+  return insights.sort((a, b) => order[a.severity] - order[b.severity])
+}
+
+/** "What changed" bullets from the consolidated internal scorecard. */
+export function buildWhatChangedFromWeighted(w: WeightedScorecard): string[] {
+  const bullets: string[] = []
+  if (w.overall_score != null) {
+    bullets.push(`Consolidated overall score: ${w.overall_score.toFixed(1)}/5 across ${w.teams.length} internal team${w.teams.length !== 1 ? 's' : ''}.`)
+  }
+  const sorted = [...w.categories]
+    .filter((c) => c.category_average != null)
+    .sort((a, b) => (a.category_average as number) - (b.category_average as number))
+  for (const cat of sorted) {
+    const low = cat.measures.filter((m) => m.average != null && (m.average as number) < 3).map((m) => m.label)
+    if (low.length > 0) {
+      bullets.push(`${cat.label} (${(cat.category_average as number).toFixed(1)}/5): ${low.join(', ')} scored below 3 — discuss improvement.`)
+    } else {
+      bullets.push(`${cat.label}: consolidated ${(cat.category_average as number).toFixed(1)}/5 (weight ${cat.weight}%).`)
+    }
+  }
+  return bullets.slice(0, 6)
 }
 
 /* ── Build Alignment Flags from Compiled Scores ────────────── */

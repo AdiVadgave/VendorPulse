@@ -42,6 +42,11 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
   const [addLoading, setAddLoading] = useState(false)
   const [removeLoading, setRemoveLoading] = useState<string | null>(null)
 
+  // Reschedule + manual-time (mirrors the Scheduling module)
+  const [rescheduling, setRescheduling] = useState(false)
+  const [manualStart, setManualStart] = useState('')
+  const [manualLoading, setManualLoading] = useState(false)
+
   // State persistence check
   const [persistenceChecked, setPersistenceChecked] = useState(false)
 
@@ -138,10 +143,43 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
         webLink: response.web_link,
         attendeeCount: response.attendee_count,
       })
+      setRescheduling(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to schedule meeting')
     } finally {
       setScheduleLoading(null)
+    }
+  }
+
+  async function handleManualSchedule() {
+    if (!manualStart) return
+    setManualLoading(true)
+    setError(null)
+    try {
+      const organiserEmail = await getTokenOwnerOrganizerEmail()
+      if (!organiserEmail) {
+        setError('Could not determine organiser email from Graph token.')
+        return
+      }
+      const startTime = manualStart.length === 16 ? `${manualStart}:00` : manualStart
+      const response = await scheduleAlignmentMeeting(
+        cycleId,
+        organiserEmail,
+        `align_manual_${Date.now()}`,
+        startTime,
+        durationMinutes,
+        timeZone
+      )
+      onMeetingScheduled({
+        teamsUrl: response.teams_meeting_url,
+        webLink: response.web_link,
+        attendeeCount: response.attendee_count,
+      })
+      setRescheduling(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to schedule meeting')
+    } finally {
+      setManualLoading(false)
     }
   }
 
@@ -337,14 +375,14 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
         <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg px-4 py-3">
           <p className="text-xs font-semibold text-violet-600 dark:text-violet-400 mb-2">Suggested Agenda</p>
           <ul className="space-y-1 text-xs text-violet-800 dark:text-violet-300">
-            <li>1. Review score comparison — Internal Stakeholder vs Vendor gaps</li>
-            <li>2. Discuss flagged categories and agree on final internal position</li>
-            <li>3. Align on face-off model roles before vendor meeting</li>
+            <li>1. Review the consolidated internal scores and low-scoring measures</li>
+            <li>2. Reconcile cross-team divergence into one agreed internal position</li>
+            <li>3. Confirm the points and evidence to raise with the vendor</li>
             <li>4. Capture action items and assign owners</li>
           </ul>
         </div>
 
-        {meetingResult ? (
+        {meetingResult && !rescheduling ? (
           /* Meeting already scheduled — show confirmation */
           <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-4 py-3 space-y-2">
             <div className="flex items-center gap-2">
@@ -354,21 +392,38 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
             <p className="text-xs text-emerald-600 dark:text-emerald-400">
               {meetingResult.attendeeCount} internal stakeholders invited
             </p>
-            {meetingResult.teamsUrl && (
-              <a
-                href={meetingResult.teamsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400 hover:underline font-medium"
+            <div className="flex items-center gap-3">
+              {meetingResult.teamsUrl && (
+                <a
+                  href={meetingResult.teamsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400 hover:underline font-medium"
+                >
+                  <ExternalLink size={11} />
+                  Open Teams Meeting
+                </a>
+              )}
+              <button
+                onClick={() => { setRescheduling(true); setError(null) }}
+                className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 font-medium"
               >
-                <ExternalLink size={11} />
-                Open Teams Meeting
-              </a>
-            )}
+                <CalendarPlus size={11} />
+                Reschedule
+              </button>
+            </div>
           </div>
         ) : (
           /* Slot finding & selection flow */
           <div className="space-y-4">
+            {rescheduling && (
+              <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                <span className="text-xs text-amber-700 dark:text-amber-400">Rescheduling — pick a new slot or set your own time.</span>
+                <button onClick={() => setRescheduling(false)} className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 font-medium">
+                  Cancel
+                </button>
+              </div>
+            )}
             {/* Date range picker + timezone */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -423,6 +478,28 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
                 {error}
               </p>
             )}
+
+            {/* Or pick your own time (manual) */}
+            <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-600 p-3 space-y-2">
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Or pick your own time</p>
+              <div className="flex flex-wrap items-end gap-2">
+                <input
+                  type="datetime-local"
+                  value={manualStart}
+                  onChange={(e) => setManualStart(e.target.value)}
+                  className="text-sm text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+                <button
+                  onClick={handleManualSchedule}
+                  disabled={!manualStart || manualLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <CalendarPlus size={13} />
+                  {manualLoading ? 'Scheduling…' : 'Schedule at this time'}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400">Uses the duration &amp; timezone selected above.</p>
+            </div>
 
             {/* Slot proposals grid */}
             {slots.length > 0 && (

@@ -181,6 +181,139 @@ export interface CompiledScorecard {
   key_recommendations: string[]
 }
 
+/* ══════════════════════════════════════════════════════════════
+ * Weighted scorecard (v2 / production format) — in-app form
+ * ══════════════════════════════════════════════════════════════ */
+
+export interface WeightedMeasureDef {
+  key: string
+  label: string
+  description: string
+}
+
+export interface WeightedCategoryDef {
+  key: ScorecardCategoryKey
+  label: string
+  weight: number
+  measures: WeightedMeasureDef[]
+}
+
+export const WEIGHTED_SCORECARD_STRUCTURE: WeightedCategoryDef[] = [
+  {
+    key: 'RISK_COMPLIANCE',
+    label: 'Risk & Compliance',
+    weight: 20,
+    measures: [
+      { key: 'PATCH_MANAGEMENT', label: 'Patch Management', description: 'Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management' },
+    ],
+  },
+  {
+    key: 'PERFORMANCE',
+    label: 'Performance',
+    weight: 30,
+    measures: [
+      { key: 'RESOURCES_CAPABILITY', label: 'Resources & Capability', description: 'Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization' },
+      { key: 'RELEASE_DELIVERY', label: 'Release & Delivery', description: 'On-time, quality project delivery, resources and capability' },
+      { key: 'OPERATIONS', label: 'Operations', description: 'Meets or exceeds contracted service levels with strong focus on user experience' },
+    ],
+  },
+  {
+    key: 'COMMERCIAL',
+    label: 'Commercial',
+    weight: 20,
+    measures: [
+      { key: 'PRICING', label: 'Pricing', description: 'Cost is competitive and well-managed' },
+      { key: 'COMMERCIAL_EXCELLENCE', label: 'Commercial Excellence', description: 'Appropriate commercial contract structure, invoices timely, accurate, and transparent' },
+      { key: 'COST_CONTROL', label: 'Cost Control', description: 'Changes and increases are managed well and minimized; cost-saving ideas shared' },
+    ],
+  },
+  {
+    key: 'RELATIONSHIP',
+    label: 'Relationship',
+    weight: 30,
+    measures: [
+      { key: 'FLEXIBILITY', label: 'Flexibility', description: 'Vendor team demonstrates flexibility & Proactive responsiveness when required' },
+      { key: 'STAKEHOLDER_ENGAGEMENT', label: 'Stakeholder Engagement', description: "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner" },
+      { key: 'ALIGNMENT', label: 'Alignment', description: 'Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)' },
+    ],
+  },
+]
+
+export interface ScorecardSubmissionPayload {
+  cycle_id: string
+  attendee_id: string
+  scores: Record<string, number>
+  comments: Record<string, string>
+  skipped_measures: string[]
+  skipped_themes: string[]
+}
+
+export interface WeightedTeamColumn {
+  attendee_id: string
+  email: string
+  name: string
+  team: string
+}
+
+export interface WeightedMeasureRow {
+  key: string
+  label: string
+  description: string
+  team_scores: Record<string, number | null>
+  average: number | null
+  comments: Record<string, string>
+}
+
+export interface WeightedCategoryResult {
+  key: ScorecardCategoryKey
+  label: string
+  weight: number
+  measures: WeightedMeasureRow[]
+  category_average: number | null
+}
+
+export interface WeightedScorecard {
+  cycle_id: string
+  teams: WeightedTeamColumn[]
+  categories: WeightedCategoryResult[]
+  overall_score: number | null
+  submitted_count: number
+}
+
+export interface ScorecardRespondent {
+  attendee_id: string
+  name: string
+  email: string
+  team: string
+}
+
+export interface ScorecardFormMeta {
+  cycle_id: string
+  vendor_name: string
+  cycle_type: string
+  quarter: string
+  year: number
+  structure: WeightedCategoryDef[]
+  respondent: ScorecardRespondent | null
+}
+
+export interface TeamSubmissionEntry {
+  attendee_id: string
+  name: string
+  email: string
+  team: string
+  submitted: boolean
+  submitted_at: string | null
+}
+
+export interface TeamSubmissionsData {
+  cycle_id: string
+  total: number
+  submitted: number
+  pending: number
+  tracker: TeamSubmissionEntry[]
+}
+
 /* ── Submission Tracker ────────────────────────────────────── */
 
 export interface SubmissionTrackerEntry {

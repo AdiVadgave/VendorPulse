@@ -196,9 +196,10 @@ def _build_brief_prompt(scorecard: dict, vendor_name: str, cycle_id: str) -> str
 
     return (
         f"Generate a vendor brief for {vendor_name} (cycle: {cycle_id}).\n\n"
-        f"Overall internal avg: {scorecard.get('overall_internal_avg')}\n"
-        f"Overall vendor avg: {scorecard.get('overall_vendor_avg')}\n\n"
-        f"Category scores:\n{categories_text}\n\n"
+        "The scores below are the CONSOLIDATED INTERNAL assessment from Shell's "
+        "stakeholder teams (a weighted scorecard). There is no vendor self-report.\n\n"
+        f"Overall consolidated score: {scorecard.get('overall_internal_avg')}\n\n"
+        f"Category scores (use 'internal_avg' as the consolidated score):\n{categories_text}\n\n"
         f"Comments:\n{comments_text}\n\n"
         f"Key recommendations: {recs}\n\n"
         "Return a valid JSON object with these exact keys:\n"
@@ -264,7 +265,7 @@ def _build_fallback_brief(scorecard: dict) -> dict:
         category_ratings.append({
             "category": cat["category_label"],
             "score": avg,
-            "rationale": f"Internal average: {avg}, Vendor average: {cat.get('vendor_avg') or 'N/A'}",
+            "rationale": f"Consolidated internal score: {avg}/5",
             "trend": cat_trend,
         })
 

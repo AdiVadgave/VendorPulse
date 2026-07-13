@@ -1,6 +1,6 @@
 /** Polling intervals (in milliseconds) — adjust here to change across the app */
 export const POLLING_INTERVALS = {
-  SUBMISSION_TRACKER_MS: 5 * 60 * 1000, // 5 minutes
+  SUBMISSION_TRACKER_MS: 15 * 1000, // 15 seconds — near-live submission updates
 } as const
 
 export const WORKFLOW_STATES = [

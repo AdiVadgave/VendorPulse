@@ -1,0 +1,101 @@
+[
+  {
+    "submission_id": "sub_7a0aee36",
+    "cycle_id": "c_b6861413",
+    "attendee_id": "att_df9d52a8",
+    "respondent_email": "kanishk.punekar@zensar.com",
+    "respondent_name": "Kanishk Punekar",
+    "team": "SOM",
+    "scores": {
+      "PATCH_MANAGEMENT": 5,
+      "PRICING": 5,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 5,
+      "ALIGNMENT": 4
+    },
+    "comments": {
+      "PATCH_MANAGEMENT": "Hi",
+      "PRICING": "hi",
+      "COMMERCIAL_EXCELLENCE": "hi",
+      "COST_CONTROL": "hi",
+      "FLEXIBILITY": "hi",
+      "STAKEHOLDER_ENGAGEMENT": "Hi",
+      "ALIGNMENT": "Hi"
+    },
+    "skipped_measures": [
+      "RESOURCES_CAPABILITY",
+      "RELEASE_DELIVERY",
+      "OPERATIONS"
+    ],
+    "skipped_themes": [
+      "PERFORMANCE"
+    ],
+    "submitted_at": "2026-07-13T08:59:44.618991+00:00"
+  },
+  {
+    "submission_id": "sub_0932cb63",
+    "cycle_id": "c_b6861413",
+    "attendee_id": "att_94917a06",
+    "respondent_email": "anup.kesarwani@zensar.com",
+    "respondent_name": "Anup Kesarwani",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 5,
+      "RESOURCES_CAPABILITY": 5,
+      "RELEASE_DELIVERY": 5,
+      "OPERATIONS": 5,
+      "PRICING": 5,
+      "COMMERCIAL_EXCELLENCE": 5,
+      "COST_CONTROL": 5,
+      "FLEXIBILITY": 5,
+      "STAKEHOLDER_ENGAGEMENT": 5,
+      "ALIGNMENT": 5
+    },
+    "comments": {
+      "PATCH_MANAGEMENT": "Hi",
+      "RESOURCES_CAPABILITY": "Hi",
+      "RELEASE_DELIVERY": "Hi",
+      "OPERATIONS": "Hi",
+      "PRICING": "Hi",
+      "COMMERCIAL_EXCELLENCE": "Hi",
+      "COST_CONTROL": "Hi",
+      "FLEXIBILITY": "Hi",
+      "STAKEHOLDER_ENGAGEMENT": "Hi",
+      "ALIGNMENT": "Hi"
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2026-07-13T09:00:57.853789+00:00"
+  },
+  {
+    "submission_id": "sub_9c482a97",
+    "cycle_id": "c_b6861413",
+    "attendee_id": "att_1fe29702",
+    "respondent_email": "aditya.vadgave@zensar.com",
+    "respondent_name": "Aditya Vadgave",
+    "team": "IDTM",
+    "scores": {},
+    "comments": {},
+    "skipped_measures": [
+      "PATCH_MANAGEMENT",
+      "RESOURCES_CAPABILITY",
+      "RELEASE_DELIVERY",
+      "OPERATIONS",
+      "PRICING",
+      "COMMERCIAL_EXCELLENCE",
+      "COST_CONTROL",
+      "FLEXIBILITY",
+      "STAKEHOLDER_ENGAGEMENT",
+      "ALIGNMENT"
+    ],
+    "skipped_themes": [
+      "RISK_COMPLIANCE",
+      "PERFORMANCE",
+      "COMMERCIAL",
+      "RELATIONSHIP"
+    ],
+    "submitted_at": "2026-07-13T09:25:09.140480+00:00"
+  }
+]

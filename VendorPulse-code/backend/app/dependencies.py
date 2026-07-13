@@ -160,11 +160,21 @@ def get_scheduling_agent(cycle_id: str | None = None):
 
 def _fetch_compiled_scorecard(cycle_id: str) -> dict:
     """
-    Reusable scorecard fetcher for the VendorPrepAgent.
-    Calls the same logic as GET /api/scorecard/compiled/{cycle_id}.
+    Legacy 2-column compiled scorecard (Google Forms era). Kept for agents that
+    still reference it; new flows should use _fetch_weighted_compiled.
     """
     from app.api.routes.scorecard import get_compiled_scorecard
     return get_compiled_scorecard(cycle_id)
+
+
+def _fetch_weighted_compiled(cycle_id: str) -> dict:
+    """
+    Consolidated internal scorecard (new weighted format), adapted to the
+    compiled shape the agents expect. Scorecards are collected from internal
+    stakeholders only — there is no vendor self-report.
+    """
+    from app.api.routes.scorecard_v2 import weighted_as_compiled
+    return weighted_as_compiled(cycle_id)
 
 
 def get_vendor_prep_agent(cycle_id: str | None = None):
@@ -172,7 +182,7 @@ def get_vendor_prep_agent(cycle_id: str | None = None):
     from app.agents.vendor_prep_agent import VendorPrepAgent
 
     return VendorPrepAgent(
-        scorecard_fetcher=_fetch_compiled_scorecard,
+        scorecard_fetcher=_fetch_weighted_compiled,
         cycle_id=cycle_id,
         llm_svc=get_llm_service() if settings.enable_llm else None,
         agent_run_repo=get_agent_run_repo(),

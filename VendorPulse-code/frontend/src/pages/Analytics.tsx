@@ -1,25 +1,18 @@
 import { useState } from 'react'
-import { Building2, TrendingUp, TrendingDown, Minus, BarChart3, Users, AlertCircle } from 'lucide-react'
+import { Building2, TrendingUp, TrendingDown, Minus, Users } from 'lucide-react'
 import {
   MOCK_VENDOR_TRENDS,
-  MOCK_RECURRING_ISSUES,
   MOCK_RADAR_DATA,
   MOCK_CROSS_VENDOR_DATA,
   MOCK_LEADERSHIP_BRIEFS,
   MOCK_STAKEHOLDER_VS_VENDOR,
-  MOCK_PARAMETER_INSIGHTS,
 } from '@/mock/analytics.mock'
 import type { ScorecardCategoryKey } from '@/types/scorecard.types'
 import { CATEGORY_LABELS, SCORECARD_CATEGORIES } from '@/types/scorecard.types'
-import type { LeadershipBrief } from '@/types/analytics.types'
 import TrendLineChart from '@/components/modules/analytics/TrendLineChart'
-import RadarChartComponent from '@/components/modules/analytics/RadarChartComponent'
 import CrossVendorComparison from '@/components/modules/analytics/CrossVendorComparison'
-import RecurringIssueAlerts from '@/components/modules/analytics/RecurringIssueAlerts'
-import LeadershipBriefCard from '@/components/modules/analytics/LeadershipBriefCard'
 import CategoryScoreCards from '@/components/modules/analytics/CategoryScoreCards'
 import StakeholderVendorGap from '@/components/modules/analytics/StakeholderVendorGap'
-import ParameterInsights from '@/components/modules/analytics/ParameterInsights'
 import { cn } from '@/utils/cn'
 
 const VENDOR_OPTIONS = [
@@ -56,31 +49,19 @@ function overallScoreColor(score: number) {
 }
 
 export default function Analytics() {
-  const [selectedVendorId, setSelectedVendorId]     = useState('v1')
-  const [selectedCategory, setSelectedCategory]     = useState<ScorecardCategoryKey | 'ALL'>('ALL')
-  const [leadershipBriefs, setLeadershipBriefs]     = useState<Record<string, LeadershipBrief>>(MOCK_LEADERSHIP_BRIEFS)
+  const [selectedVendorId, setSelectedVendorId] = useState('v1')
+  const [selectedCategory, setSelectedCategory] = useState<ScorecardCategoryKey | 'ALL'>('ALL')
 
   const selectedTrend   = MOCK_VENDOR_TRENDS.find((t) => t.vendor_id === selectedVendorId)!
-  const radarData       = MOCK_RADAR_DATA[selectedVendorId]
   const gapData         = MOCK_STAKEHOLDER_VS_VENDOR[selectedVendorId]
-  const insights        = MOCK_PARAMETER_INSIGHTS[selectedVendorId] ?? []
   const vendorOption    = VENDOR_OPTIONS.find((v) => v.id === selectedVendorId)!
   const brief           = MOCK_LEADERSHIP_BRIEFS[selectedVendorId]
   const trajectory      = brief?.trajectory ?? 'stable'
   const trajectoryConf  = TRAJECTORY_CONFIG[trajectory]
   const overall         = overallScore(selectedVendorId)
-  const openIssues      = MOCK_RECURRING_ISSUES.filter((i) => i.vendor_id === selectedVendorId && i.status === 'OPEN').length
-  const flaggedParams   = insights.filter((i) => Math.abs(i.gap) >= 1 || i.average < 3.0).length
 
-  function handleGenerateBrief() {
-    setLeadershipBriefs((prev) => ({
-      ...prev,
-      [selectedVendorId]: {
-        ...MOCK_LEADERSHIP_BRIEFS[selectedVendorId],
-        generated_at: new Date().toISOString(),
-      },
-    }))
-  }
+  // Radar data retained for future use
+  void MOCK_RADAR_DATA
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -117,7 +98,7 @@ export default function Analytics() {
       </div>
 
       {/* ── KPI summary row ───────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         {/* Overall score */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Overall Score</p>
@@ -133,28 +114,6 @@ export default function Analytics() {
             {trajectoryConf.label}
           </p>
           <p className="text-xs text-slate-400 mt-0.5">5-cycle pattern</p>
-        </div>
-
-        {/* Open issues */}
-        <div className={cn('rounded-xl border p-4', openIssues > 0 ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800')}>
-          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
-            <span className="flex items-center gap-1"><AlertCircle size={11} /> Recurring Issues</span>
-          </p>
-          <p className={cn('text-3xl font-bold', openIssues > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400')}>
-            {openIssues}
-          </p>
-          <p className="text-xs text-slate-400 mt-0.5">open this cycle</p>
-        </div>
-
-        {/* Flagged parameters */}
-        <div className={cn('rounded-xl border p-4', flaggedParams > 0 ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800')}>
-          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
-            <span className="flex items-center gap-1"><BarChart3 size={11} /> Flagged Parameters</span>
-          </p>
-          <p className={cn('text-3xl font-bold', flaggedParams > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400')}>
-            {flaggedParams}
-          </p>
-          <p className="text-xs text-slate-400 mt-0.5">with gap ≥ 1 or avg &lt; 3.0</p>
         </div>
       </div>
 
@@ -193,12 +152,11 @@ export default function Analytics() {
         ))}
       </div>
 
-      {/* ── Trend chart + Radar ───────────────────────────────────── */}
+      {/* ── Trend chart ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2">
           <TrendLineChart trend={selectedTrend} selectedCategory={selectedCategory} />
         </div>
-        
       </div>
 
       {/* ── Stakeholder vs Vendor gap ─────────────────────────────── */}
@@ -212,20 +170,6 @@ export default function Analytics() {
         </div>
         <CrossVendorComparison data={MOCK_CROSS_VENDOR_DATA} />
       </div>
-
-      {/* ── Parameter insights + Recurring issues ────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <ParameterInsights insights={insights} vendorName={vendorOption.name} />
-        <RecurringIssueAlerts issues={MOCK_RECURRING_ISSUES.filter((i) => i.vendor_id === selectedVendorId)} />
-      </div>
-
-      {/* ── Leadership brief ─────────────────────────────────────── */}
-      <LeadershipBriefCard
-        vendorId={selectedVendorId}
-        vendorName={vendorOption.name}
-        brief={leadershipBriefs[selectedVendorId] ?? null}
-        onGenerate={handleGenerateBrief}
-      />
     </div>
   )
 }

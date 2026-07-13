@@ -316,17 +316,35 @@ def schedule_alignment_meeting(
     year = cycle.get("year", "")
     subject = f"Internal Alignment — {vendor_name} ({quarter} {year})"
 
+    # Reschedule-in-place: if an alignment meeting already exists for this cycle,
+    # PATCH the existing Teams event (keeps the join link + invite thread) instead
+    # of creating a duplicate. Mirrors the Scheduling module's reschedule.
+    existing = next(
+        (m for m in meeting_repo.get_for_cycle(cycleId)
+         if m.get("meetingType") == "INTERNAL_ALIGNMENT" and m.get("status") != "cancelled"),
+        None,
+    )
+    is_reschedule = bool(existing and existing.get("meetingId"))
+
     try:
         duration_hours = float(payload.duration_minutes) / 60.0
-        result = asyncio.run(graph_service.create_event(
-            subject=subject,
-            attendee_emails=internal_emails,
-            start_time=payload.start_time,
-            duration_hours=duration_hours,
-            organiser_email=payload.organiser_email.strip().lower(),
-            is_online_meeting=True,
-            time_zone=payload.time_zone,
-        ))
+        if is_reschedule:
+            result = asyncio.run(graph_service.update_event(
+                event_id=existing["meetingId"],
+                start_time=payload.start_time,
+                duration_hours=duration_hours,
+                time_zone=payload.time_zone,
+            ))
+        else:
+            result = asyncio.run(graph_service.create_event(
+                subject=subject,
+                attendee_emails=internal_emails,
+                start_time=payload.start_time,
+                duration_hours=duration_hours,
+                organiser_email=payload.organiser_email.strip().lower(),
+                is_online_meeting=True,
+                time_zone=payload.time_zone,
+            ))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Graph API error: {str(e)}")
 
@@ -334,9 +352,10 @@ def schedule_alignment_meeting(
         status_code = int(result.get("status_code") or 400)
         raise HTTPException(status_code=status_code, detail=result.get("error", "Graph API error"))
 
-    teams_url = result.get("onlineMeetingUrl")
-    web_link = result.get("webLink")
-    event_id = result.get("id") or f"m{uuid.uuid4().hex[:8]}"
+    # On reschedule, Graph's PATCH may not echo the online-meeting URL — keep the old one.
+    teams_url = result.get("onlineMeetingUrl") or (existing.get("teamsMeetingUrl") if existing else None)
+    web_link = result.get("webLink") or (existing.get("webLink") if existing else None)
+    event_id = result.get("id") or (existing.get("meetingId") if existing else None) or f"m{uuid.uuid4().hex[:8]}"
 
     # Persist meeting to meetings.json so state survives refresh
     try:
@@ -362,8 +381,12 @@ def schedule_alignment_meeting(
             "teamsMeetingUrl": teams_url,
             "webLink": web_link,
         }
-        meeting_repo.insert(meeting_record)
-        logger.info("ALIGNMENT: meeting persisted — meetingId=%s", event_id)
+        if is_reschedule:
+            meeting_repo.replace_by_id("meetingId", event_id, meeting_record)
+            logger.info("ALIGNMENT: meeting rescheduled — meetingId=%s", event_id)
+        else:
+            meeting_repo.insert(meeting_record)
+            logger.info("ALIGNMENT: meeting persisted — meetingId=%s", event_id)
     except Exception as e:
         logger.warning("ALIGNMENT: failed to persist meeting: %s", e)
 
@@ -591,6 +614,98 @@ def get_alignment_flags(cycleId: str, payload: AlignmentFlagsRequest):
             "action": "get_alignment_flags",
             "params": {"cycle_id": cycleId},
         },
+    )
+
+
+class InsightsRequest(BaseModel):
+    cycle_id: str
+
+
+def _deterministic_insights(w: dict) -> list[dict]:
+    """Runtime insights computed straight from the consolidated (weighted)
+    scorecard: low consolidated scores + cross-team divergence. No hardcoding."""
+    insights: list[dict] = []
+    i = 0
+    for cat in w.get("categories", []):
+        cavg = cat.get("category_average")
+        if cavg is not None and cavg < 3:
+            i += 1
+            insights.append({
+                "insight_id": f"iw-{i}", "type": "low_score", "category": cat["key"],
+                "message": f"{cat['label']}: consolidated {cavg:.1f}/5 — below target; prepare an improvement ask for the vendor.",
+                "severity": "warning",
+            })
+        for m in cat.get("measures", []):
+            avg = m.get("average")
+            if avg is not None and avg < 3:
+                i += 1
+                insights.append({
+                    "insight_id": f"iw-{i}", "type": "low_score", "category": cat["key"],
+                    "parameter_key": m["key"], "parameter_label": m["label"],
+                    "message": f"{m['label']}: consolidated {avg:.1f}/5 — flag for the vendor discussion.",
+                    "severity": "warning",
+                })
+            scores = [v for v in (m.get("team_scores") or {}).values() if isinstance(v, (int, float))]
+            if len(scores) >= 2:
+                spread = max(scores) - min(scores)
+                if spread >= 1:
+                    i += 1
+                    insights.append({
+                        "insight_id": f"iw-{i}", "type": "high_variance", "category": cat["key"],
+                        "parameter_key": m["key"], "parameter_label": m["label"],
+                        "message": f"{m['label']}: internal teams differ by {spread:.1f} pts — reconcile into one position before the vendor meeting.",
+                        "severity": "critical" if spread >= 2 else "warning",
+                    })
+    order = {"critical": 0, "warning": 1, "info": 2}
+    insights.sort(key=lambda x: order.get(x["severity"], 3))
+    return insights
+
+
+@router.post("/insights", response_model=AgentResponse)
+def get_alignment_insights(cycleId: str, payload: InsightsRequest):
+    """Generate alignment insights from the CONSOLIDATED internal scorecard
+    (runtime — never hardcoded). LLM narrates when enabled; otherwise the
+    deterministic insights are returned as-is."""
+    if payload.cycle_id != cycleId:
+        raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
+
+    from app.api.routes.scorecard_v2 import _compile_weighted
+    weighted = _compile_weighted(cycleId)
+    insights = _deterministic_insights(weighted)
+
+    llm = get_llm_service() if settings.enable_llm else None
+    if llm and llm.is_enabled and insights:
+        prompt = (
+            "Below is the CONSOLIDATED internal scorecard (internal teams only; no "
+            "vendor self-report) and a set of deterministically-computed insights.\n\n"
+            f"Consolidated scorecard:\n{json.dumps(weighted.get('categories', []), indent=2)}\n\n"
+            f"Overall score: {weighted.get('overall_score')}\n\n"
+            f"Computed insights (ground truth — keep the same facts, severities and ids):\n"
+            f"{json.dumps(insights, indent=2)}\n\n"
+            "Rewrite ONLY the 'message' of each insight to be sharper and more "
+            "decision-useful for the internal alignment call. Do NOT change any "
+            "number, id, severity, category or type, and do NOT add or remove items. "
+            "Return ONLY a JSON array of the same objects with improved 'message' fields."
+        )
+        raw = llm.call_simple(prompt, system=ALIGNMENT_SYSTEM_PROMPT, max_tokens=1200)
+        try:
+            parsed = json.loads(_strip_markdown_json(raw))
+            if isinstance(parsed, list) and len(parsed) == len(insights):
+                # Keep our figures/ids/severities; take only the narrated message.
+                for base, refined in zip(insights, parsed):
+                    if isinstance(refined, dict) and refined.get("message"):
+                        base["message"] = str(refined["message"])
+        except json.JSONDecodeError:
+            pass  # fall back to deterministic messages
+
+    return AgentResponse(
+        status="success",
+        agent="alignment_agent",
+        summary=f"{len(insights)} alignment insight(s) from the consolidated internal scorecard.",
+        data={"insights": insights},
+        warnings=[] if weighted.get("submitted_count") else ["No scorecards submitted yet."],
+        next_actions=["REVIEW_INSIGHTS"],
+        requires_approval=False,
     )
 
 

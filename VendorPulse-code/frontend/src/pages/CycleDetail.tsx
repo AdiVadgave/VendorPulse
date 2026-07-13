@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Building2,
   Clock,
+  ArrowRight,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { getMockCycleById as getMockCycleById } from '@/mock/cycles.mock'
@@ -21,9 +22,9 @@ import {
   MOCK_ATTENDEES_RSVP,
 } from '@/mock/scheduling.mock'
 import { completeAttendanceConfirmation, fetchAttendeesSeeded, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
-import { getCompiledScorecard } from '@/lib/scorecardApi'
+import { getCompiledScorecard, getWeightedScorecard } from '@/lib/scorecardApi'
 import { compiledScorecardToLegacy } from '@/mock/scorecard.mock'
-import type { CompiledCategoryScore, CompiledScorecard } from '@/types/scorecard.types'
+import type { CompiledCategoryScore, CompiledScorecard, WeightedScorecard, TeamSubmissionsData } from '@/types/scorecard.types'
 import {
   MOCK_SCORE_DELTAS,
   MOCK_ALIGNMENT_FLAGS,
@@ -35,6 +36,9 @@ import {
   generateWhatChangedBullets,
   buildComparisonsFromScorecard,
   buildFlagsFromScorecard,
+  buildFlagsFromWeighted,
+  buildInsightsFromWeighted,
+  buildWhatChangedFromWeighted,
 } from '@/mock/alignment.mock'
 import {
   MOCK_PUSHBACK_ITEMS,
@@ -57,7 +61,9 @@ import MeetingPlanPanel from '@/components/modules/scheduling/MeetingPlanPanel'
 
 import ScorecardDispatchPanel from '@/components/modules/scorecard/ScorecardDispatchPanel'
 import SubmissionTracker from '@/components/modules/scorecard/SubmissionTracker'
-import CompiledScorecardTable from '@/components/modules/scorecard/CompiledScorecardTable'
+import WeightedScorecardTable from '@/components/modules/scorecard/WeightedScorecardTable'
+import FinalizeScorecardTable from '@/components/modules/scorecard/FinalizeScorecardTable'
+import TeamScorecardsSection from '@/components/modules/scorecard/TeamScorecardsSection'
 
 import ChangeHighlightsPanel from '@/components/modules/alignment/ChangeHighlightsPanel'
 import AlignmentFlagsPanel from '@/components/modules/alignment/AlignmentFlagsPanel'
@@ -83,7 +89,8 @@ import { WORKFLOW_STATES, TAB_KEYS, TAB_LABELS, TAB_MIN_STATE_INDEX, getDefaultT
 import { useCycleStore } from '@/store/useCycleStore'
 import type { SchedulingPhase, CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 // scorecard types imported via CompiledCategoryScore and CompiledScorecard above
-import type { ExtractedAction } from '@/types/alignment.types'
+import type { ExtractedAction, AlignmentInsight } from '@/types/alignment.types'
+import { getAlignmentInsights } from '@/lib/alignmentApi'
 import type { VendorBrief, PushbackItem, PushbackResponse } from '@/types/vendor-prep.types'
 import type { MeetingNote } from '@/types/meeting.types'
 
@@ -519,6 +526,13 @@ export default function CycleDetail() {
             onCompiledFetched={handleCompiledFetched}
             cycleId={cycle.cycle_id}
             attendees={schedulingAttendees}
+            onAttendeesChanged={setSchedulingAttendees}
+            onScorecardCompiled={() => advanceWorkflow(cycle!.cycle_id, 'SCORECARD_COMPILED')}
+            onProceedToAlignment={() => {
+              advanceWorkflow(cycle!.cycle_id, 'SCORECARD_COMPILED')
+              setActiveTab('alignment')
+              setLastTab(cycle!.cycle_id, 'alignment')
+            }}
           />
         )}
 
@@ -816,7 +830,8 @@ function SchedulingTab({
 
 /* ── Scorecard Tab ────────────────────────────────────────── */
 function ScorecardTab({
-  cycle, dispatched, onDispatched, compiledScorecard, onCompiledFetched, cycleId, attendees,
+  cycle, dispatched, onDispatched, onCompiledFetched, cycleId, attendees, onAttendeesChanged,
+  onScorecardCompiled, onProceedToAlignment,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   dispatched: boolean
@@ -825,53 +840,116 @@ function ScorecardTab({
   onCompiledFetched: (cs: CompiledScorecard) => void
   cycleId: string
   attendees: CycleAttendee[]
+  onAttendeesChanged: (a: CycleAttendee[]) => void
+  /** Advance the cycle to SCORECARD_COMPILED (unlocks the Alignment tab). */
+  onScorecardCompiled: () => void
+  /** Advance to SCORECARD_COMPILED and navigate to the Alignment tab. */
+  onProceedToAlignment: () => void
 }) {
+  const [subTab, setSubTab] = useState<'collection' | 'finalize'>('collection')
+  const [weighted, setWeighted] = useState<WeightedScorecard | null>(null)
   const [autoFetched, setAutoFetched] = useState(false)
 
-  // Auto-fetch compiled scorecard when dispatched and not yet fetched
-  useEffect(() => {
-    if (!dispatched || autoFetched) return
-    const fetchCompiled = async () => {
-      try {
-        const cs = await getCompiledScorecard(cycleId)
-        if (cs.internal_respondents > 0 || cs.vendor_respondents > 0) {
-          onCompiledFetched(cs)
-        }
-      } catch { /* backend may not be ready */ }
-      setAutoFetched(true)
-    }
-    fetchCompiled()
-  }, [dispatched, autoFetched, cycleId, onCompiledFetched])
+  const refreshWeighted = useCallback(async () => {
+    try {
+      setWeighted(await getWeightedScorecard(cycleId))
+    } catch { /* backend may not be ready */ }
+  }, [cycleId])
 
-  // Refresh compiled scorecard when submission tracker updates
-  const handleSubmissionsUpdated = useCallback(async () => {
+  // Refresh the weighted (new) scorecard, auto-advance once every key team has
+  // submitted, and keep the legacy 2-column compiled in sync for Alignment.
+  const handleSubmissionsUpdated = useCallback(async (data?: TeamSubmissionsData) => {
+    void refreshWeighted()
+    // All key internal-stakeholder teams submitted → compile & unlock Alignment.
+    if (data && data.total > 0 && data.pending === 0) onScorecardCompiled()
     try {
       const cs = await getCompiledScorecard(cycleId)
-      if (cs.internal_respondents > 0 || cs.vendor_respondents > 0) {
-        onCompiledFetched(cs)
-      }
+      if (cs.internal_respondents > 0 || cs.vendor_respondents > 0) onCompiledFetched(cs)
     } catch { /* ignore */ }
-  }, [cycleId, onCompiledFetched])
+  }, [cycleId, onCompiledFetched, refreshWeighted, onScorecardCompiled])
+
+  useEffect(() => { void refreshWeighted() }, [refreshWeighted])
+  useEffect(() => {
+    if (!dispatched || autoFetched) return
+    void handleSubmissionsUpdated()
+    setAutoFetched(true)
+  }, [dispatched, autoFetched, handleSubmissionsUpdated])
+
+  const subTabBtn = (key: 'collection' | 'finalize', label: string) => (
+    <button
+      onClick={() => { setSubTab(key); if (key === 'finalize') void refreshWeighted() }}
+      className={cn(
+        'flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
+        subTab === key
+          ? 'bg-violet-600 text-white'
+          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+      )}
+    >
+      {label}
+    </button>
+  )
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
-      <ScorecardDispatchPanel
-        vendorName={cycle.vendor_name}
-        cycleId={cycleId}
-        quarter={cycle.quarter}
-        year={cycle.year}
-        attendees={attendees}
-        onDispatched={onDispatched}
-        alreadyDispatched={dispatched}
-      />
-      {dispatched && (
-        <SubmissionTracker
-          cycleId={cycleId}
-          onSubmissionsUpdated={handleSubmissionsUpdated}
-        />
+      <div className="flex w-full gap-2.5 align-centre bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-1.5 w-full">
+        {subTabBtn('collection', 'Scorecard Collection')}
+        {subTabBtn('finalize', 'Comparison & Finalize')}
+      </div>
+
+      {subTab === 'collection' && (
+        <>
+          <ScorecardDispatchPanel
+            vendorName={cycle.vendor_name}
+            cycleId={cycleId}
+            quarter={cycle.quarter}
+            year={cycle.year}
+            attendees={attendees}
+            onDispatched={onDispatched}
+            onAttendeesChanged={onAttendeesChanged}
+            alreadyDispatched={dispatched}
+          />
+          <SubmissionTracker cycleId={cycleId} onSubmissionsUpdated={handleSubmissionsUpdated} />
+        </>
       )}
-      {compiledScorecard && (compiledScorecard.internal_respondents > 0 || compiledScorecard.vendor_respondents > 0) && (
-        <CompiledScorecardTable scorecard={compiledScorecard} />
+
+      {subTab === 'finalize' && (
+        <>
+          {weighted && weighted.teams.length > 0 && (
+            <TeamScorecardsSection data={weighted} />
+          )}
+          {weighted ? (
+            <WeightedScorecardTable data={weighted} />
+          ) : (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center text-sm text-slate-500 dark:text-slate-400">
+              Loading consolidated scorecard…
+            </div>
+          )}
+          {weighted && weighted.submitted_count > 0 && (
+            <FinalizeScorecardTable cycleId={cycleId} consolidated={weighted} />
+          )}
+        </>
+      )}
+
+      {/* Proceed to Internal Alignment — HITL gate once scorecards are out/collected */}
+      {dispatched && (
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+              Ready to move to Internal Alignment?
+            </p>
+            <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
+              {(weighted?.submitted_count ?? 0)} team{(weighted?.submitted_count ?? 0) !== 1 ? 's' : ''} submitted so far.
+              Proceeding compiles the scorecard and unlocks the Internal Alignment tab.
+            </p>
+          </div>
+          <button
+            onClick={onProceedToAlignment}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0"
+          >
+            Proceed to Internal Alignment
+            <ArrowRight size={14} />
+          </button>
+        </div>
       )}
     </div>
   )
@@ -895,36 +973,54 @@ function AlignmentTab({
 }) {
   const [alignmentNotesText, setAlignmentNotesText] = useState('')
   const [, setAlignmentMinutesApproved] = useState(false)
-  // Prefer building comparisons directly from the 2-column compiled scorecard
-  // (uses real internal_avg / vendor_avg values). Legacy path kept as fallback.
+
+  // Scorecards are collected from internal-stakeholder TEAMS only (no vendor
+  // self-report). Alignment therefore works off the consolidated weighted
+  // scorecard: surface low consolidated scores and where internal teams diverge.
+  const [weighted, setWeighted] = useState<WeightedScorecard | null>(null)
+  const [serverInsights, setServerInsights] = useState<AlignmentInsight[] | null>(null)
+  useEffect(() => {
+    getWeightedScorecard(cycleId).then(setWeighted).catch(() => { /* not ready */ })
+    // Runtime AI insights from the consolidated internal scorecard (LLM narrates when enabled).
+    getAlignmentInsights(cycleId)
+      .then((r) => setServerInsights(r.data?.insights ?? null))
+      .catch(() => setServerInsights(null))
+  }, [cycleId])
+  const hasWeighted = !!weighted && weighted.teams.length > 0
+
+  // Legacy 2-column comparison (kept only as a fallback for mock cycles).
   const comparisons = compiledScorecard
     ? buildComparisonsFromScorecard(compiledScorecard)
     : compiledScores
       ? buildCategoryComparisons(compiledScores)
       : []
 
-  const dynamicFlags = compiledScorecard
+  const legacyFlags = compiledScorecard
     ? buildFlagsFromScorecard(compiledScorecard)
     : compiledScores
       ? buildAlignmentFlags(compiledScores)
       : []
 
-  const insights = generateAlignmentInsights(comparisons, MOCK_SCORE_DELTAS)
+  const flags = hasWeighted
+    ? buildFlagsFromWeighted(weighted!)
+    : legacyFlags.length > 0 ? legacyFlags : MOCK_ALIGNMENT_FLAGS
 
-  // Use dynamic flags if compiled data is available, otherwise fall back to mock
-  const flags = dynamicFlags.length > 0 ? dynamicFlags : MOCK_ALIGNMENT_FLAGS
+  // Prefer the backend insights (runtime from consolidated data, LLM-narrated when
+  // enabled); fall back to the deterministic client builder, then legacy mock.
+  const insights = serverInsights && serverInsights.length > 0
+    ? serverInsights
+    : hasWeighted
+      ? buildInsightsFromWeighted(weighted!)
+      : generateAlignmentInsights(comparisons, MOCK_SCORE_DELTAS)
 
-  // Generate what-changed bullets dynamically from compiled data, fallback to static
   const STATIC_BULLETS = [
-    'Performance improved by +0.90 points to 3.90 — strongest improvement this cycle, driven by delivery quality and SLA adherence.',
-    'Commercial category up +0.50 points — billing accuracy and contract compliance both performing well.',
-    'Risk & Compliance edged up +0.34 points — security posture improving but patch management remains a discussion point.',
-    'Relationship dipped −0.37 points to 4.13 — communication effectiveness gap between Stakeholder (3) and Vendor (4) needs alignment.',
-    'Key flag: Delivery Timeliness, Pricing Competitiveness, and Communication show 1+ point gaps between Stakeholder and Vendor scores.',
+    'Review the consolidated internal scorecard above and agree the position on any low-scoring or divergent measures before the vendor meeting.',
   ]
-  const whatChangedBullets = comparisons.length > 0
-    ? generateWhatChangedBullets(comparisons, flags)
-    : STATIC_BULLETS
+  const whatChangedBullets = hasWeighted
+    ? buildWhatChangedFromWeighted(weighted!)
+    : comparisons.length > 0
+      ? generateWhatChangedBullets(comparisons, flags)
+      : STATIC_BULLETS
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">

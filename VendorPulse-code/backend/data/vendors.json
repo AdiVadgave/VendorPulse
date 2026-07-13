@@ -46,5 +46,11 @@
     "name": "Anup",
     "category": "IT Infrastructure",
     "status": "active"
+  },
+  {
+    "vendor_id": "v_8d81d644",
+    "name": "Kanishk",
+    "category": "IT Infrastructure",
+    "status": "active"
   }
 ]

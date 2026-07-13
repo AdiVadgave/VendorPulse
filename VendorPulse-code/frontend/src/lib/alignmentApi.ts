@@ -3,7 +3,7 @@
  * All calls go through the base apiFetch wrapper.
  */
 import { apiFetch } from './api'
-import type { ExtractedAction } from '@/types/alignment.types'
+import type { ExtractedAction, AlignmentInsight } from '@/types/alignment.types'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 
 // ── Response shape ──────────────────────────────────────────────────────────
@@ -38,6 +38,25 @@ export async function extractAlignmentActions(
         notes_text: notesText,
       }),
     }
+  )
+}
+
+// ── AI-Generated Insights (from consolidated internal scorecard) ─────────────
+
+export interface InsightsPayload {
+  insights: AlignmentInsight[]
+}
+
+/**
+ * Generate alignment insights from the consolidated internal scorecard.
+ * Runtime — computed from the actual submitted scores (LLM narrates when enabled).
+ */
+export async function getAlignmentInsights(
+  cycleId: string
+): Promise<AgentResponse<InsightsPayload>> {
+  return apiFetch<AgentResponse<InsightsPayload>>(
+    `/api/cycles/${cycleId}/alignment/insights`,
+    { method: 'POST', body: JSON.stringify({ cycle_id: cycleId }) }
   )
 }
 

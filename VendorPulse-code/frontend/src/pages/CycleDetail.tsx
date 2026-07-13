@@ -53,6 +53,7 @@ import AttendeeRefreshPanel from '@/components/modules/scheduling/AttendeeRefres
 import SlotRankingPanel from '@/components/modules/scheduling/SlotRankingPanel'
 import InviteApprovalPanel from '@/components/modules/scheduling/InviteApprovalPanel'
 import ConfirmationTracker from '@/components/modules/scheduling/ConfirmationTracker'
+import MeetingPlanPanel from '@/components/modules/scheduling/MeetingPlanPanel'
 
 import ScorecardDispatchPanel from '@/components/modules/scorecard/ScorecardDispatchPanel'
 import SubmissionTracker from '@/components/modules/scorecard/SubmissionTracker'
@@ -484,7 +485,7 @@ export default function CycleDetail() {
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto p-6">
         {activeTab === 'overview' && (
-          <OverviewTab cycle={cycle} currentStateIndex={currentStateIndex} />
+          <OverviewTab cycle={cycle} currentStateIndex={currentStateIndex} isMockCycle={isMockCycle} />
         )}
 
         {activeTab === 'scheduling' && (
@@ -596,9 +597,11 @@ export default function CycleDetail() {
 function OverviewTab({
   cycle,
   currentStateIndex,
+  isMockCycle,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   currentStateIndex: number
+  isMockCycle: boolean
 }) {
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -606,7 +609,7 @@ function OverviewTab({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: 'Cycle Progress', value: `${currentStateIndex + 1} / ${WORKFLOW_STATES.length}`, sub: 'workflow steps' },
-          { label: 'Quarter', value: `${cycle.quarter} ${cycle.year}`, sub: 'governance cycle' },
+          { label: `${cycle.cycle_type ?? 'SPR'} · Quarter`, value: `${cycle.quarter} ${cycle.year}`, sub: 'governance cycle' },
           { label: 'Vendor', value: cycle.vendor_name, sub: 'IT Infrastructure' },
         ].map((card) => (
           <div key={card.label} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
@@ -616,6 +619,12 @@ function OverviewTab({
           </div>
         ))}
       </div>
+
+      <MeetingPlanPanel
+        cycleId={cycle.cycle_id}
+        meetingPlan={cycle.meeting_plan ?? []}
+        isMockCycle={isMockCycle}
+      />
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Workflow Steps</h3>
@@ -747,6 +756,16 @@ function SchedulingTab({
             onSlotTimeZoneSelected(tz)
             onPhaseChange('invite_approval')
           }}
+          onManualScheduled={(manualSlot, tz, teamsUrl) => {
+            // Coordinator bypassed the ranked slots and set their own time.
+            // The Teams meeting is already created via Graph — jump straight to
+            // confirmation tracking (which advances the workflow to MEETING_SCHEDULED).
+            onSlotsReceived([manualSlot])
+            onSlotSelected(manualSlot.slot_id)
+            onSlotTimeZoneSelected(tz)
+            onTeamsMeetingUrlCaptured(teamsUrl)
+            onPhaseChange('confirmation_tracking')
+          }}
         />
       )}
       {schedulingPhase === 'invite_approval' && (
@@ -778,10 +797,17 @@ function SchedulingTab({
       {schedulingPhase === 'confirmation_tracking' && (
         selectedSlot ? (
           <ConfirmationTracker
+            cycleId={cycle.cycle_id}
             attendees={attendees.length > 0 ? attendees : MOCK_ATTENDEES_RSVP}
             slot={selectedSlot}
             timeZoneOverride={selectedSlotTimeZone}
             onProceed={onScorecardProceed}
+            onRescheduled={isMockCycle ? undefined : (newSlot, tz, teamsUrl) => {
+              onSlotsReceived([newSlot])
+              onSlotSelected(newSlot.slot_id)
+              onSlotTimeZoneSelected(tz)
+              onTeamsMeetingUrlCaptured(teamsUrl)
+            }}
           />
         ) : null
       )}

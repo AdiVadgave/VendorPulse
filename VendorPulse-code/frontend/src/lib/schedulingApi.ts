@@ -4,7 +4,7 @@
  */
 import { apiFetch } from './api'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
-import type { GovernanceCycle } from '@/types/cycle.types'
+import type { CycleMeeting, GovernanceCycle } from '@/types/cycle.types'
 
 // ── Response shapes ──────────────────────────────────────────────────────────
 
@@ -100,6 +100,61 @@ export async function setBackendWorkflowState(
     // remains the source of truth via localStorage.
     return null
   }
+}
+
+// ── Meeting plan ───────────────────────────────────────────────────────────
+
+/** Replace the cycle's meeting plan (which meetings are included in this cycle). */
+export async function updateMeetingPlan(
+  cycleId: string,
+  meetingPlan: CycleMeeting[]
+): Promise<CycleMeeting[]> {
+  const res = await apiFetch<{ cycle: GovernanceCycle; meeting_plan: CycleMeeting[] }>(
+    `/api/cycles/${cycleId}/meeting-plan`,
+    { method: 'PUT', body: JSON.stringify({ meeting_plan: meetingPlan }) }
+  )
+  return res.meeting_plan ?? meetingPlan
+}
+
+// ── Manual / reschedule (main governance meeting) ────────────────────────────
+
+export interface ScheduleManualResult {
+  message: string
+  event_id?: string
+  teams_meeting_url?: string | null
+  web_link?: string | null
+  slot?: SlotProposal
+  rescheduled: boolean
+}
+
+/**
+ * Manually schedule (or reschedule) the main governance meeting at a
+ * coordinator-chosen time, bypassing the ranked slot recommendations.
+ * Creates/updates a real Teams meeting via Microsoft Graph.
+ */
+export async function scheduleMeetingManual(
+  cycleId: string,
+  params: {
+    organiserEmail: string
+    startTime: string // local wall-clock, e.g. "2026-07-20T14:30:00"
+    durationHours: number
+    timeZone: 'IST' | 'UTC' | 'GMT'
+    reschedule?: boolean
+  }
+): Promise<ScheduleManualResult> {
+  return apiFetch<ScheduleManualResult>(
+    `/api/cycles/${cycleId}/scheduling/graph/schedule-manual`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        organiser_email: params.organiserEmail,
+        start_time: params.startTime,
+        duration_hours: params.durationHours,
+        time_zone: params.timeZone,
+        reschedule: params.reschedule ?? false,
+      }),
+    }
+  )
 }
 
 export function getPreferredOrganizerEmail(attendees: CycleAttendee[]): string | null {

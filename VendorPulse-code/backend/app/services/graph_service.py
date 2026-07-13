@@ -356,6 +356,133 @@ class GraphService:
             logger.exception("create_event: request failed — %s", e)
             return {"error": f"Request failed: {str(e)}"}
 
+    def _graph_local_start_end(
+        self, start_time: str, duration_hours: float, time_zone: str
+    ) -> tuple[str, str, str]:
+        """Convert an ISO start + duration into Graph local wall-clock start/end
+        strings plus the Graph timezone id. Mirrors the conversion in
+        create_event. Raises ValueError on an unparseable start_time.
+        """
+        graph_tz = self._TZ_ALIASES.get(time_zone.upper(), time_zone)
+
+        try:
+            from zoneinfo import ZoneInfo  # Python 3.9+
+        except Exception:  # pragma: no cover
+            ZoneInfo = None  # type: ignore
+
+        def _to_zoneinfo(gtz: str):
+            if ZoneInfo is None:
+                return None
+            iana = {
+                "India Standard Time": "Asia/Kolkata",
+                "UTC": "UTC",
+                "GMT Standard Time": "Europe/London",
+            }.get(gtz, gtz)
+            try:
+                return ZoneInfo(iana)
+            except Exception:
+                return None
+
+        def _fixed_offset_minutes(gtz: str) -> int | None:
+            normalized = (gtz or "").strip().upper()
+            if normalized in {"INDIA STANDARD TIME", "IST"}:
+                return 330
+            if normalized in {"UTC", "GMT STANDARD TIME", "GMT"}:
+                return 0
+            return None
+
+        start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+
+        if start_dt.tzinfo is not None:
+            if graph_tz == "UTC":
+                start_local = start_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            else:
+                tzinfo_target = _to_zoneinfo(graph_tz)
+                if tzinfo_target is not None:
+                    start_local = start_dt.astimezone(tzinfo_target).replace(tzinfo=None)
+                else:
+                    offset_minutes = _fixed_offset_minutes(graph_tz)
+                    if offset_minutes is None:
+                        start_local = start_dt.replace(tzinfo=None)
+                    else:
+                        utc_dt = start_dt.astimezone(timezone.utc)
+                        start_local = (utc_dt + timedelta(minutes=offset_minutes)).replace(tzinfo=None)
+        else:
+            start_local = start_dt
+
+        end_local = start_local + timedelta(hours=duration_hours)
+        return (
+            start_local.isoformat(timespec="seconds"),
+            end_local.isoformat(timespec="seconds"),
+            graph_tz,
+        )
+
+    async def update_event(
+        self,
+        event_id: str,
+        start_time: str,
+        duration_hours: float = 1.0,
+        time_zone: str = "UTC",
+    ) -> dict:
+        """
+        Reschedule an existing event by PATCHing its start/end time.
+
+        Keeps the same Teams join URL and invite thread so attendees receive an
+        update rather than a brand-new meeting.
+
+        Returns:
+            {"id", "webLink", "onlineMeetingUrl", "iCalUId"} or {"error": ...}
+        """
+        logger.info(
+            "update_event — event_id=%s, start=%s, duration_hours=%s, tz=%s",
+            event_id, start_time, duration_hours, time_zone,
+        )
+        if not httpx:
+            raise ImportError("httpx is required. Install with: pip install httpx")
+
+        if not event_id:
+            return {"error": "event_id is required"}
+
+        try:
+            start_iso, end_iso, graph_tz = self._graph_local_start_end(
+                start_time, duration_hours, time_zone
+            )
+        except ValueError as e:
+            return {"error": f"Invalid datetime format: {e}"}
+
+        body = {
+            "start": {"dateTime": start_iso, "timeZone": graph_tz},
+            "end": {"dateTime": end_iso, "timeZone": graph_tz},
+            "responseRequested": True,
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.patch(
+                    f"{self.BASE_URL}/me/events/{event_id}",
+                    json=body,
+                    headers=self.headers,
+                    timeout=30.0,
+                )
+                result = response.json() if response.content else {}
+
+                if response.status_code not in (200, 201):
+                    logger.error("update_event: Graph API error — status=%d", response.status_code)
+                    return self._build_graph_error(
+                        response.status_code, result, fallback="Failed to update event"
+                    )
+
+                logger.info("update_event: success — event_id=%s", result.get("id"))
+                return {
+                    "id": result.get("id"),
+                    "webLink": result.get("webLink"),
+                    "onlineMeetingUrl": (result.get("onlineMeeting") or {}).get("joinUrl"),
+                    "iCalUId": result.get("iCalUId"),
+                }
+        except Exception as e:
+            logger.exception("update_event: request failed — %s", e)
+            return {"error": f"Request failed: {str(e)}"}
+
     async def get_me_profile(self) -> dict:
         """Fetch /me profile (debug helper).
 

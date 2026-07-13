@@ -23,7 +23,8 @@ import type { WorkflowState } from '@/utils/constants'
 import { cn } from '@/utils/cn'
 import { apiFetch } from '@/lib/api'
 import { useCycleStore } from '@/store/useCycleStore'
-import type { GovernanceCycle } from '@/types/cycle.types'
+import type { CycleType, GovernanceCycle } from '@/types/cycle.types'
+import { CYCLE_TYPE_LABELS } from '@/types/cycle.types'
 import { fetchVendors, fetchCategories } from '@/lib/schedulingApi'
 import type { VendorRecord } from '@/lib/schedulingApi'
 
@@ -65,6 +66,7 @@ interface NewCycleForm {
   vendor_id: string
   vendor_name: string
   category: string
+  cycle_type: CycleType
   quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4'
   year: number
 }
@@ -87,6 +89,7 @@ function NewCycleModal({
     vendor_id: '',
     vendor_name: '',
     category: '',
+    cycle_type: 'SPR',
     quarter: 'Q1',
     year: currentYear,
   })
@@ -211,6 +214,7 @@ function NewCycleModal({
           vendor_id: form.vendor_id,
           vendor_name: form.vendor_name.trim(),
           category: form.category.trim() || 'IT Infrastructure',
+          cycle_type: form.cycle_type,
           quarter: form.quarter,
           year: form.year,
         }),
@@ -397,6 +401,20 @@ function NewCycleModal({
                 )}
               </div>
             )}
+          </div>
+
+          {/* Cycle type — SPR is currently the only option */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              Cycle Type
+            </label>
+            <select
+              value={form.cycle_type}
+              onChange={(e) => setForm((f) => ({ ...f, cycle_type: e.target.value as CycleType }))}
+              className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="SPR">SPR — {CYCLE_TYPE_LABELS.SPR}</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -646,7 +664,7 @@ export default function Dashboard() {
                           {cycle.vendor_name}
                         </p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {cycle.quarter} {cycle.year} · EGB/QBR
+                          {cycle.quarter} {cycle.year} · {cycle.cycle_type ?? 'SPR'}
                         </p>
                       </div>
                     </div>

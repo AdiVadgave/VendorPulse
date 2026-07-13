@@ -11,8 +11,7 @@ Desktop.ini
 **/claude/
 .claude/
 
-/google sheet
-Backend/google sheet/*
+**/google sheet/
 client_secret.json
 
 # VS Code
@@ -53,6 +52,11 @@ client_secret.json
 # TypeScript
 **/*.tsbuildinfo
 
+# Temp / scratch / editor-duplicate files
+**/*.tmp
+**/*.bak
+**/*.orig
+
 # dotenv (do not commit secrets)
 **/.env
 **/.env.*
@@ -78,17 +82,15 @@ client_secret.json
 
 # --- Project-specific ---
 /dev artifacts/.ipynb_checkpoints/
+
+# Backend runtime datastore (per-cycle data written at runtime — not source)
 VendorPulse-code/backend/data/cycles.json
 VendorPulse-code/backend/data/slot_proposals.json
-VendorPulse-code/backend/data/google_token.json
 VendorPulse-code/backend/data/attendees.json
-VendorPulse-code/backend/data/cycles.json
 VendorPulse-code/backend/data/scorecard_responses.json
-VendorPulse-code/backend/data/slot_proposals.json
-VendorPulse-code/backend/data/attendees.json
-VendorPulse-code/backend/data/cycles.json
-VendorPulse-code/backend/data/slot_proposals.json
+VendorPulse-code/backend/data/google_token.json
 VendorPulse-code/backend/slide3.txt
+
 dev artifacts/VendorPulse-Demo-Script.md
 dev artifacts/demo-qa-cheatsheet.md
 dev artifacts/slide-script.md

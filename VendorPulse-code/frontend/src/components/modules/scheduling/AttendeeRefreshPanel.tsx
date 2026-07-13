@@ -14,7 +14,14 @@ import {
   Trash2,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
-import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
+import type {
+  CycleAttendee,
+  SlotProposal,
+  AttendanceRequirement,
+  LTStatus,
+  ShellDepartment,
+} from '@/types/scheduling.types'
+import { SHELL_DEPARTMENTS } from '@/types/scheduling.types'
 import { ROLE_LABELS } from '@/types/cycle.types'
 import type { StakeholderRole } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
@@ -47,6 +54,9 @@ function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel
   const [role, setRole] = useState<StakeholderRole>('VMO_COORDINATOR')
   const [attendeeType, setAttendeeType] = useState<'Internal Stakeholder' | 'Vendor'>('Internal Stakeholder')
   const [isKey, setIsKey] = useState(false)
+  const [attendanceRequirement, setAttendanceRequirement] = useState<AttendanceRequirement>('Required')
+  const [ltStatus, setLtStatus] = useState<LTStatus>('Non-LT')
+  const [shellDepartment, setShellDepartment] = useState<ShellDepartment>('IDTM')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -116,6 +126,9 @@ function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel
               organisation: selected.organisation,
               type: attendeeType,
               is_key: isKey,
+              attendance_requirement: attendanceRequirement,
+              lt_status: ltStatus,
+              shell_department: attendeeType === 'Internal Stakeholder' ? shellDepartment : null,
               user_id: selected.user_id,
             },
           ]),
@@ -139,6 +152,9 @@ function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel
         organisation: selected.organisation,
         type: attendeeType,
         is_key: isKey,
+        attendance_requirement: attendanceRequirement,
+        lt_status: ltStatus,
+        shell_department: attendeeType === 'Internal Stakeholder' ? shellDepartment : null,
         invite_status: 'PENDING',
         availability_submitted: false,
         user_id: selected.user_id,
@@ -252,6 +268,44 @@ function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel
               </span>
             </label>
           </div>
+
+          {/* Invitee classification */}
+          <div className="space-y-1">
+            <label className="text-xs text-slate-600 dark:text-slate-400">Attendance</label>
+            <select
+              value={attendanceRequirement}
+              onChange={(e) => setAttendanceRequirement(e.target.value as AttendanceRequirement)}
+              className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="Required">Required</option>
+              <option value="Optional">Optional</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-slate-600 dark:text-slate-400">Leadership</label>
+            <select
+              value={ltStatus}
+              onChange={(e) => setLtStatus(e.target.value as LTStatus)}
+              className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="Non-LT">Non-LT</option>
+              <option value="LT">LT (Leadership Team)</option>
+            </select>
+          </div>
+          {attendeeType === 'Internal Stakeholder' && (
+            <div className="space-y-1">
+              <label className="text-xs text-slate-600 dark:text-slate-400">Shell Department</label>
+              <select
+                value={shellDepartment}
+                onChange={(e) => setShellDepartment(e.target.value as ShellDepartment)}
+                className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {SHELL_DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
@@ -364,6 +418,30 @@ export default function AttendeeRefreshPanel({
       )
     } finally {
       setTogglingType(null)
+    }
+  }
+
+  async function handleUpdateClassification(
+    attendee: CycleAttendee,
+    patch: Partial<Pick<CycleAttendee, 'attendance_requirement' | 'lt_status' | 'shell_department'>>
+  ) {
+    try {
+      const updated = await apiFetch<{ attendee: CycleAttendee }>(
+        `/api/cycles/${cycleId}/attendees/${attendee.attendee_id}`,
+        { method: 'PUT', body: JSON.stringify(patch) }
+      )
+      onAttendeesChanged(
+        attendees.map((a) =>
+          a.attendee_id === attendee.attendee_id ? { ...a, ...updated.attendee } : a
+        )
+      )
+    } catch {
+      // optimistic update if backend is unavailable
+      onAttendeesChanged(
+        attendees.map((a) =>
+          a.attendee_id === attendee.attendee_id ? { ...a, ...patch } : a
+        )
+      )
     }
   }
 
@@ -630,6 +708,9 @@ export default function AttendeeRefreshPanel({
                   <th className="text-left px-4 py-2.5 font-medium">Role</th>
                   <th className="text-left px-4 py-2.5 font-medium">Organisation</th>
                   <th className="text-left px-4 py-2.5 font-medium">Type</th>
+                  <th className="text-left px-4 py-2.5 font-medium">Attendance</th>
+                  <th className="text-left px-4 py-2.5 font-medium">LT</th>
+                  <th className="text-left px-4 py-2.5 font-medium">Dept</th>
                   <th className="text-left px-4 py-2.5 font-medium">Key</th>
                   <th className="text-left px-4 py-2.5 font-medium">Action</th>
                 </tr>
@@ -669,6 +750,51 @@ export default function AttendeeRefreshPanel({
                         ) : null}
                         {a.type === 'Vendor' ? 'Vendor' : 'Internal'}
                       </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={a.attendance_requirement ?? 'Required'}
+                        onChange={(e) =>
+                          handleUpdateClassification(a, {
+                            attendance_requirement: e.target.value as AttendanceRequirement,
+                          })
+                        }
+                        className="px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="Required">Required</option>
+                        <option value="Optional">Optional</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={a.lt_status ?? 'Non-LT'}
+                        onChange={(e) =>
+                          handleUpdateClassification(a, { lt_status: e.target.value as LTStatus })
+                        }
+                        className="px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="Non-LT">Non-LT</option>
+                        <option value="LT">LT</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      {a.type === 'Internal Stakeholder' ? (
+                        <select
+                          value={a.shell_department ?? 'IDTM'}
+                          onChange={(e) =>
+                            handleUpdateClassification(a, {
+                              shell_department: e.target.value as ShellDepartment,
+                            })
+                          }
+                          className="px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          {SHELL_DEPARTMENTS.map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <button

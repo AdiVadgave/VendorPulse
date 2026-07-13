@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Cpu, Info, AlertCircle, ChevronDown } from 'lucide-react'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import SlotCard from './SlotCard'
+import ManualScheduleControl from './ManualScheduleControl'
 import type { SlotProposal } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
 import { approveSlot } from '@/lib/schedulingApi'
@@ -14,6 +15,8 @@ interface SlotRankingPanelProps {
   slots: SlotProposal[]
   onSlotApproved: (slotId: string, timeZone: TimeZoneView) => void
   onBackToAttendees: () => void
+  /** Manual override: meeting scheduled at a coordinator-chosen time via Graph. */
+  onManualScheduled: (slot: SlotProposal, timeZone: TimeZoneView, teamsUrl: string | null) => void
 }
 
 export default function SlotRankingPanel({
@@ -21,6 +24,7 @@ export default function SlotRankingPanel({
   slots,
   onSlotApproved,
   onBackToAttendees,
+  onManualScheduled,
 }: SlotRankingPanelProps) {
   const PAGE_SIZE = SCHEDULING_CONFIG.PAGE_SIZE
 
@@ -128,6 +132,14 @@ export default function SlotRankingPanel({
           />
         ))}
       </div>
+
+      {/* Manual override — bypass the recommendations and set your own time */}
+      <ManualScheduleControl
+        cycleId={cycleId}
+        mode="schedule"
+        defaultTimeZone={timeZoneView}
+        onScheduled={onManualScheduled}
+      />
 
       {/* Load more */}
       {visibleCount < slots.length && (

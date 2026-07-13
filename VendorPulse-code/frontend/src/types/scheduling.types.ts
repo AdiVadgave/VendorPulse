@@ -6,6 +6,28 @@ export type AttendanceConfirmationStatus = 'PENDING' | 'CONFIRMED' | 'REPLACED' 
 
 export type AttendeeType = 'Internal Stakeholder' | 'Vendor'
 
+// Invitee classification
+export type AttendanceRequirement = 'Required' | 'Optional'
+export type LTStatus = 'LT' | 'Non-LT'
+export type ShellDepartment =
+  | 'IDTM'
+  | 'IDE'
+  | 'SOM'
+  | 'Business'
+  | 'CP'
+  | 'IRM'
+  | 'Other'
+
+export const SHELL_DEPARTMENTS: ShellDepartment[] = [
+  'IDTM',
+  'IDE',
+  'SOM',
+  'Business',
+  'CP',
+  'IRM',
+  'Other',
+]
+
 export interface CycleAttendee {
   attendee_id: string
   stakeholder_id: string
@@ -17,6 +39,10 @@ export interface CycleAttendee {
   organisation: string
   type: AttendeeType
   is_key: boolean
+  // Invitee classification
+  attendance_requirement?: AttendanceRequirement
+  lt_status?: LTStatus
+  shell_department?: ShellDepartment | null
   invite_status: InviteStatus
   availability_submitted: boolean
   user_id?: string

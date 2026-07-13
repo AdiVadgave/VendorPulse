@@ -7,15 +7,54 @@ export interface Vendor {
   status: 'active' | 'inactive' | 'under_review'
 }
 
+// Cycle type — currently SPR (Supplier Performance Review) is the only option.
+export type CycleType = 'SPR'
+
+export const CYCLE_TYPE_LABELS: Record<CycleType, string> = {
+  SPR: 'Supplier Performance Review',
+}
+
+// Meetings that can make up a governance cycle.
+export type MeetingType =
+  | 'INTERNAL_ALIGNMENT'
+  | 'SUPPLIER_PREP'
+  | 'LEADERSHIP_ALIGNMENT'
+  | 'MAIN_GOVERNANCE'
+
+export const MEETING_TYPE_LABELS: Record<MeetingType, string> = {
+  INTERNAL_ALIGNMENT: 'Internal Alignment Call',
+  SUPPLIER_PREP: 'Supplier Prep Call',
+  LEADERSHIP_ALIGNMENT: 'Leadership Alignment Call',
+  MAIN_GOVERNANCE: 'Main Governance Meeting',
+}
+
+// Where each meeting type is actually scheduled within the app.
+export const MEETING_TYPE_TAB: Record<MeetingType, string> = {
+  INTERNAL_ALIGNMENT: 'Alignment tab',
+  SUPPLIER_PREP: 'Vendor Prep tab',
+  LEADERSHIP_ALIGNMENT: 'Alignment tab',
+  MAIN_GOVERNANCE: 'Scheduling tab',
+}
+
+export interface CycleMeeting {
+  meeting_key: string
+  meeting_type: MeetingType
+  title: string
+  enabled: boolean
+  order: number
+}
+
 export interface GovernanceCycle {
   cycle_id: string
   vendor_id: string
   vendor_name: string
+  cycle_type?: CycleType
   quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4'
   year: number
   workflow_state: WorkflowState
   created_at: string
   updated_at: string
+  meeting_plan?: CycleMeeting[]
   scorecard_dispatched_at?: string | null
   scorecard_dispatched_to?: string[] | null
   scorecard_dispatched?: boolean

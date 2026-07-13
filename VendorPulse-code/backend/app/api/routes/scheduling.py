@@ -33,7 +33,9 @@ from app.models.scheduling import (
     CycleAttendeeCreate,
     CycleAttendeeUpdate,
     CycleCreate,
+    MeetingPlanUpdate,
     RankSlotsRequest,
+    default_meeting_plan,
 )
 from app.services.scheduling_service import SchedulingService
 from app.services.graph_service import GraphService
@@ -146,11 +148,13 @@ def create_cycle(
         "cycle_id": f"c_{uuid.uuid4().hex[:8]}",
         "vendor_id": vendor_id,
         "vendor_name": vendor_name,
+        "cycle_type": payload.cycle_type,
         "quarter": payload.quarter,
         "year": payload.year,
         "workflow_state": "CYCLE_CREATED",
         "created_at": now,
         "updated_at": now,
+        "meeting_plan": [m.model_dump() for m in default_meeting_plan()],
     }
     result = cycle_repo.insert(cycle)
     logger.info("create_cycle success — cycle_id=%s", cycle["cycle_id"])
@@ -165,8 +169,30 @@ def get_cycle(cycleId: str, cycle_repo=Depends(get_cycle_repo)):
     ws_idx = WORKFLOW_STATES.index(ws) if ws in WORKFLOW_STATES else 0
     cycle["scorecard_dispatched"] = bool(cycle.get("scorecard_dispatched_at"))
     cycle["meeting_scheduled"] = ws_idx >= WORKFLOW_STATES.index("MEETING_SCHEDULED")
+    # Backfill defaults for cycles created before these fields existed.
+    cycle.setdefault("cycle_type", "SPR")
+    if not cycle.get("meeting_plan"):
+        cycle["meeting_plan"] = [m.model_dump() for m in default_meeting_plan()]
     logger.info("get_cycle success — cycleId=%s, workflow_state=%s", cycleId, ws)
     return {"cycle": cycle}
+
+
+@router.put("/api/cycles/{cycleId}/meeting-plan")
+def update_meeting_plan(
+    cycleId: str,
+    payload: MeetingPlanUpdate,
+    cycle_repo=Depends(get_cycle_repo),
+):
+    """Replace the cycle's meeting plan. The VMO can toggle which meetings are
+    included, rename them, or add multiple internal-alignment calls at any time."""
+    logger.info("update_meeting_plan called — cycleId=%s, meetings=%d", cycleId, len(payload.meeting_plan))
+    _get_cycle_or_404(cycleId, cycle_repo)
+    plan = [m.model_dump() for m in payload.meeting_plan]
+    now = datetime.now(timezone.utc).isoformat()
+    updated = cycle_repo.update_by_id(
+        "cycle_id", cycleId, {"meeting_plan": plan, "updated_at": now}
+    )
+    return {"cycle": updated, "meeting_plan": plan}
 
 
 @router.post("/api/cycles/{cycleId}/workflow-state")

@@ -10,16 +10,20 @@ import {
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
+import ManualScheduleControl from './ManualScheduleControl'
 import type { CycleAttendee, InviteStatus, SlotProposal } from '@/types/scheduling.types'
 import { ROLE_LABELS } from '@/types/cycle.types'
 
 // Replaced Mock Teams integration
 
 interface ConfirmationTrackerProps {
+  cycleId: string
   attendees: CycleAttendee[]
   slot: SlotProposal
   timeZoneOverride?: 'IST' | 'UTC' | 'GMT'
   onProceed?: () => void
+  /** Reschedule the meeting to a new coordinator-chosen time via Graph. */
+  onRescheduled?: (slot: SlotProposal, timeZone: 'IST' | 'UTC' | 'GMT', teamsUrl: string | null) => void
 }
 
 const STATUS_CONFIG: Record<
@@ -44,10 +48,12 @@ const STATUS_CONFIG: Record<
 }
 
 export default function ConfirmationTracker({
+  cycleId,
   attendees,
   slot,
   timeZoneOverride,
   onProceed,
+  onRescheduled,
 }: ConfirmationTrackerProps) {
   const [nudgeSent, setNudgeSent] = useState<Set<string>>(new Set())
   const [nudgingId, setNudgingId] = useState<string | null>(null)
@@ -114,6 +120,16 @@ export default function ConfirmationTracker({
           <AgentStatusBadge status="complete" label="Invite Sent" />
         </div>
       </div>
+
+      {/* Reschedule — re-book the meeting at a new time via Graph */}
+      {onRescheduled && (
+        <ManualScheduleControl
+          cycleId={cycleId}
+          mode="reschedule"
+          defaultTimeZone={timeZoneOverride ?? 'IST'}
+          onScheduled={onRescheduled}
+        />
+      )}
 
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-4">

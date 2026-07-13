@@ -60,6 +60,23 @@ class SendInviteRequest(BaseModel):
     organiser_email: str = Field(..., description="Email of the meeting organiser")
 
 
+class ScheduleManualRequest(BaseModel):
+    """Request body for manually scheduling (or rescheduling) the main
+    governance meeting at a coordinator-chosen time, bypassing ranked slots."""
+
+    organiser_email: str = Field(..., description="Email of the meeting organiser")
+    start_time: str = Field(
+        ...,
+        description="Local wall-clock start datetime, e.g. '2026-07-20T14:30:00' (interpreted in time_zone)",
+    )
+    duration_hours: float = Field(0.5, description="Meeting duration in hours")
+    time_zone: str = Field("UTC", description="Timezone for the chosen time (IST, UTC, GMT)")
+    reschedule: bool = Field(
+        False,
+        description="If true (or the cycle already has a Teams meeting), update the existing event in place",
+    )
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────
@@ -846,5 +863,195 @@ def send_meeting_invite_graph(
     logger.info(
         "send_meeting_invite_graph success — cycleId=%s, event_id=%s, attendees=%d",
         cycleId, result.get("id"), len(attendee_emails),
+    )
+    return response_payload
+
+
+def _manual_local_to_utc_iso(local_dt_str: str, source_tz: str) -> str:
+    """Convert a local wall-clock datetime (no offset) to UTC ISO ('...Z')."""
+    if not local_dt_str:
+        return ""
+    normalized = str(local_dt_str).strip()
+    if "." in normalized:
+        normalized = normalized.split(".", 1)[0]
+    # Strip any explicit offset — we treat the value as local to source_tz.
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1]
+    try:
+        naive = datetime.fromisoformat(normalized)
+    except Exception:
+        return local_dt_str
+    naive = naive.replace(tzinfo=None)
+
+    up = (source_tz or "").strip().upper()
+    iana = "UTC"
+    if up == "IST" or "INDIA" in up:
+        iana = "Asia/Kolkata"
+    elif up == "GMT" or "GMT" in up:
+        iana = "Europe/London"
+    try:
+        from zoneinfo import ZoneInfo
+
+        aware = naive.replace(tzinfo=ZoneInfo(iana))
+        return aware.astimezone(timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
+    except Exception:
+        offset_minutes = 330 if iana == "Asia/Kolkata" else 0
+        return (naive - timedelta(minutes=offset_minutes)).isoformat(timespec="seconds") + "Z"
+
+
+@router.post("/api/cycles/{cycleId}/scheduling/graph/schedule-manual")
+def schedule_meeting_manual_graph(
+    cycleId: str,
+    payload: ScheduleManualRequest,
+    cycle_repo=Depends(get_cycle_repo),
+    attendee_repo=Depends(get_attendee_repo),
+    slot_repo=Depends(get_slot_repo),
+):
+    """
+    Manually schedule (or reschedule) the main governance meeting at a
+    coordinator-chosen time, bypassing the ranked slot recommendations.
+
+    Creates a real Teams meeting via Graph. When the cycle already has a Teams
+    meeting (or reschedule=true), the existing event is updated in place so the
+    join link and invite thread are preserved.
+    """
+    logger.info(
+        "schedule_meeting_manual_graph called — cycleId=%s, organiser=%s, start=%s, tz=%s, reschedule=%s",
+        cycleId, payload.organiser_email, payload.start_time, payload.time_zone, payload.reschedule,
+    )
+    cycle = _get_cycle_or_404(cycleId, cycle_repo)
+
+    # Need a confirmed attendee list before scheduling.
+    try:
+        workflow_engine.assert_at_least(cycle, "ATTENDEE_REFRESH_SENT")
+    except WorkflowStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+    graph_access_token = _get_graph_access_token()
+    if not graph_access_token:
+        raise HTTPException(status_code=500, detail="GRAPH_ACCESS_TOKEN is not set in .env")
+
+    graph_service = GraphService(graph_access_token)
+
+    token_owner = _token_owner_email(graph_access_token)
+    organiser_email = payload.organiser_email.strip().lower()
+    if not token_owner:
+        raise HTTPException(
+            status_code=401,
+            detail="Could not determine token owner identity from GRAPH_ACCESS_TOKEN claims",
+        )
+    if organiser_email != token_owner:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Organiser must match token owner in dev mode. "
+                f"Provided organiser='{organiser_email}', token owner='{token_owner}'."
+            ),
+        )
+
+    attendees = attendee_repo.get_for_cycle(cycleId)
+    attendee_emails = [a.get("email") for a in attendees if a.get("email")]
+    invalid = [e for e in attendee_emails if not _is_valid_email(str(e))]
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Invalid attendee email(s): {invalid}")
+    if not attendee_emails:
+        raise HTTPException(status_code=400, detail="No attendee emails found")
+
+    existing_event_id = cycle.get("teams_meeting_event_id")
+    is_reschedule = bool(payload.reschedule or existing_event_id)
+    display_tz = (payload.time_zone or "UTC").strip().upper()
+    display_tz = display_tz if display_tz in ("IST", "UTC", "GMT") else "UTC"
+
+    try:
+        if is_reschedule and existing_event_id:
+            result = asyncio.run(graph_service.update_event(
+                event_id=existing_event_id,
+                start_time=payload.start_time,
+                duration_hours=payload.duration_hours,
+                time_zone=payload.time_zone,
+            ))
+        else:
+            subject = (
+                f"Vendor Meeting — {cycle.get('vendor_name', 'TBD')} "
+                f"({cycle.get('quarter', '')} {cycle.get('year', '')})"
+            )
+            result = asyncio.run(graph_service.create_event(
+                subject=subject,
+                attendee_emails=attendee_emails,
+                start_time=payload.start_time,
+                duration_hours=payload.duration_hours,
+                organiser_email=organiser_email,
+                is_online_meeting=True,
+                time_zone=payload.time_zone,
+            ))
+    except Exception as e:
+        import traceback
+        raise HTTPException(status_code=500, detail=f"Graph API error: {str(e)}\n{traceback.format_exc()}")
+
+    if "error" in result:
+        status_code = int(result.get("status_code") or 400)
+        detail = result.get("detail")
+        message = result.get("error")
+        raise HTTPException(status_code=status_code, detail=(f"{message} - {detail}" if detail else message))
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # First-time manual schedule: advance the workflow to MEETING_SCHEDULED.
+    # Reschedule: state already at/after MEETING_SCHEDULED — leave it unchanged.
+    if workflow_engine.can_transition(cycle.get("workflow_state", ""), "MEETING_SCHEDULED"):
+        workflow_engine.transition_to(cycle, "MEETING_SCHEDULED", cycle_repo, now)
+
+    # Preserve the previous join URL on reschedule if Graph didn't echo one back.
+    teams_url = result.get("onlineMeetingUrl") or cycle.get("teams_meeting_url")
+    web_link = result.get("webLink") or cycle.get("teams_meeting_web_link")
+    cycle_repo.mark_teams_meeting_scheduled(
+        cycleId,
+        teams_meeting_url=teams_url,
+        web_link=web_link,
+        event_id=result.get("id") or existing_event_id,
+        scheduled_at=now,
+    )
+
+    # Record an approved slot for the chosen time so the scheduling UI reflects it.
+    proposed_time_utc = _manual_local_to_utc_iso(payload.start_time, payload.time_zone)
+    attendee_names = [(a.get("name") or a.get("email") or "") for a in attendees]
+    slot_repo.clear_for_cycle(cycleId)
+    manual_slot = {
+        "slot_id": f"slot_{uuid.uuid4().hex[:8]}",
+        "cycle_id": cycleId,
+        "proposed_time": proposed_time_utc,
+        "proposed_time_zone": display_tz,
+        "duration_minutes": int(payload.duration_hours * 60),
+        "organiser_available": True,
+        "exec_sponsor_available": True,
+        "rank_score": 100.0,
+        "is_approved": True,
+        "approved_by": organiser_email,
+        "approved_at": now,
+        "attendance_count": len(attendee_names),
+        "total_attendees": len(attendee_names),
+        "conflict_count": 0,
+        "attending": attendee_names,
+        "tentative": [],
+        "conflicts": [],
+        "ranking_rationale": "Manually scheduled by the VMO coordinator (recommendations bypassed).",
+    }
+    slot_repo.insert(manual_slot)
+
+    response_payload = {
+        "message": (
+            "Teams meeting rescheduled to the new time"
+            if (is_reschedule and existing_event_id)
+            else "Teams meeting created manually and invites sent"
+        ),
+        "event_id": result.get("id") or existing_event_id,
+        "teams_meeting_url": teams_url,
+        "web_link": web_link,
+        "slot": manual_slot,
+        "rescheduled": bool(is_reschedule and existing_event_id),
+    }
+    logger.info(
+        "schedule_meeting_manual_graph success — cycleId=%s, event_id=%s, rescheduled=%s",
+        cycleId, response_payload["event_id"], response_payload["rescheduled"],
     )
     return response_payload

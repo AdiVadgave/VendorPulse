@@ -93,8 +93,9 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   const [dispatchResult, setDispatchResult] = useState<DispatchResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Only key attendees get scorecard emails
-  const keyAttendees = attendees.filter((a) => a.is_key)
+  // Only key internal stakeholders get scorecard emails — scorecards are not
+  // collected from vendors.
+  const keyAttendees = attendees.filter((a) => a.is_key && a.type === 'Internal Stakeholder')
 
   async function handleGenerate() {
     setError(null)

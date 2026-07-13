@@ -34,5 +34,17 @@
     "name": "zensar2",
     "category": "IT Infrastructure",
     "status": "active"
+  },
+  {
+    "vendor_id": "v_a836ad9d",
+    "name": "ABCDF",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_cf5bd5f6",
+    "name": "Anup",
+    "category": "IT Infrastructure",
+    "status": "active"
   }
 ]

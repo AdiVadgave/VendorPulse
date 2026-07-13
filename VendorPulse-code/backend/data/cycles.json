@@ -62,5 +62,99 @@
       "kanishkpunekar54@gmail.com",
       "adivadgave16@gmail.com"
     ]
+  },
+  {
+    "cycle_id": "c_9b4dc5f5",
+    "vendor_id": "v_a836ad9d",
+    "vendor_name": "ABCDF",
+    "cycle_type": "SPR",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "MEETING_SCHEDULED",
+    "created_at": "2026-07-13T06:00:34.097226+00:00",
+    "updated_at": "2026-07-13T06:15:44.719681+00:00",
+    "meeting_plan": [
+      {
+        "meeting_key": "internal_alignment_1",
+        "meeting_type": "INTERNAL_ALIGNMENT",
+        "title": "Internal Alignment Call",
+        "enabled": true,
+        "order": 1
+      },
+      {
+        "meeting_key": "supplier_prep",
+        "meeting_type": "SUPPLIER_PREP",
+        "title": "Supplier Prep Call",
+        "enabled": true,
+        "order": 2
+      },
+      {
+        "meeting_key": "leadership_alignment",
+        "meeting_type": "LEADERSHIP_ALIGNMENT",
+        "title": "Leadership Alignment Call",
+        "enabled": true,
+        "order": 3
+      },
+      {
+        "meeting_key": "main_governance",
+        "meeting_type": "MAIN_GOVERNANCE",
+        "title": "Main Governance Meeting",
+        "enabled": true,
+        "order": 4
+      }
+    ],
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YjYwZTVjOGEtMGM5NS00YmExLWE5NzUtOWVmZjY5M2YyZmZj%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABZTEAIwAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "teams_meeting_event_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABZTEAIwAAAA==",
+    "teams_meeting_scheduled_at": "2026-07-13T06:11:37.177469+00:00"
+  },
+  {
+    "cycle_id": "c_23352023",
+    "vendor_id": "v_cf5bd5f6",
+    "vendor_name": "Anup",
+    "cycle_type": "SPR",
+    "quarter": "Q2",
+    "year": 2026,
+    "workflow_state": "SCORECARD_REQUEST_SENT",
+    "created_at": "2026-07-13T06:19:37.998619+00:00",
+    "updated_at": "2026-07-13T06:35:15.370018+00:00",
+    "meeting_plan": [
+      {
+        "meeting_key": "internal_alignment_1",
+        "meeting_type": "INTERNAL_ALIGNMENT",
+        "title": "Internal Alignment Call",
+        "enabled": true,
+        "order": 1
+      },
+      {
+        "meeting_key": "supplier_prep",
+        "meeting_type": "SUPPLIER_PREP",
+        "title": "Supplier Prep Call",
+        "enabled": true,
+        "order": 2
+      },
+      {
+        "meeting_key": "leadership_alignment",
+        "meeting_type": "LEADERSHIP_ALIGNMENT",
+        "title": "Leadership Alignment Call",
+        "enabled": false,
+        "order": 3
+      },
+      {
+        "meeting_key": "main_governance",
+        "meeting_type": "MAIN_GOVERNANCE",
+        "title": "Main Governance Meeting",
+        "enabled": true,
+        "order": 4
+      }
+    ],
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_NDcwM2Y3NTktZWE5ZS00ZGVlLThkZWMtMGU2OThjNTFiMTU1%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABZTEAJAAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "teams_meeting_event_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABZTEAJAAAAA==",
+    "teams_meeting_scheduled_at": "2026-07-13T06:27:05.608543+00:00",
+    "scorecard_dispatched_at": "2026-07-13T06:35:15.370018+00:00",
+    "scorecard_dispatched_to": [
+      "anupkrsarwani3537@gmail.com"
+    ]
   }
 ]

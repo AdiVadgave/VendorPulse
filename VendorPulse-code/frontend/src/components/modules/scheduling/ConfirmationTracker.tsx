@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
-import ManualScheduleControl from './ManualScheduleControl'
+import RescheduleControl from './RescheduleControl'
 import type { CycleAttendee, InviteStatus, SlotProposal } from '@/types/scheduling.types'
 import { ROLE_LABELS } from '@/types/cycle.types'
 
@@ -121,13 +121,13 @@ export default function ConfirmationTracker({
         </div>
       </div>
 
-      {/* Reschedule — re-book the meeting at a new time via Graph */}
+      {/* Reschedule — find new Graph slots to pick from, or set your own time */}
       {onRescheduled && (
-        <ManualScheduleControl
+        <RescheduleControl
           cycleId={cycleId}
-          mode="reschedule"
+          attendees={attendees}
           defaultTimeZone={timeZoneOverride ?? 'IST'}
-          onScheduled={onRescheduled}
+          onRescheduled={onRescheduled}
         />
       )}
 

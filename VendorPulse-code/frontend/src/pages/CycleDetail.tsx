@@ -756,15 +756,14 @@ function SchedulingTab({
             onSlotTimeZoneSelected(tz)
             onPhaseChange('invite_approval')
           }}
-          onManualScheduled={(manualSlot, tz, teamsUrl) => {
+          onManualScheduled={(manualSlot, tz) => {
             // Coordinator bypassed the ranked slots and set their own time.
-            // The Teams meeting is already created via Graph — jump straight to
-            // confirmation tracking (which advances the workflow to MEETING_SCHEDULED).
+            // Route to Invite Approval so they can review/edit the invite before
+            // it is sent (the Teams meeting is created on approval, like a ranked slot).
             onSlotsReceived([manualSlot])
             onSlotSelected(manualSlot.slot_id)
             onSlotTimeZoneSelected(tz)
-            onTeamsMeetingUrlCaptured(teamsUrl)
-            onPhaseChange('confirmation_tracking')
+            onPhaseChange('invite_approval')
           }}
         />
       )}

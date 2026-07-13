@@ -356,8 +356,6 @@ export default function AttendeeRefreshPanel({
     .split('T')[0]
 
   const [showAddForm, setShowAddForm] = useState(false)
-  const [togglingKey, setTogglingKey] = useState<string | null>(null)
-  const [togglingType, setTogglingType] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isGraphSearching, setIsGraphSearching] = useState(false)
   const [graphStatus, setGraphStatus] = useState<string>('')
@@ -367,63 +365,9 @@ export default function AttendeeRefreshPanel({
   const [graphDurationHours, setGraphDurationHours] = useState(0.5)
   const [graphTimeZone, setGraphTimeZone] = useState<'IST' | 'UTC' | 'GMT'>('IST')
 
-  async function handleToggleKey(attendee: CycleAttendee) {
-    setTogglingKey(attendee.attendee_id)
-    try {
-      const updated = await apiFetch<{ attendee: CycleAttendee }>(
-        `/api/cycles/${cycleId}/attendees/${attendee.attendee_id}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({ is_key: !attendee.is_key }),
-        }
-      )
-      onAttendeesChanged(
-        attendees.map((a) =>
-          a.attendee_id === attendee.attendee_id ? { ...a, ...updated.attendee } : a
-        )
-      )
-    } catch {
-      // optimistic toggle
-      onAttendeesChanged(
-        attendees.map((a) =>
-          a.attendee_id === attendee.attendee_id ? { ...a, is_key: !a.is_key } : a
-        )
-      )
-    } finally {
-      setTogglingKey(null)
-    }
-  }
-
-  async function handleToggleType(attendee: CycleAttendee) {
-    const newType = attendee.type === 'Vendor' ? 'Internal Stakeholder' : 'Vendor'
-    setTogglingType(attendee.attendee_id)
-    try {
-      const updated = await apiFetch<{ attendee: CycleAttendee }>(
-        `/api/cycles/${cycleId}/attendees/${attendee.attendee_id}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({ type: newType }),
-        }
-      )
-      onAttendeesChanged(
-        attendees.map((a) =>
-          a.attendee_id === attendee.attendee_id ? { ...a, ...updated.attendee } : a
-        )
-      )
-    } catch {
-      onAttendeesChanged(
-        attendees.map((a) =>
-          a.attendee_id === attendee.attendee_id ? { ...a, type: newType as CycleAttendee['type'] } : a
-        )
-      )
-    } finally {
-      setTogglingType(null)
-    }
-  }
-
-  async function handleUpdateClassification(
+  async function handleUpdateAttendee(
     attendee: CycleAttendee,
-    patch: Partial<Pick<CycleAttendee, 'attendance_requirement' | 'lt_status' | 'shell_department'>>
+    patch: Partial<Pick<CycleAttendee, 'type' | 'is_key' | 'attendance_requirement' | 'lt_status' | 'shell_department'>>
   ) {
     try {
       const updated = await apiFetch<{ attendee: CycleAttendee }>(
@@ -733,29 +677,28 @@ export default function AttendeeRefreshPanel({
                       {a.organisation}
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleToggleType(a)}
-                        disabled={togglingType === a.attendee_id}
-                        title={`Switch to ${a.type === 'Vendor' ? 'Internal Stakeholder' : 'Vendor'}`}
-                        className={cn(
-                          'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors',
-                          a.type === 'Vendor'
-                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/50'
-                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50',
-                          togglingType === a.attendee_id && 'opacity-50 cursor-not-allowed'
-                        )}
+                      <select
+                        value={a.type}
+                        onChange={(e) => {
+                          const newType = e.target.value as CycleAttendee['type']
+                          handleUpdateAttendee(a, {
+                            type: newType,
+                            // Vendors have no Shell department and are never key
+                            // (scorecards are collected from internal stakeholders only).
+                            ...(newType === 'Vendor' ? { shell_department: null, is_key: false } : {}),
+                          })
+                        }}
+                        className="px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
-                        {togglingType === a.attendee_id ? (
-                          <Loader2 size={11} className="animate-spin" />
-                        ) : null}
-                        {a.type === 'Vendor' ? 'Vendor' : 'Internal'}
-                      </button>
+                        <option value="Internal Stakeholder">Internal</option>
+                        <option value="Vendor">Vendor</option>
+                      </select>
                     </td>
                     <td className="px-4 py-3">
                       <select
                         value={a.attendance_requirement ?? 'Required'}
                         onChange={(e) =>
-                          handleUpdateClassification(a, {
+                          handleUpdateAttendee(a, {
                             attendance_requirement: e.target.value as AttendanceRequirement,
                           })
                         }
@@ -769,7 +712,7 @@ export default function AttendeeRefreshPanel({
                       <select
                         value={a.lt_status ?? 'Non-LT'}
                         onChange={(e) =>
-                          handleUpdateClassification(a, { lt_status: e.target.value as LTStatus })
+                          handleUpdateAttendee(a, { lt_status: e.target.value as LTStatus })
                         }
                         className="px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
@@ -782,7 +725,7 @@ export default function AttendeeRefreshPanel({
                         <select
                           value={a.shell_department ?? 'IDTM'}
                           onChange={(e) =>
-                            handleUpdateClassification(a, {
+                            handleUpdateAttendee(a, {
                               shell_department: e.target.value as ShellDepartment,
                             })
                           }
@@ -797,25 +740,24 @@ export default function AttendeeRefreshPanel({
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleToggleKey(a)}
-                        disabled={togglingKey === a.attendee_id}
-                        title={a.is_key ? 'Remove key status' : 'Mark as key attendee'}
-                        className={cn(
-                          'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors',
-                          a.is_key
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50'
-                            : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700',
-                          togglingKey === a.attendee_id && 'opacity-50 cursor-not-allowed'
-                        )}
-                      >
-                        {togglingKey === a.attendee_id ? (
-                          <Loader2 size={11} className="animate-spin" />
-                        ) : (
-                          <Key size={11} />
-                        )}
-                        {a.is_key ? 'Key' : 'Set key'}
-                      </button>
+                      {a.type === 'Internal Stakeholder' ? (
+                        <select
+                          value={a.is_key ? 'key' : 'not'}
+                          onChange={(e) => handleUpdateAttendee(a, { is_key: e.target.value === 'key' })}
+                          title={a.is_key ? 'Key attendee (fills scorecard)' : 'Not a key attendee'}
+                          className={cn(
+                            'px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500',
+                            a.is_key
+                              ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                          )}
+                        >
+                          <option value="key">Key</option>
+                          <option value="not">Not key</option>
+                        </select>
+                      ) : (
+                        <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <button
@@ -846,7 +788,7 @@ export default function AttendeeRefreshPanel({
         <div className="px-5 py-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-1.5">
             <Key size={11} className="text-amber-500" />
-            <span>Select at least one key attendee for vendor and internal Stakeholder</span>
+            <span>Key internal stakeholders fill the scorecard (scorecards are not collected from vendors)</span>
           </div>
         </div>
       </div>

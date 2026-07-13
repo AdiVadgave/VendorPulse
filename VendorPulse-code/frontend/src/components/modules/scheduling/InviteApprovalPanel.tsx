@@ -68,6 +68,30 @@ export default function InviteApprovalPanel({
   const displayZone = toDisplayZone(slotTimeZone)
   const ianaZone = toIanaZone(slotTimeZone)
 
+  const defaultSubject = `SPR Meeting Invitation — ${vendorName} ${quarter} ${year}`
+  const defaultBody = [
+    'Dear Team,',
+    '',
+    `You are invited to the SPR (Supplier Performance Review) governance meeting for ${vendorName} — ${quarter} ${year}.`,
+    '',
+    `Date: ${formatDateInZone(dateObj)}`,
+    `Time: ${formatTimeInZone(dateObj)} - ${formatTimeInZone(endTime)} ${displayZone}`,
+    'Location: Microsoft Teams',
+    '',
+    'Agenda:',
+    `1. ${quarter} Performance Review & Scorecard Discussion`,
+    '2. Key Issues, Concerns and Pushback Responses',
+    '3. Commitments and Action Items Review',
+    '4. Forward Planning & AOB',
+    '',
+    'Please accept or decline this invitation via Microsoft Teams.',
+    '',
+    '— VendorPulse Scheduling Agent',
+  ].join('\n')
+
+  const [subject, setSubject] = useState(defaultSubject)
+  const [body, setBody] = useState(defaultBody)
+
   function formatDateInZone(date: Date): string {
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -113,6 +137,8 @@ export default function InviteApprovalPanel({
         body: JSON.stringify({
           slot_id: slot.slot_id,
           organiser_email: organiserEmail,
+          subject,
+          body,
         }),
       })
 
@@ -232,23 +258,28 @@ export default function InviteApprovalPanel({
           </div>
         </div>
 
-        {/* Email preview */}
+        {/* Editable invite */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
           <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
             <FileText size={14} className="text-slate-400" />
             <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-              Teams Invite Preview
+              Teams Invite — Editable
             </span>
-            <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 font-medium">
-              Pending approval
-            </span>
+            <button
+              type="button"
+              onClick={() => { setSubject(defaultSubject); setBody(defaultBody) }}
+              disabled={isProcessing || hasSentInvite}
+              className="ml-auto text-xs text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50 disabled:no-underline"
+            >
+              Reset to default
+            </button>
           </div>
 
           <div className="p-5 space-y-3 text-sm">
             <div className="space-y-1.5 pb-3 border-b border-slate-100 dark:border-slate-800 text-xs">
               <div className="flex gap-3">
-                <span className="text-slate-500 dark:text-slate-400 w-14 shrink-0">To:</span>
-                <span className="text-slate-700 dark:text-slate-300">
+                <span className="text-slate-500 dark:text-slate-400 w-16 shrink-0 pt-1">To:</span>
+                <span className="text-slate-700 dark:text-slate-300 pt-1">
                   {attendees
                     .slice(0, 3)
                     .map((a) => a.email)
@@ -256,49 +287,31 @@ export default function InviteApprovalPanel({
                   {attendees.length > 3 && ` and ${attendees.length - 3} more`}
                 </span>
               </div>
-              <div className="flex gap-3">
-                <span className="text-slate-500 dark:text-slate-400 w-14 shrink-0">Subject:</span>
-                <span className="text-slate-700 dark:text-slate-300 font-medium">
-                  EGB/QBR Meeting Invitation — {vendorName} {quarter} {year}
-                </span>
+              <div className="flex gap-3 items-center">
+                <label className="text-slate-500 dark:text-slate-400 w-16 shrink-0">Subject:</label>
+                <input
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  disabled={isProcessing || hasSentInvite}
+                  className="flex-1 px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                />
               </div>
             </div>
 
-            <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-              <p>Dear Team,</p>
-              <p>
-                You are invited to the{' '}
-                <strong>EGB/QBR governance review</strong> for{' '}
-                <strong>
-                  {vendorName} — {quarter} {year}
-                </strong>
-                .
-              </p>
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 rounded-lg p-3 space-y-1 text-xs">
-                <p>
-                  📅 <strong>Date:</strong>{' '}
-                  {formatDateInZone(dateObj)}
-                </p>
-                <p>
-                  🕙 <strong>Time:</strong> {formatTimeInZone(dateObj)} –{' '}
-                  {formatTimeInZone(endTime)} {displayZone}
-                </p>
-                <p>📍 <strong>Location:</strong> Conference Room B / Microsoft Teams</p>
-              </div>
-              <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                Agenda:
-              </p>
-              <ol className="list-decimal list-inside space-y-0.5 text-xs text-slate-600 dark:text-slate-400">
-                <li>{quarter} Performance Review &amp; Scorecard Discussion</li>
-                <li>Key Issues, Concerns and Pushback Responses</li>
-                <li>Commitments and Action Items Review</li>
-                <li>Forward Planning &amp; AOB</li>
-              </ol>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Please accept or decline this invitation via Microsoft Teams at your earliest convenience.
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                — VendorPulse Scheduling Agent
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                Invite body (editable)
+              </label>
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                disabled={isProcessing || hasSentInvite}
+                rows={14}
+                className="w-full px-3 py-2 text-xs leading-relaxed font-mono border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y disabled:opacity-60"
+              />
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                This text is sent as the meeting invite body via Microsoft Graph. Edit freely before approving.
               </p>
             </div>
           </div>

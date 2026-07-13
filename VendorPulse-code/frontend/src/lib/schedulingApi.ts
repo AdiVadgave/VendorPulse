@@ -116,6 +116,31 @@ export async function updateMeetingPlan(
   return res.meeting_plan ?? meetingPlan
 }
 
+// ── Manual slot (create-only, pending invite approval) ───────────────────────
+
+/**
+ * Create an approved slot at a coordinator-chosen time WITHOUT creating the
+ * Teams meeting. The UI then routes to Invite Approval, where the coordinator
+ * reviews/edits the invite before it is sent.
+ */
+export async function createManualSlot(
+  cycleId: string,
+  params: { startTime: string; durationHours: number; timeZone: 'IST' | 'UTC' | 'GMT' }
+): Promise<SlotProposal> {
+  const res = await apiFetch<{ slot: SlotProposal }>(
+    `/api/cycles/${cycleId}/scheduling/manual-slot`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        start_time: params.startTime,
+        duration_hours: params.durationHours,
+        time_zone: params.timeZone,
+      }),
+    }
+  )
+  return res.slot
+}
+
 // ── Manual / reschedule (main governance meeting) ────────────────────────────
 
 export interface ScheduleManualResult {

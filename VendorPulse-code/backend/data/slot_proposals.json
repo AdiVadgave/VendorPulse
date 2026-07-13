@@ -2215,5 +2215,52 @@
     ],
     "tentative": [],
     "conflicts": []
+  },
+  {
+    "slot_id": "slot_487351f0",
+    "cycle_id": "c_9b4dc5f5",
+    "proposed_time": "2026-07-24T11:40:00Z",
+    "proposed_time_zone": "UTC",
+    "duration_minutes": 90,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "approved_by": "chinmay.kotkar@zensar.com",
+    "approved_at": "2026-07-13T06:11:37.177469+00:00",
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar"
+    ],
+    "tentative": [],
+    "conflicts": [],
+    "ranking_rationale": "Manually scheduled by the VMO coordinator (recommendations bypassed)."
+  },
+  {
+    "slot_id": "slot_e13251ea",
+    "cycle_id": "c_23352023",
+    "proposed_time": "2026-07-24T06:26:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "approved_by": "chinmay.kotkar@zensar.com",
+    "approved_at": "2026-07-13T06:27:05.608543+00:00",
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar",
+      "abhishek Biyani"
+    ],
+    "tentative": [],
+    "conflicts": [],
+    "ranking_rationale": "Manually scheduled by the VMO coordinator (recommendations bypassed)."
   }
 ]

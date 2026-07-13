@@ -58,6 +58,20 @@ class SendInviteRequest(BaseModel):
 
     slot_id: str = Field(..., description="The slot_proposals.json slot_id to convert to Teams meeting")
     organiser_email: str = Field(..., description="Email of the meeting organiser")
+    subject: Optional[str] = Field(default=None, description="Optional coordinator-edited invite subject")
+    body: Optional[str] = Field(default=None, description="Optional coordinator-edited invite body text")
+
+
+class ManualSlotRequest(BaseModel):
+    """Create an approved slot at a coordinator-chosen time (no Graph event yet).
+
+    Used by the manual-override path so the coordinator still reviews/edits the
+    invite on the Invite Approval screen before it is actually sent.
+    """
+
+    start_time: str = Field(..., description="Local wall-clock start datetime, e.g. '2026-07-20T14:30:00'")
+    duration_hours: float = Field(0.5, description="Meeting duration in hours")
+    time_zone: str = Field("UTC", description="Timezone for the chosen time (IST, UTC, GMT)")
 
 
 class ScheduleManualRequest(BaseModel):
@@ -781,8 +795,11 @@ def send_meeting_invite_graph(
     if not attendee_emails:
         raise HTTPException(status_code=400, detail="No attendee emails found")
 
-    # Build meeting subject
-    subject = f"Vendor Meeting — {cycle.get('vendor_name', 'TBD')} ({cycle.get('quarter', '')} {cycle.get('year', '')})"
+    # Build meeting subject — prefer the coordinator-edited subject when provided.
+    subject = (payload.subject or "").strip() or (
+        f"Vendor Meeting — {cycle.get('vendor_name', 'TBD')} ({cycle.get('quarter', '')} {cycle.get('year', '')})"
+    )
+    invite_body = (payload.body or "").strip() or None
 
     # Create event (synchronous wrapper)
     try:
@@ -797,6 +814,7 @@ def send_meeting_invite_graph(
             organiser_email=organiser_email,
             is_online_meeting=True,
             time_zone=slot.get("proposed_time_zone") or "UTC",
+            body=invite_body,
         ))
     except Exception as e:
         import traceback
@@ -868,15 +886,29 @@ def send_meeting_invite_graph(
 
 
 def _manual_local_to_utc_iso(local_dt_str: str, source_tz: str) -> str:
-    """Convert a local wall-clock datetime (no offset) to UTC ISO ('...Z')."""
+    """Convert a start datetime to UTC ISO ('...Z').
+
+    Accepts two forms:
+      • tz-aware / UTC (ends with 'Z' or has an offset) — e.g. a Graph slot's
+        proposed_time — treated as an absolute instant.
+      • naive local wall-clock (no offset) — e.g. a manual datetime-local input —
+        treated as local to *source_tz*.
+    """
     if not local_dt_str:
         return ""
     normalized = str(local_dt_str).strip()
     if "." in normalized:
         normalized = normalized.split(".", 1)[0]
-    # Strip any explicit offset — we treat the value as local to source_tz.
-    if normalized.endswith("Z"):
-        normalized = normalized[:-1]
+
+    # Absolute instant already carries tz info → convert straight to UTC.
+    has_offset = normalized.endswith("Z") or bool(re.search(r"[+-]\d{2}:\d{2}$", normalized))
+    if has_offset:
+        try:
+            aware = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+            return aware.astimezone(timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
+        except Exception:
+            return local_dt_str
+
     try:
         naive = datetime.fromisoformat(normalized)
     except Exception:
@@ -897,6 +929,68 @@ def _manual_local_to_utc_iso(local_dt_str: str, source_tz: str) -> str:
     except Exception:
         offset_minutes = 330 if iana == "Asia/Kolkata" else 0
         return (naive - timedelta(minutes=offset_minutes)).isoformat(timespec="seconds") + "Z"
+
+
+@router.post("/api/cycles/{cycleId}/scheduling/manual-slot")
+def create_manual_slot(
+    cycleId: str,
+    payload: ManualSlotRequest,
+    cycle_repo=Depends(get_cycle_repo),
+    attendee_repo=Depends(get_attendee_repo),
+    slot_repo=Depends(get_slot_repo),
+):
+    """
+    Create an approved slot at a coordinator-chosen time WITHOUT creating a
+    Teams meeting. The frontend then routes to Invite Approval, where the
+    coordinator reviews/edits the invite before send-invite creates the event.
+    """
+    logger.info(
+        "create_manual_slot called — cycleId=%s, start=%s, tz=%s",
+        cycleId, payload.start_time, payload.time_zone,
+    )
+    cycle = _get_cycle_or_404(cycleId, cycle_repo)
+    try:
+        workflow_engine.assert_at_least(cycle, "ATTENDEE_REFRESH_SENT")
+    except WorkflowStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+    # Ensure the cycle is at least AVAILABILITY_COLLECTED so the later
+    # send-invite precondition is satisfied.
+    now = datetime.now(timezone.utc).isoformat()
+    if workflow_engine.can_transition(cycle.get("workflow_state", ""), "AVAILABILITY_COLLECTED"):
+        workflow_engine.advance(cycle, cycle_repo, now)
+
+    display_tz = (payload.time_zone or "UTC").strip().upper()
+    display_tz = display_tz if display_tz in ("IST", "UTC", "GMT") else "UTC"
+
+    attendees = attendee_repo.get_for_cycle(cycleId)
+    attendee_names = [(a.get("name") or a.get("email") or "") for a in attendees]
+    proposed_time_utc = _manual_local_to_utc_iso(payload.start_time, payload.time_zone)
+
+    slot = {
+        "slot_id": f"slot_{uuid.uuid4().hex[:8]}",
+        "cycle_id": cycleId,
+        "proposed_time": proposed_time_utc,
+        "proposed_time_zone": display_tz,
+        "duration_minutes": int(payload.duration_hours * 60),
+        "organiser_available": True,
+        "exec_sponsor_available": True,
+        "rank_score": 100.0,
+        "is_approved": True,
+        "approved_by": "coordinator",
+        "approved_at": now,
+        "attendance_count": len(attendee_names),
+        "total_attendees": len(attendee_names),
+        "conflict_count": 0,
+        "attending": attendee_names,
+        "tentative": [],
+        "conflicts": [],
+        "ranking_rationale": "Manually chosen time — pending invite approval.",
+    }
+    slot_repo.clear_for_cycle(cycleId)
+    slot_repo.insert(slot)
+    logger.info("create_manual_slot success — cycleId=%s, slot_id=%s", cycleId, slot["slot_id"])
+    return {"slot": slot}
 
 
 @router.post("/api/cycles/{cycleId}/scheduling/graph/schedule-manual")

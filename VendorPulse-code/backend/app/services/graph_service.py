@@ -210,6 +210,7 @@ class GraphService:
         organiser_email: str = "",
         is_online_meeting: bool = True,
         time_zone: str = "UTC",
+        body: Optional[str] = None,
     ) -> dict:
         """
         Create an online Teams meeting event and send invites.
@@ -313,7 +314,7 @@ class GraphService:
         ]
 
         # Request body
-        body = {
+        request_body = {
             "subject": subject,
             "start": {
                 "dateTime": start_local.isoformat(timespec="seconds"),
@@ -330,17 +331,20 @@ class GraphService:
             "reminderMinutesBeforeStart": 15,
             "responseRequested": True,
         }
+        # Optional coordinator-edited invite body (plain text preserves newlines).
+        if body:
+            request_body["body"] = {"contentType": "Text", "content": body}
 
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{self.BASE_URL}/me/events",
-                    json=body,
+                    json=request_body,
                     headers=self.headers,
                     timeout=30.0,
                 )
                 result = response.json()
-                
+
                 if response.status_code not in (200, 201):
                     logger.error("create_event: Graph API error — status=%d", response.status_code)
                     return self._build_graph_error(response.status_code, result)

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { CalendarClock, Loader2, AlertCircle, PencilLine } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { SlotProposal } from '@/types/scheduling.types'
-import { scheduleMeetingManual, getTokenOwnerOrganizerEmail } from '@/lib/schedulingApi'
+import { scheduleMeetingManual, createManualSlot, getTokenOwnerOrganizerEmail } from '@/lib/schedulingApi'
 
 type TimeZoneView = 'IST' | 'UTC' | 'GMT'
 
@@ -35,7 +35,7 @@ export default function ManualScheduleControl({
   const [error, setError] = useState<string | null>(null)
 
   const isReschedule = mode === 'reschedule'
-  const ctaLabel = isReschedule ? 'Reschedule to this time' : 'Schedule at this time'
+  const ctaLabel = isReschedule ? 'Reschedule to this time' : 'Continue to invite review'
 
   async function handleSubmit() {
     if (!startLocal) {
@@ -45,25 +45,30 @@ export default function ManualScheduleControl({
     setIsSubmitting(true)
     setError(null)
     try {
-      const organiserEmail = await getTokenOwnerOrganizerEmail()
-      if (!organiserEmail) {
-        setError('Could not resolve the organiser from the Graph token. Refresh GRAPH_ACCESS_TOKEN and retry.')
-        return
-      }
       // datetime-local yields "YYYY-MM-DDTHH:mm"; add seconds for the backend.
       const startTime = startLocal.length === 16 ? `${startLocal}:00` : startLocal
-      const result = await scheduleMeetingManual(cycleId, {
-        organiserEmail,
-        startTime,
-        durationHours,
-        timeZone,
-        reschedule: isReschedule,
-      })
-      if (result.slot) {
-        onScheduled(result.slot, timeZone, result.teams_meeting_url ?? null)
+      if (isReschedule) {
+        const organiserEmail = await getTokenOwnerOrganizerEmail()
+        if (!organiserEmail) {
+          setError('Could not resolve the organiser from the Graph token. Refresh GRAPH_ACCESS_TOKEN and retry.')
+          return
+        }
+        const result = await scheduleMeetingManual(cycleId, {
+          organiserEmail,
+          startTime,
+          durationHours,
+          timeZone,
+          reschedule: true,
+        })
+        if (result.slot) onScheduled(result.slot, timeZone, result.teams_meeting_url ?? null)
+      } else {
+        // Create an approved slot only — the Teams meeting is created after the
+        // coordinator reviews/edits the invite on the Invite Approval screen.
+        const slot = await createManualSlot(cycleId, { startTime, durationHours, timeZone })
+        onScheduled(slot, timeZone, null)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to schedule the meeting via Graph')
+      setError(err instanceof Error ? err.message : 'Failed to set the meeting time')
     } finally {
       setIsSubmitting(false)
     }
@@ -98,8 +103,8 @@ export default function ManualScheduleControl({
 
       {!open && !isReschedule && (
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
-          Prefer not to use the recommendations above? Set your own date and time — VendorPulse will still
-          create the Teams meeting and send invites via Microsoft Graph.
+          Prefer not to use the recommendations above? Set your own date and time — you'll then review and
+          edit the invite on the next screen before it's sent.
         </p>
       )}
 
@@ -160,7 +165,7 @@ export default function ManualScheduleControl({
             )}
           >
             {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <CalendarClock size={14} />}
-            {isSubmitting ? 'Scheduling via Graph…' : ctaLabel}
+            {isSubmitting ? (isReschedule ? 'Rescheduling…' : 'Preparing invite…') : ctaLabel}
           </button>
         </div>
       )}

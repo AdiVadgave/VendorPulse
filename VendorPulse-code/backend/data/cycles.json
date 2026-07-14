@@ -92,5 +92,401 @@
       "kanishkpunekar54@gmail.com",
       "anupkrsarwani3537@gmail.com"
     ]
+  },
+  {
+    "cycle_id": "c_95e783c1",
+    "vendor_id": "v_e7870df1",
+    "vendor_name": "Zensar4",
+    "cycle_type": "SPR",
+    "quarter": "Q2",
+    "year": 2026,
+    "workflow_state": "ARCHIVED",
+    "created_at": "2026-07-13T12:33:06.723133+00:00",
+    "updated_at": "2026-07-13T12:51:02.364664+00:00",
+    "meeting_plan": [
+      {
+        "meeting_key": "internal_alignment_1",
+        "meeting_type": "INTERNAL_ALIGNMENT",
+        "title": "Internal Alignment Call",
+        "enabled": true,
+        "order": 1
+      },
+      {
+        "meeting_key": "supplier_prep",
+        "meeting_type": "SUPPLIER_PREP",
+        "title": "Supplier Prep Call",
+        "enabled": true,
+        "order": 2
+      },
+      {
+        "meeting_key": "leadership_alignment",
+        "meeting_type": "LEADERSHIP_ALIGNMENT",
+        "title": "Leadership Alignment Call",
+        "enabled": false,
+        "order": 3
+      },
+      {
+        "meeting_key": "main_governance",
+        "meeting_type": "MAIN_GOVERNANCE",
+        "title": "Main Governance Meeting",
+        "enabled": true,
+        "order": 4
+      }
+    ],
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MDE4YjkyYzItMGZmYi00MzBlLWEzNTUtMzBiMjMyNTk0YTkz%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABZXxoMwAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "teams_meeting_event_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABZXxoMwAAAA==",
+    "teams_meeting_scheduled_at": "2026-07-13T12:36:09.320047+00:00",
+    "scorecard_dispatched_at": "2026-07-13T12:40:07.471876+00:00",
+    "scorecard_dispatched_to": [
+      "anupkrsarwani3537@gmail.com",
+      "kanishkpunekar54@gmail.com"
+    ]
+  },
+  {
+    "cycle_id": "c_b43d365e",
+    "vendor_id": "v_5a3ba64a",
+    "vendor_name": "NOVSA",
+    "cycle_type": "SPR",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "SCORECARD_COLLECTION",
+    "created_at": "2026-07-14T06:04:48.760413+00:00",
+    "updated_at": "2026-07-14T06:07:00.098786+00:00",
+    "meeting_plan": [
+      {
+        "meeting_key": "internal_alignment_1",
+        "meeting_type": "INTERNAL_ALIGNMENT",
+        "title": "Internal Alignment Call",
+        "enabled": true,
+        "order": 1
+      },
+      {
+        "meeting_key": "supplier_prep",
+        "meeting_type": "SUPPLIER_PREP",
+        "title": "Supplier Prep Call",
+        "enabled": true,
+        "order": 2
+      },
+      {
+        "meeting_key": "leadership_alignment",
+        "meeting_type": "LEADERSHIP_ALIGNMENT",
+        "title": "Leadership Alignment Call",
+        "enabled": false,
+        "order": 3
+      },
+      {
+        "meeting_key": "main_governance",
+        "meeting_type": "MAIN_GOVERNANCE",
+        "title": "Main Governance Meeting",
+        "enabled": true,
+        "order": 4
+      }
+    ],
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MGM1M2MyNjgtM2M4Zi00NGI5LTljZDgtNDJmNmRjOGI4Y2Y0%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABZcDDigAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "teams_meeting_event_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABZcDDigAAAA==",
+    "teams_meeting_scheduled_at": "2026-07-14T06:06:06.131405+00:00",
+    "scorecard_dispatched_at": "2026-07-14T06:06:24.995809+00:00",
+    "scorecard_dispatched_to": [
+      "anupkrsarwani3537@gmail.com",
+      "kanishkpunekar54@gmail.com"
+    ]
+  },
+  {
+    "cycle_id": "c_d4128b63",
+    "vendor_id": "v_05392e0d",
+    "vendor_name": "TCS",
+    "cycle_type": "SPR",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "ATTENDEE_REFRESH_SENT",
+    "created_at": "2026-07-14T09:44:49.290721+00:00",
+    "updated_at": "2026-07-14T09:45:09.584792+00:00",
+    "meeting_plan": [
+      {
+        "meeting_key": "internal_alignment_1",
+        "meeting_type": "INTERNAL_ALIGNMENT",
+        "title": "Internal Alignment Call",
+        "enabled": true,
+        "order": 1
+      },
+      {
+        "meeting_key": "supplier_prep",
+        "meeting_type": "SUPPLIER_PREP",
+        "title": "Supplier Prep Call",
+        "enabled": true,
+        "order": 2
+      },
+      {
+        "meeting_key": "leadership_alignment",
+        "meeting_type": "LEADERSHIP_ALIGNMENT",
+        "title": "Leadership Alignment Call",
+        "enabled": false,
+        "order": 3
+      },
+      {
+        "meeting_key": "main_governance",
+        "meeting_type": "MAIN_GOVERNANCE",
+        "title": "Main Governance Meeting",
+        "enabled": true,
+        "order": 4
+      }
+    ],
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_beb2c8b0",
+    "vendor_id": "v_7d08f426",
+    "vendor_name": "Zensar",
+    "cycle_type": "SPR",
+    "quarter": "Q1",
+    "year": 2026,
+    "workflow_state": "SCORECARD_COMPILED",
+    "created_at": "2026-07-14T09:45:30.804845+00:00",
+    "updated_at": "2026-07-14T10:01:11.433753+00:00",
+    "meeting_plan": [
+      {
+        "meeting_key": "internal_alignment_1",
+        "meeting_type": "INTERNAL_ALIGNMENT",
+        "title": "Internal Alignment Call",
+        "enabled": true,
+        "order": 1
+      },
+      {
+        "meeting_key": "supplier_prep",
+        "meeting_type": "SUPPLIER_PREP",
+        "title": "Supplier Prep Call",
+        "enabled": true,
+        "order": 2
+      },
+      {
+        "meeting_key": "leadership_alignment",
+        "meeting_type": "LEADERSHIP_ALIGNMENT",
+        "title": "Leadership Alignment Call",
+        "enabled": false,
+        "order": 3
+      },
+      {
+        "meeting_key": "main_governance",
+        "meeting_type": "MAIN_GOVERNANCE",
+        "title": "Main Governance Meeting",
+        "enabled": true,
+        "order": 4
+      }
+    ],
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 10,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "IRM_ASSURANCE_RISK",
+              "label": "IRM Assurance & Risk Management",
+              "description": "Information Risk Management assurance — effective identification, control and reporting of information and cyber risks",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "HSSE",
+          "label": "HSSE",
+          "weight": 10,
+          "measures": [
+            {
+              "key": "DECARBONISATION",
+              "label": "Decarbonisation",
+              "description": "Progress toward decarbonisation and sustainability commitments (colour-coded RAG; no influence on the score)",
+              "measure_type": "rag"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": true
+    },
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YTM3YmZmOGQtNDExZC00YWZjLTkxM2EtZWExN2ZhNmJmOTdk%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%22a844e461-c000-4ba2-a5e7-ef7c9ee101ca%22%7d",
+    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AAMkADI3NGY2NjFkLTdjZmEtNDVkZC1hNmU2LTY0NDc1YzI1YjI2YwBGAAAAAAB8ionGtHm%2FSr91OJM2o4j2BwBBbnqVere0S42PGqt5wX0sAAAAAAENAABBbnqVere0S42PGqt5wX0sAAFlZYMDAAA%3D&exvsurl=1&path=/calendar/item",
+    "teams_meeting_event_id": "AAMkADI3NGY2NjFkLTdjZmEtNDVkZC1hNmU2LTY0NDc1YzI1YjI2YwBGAAAAAAB8ionGtHm-Sr91OJM2o4j2BwBBbnqVere0S42PGqt5wX0sAAAAAAENAABBbnqVere0S42PGqt5wX0sAAFlZYMDAAA=",
+    "teams_meeting_scheduled_at": "2026-07-14T09:51:08.672973+00:00",
+    "scorecard_dispatched_at": "2026-07-14T09:59:31.675975+00:00",
+    "scorecard_dispatched_to": [
+      "adivadgave16@gmail.com",
+      "kanishkpunekar54@gmail.com"
+    ]
   }
 ]

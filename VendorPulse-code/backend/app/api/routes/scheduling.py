@@ -37,6 +37,7 @@ from app.models.scheduling import (
     RankSlotsRequest,
     default_meeting_plan,
 )
+from app.utils.scorecard_structure import default_scorecard_config
 from app.services.scheduling_service import SchedulingService
 from app.services.graph_service import GraphService
 from app.config import Settings, settings
@@ -155,6 +156,7 @@ def create_cycle(
         "created_at": now,
         "updated_at": now,
         "meeting_plan": [m.model_dump() for m in default_meeting_plan()],
+        "scorecard_config": default_scorecard_config(),
     }
     result = cycle_repo.insert(cycle)
     logger.info("create_cycle success — cycle_id=%s", cycle["cycle_id"])
@@ -173,6 +175,8 @@ def get_cycle(cycleId: str, cycle_repo=Depends(get_cycle_repo)):
     cycle.setdefault("cycle_type", "SPR")
     if not cycle.get("meeting_plan"):
         cycle["meeting_plan"] = [m.model_dump() for m in default_meeting_plan()]
+    if not (cycle.get("scorecard_config") or {}).get("categories"):
+        cycle["scorecard_config"] = default_scorecard_config()
     logger.info("get_cycle success — cycleId=%s, workflow_state=%s", cycleId, ws)
     return {"cycle": cycle}
 

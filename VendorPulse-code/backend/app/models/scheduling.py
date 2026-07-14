@@ -227,6 +227,45 @@ class MeetingPlanUpdate(BaseModel):
     meeting_plan: list[CycleMeeting]
 
 
+# ---------------------------------------------------------------------------
+# Per-SPR scorecard configuration (which measures + per-theme weights)
+# ---------------------------------------------------------------------------
+
+ScorecardMeasureType = Literal["numeric", "rag"]
+
+
+class ScorecardMeasureCfg(BaseModel):
+    key: str
+    label: str
+    description: str = ""
+    measure_type: ScorecardMeasureType = "numeric"
+
+
+class ScorecardCategoryCfg(BaseModel):
+    key: str
+    label: str
+    weight: int = 0
+    measures: list[ScorecardMeasureCfg] = Field(default_factory=list)
+
+
+class ScorecardConfig(BaseModel):
+    """The measures included in a cycle's scorecard and their per-theme weights.
+    Chosen by the VMO before dispatch; defaults to the standard structure."""
+
+    categories: list[ScorecardCategoryCfg] = Field(default_factory=list)
+    configured: bool = False
+
+
+class ScorecardConfigUpdate(BaseModel):
+    """VMO selection: which measures to include + weight per theme.
+
+    Labels/descriptions/types are resolved server-side from the catalog, so the
+    client only sends the chosen measure keys and the per-theme weights."""
+
+    selected_measure_keys: list[str] = Field(default_factory=list)
+    weights: dict[str, int] = Field(default_factory=dict, description="theme_key -> weight (included themes must sum to 100)")
+
+
 class CycleCreate(BaseModel):
     vendor_id: str
     vendor_name: str
@@ -247,6 +286,9 @@ class Cycle(BaseModel):
     created_at: str
     updated_at: str
     meeting_plan: list[CycleMeeting] = Field(default_factory=default_meeting_plan)
+    # Per-SPR scorecard configuration (measures + per-theme weights). None until
+    # seeded/backfilled with the default structure.
+    scorecard_config: Optional[ScorecardConfig] = None
     scorecard_dispatched_at: Optional[str] = None
     scorecard_dispatched_to: Optional[list[str]] = None
     # Populated when the vendor meeting invite is sent via Graph.

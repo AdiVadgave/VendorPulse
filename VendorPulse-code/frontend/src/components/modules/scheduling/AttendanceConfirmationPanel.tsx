@@ -281,6 +281,7 @@ export default function AttendanceConfirmationPanel({
           email: a.replaced_by_email ?? '',
           role: a.role,
           organisation: a.organisation,
+          type: a.type,
           is_key: a.is_key,
           invite_status: 'PENDING',
           availability_submitted: false,

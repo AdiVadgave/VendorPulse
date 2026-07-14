@@ -4,6 +4,7 @@ import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
 import { WEIGHTED_SCORECARD_STRUCTURE } from '@/types/scorecard.types'
+import type { WeightedCategoryDef } from '@/types/scorecard.types'
 import { checkGoogleAuth, dispatchInAppScorecard, buildScorecardLink } from '@/lib/scorecardApi'
 import type { DispatchResponse } from '@/lib/scorecardApi'
 import type { CycleAttendee } from '@/types/scheduling.types'
@@ -19,6 +20,8 @@ interface Props {
   onDispatched: () => void
   onAttendeesChanged?: (updated: CycleAttendee[]) => void
   alreadyDispatched?: boolean
+  /** The configured scorecard structure for this cycle (falls back to default). */
+  structure?: WeightedCategoryDef[]
 }
 
 const REMINDER_SCHEDULE = [
@@ -27,11 +30,11 @@ const REMINDER_SCHEDULE = [
   { label: 'T−0 days', tone: 'Escalation to organiser', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
 ]
 
-const TOTAL_MEASURES = WEIGHTED_SCORECARD_STRUCTURE.reduce((sum, c) => sum + c.measures.length, 0)
 const GOOGLE_AUTH_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/google`
 
-function CategoriesDropdown() {
+function CategoriesDropdown({ structure }: { structure: WeightedCategoryDef[] }) {
   const [open, setOpen] = useState(false)
+  const totalMeasures = structure.reduce((sum, c) => sum + c.measures.length, 0)
   return (
     <div className="mb-4">
       <button
@@ -40,13 +43,13 @@ function CategoriesDropdown() {
       >
         <span>Scorecard Themes &amp; Measures</span>
         <span className="flex items-center gap-1">
-          <span className="text-[10px] font-normal normal-case">{WEIGHTED_SCORECARD_STRUCTURE.length} themes &middot; {TOTAL_MEASURES} measures</span>
+          <span className="text-[10px] font-normal normal-case">{structure.length} themes &middot; {totalMeasures} measures</span>
           {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
       </button>
       {open && (
         <div className="space-y-2">
-          {WEIGHTED_SCORECARD_STRUCTURE.map((cat) => (
+          {structure.map((cat) => (
             <div key={cat.key} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{cat.label}</span>
@@ -56,7 +59,7 @@ function CategoriesDropdown() {
                 {cat.measures.map((m) => (
                   <div key={m.key} className="flex items-center justify-between text-xs py-0.5 px-2">
                     <span className="text-slate-600 dark:text-slate-400">{m.label}</span>
-                    <span className="text-slate-400 dark:text-slate-500">1&ndash;5</span>
+                    <span className="text-slate-400 dark:text-slate-500">{m.measure_type === 'rag' ? 'RAG' : '1–5'}</span>
                   </div>
                 ))}
               </div>
@@ -68,7 +71,9 @@ function CategoriesDropdown() {
   )
 }
 
-export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false }: Props) {
+export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false, structure }: Props) {
+  const effectiveStructure = structure && structure.length > 0 ? structure : WEIGHTED_SCORECARD_STRUCTURE
+  const totalMeasures = effectiveStructure.reduce((sum, c) => sum + c.measures.length, 0)
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(alreadyDispatched ? 'complete' : 'idle')
   const [showApproval, setShowApproval] = useState(false)
   const [dispatched, setDispatched] = useState(alreadyDispatched)
@@ -160,14 +165,14 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
             <div>
               <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Scorecard Request Dispatch</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {vendorName} &middot; {WEIGHTED_SCORECARD_STRUCTURE.length} themes &middot; {TOTAL_MEASURES} measures &middot; in-app form
+                {vendorName} &middot; {effectiveStructure.length} themes &middot; {totalMeasures} measures &middot; in-app form
               </p>
             </div>
           </div>
           <AgentStatusBadge status={agentStatus} />
         </div>
 
-        <CategoriesDropdown />
+        <CategoriesDropdown structure={effectiveStructure} />
 
         {/* Recipients — key internal stakeholders (read-only) */}
         <div className="mb-4">

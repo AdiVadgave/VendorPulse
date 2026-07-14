@@ -185,26 +185,34 @@ export interface CompiledScorecard {
  * Weighted scorecard (v2 / production format) — in-app form
  * ══════════════════════════════════════════════════════════════ */
 
+export type ScorecardMeasureType = 'numeric' | 'rag'
+
 export interface WeightedMeasureDef {
   key: string
   label: string
   description: string
+  measure_type?: ScorecardMeasureType
 }
 
 export interface WeightedCategoryDef {
-  key: ScorecardCategoryKey
+  key: string
   label: string
   weight: number
   measures: WeightedMeasureDef[]
 }
 
+/**
+ * Fallback structure used only if the backend config hasn't loaded. The
+ * authoritative per-SPR structure comes from the backend (`scorecard_config`),
+ * so this stays minimal and is never the source of truth.
+ */
 export const WEIGHTED_SCORECARD_STRUCTURE: WeightedCategoryDef[] = [
   {
     key: 'RISK_COMPLIANCE',
     label: 'Risk & Compliance',
     weight: 20,
     measures: [
-      { key: 'PATCH_MANAGEMENT', label: 'Patch Management', description: 'Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management' },
+      { key: 'PATCH_MANAGEMENT', label: 'Patch Management', description: 'Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management', measure_type: 'numeric' },
     ],
   },
   {
@@ -212,9 +220,9 @@ export const WEIGHTED_SCORECARD_STRUCTURE: WeightedCategoryDef[] = [
     label: 'Performance',
     weight: 30,
     measures: [
-      { key: 'RESOURCES_CAPABILITY', label: 'Resources & Capability', description: 'Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization' },
-      { key: 'RELEASE_DELIVERY', label: 'Release & Delivery', description: 'On-time, quality project delivery, resources and capability' },
-      { key: 'OPERATIONS', label: 'Operations', description: 'Meets or exceeds contracted service levels with strong focus on user experience' },
+      { key: 'RESOURCES_CAPABILITY', label: 'Resources & Capability', description: 'Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization', measure_type: 'numeric' },
+      { key: 'RELEASE_DELIVERY', label: 'Release & Delivery', description: 'On-time, quality project delivery, resources and capability', measure_type: 'numeric' },
+      { key: 'OPERATIONS', label: 'Operations', description: 'Meets or exceeds contracted service levels with strong focus on user experience', measure_type: 'numeric' },
     ],
   },
   {
@@ -222,9 +230,9 @@ export const WEIGHTED_SCORECARD_STRUCTURE: WeightedCategoryDef[] = [
     label: 'Commercial',
     weight: 20,
     measures: [
-      { key: 'PRICING', label: 'Pricing', description: 'Cost is competitive and well-managed' },
-      { key: 'COMMERCIAL_EXCELLENCE', label: 'Commercial Excellence', description: 'Appropriate commercial contract structure, invoices timely, accurate, and transparent' },
-      { key: 'COST_CONTROL', label: 'Cost Control', description: 'Changes and increases are managed well and minimized; cost-saving ideas shared' },
+      { key: 'PRICING', label: 'Pricing', description: 'Cost is competitive and well-managed', measure_type: 'numeric' },
+      { key: 'COMMERCIAL_EXCELLENCE', label: 'Commercial Excellence', description: 'Appropriate commercial contract structure, invoices timely, accurate, and transparent', measure_type: 'numeric' },
+      { key: 'COST_CONTROL', label: 'Cost Control', description: 'Changes and increases are managed well and minimized; cost-saving ideas shared', measure_type: 'numeric' },
     ],
   },
   {
@@ -232,17 +240,55 @@ export const WEIGHTED_SCORECARD_STRUCTURE: WeightedCategoryDef[] = [
     label: 'Relationship',
     weight: 30,
     measures: [
-      { key: 'FLEXIBILITY', label: 'Flexibility', description: 'Vendor team demonstrates flexibility & Proactive responsiveness when required' },
-      { key: 'STAKEHOLDER_ENGAGEMENT', label: 'Stakeholder Engagement', description: "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner" },
-      { key: 'ALIGNMENT', label: 'Alignment', description: 'Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)' },
+      { key: 'FLEXIBILITY', label: 'Flexibility', description: 'Vendor team demonstrates flexibility & Proactive responsiveness when required', measure_type: 'numeric' },
+      { key: 'STAKEHOLDER_ENGAGEMENT', label: 'Stakeholder Engagement', description: "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner", measure_type: 'numeric' },
+      { key: 'ALIGNMENT', label: 'Alignment', description: 'Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)', measure_type: 'numeric' },
     ],
   },
 ]
+
+/* ── Per-SPR scorecard configuration (catalog + selection) ─────── */
+
+export type RAGStatus = 'red' | 'amber' | 'green'
+
+export interface ScorecardCatalogMeasure {
+  key: string
+  label: string
+  description: string
+  measure_type: ScorecardMeasureType
+}
+
+export interface ScorecardCatalogTheme {
+  key: string
+  label: string
+  default_weight: number
+  measures: ScorecardCatalogMeasure[]
+}
+
+export interface ScorecardConfigMeasure {
+  key: string
+  label: string
+  description: string
+  measure_type: ScorecardMeasureType
+}
+
+export interface ScorecardConfigTheme {
+  key: string
+  label: string
+  weight: number
+  measures: ScorecardConfigMeasure[]
+}
+
+export interface ScorecardConfig {
+  categories: ScorecardConfigTheme[]
+  configured: boolean
+}
 
 export interface ScorecardSubmissionPayload {
   cycle_id: string
   attendee_id: string
   scores: Record<string, number>
+  rag_scores: Record<string, string>
   comments: Record<string, string>
   skipped_measures: string[]
   skipped_themes: string[]
@@ -259,7 +305,10 @@ export interface WeightedMeasureRow {
   key: string
   label: string
   description: string
+  measure_type?: ScorecardMeasureType
   team_scores: Record<string, number | null>
+  team_rag?: Record<string, string | null>
+  rag_consensus?: string | null
   average: number | null
   comments: Record<string, string>
 }

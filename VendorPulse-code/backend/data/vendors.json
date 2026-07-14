@@ -52,5 +52,17 @@
     "name": "Kanishk",
     "category": "IT Infrastructure",
     "status": "active"
+  },
+  {
+    "vendor_id": "v_e7870df1",
+    "name": "Zensar4",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_5a3ba64a",
+    "name": "NOVSA",
+    "category": "Managed Services",
+    "status": "active"
   }
 ]

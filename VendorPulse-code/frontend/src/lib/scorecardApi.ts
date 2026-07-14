@@ -132,7 +132,35 @@ import type {
   ScorecardSubmissionPayload,
   WeightedScorecard,
   TeamSubmissionsData,
+  ScorecardCatalogTheme,
+  ScorecardConfig,
 } from '@/types/scorecard.types'
+
+// ── Per-SPR scorecard configuration (catalog + selection) ─────────────────────
+
+/** The full catalog of themes/measures a VMO can choose from. */
+export async function getScorecardCatalog(): Promise<ScorecardCatalogTheme[]> {
+  const res = await apiFetch<{ catalog: ScorecardCatalogTheme[] }>('/api/scorecard/catalog')
+  return res.catalog
+}
+
+/** The effective scorecard configuration for a cycle (measures + weights). */
+export async function getScorecardConfig(cycleId: string): Promise<ScorecardConfig> {
+  const res = await apiFetch<{ config: ScorecardConfig }>(`/api/scorecard/config/${cycleId}`)
+  return res.config
+}
+
+/** Save the VMO's scorecard selection (measure keys + per-theme weights). */
+export async function saveScorecardConfig(
+  cycleId: string,
+  payload: { selected_measure_keys: string[]; weights: Record<string, number> }
+): Promise<ScorecardConfig> {
+  const res = await apiFetch<{ config: ScorecardConfig }>(`/api/scorecard/config/${cycleId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+  return res.config
+}
 
 /** Form metadata (vendor/quarter + structure + respondent identity) for the in-app scorecard page */
 export async function getScorecardFormMeta(cycleId: string, attendeeId?: string): Promise<ScorecardFormMeta> {

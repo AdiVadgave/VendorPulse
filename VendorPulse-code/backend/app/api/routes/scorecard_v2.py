@@ -29,8 +29,33 @@ from app.core.workflow_engine import WORKFLOW_STATES, workflow_engine
 from app.dependencies import get_attendee_repo, get_cycle_repo, get_user_repo
 from app.repositories.base_repository import BaseRepository
 from app.services.gmail_service import GmailSendError, build_scorecard_email, send_html_email
+from app.models.scheduling import ScorecardConfigUpdate
 from app.services.google_auth_service import is_authenticated
-from app.utils.scorecard_structure import WEIGHTED_SCORECARD_STRUCTURE
+from app.utils.scorecard_structure import (
+    SCORECARD_CATALOG,
+    WEIGHTED_SCORECARD_STRUCTURE,
+    build_config_from_selection,
+    default_scorecard_config,
+)
+
+_RAG_VALUES = {"red", "amber", "green"}
+_RAG_ORDER = {"red": 0, "amber": 1, "green": 2}
+
+
+def _effective_config(cycle: dict) -> dict:
+    """The cycle's scorecard config, or the default structure if unconfigured."""
+    cfg = cycle.get("scorecard_config") or {}
+    if cfg.get("categories"):
+        return cfg
+    return default_scorecard_config()
+
+
+def _rag_consensus(values: list[str]) -> Optional[str]:
+    """Consolidated RAG = the most conservative (worst) status provided."""
+    vals = [v for v in values if v in _RAG_VALUES]
+    if not vals:
+        return None
+    return min(vals, key=lambda v: _RAG_ORDER[v])
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +80,8 @@ class ScorecardSubmission(BaseModel):
 
     cycle_id: str
     attendee_id: str
-    scores: dict[str, int] = Field(default_factory=dict, description="measure_key -> 1..5")
+    scores: dict[str, int] = Field(default_factory=dict, description="measure_key -> 1..5 (numeric measures)")
+    rag_scores: dict[str, str] = Field(default_factory=dict, description="measure_key -> red|amber|green (RAG measures)")
     comments: dict[str, str] = Field(default_factory=dict, description="measure_key -> comment")
     skipped_measures: list[str] = Field(default_factory=list)
     skipped_themes: list[str] = Field(default_factory=list)
@@ -85,6 +111,56 @@ def get_structure():
     return {"structure": WEIGHTED_SCORECARD_STRUCTURE}
 
 
+# ── Per-SPR configuration (catalog + selection) ──────────────────────────────
+
+
+@router.get("/catalog")
+def get_catalog():
+    """The full menu of themes/measures a VMO can choose from for a scorecard."""
+    return {"catalog": SCORECARD_CATALOG}
+
+
+@router.get("/config/{cycle_id}")
+def get_scorecard_config(cycle_id: str):
+    """The effective scorecard configuration for a cycle (measures + weights)."""
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+    cfg = _effective_config(cycle)
+    return {"cycle_id": cycle_id, "config": cfg, "configured": bool(cfg.get("configured"))}
+
+
+@router.put("/config/{cycle_id}")
+def save_scorecard_config(cycle_id: str, payload: ScorecardConfigUpdate):
+    """Save the VMO's scorecard selection (measures + per-theme weights).
+
+    Weights of the *included* themes must sum to 100. Labels/descriptions/types
+    are resolved authoritatively from the catalog."""
+    cycle_repo = get_cycle_repo()
+    cycle = cycle_repo.get_by_cycle_id(cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+
+    cfg = build_config_from_selection(payload.selected_measure_keys, payload.weights)
+    if not cfg["categories"]:
+        raise HTTPException(status_code=400, detail="Select at least one measure to include in the scorecard.")
+
+    total = sum(c["weight"] for c in cfg["categories"])
+    if total != 100:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Theme weights must sum to 100 (got {total}). Adjust the per-theme weights.",
+        )
+    if any(c["weight"] <= 0 for c in cfg["categories"]):
+        raise HTTPException(status_code=400, detail="Each included theme must have a weight greater than 0.")
+
+    now = datetime.now(timezone.utc).isoformat()
+    updated = cycle_repo.update_by_id("cycle_id", cycle_id, {"scorecard_config": cfg, "updated_at": now})
+    logger.info("save_scorecard_config — cycle=%s themes=%d measures=%d",
+                cycle_id, len(cfg["categories"]), sum(len(c["measures"]) for c in cfg["categories"]))
+    return {"cycle_id": cycle_id, "config": cfg, "cycle": updated}
+
+
 @router.get("/form-meta/{cycle_id}")
 def get_form_meta(cycle_id: str, attendee: str = ""):
     cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
@@ -108,7 +184,7 @@ def get_form_meta(cycle_id: str, attendee: str = ""):
         "cycle_type": cycle.get("cycle_type", "SPR"),
         "quarter": cycle.get("quarter", ""),
         "year": cycle.get("year"),
-        "structure": WEIGHTED_SCORECARD_STRUCTURE,
+        "structure": _effective_config(cycle)["categories"],
         "respondent": respondent,
     }
 
@@ -135,10 +211,14 @@ def submit_scorecard(payload: ScorecardSubmission):
     if att is None:
         raise HTTPException(status_code=404, detail="Attendee not found in this cycle")
 
-    # Validate provided scores are 1..5.
+    # Validate provided numeric scores are 1..5.
     for mkey, val in payload.scores.items():
         if not isinstance(val, int) or not (1 <= val <= 5):
             raise HTTPException(status_code=400, detail=f"Score for '{mkey}' must be an integer 1..5")
+    # Validate RAG statuses.
+    for mkey, val in payload.rag_scores.items():
+        if val not in _RAG_VALUES:
+            raise HTTPException(status_code=400, detail=f"RAG status for '{mkey}' must be red, amber or green")
 
     now = datetime.now(timezone.utc).isoformat()
     repo = _submissions_repo()
@@ -163,6 +243,7 @@ def submit_scorecard(payload: ScorecardSubmission):
         "respondent_name": att.get("name", ""),
         "team": att.get("shell_department") or att.get("name", ""),
         "scores": payload.scores,
+        "rag_scores": payload.rag_scores,
         "comments": payload.comments,
         "skipped_measures": payload.skipped_measures,
         "skipped_themes": payload.skipped_themes,
@@ -237,6 +318,9 @@ def get_team_submissions(cycle_id: str):
 
 
 def _compile_weighted(cycle_id: str) -> dict:
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    config = _effective_config(cycle) if cycle else default_scorecard_config()
+
     attendee_repo = get_attendee_repo()
     attendees = [a for a in attendee_repo.find_all() if a.get("cycle_id") == cycle_id]
     key_internal = [
@@ -264,34 +348,52 @@ def _compile_weighted(cycle_id: str) -> dict:
     weighted_num = 0.0
     weighted_den = 0.0
 
-    for cat in WEIGHTED_SCORECARD_STRUCTURE:
+    for cat in config["categories"]:
         measures_out = []
         measure_avgs: list[float] = []
         for m in cat["measures"]:
             mkey = m["key"]
+            measure_type = m.get("measure_type", "numeric")
             team_scores: dict[str, Optional[int]] = {}
+            team_rag: dict[str, Optional[str]] = {}
             comments: dict[str, str] = {}
             provided: list[int] = []
+            rag_values: list[str] = []
             for a in submitting:
                 aid = a.get("attendee_id")
                 s = subs_by_attendee[aid]
-                score = (s.get("scores") or {}).get(mkey)
-                if isinstance(score, int) and 1 <= score <= 5:
-                    team_scores[aid] = score
-                    provided.append(score)
-                else:
+                if measure_type == "rag":
+                    rag = (s.get("rag_scores") or {}).get(mkey)
+                    if rag in _RAG_VALUES:
+                        team_rag[aid] = rag
+                        rag_values.append(rag)
+                    else:
+                        team_rag[aid] = None
                     team_scores[aid] = None
+                else:
+                    score = (s.get("scores") or {}).get(mkey)
+                    if isinstance(score, int) and 1 <= score <= 5:
+                        team_scores[aid] = score
+                        provided.append(score)
+                    else:
+                        team_scores[aid] = None
                 comment = (s.get("comments") or {}).get(mkey)
                 if comment:
                     comments[aid] = comment
+
+            # RAG measures are collected and displayed but never averaged.
             avg = round(sum(provided) / len(provided), 2) if provided else None
-            if avg is not None:
+            if measure_type != "rag" and avg is not None:
                 measure_avgs.append(avg)
+
             measures_out.append({
                 "key": mkey,
                 "label": m["label"],
-                "description": m["description"],
+                "description": m.get("description", ""),
+                "measure_type": measure_type,
                 "team_scores": team_scores,
+                "team_rag": team_rag,
+                "rag_consensus": _rag_consensus(rag_values) if measure_type == "rag" else None,
                 "average": avg,
                 "comments": comments,
             })
@@ -346,6 +448,7 @@ def weighted_as_compiled(cycle_id: str) -> dict:
                 "vendor_count": 0,
             }
             for m in cat["measures"]
+            if m.get("measure_type", "numeric") != "rag"
         ]
         categories.append({
             "category": cat["key"],

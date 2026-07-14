@@ -581,5 +581,33 @@
     "meetingType": "INTERNAL_ALIGNMENT",
     "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_Yjc0NGQ0MjItZWZiNi00YTE5LTkwNmMtNTdjOTA4NzYwOThh%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
     "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABSngD7AAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+  },
+  {
+    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABZXxoNAAAAA==",
+    "title": "Internal Alignment — Zensar4 (Q2 2026)",
+    "description": "Internal alignment meeting for cycle c_95e783c1",
+    "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
+    "organizerId": "chinmay.kotkar@zensar.com",
+    "participants": [
+      {
+        "userId": "anup.kesarwani@zensar.com",
+        "status": "pending"
+      },
+      {
+        "userId": "kanishk.punekar@zensar.com",
+        "status": "pending"
+      }
+    ],
+    "timeSlot": {
+      "date": "2026-07-20",
+      "startTime": "03:30",
+      "endTime": "04:00"
+    },
+    "status": "scheduled",
+    "createdAt": "2026-07-13T12:44:39.454843+00:00",
+    "cycleId": "c_95e783c1",
+    "meetingType": "INTERNAL_ALIGNMENT",
+    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MDgxMGRiMjctNDNlNi00YWVmLTg1OGUtOWMyNGIyYzBmNDkx%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABZXxoNAAAAA%3D%3D&exvsurl=1&path=/calendar/item"
   }
 ]

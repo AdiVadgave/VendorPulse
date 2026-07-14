@@ -22,14 +22,13 @@ import {
   MOCK_ATTENDEES_RSVP,
 } from '@/mock/scheduling.mock'
 import { completeAttendanceConfirmation, fetchAttendeesSeeded, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
-import { getCompiledScorecard, getWeightedScorecard } from '@/lib/scorecardApi'
+import { getCompiledScorecard, getWeightedScorecard, getScorecardConfig } from '@/lib/scorecardApi'
 import { compiledScorecardToLegacy } from '@/mock/scorecard.mock'
-import type { CompiledCategoryScore, CompiledScorecard, WeightedScorecard, TeamSubmissionsData } from '@/types/scorecard.types'
+import type { CompiledCategoryScore, CompiledScorecard, WeightedScorecard, TeamSubmissionsData, ScorecardConfig } from '@/types/scorecard.types'
 import {
   MOCK_SCORE_DELTAS,
   MOCK_ALIGNMENT_FLAGS,
   MOCK_FACE_OFF,
-  MOCK_ALIGNMENT_ACTIONS,
   buildCategoryComparisons,
   generateAlignmentInsights,
   buildAlignmentFlags,
@@ -64,6 +63,7 @@ import SubmissionTracker from '@/components/modules/scorecard/SubmissionTracker'
 import WeightedScorecardTable from '@/components/modules/scorecard/WeightedScorecardTable'
 import FinalizeScorecardTable from '@/components/modules/scorecard/FinalizeScorecardTable'
 import TeamScorecardsSection from '@/components/modules/scorecard/TeamScorecardsSection'
+import ScorecardConfigPanel from '@/components/modules/scorecard/ScorecardConfigPanel'
 
 import ChangeHighlightsPanel from '@/components/modules/alignment/ChangeHighlightsPanel'
 import AlignmentFlagsPanel from '@/components/modules/alignment/AlignmentFlagsPanel'
@@ -848,12 +848,20 @@ function ScorecardTab({
 }) {
   const [subTab, setSubTab] = useState<'collection' | 'finalize'>('collection')
   const [weighted, setWeighted] = useState<WeightedScorecard | null>(null)
+  const [config, setConfig] = useState<ScorecardConfig | null>(null)
   const [autoFetched, setAutoFetched] = useState(false)
 
   const refreshWeighted = useCallback(async () => {
     try {
       setWeighted(await getWeightedScorecard(cycleId))
     } catch { /* backend may not be ready */ }
+  }, [cycleId])
+
+  // Load the per-SPR scorecard configuration (measures + weights).
+  useEffect(() => {
+    let mounted = true
+    getScorecardConfig(cycleId).then((c) => { if (mounted) setConfig(c) }).catch(() => {})
+    return () => { mounted = false }
   }, [cycleId])
 
   // Refresh the weighted (new) scorecard, auto-advance once every key team has
@@ -898,6 +906,7 @@ function ScorecardTab({
 
       {subTab === 'collection' && (
         <>
+          <ScorecardConfigPanel cycleId={cycleId} dispatched={dispatched} onSaved={setConfig} />
           <ScorecardDispatchPanel
             vendorName={cycle.vendor_name}
             cycleId={cycleId}
@@ -907,6 +916,7 @@ function ScorecardTab({
             onDispatched={onDispatched}
             onAttendeesChanged={onAttendeesChanged}
             alreadyDispatched={dispatched}
+            structure={config?.categories}
           />
           <SubmissionTracker cycleId={cycleId} onSubmissionsUpdated={handleSubmissionsUpdated} />
         </>
@@ -971,8 +981,7 @@ function AlignmentTab({
   onAlignmentSlotsFound: (slots: SlotProposal[]) => void
   onAlignmentMeetingScheduled: (result: { teamsUrl: string | null; webLink: string | null; attendeeCount: number }) => void
 }) {
-  const [alignmentNotesText, setAlignmentNotesText] = useState('')
-  const [, setAlignmentMinutesApproved] = useState(false)
+  const [, setAlignmentNotesText] = useState('')
 
   // Scorecards are collected from internal-stakeholder TEAMS only (no vendor
   // self-report). Alignment therefore works off the consolidated weighted

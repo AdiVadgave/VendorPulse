@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import { MessageSquare, ChevronDown, Lock } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { WeightedScorecard } from '@/types/scorecard.types'
+import { RagDot, RagChip } from './rag'
 
 interface Props {
   data: WeightedScorecard
@@ -91,15 +92,20 @@ export default function WeightedScorecardTable({ data }: Props) {
                         </div>
                       </td>
                       {teams.map((t) => {
+                        const isRag = m.measure_type === 'rag'
                         const v = m.team_scores[t.attendee_id]
                         return (
                           <td key={t.attendee_id} className="text-center px-3 py-2.5 text-slate-600 dark:text-slate-400">
-                            {v == null ? <span className="text-slate-300 dark:text-slate-600">—</span> : v}
+                            {isRag
+                              ? <RagDot value={m.team_rag?.[t.attendee_id]} />
+                              : (v == null ? <span className="text-slate-300 dark:text-slate-600">—</span> : v)}
                           </td>
                         )
                       })}
                       <td className={cn('text-center px-3 py-2.5 font-semibold bg-emerald-50/60 dark:bg-emerald-900/10', scoreColor(m.average))}>
-                        {m.average != null ? m.average.toFixed(1) : '—'}
+                        {m.measure_type === 'rag'
+                          ? <RagChip value={m.rag_consensus} />
+                          : (m.average != null ? m.average.toFixed(1) : '—')}
                       </td>
                       {mi === 0 ? (
                         <td rowSpan={cat.measures.length} className="text-center px-3 py-2.5 text-slate-500 dark:text-slate-400 align-middle">
@@ -131,7 +137,7 @@ export default function WeightedScorecardTable({ data }: Props) {
         </table>
       </div>
       <div className="px-3 py-1.5 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
-        Blank (—) = team marked this measure as not applicable. Overall = weighted average of theme averages.
+        Blank (—) = team marked this measure as not applicable. RAG measures are colour-coded status only and do not affect the score. Overall = weighted average of theme averages.
       </div>
     </div>
   )

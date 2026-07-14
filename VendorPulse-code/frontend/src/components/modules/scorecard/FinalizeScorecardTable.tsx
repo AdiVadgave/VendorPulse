@@ -3,6 +3,7 @@ import { Save, RotateCcw, Loader2, CheckCircle2, PencilLine } from 'lucide-react
 import { cn } from '@/utils/cn'
 import type { WeightedScorecard } from '@/types/scorecard.types'
 import { getFinalScorecard, saveFinalScorecard, resetFinalScorecard } from '@/lib/scorecardApi'
+import { RagChip } from './rag'
 
 interface Props {
   cycleId: string
@@ -93,9 +94,12 @@ export default function FinalizeScorecardTable({ cycleId, consolidated }: Props)
           key: m.key,
           label: m.label,
           description: m.description,
+          measure_type: m.measure_type,
           team_scores: {},
+          team_rag: {},
+          rag_consensus: m.rag_consensus ?? null,
           comments: {},
-          average: values[m.key] ?? null,
+          average: m.measure_type === 'rag' ? null : (values[m.key] ?? null),
         })),
       }))
       const final = await saveFinalScorecard(cycleId, {
@@ -171,16 +175,20 @@ export default function FinalizeScorecardTable({ cycleId, consolidated }: Props)
                   )}
                   <td className="px-3 py-2.5 text-slate-700 dark:text-slate-300">{m.label}</td>
                   <td className="text-center px-3 py-2">
-                    <input
-                      type="number"
-                      min={0}
-                      max={5}
-                      step={0.1}
-                      value={values[m.key] ?? ''}
-                      onChange={(e) => setMeasure(m.key, e.target.value)}
-                      placeholder="—"
-                      className="w-20 px-2 py-1 text-center text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
+                    {m.measure_type === 'rag' ? (
+                      <span title="Colour-coded status — not part of the score"><RagChip value={m.rag_consensus} /></span>
+                    ) : (
+                      <input
+                        type="number"
+                        min={0}
+                        max={5}
+                        step={0.1}
+                        value={values[m.key] ?? ''}
+                        onChange={(e) => setMeasure(m.key, e.target.value)}
+                        placeholder="—"
+                        className="w-20 px-2 py-1 text-center text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    )}
                   </td>
                   {mi === 0 && (
                     <td rowSpan={cat.measures.length} className={cn('text-center px-3 py-2.5 font-semibold align-middle', scoreColor(computed.catAvgs[cat.key]))}>

@@ -162,7 +162,6 @@ export default function MeetingMinutesViewer({ cycleId, notes, vendorName, quart
                   <div className="space-y-1.5">
                     <button
                       onClick={handleSend}
-                      disabled={sendStatus === 'sending'}
                       className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                     >
                       <Send size={14} />

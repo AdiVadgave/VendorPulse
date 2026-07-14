@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { TrendingUp, TrendingDown, Minus, Sparkles, AlertTriangle, Info, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Sparkles, AlertTriangle, Info, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
 import type { ScoreDelta, AlignmentInsight } from '@/types/alignment.types'
-import { CATEGORY_LABELS } from '@/types/scorecard.types'
 import { cn } from '@/utils/cn'
 
 interface Props {
@@ -37,11 +36,8 @@ const SEVERITY_CONFIG = {
   },
 }
 
-export default function ChangeHighlightsPanel({ deltas, whatChangedBullets, insights }: Props) {
-  const significant = deltas.filter((d) => d.significant)
+export default function ChangeHighlightsPanel({ insights }: Props) {
   const [insightsOpen, setInsightsOpen] = useState(false)
-  const [summaryOpen, setSummaryOpen] = useState(true)
-  const [deltasOpen, setDeltasOpen] = useState(false)
 
   return (
     <div className="space-y-4">

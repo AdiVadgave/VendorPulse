@@ -32,7 +32,7 @@ export default function SlotRankingPanel({
   const [processingSlotId, setProcessingSlotId] = useState<string | null>(null)
   const [approveError, setApproveError] = useState<string | null>(null)
   const [timeZoneView, setTimeZoneView] = useState<TimeZoneView>('IST')
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE)
 
   async function handleApprove(slotId: string) {
     setProcessingSlotId(slotId)

@@ -6,6 +6,7 @@ import type { ScorecardFormMeta, WeightedScorecard } from '@/types/scorecard.typ
 import { WEIGHTED_SCORECARD_STRUCTURE } from '@/types/scorecard.types'
 import { getScorecardFormMeta, submitScorecard, checkAlreadySubmitted, getWeightedScorecard } from '@/lib/scorecardApi'
 import WeightedScorecardTable from '@/components/modules/scorecard/WeightedScorecardTable'
+import { RAG_OPTIONS, RAG_META } from '@/components/modules/scorecard/rag'
 
 // Brand header shown at the top of the standalone scorecard form (dark themed).
 function BrandHeader() {
@@ -37,6 +38,7 @@ export default function ScorecardForm() {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [scores, setScores] = useState<Record<string, number>>({})
+  const [rag, setRag] = useState<Record<string, string>>({})
   const [comments, setComments] = useState<Record<string, string>>({})
   const [skippedThemes, setSkippedThemes] = useState<Set<string>>(new Set())
   const [skippedMeasures, setSkippedMeasures] = useState<Set<string>>(new Set())
@@ -113,12 +115,16 @@ export default function ScorecardForm() {
       if (skippedThemes.has(cat.key)) continue
       for (const m of cat.measures) {
         if (skippedMeasures.has(m.key)) continue
-        if (!scores[m.key]) miss.push(`${m.label}: score`)
+        if (m.measure_type === 'rag') {
+          if (!rag[m.key]) miss.push(`${m.label}: status`)
+        } else if (!scores[m.key]) {
+          miss.push(`${m.label}: score`)
+        }
         if (!(comments[m.key] ?? '').trim()) miss.push(`${m.label}: comment`)
       }
     }
     return miss
-  }, [structure, skippedThemes, skippedMeasures, scores, comments])
+  }, [structure, skippedThemes, skippedMeasures, scores, rag, comments])
 
   const canSubmit = !!respondent && missing.length === 0 && !submitting
 
@@ -129,12 +135,14 @@ export default function ScorecardForm() {
     setError(null)
     try {
       const submitScores: Record<string, number> = {}
+      const submitRag: Record<string, string> = {}
       const submitComments: Record<string, string> = {}
       for (const cat of structure) {
         if (skippedThemes.has(cat.key)) continue
         for (const m of cat.measures) {
           if (skippedMeasures.has(m.key)) continue
-          submitScores[m.key] = scores[m.key]
+          if (m.measure_type === 'rag') submitRag[m.key] = rag[m.key]
+          else submitScores[m.key] = scores[m.key]
           submitComments[m.key] = (comments[m.key] ?? '').trim()
         }
       }
@@ -142,6 +150,7 @@ export default function ScorecardForm() {
         cycle_id: cycleId,
         attendee_id: attendeeId,
         scores: submitScores,
+        rag_scores: submitRag,
         comments: submitComments,
         skipped_measures: Array.from(skippedMeasures),
         skipped_themes: Array.from(skippedThemes),
@@ -278,7 +287,14 @@ export default function ScorecardForm() {
                       <div key={m.key} className="p-5 space-y-2.5">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{m.label}</p>
+                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                              {m.label}
+                              {m.measure_type === 'rag' && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400" title="Colour-coded status — not included in the numeric score">
+                                  Status only
+                                </span>
+                              )}
+                            </p>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{m.description}</p>
                           </div>
                           <label className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 shrink-0 cursor-pointer">
@@ -289,27 +305,48 @@ export default function ScorecardForm() {
 
                         {!measureSkipped && (
                           <>
-                            <div className="flex flex-wrap gap-2">
-                              {SCORE_OPTIONS.map((n) => (
-                                <button
-                                  key={n}
-                                  type="button"
-                                  onClick={() => setScores((s) => ({ ...s, [m.key]: n }))}
-                                  className={cn(
-                                    'w-16 py-1.5 rounded-lg text-xs font-medium border transition-colors',
-                                    scores[m.key] === n
-                                      ? 'bg-indigo-600 border-indigo-600 text-white'
-                                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-400'
-                                  )}
-                                  title={SCORE_LABELS[n]}
-                                >
-                                  {n}
-                                </button>
-                              ))}
-                              {scores[m.key] && (
-                                <span className="self-center text-xs text-slate-500 dark:text-slate-400">{SCORE_LABELS[scores[m.key]]}</span>
-                              )}
-                            </div>
+                            {m.measure_type === 'rag' ? (
+                              <div className="flex flex-wrap gap-2">
+                                {RAG_OPTIONS.map((opt) => (
+                                  <button
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => setRag((r) => ({ ...r, [m.key]: opt }))}
+                                    className={cn(
+                                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                                      rag[m.key] === opt
+                                        ? 'border-transparent ' + RAG_META[opt].chip
+                                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-400'
+                                    )}
+                                  >
+                                    <span className={cn('w-2 h-2 rounded-full', RAG_META[opt].dot)} />
+                                    {RAG_META[opt].label}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {SCORE_OPTIONS.map((n) => (
+                                  <button
+                                    key={n}
+                                    type="button"
+                                    onClick={() => setScores((s) => ({ ...s, [m.key]: n }))}
+                                    className={cn(
+                                      'w-16 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                                      scores[m.key] === n
+                                        ? 'bg-indigo-600 border-indigo-600 text-white'
+                                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-400'
+                                    )}
+                                    title={SCORE_LABELS[n]}
+                                  >
+                                    {n}
+                                  </button>
+                                ))}
+                                {scores[m.key] && (
+                                  <span className="self-center text-xs text-slate-500 dark:text-slate-400">{SCORE_LABELS[scores[m.key]]}</span>
+                                )}
+                              </div>
+                            )}
                             <textarea
                               value={comments[m.key] ?? ''}
                               onChange={(e) => setComments((c) => ({ ...c, [m.key]: e.target.value }))}

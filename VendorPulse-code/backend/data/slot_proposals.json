@@ -2229,5 +2229,755 @@
       "Anup Kesarwani"
     ],
     "conflicts": []
+  },
+  {
+    "slot_id": "slot_9e6523c6",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T03:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar",
+      "abhishek.biyani@zensar.com"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_ebe919db",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T04:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar",
+      "abhishek.biyani@zensar.com"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_c1e266b5",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T05:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar",
+      "abhishek.biyani@zensar.com"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_6845bd19",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T05:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar",
+      "abhishek.biyani@zensar.com"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_e25c344d",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T06:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar",
+      "abhishek.biyani@zensar.com"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_a1bfe558",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T06:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 70.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "abhishek.biyani@zensar.com"
+    ],
+    "tentative": [
+      "Anup Kesarwani",
+      "Kanishk Punekar"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_4ddf67cc",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T07:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar",
+      "abhishek.biyani@zensar.com"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_afe7e3d7",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T08:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar",
+      "abhishek.biyani@zensar.com"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_c0cd554d",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T08:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar",
+      "abhishek.biyani@zensar.com"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_2f6753ef",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T09:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 70.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani"
+    ],
+    "tentative": [
+      "Kanishk Punekar",
+      "abhishek.biyani@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_9af00b01",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T10:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 70.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani"
+    ],
+    "tentative": [
+      "Kanishk Punekar",
+      "abhishek.biyani@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_b780a5e3",
+    "cycle_id": "c_95e783c1",
+    "proposed_time": "2026-07-13T10:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 70.0,
+    "is_approved": false,
+    "attendance_count": 3,
+    "total_attendees": 3,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani"
+    ],
+    "tentative": [
+      "Kanishk Punekar",
+      "abhishek.biyani@zensar.com"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_b7d57e17",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T04:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar"
+    ],
+    "tentative": [],
+    "conflicts": [],
+    "approved_by": "coordinator",
+    "approved_at": "2026-07-14T06:05:52.233125+00:00"
+  },
+  {
+    "slot_id": "slot_576f5c53",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T05:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_719b539a",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T06:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_0e4e270e",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T06:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 70.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [],
+    "tentative": [
+      "Anup Kesarwani",
+      "Kanishk Punekar"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_fe45e4c1",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T07:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_4bc0d231",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T07:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_c514a666",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T08:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_5bcacd58",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T08:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani",
+      "Kanishk Punekar"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_579a0eb5",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T09:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 85.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani"
+    ],
+    "tentative": [
+      "Kanishk Punekar"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_badf0d68",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T10:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 85.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani"
+    ],
+    "tentative": [
+      "Kanishk Punekar"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_197b3c59",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T10:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 85.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Anup Kesarwani"
+    ],
+    "tentative": [
+      "Kanishk Punekar"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_f9600a12",
+    "cycle_id": "c_b43d365e",
+    "proposed_time": "2026-07-22T11:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 70.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [],
+    "tentative": [
+      "Anup Kesarwani",
+      "Kanishk Punekar"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_8be85d41",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T04:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 70.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [],
+    "tentative": [
+      "Aditya Vadgave",
+      "Kanishk Punekar"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_f934c75e",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T04:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": true,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Aditya Vadgave",
+      "Kanishk Punekar"
+    ],
+    "tentative": [],
+    "conflicts": [],
+    "approved_by": "coordinator",
+    "approved_at": "2026-07-14T09:50:53.469416+00:00"
+  },
+  {
+    "slot_id": "slot_5c90dd5e",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T05:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 100.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Aditya Vadgave",
+      "Kanishk Punekar"
+    ],
+    "tentative": [],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_c3f1d32b",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T05:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 85.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Aditya Vadgave"
+    ],
+    "tentative": [
+      "Kanishk Punekar"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_4dfbcfcc",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T06:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 85.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Kanishk Punekar"
+    ],
+    "tentative": [
+      "Aditya Vadgave"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_2c5f3f2a",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T06:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 85.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Kanishk Punekar"
+    ],
+    "tentative": [
+      "Aditya Vadgave"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_52fc4199",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T07:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 85.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Kanishk Punekar"
+    ],
+    "tentative": [
+      "Aditya Vadgave"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_8d6177f9",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T07:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 85.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Kanishk Punekar"
+    ],
+    "tentative": [
+      "Aditya Vadgave"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_360352f8",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T08:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 85.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Kanishk Punekar"
+    ],
+    "tentative": [
+      "Aditya Vadgave"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_961db0c0",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T08:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 85.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [
+      "Kanishk Punekar"
+    ],
+    "tentative": [
+      "Aditya Vadgave"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_ff79ff08",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T09:00:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 70.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [],
+    "tentative": [
+      "Aditya Vadgave",
+      "Kanishk Punekar"
+    ],
+    "conflicts": []
+  },
+  {
+    "slot_id": "slot_76b88ac7",
+    "cycle_id": "c_beb2c8b0",
+    "proposed_time": "2026-07-14T09:30:00Z",
+    "proposed_time_zone": "IST",
+    "duration_minutes": 30,
+    "organiser_available": true,
+    "exec_sponsor_available": true,
+    "rank_score": 70.0,
+    "is_approved": false,
+    "attendance_count": 2,
+    "total_attendees": 2,
+    "conflict_count": 0,
+    "attending": [],
+    "tentative": [
+      "Aditya Vadgave",
+      "Kanishk Punekar"
+    ],
+    "conflicts": []
   }
 ]

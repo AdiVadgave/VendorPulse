@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from 'react'
 import { Users } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { WeightedScorecard } from '@/types/scorecard.types'
+import { RagChip } from './rag'
 
 interface Props {
   data: WeightedScorecard
@@ -30,7 +31,9 @@ export default function TeamScorecardsSection({ data }: Props) {
         key: m.key,
         label: m.label,
         description: m.description,
+        measure_type: m.measure_type,
         score: m.team_scores[team.attendee_id] ?? null,
+        rag: m.team_rag?.[team.attendee_id] ?? null,
         comment: m.comments[team.attendee_id] ?? '',
       }))
       const provided = measures.map((m) => m.score).filter((s): s is number => s != null)
@@ -112,8 +115,10 @@ export default function TeamScorecardsSection({ data }: Props) {
                     )}
                     <td className="px-3 py-2.5 text-slate-700 dark:text-slate-300 whitespace-nowrap align-top">{m.label}</td>
                     <td className="px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400 align-top">{m.description}</td>
-                    <td className={cn('text-center px-3 py-2.5 font-semibold whitespace-nowrap align-top', scoreColor(m.score))}>
-                      {m.score != null ? `${m.score}/5` : 'N/A'}
+                    <td className={cn('text-center px-3 py-2.5 font-semibold whitespace-nowrap align-top', m.measure_type === 'rag' ? '' : scoreColor(m.score))}>
+                      {m.measure_type === 'rag'
+                        ? <RagChip value={m.rag} />
+                        : (m.score != null ? `${m.score}/5` : 'N/A')}
                     </td>
                     {mi === 0 && (
                       <td rowSpan={cat.measures.length} className={cn('text-center px-3 py-2.5 font-semibold align-top whitespace-nowrap', scoreColor(cat.avg))}>

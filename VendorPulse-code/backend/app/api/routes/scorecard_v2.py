@@ -16,21 +16,24 @@ Endpoints (prefix /api/scorecard):
 """
 from __future__ import annotations
 
+import io
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.core.workflow_engine import WORKFLOW_STATES, workflow_engine
-from app.dependencies import get_attendee_repo, get_cycle_repo, get_user_repo
+from app.dependencies import get_attendee_repo, get_cycle_repo, get_llm_service, get_user_repo
 from app.repositories.base_repository import BaseRepository
 from app.services.gmail_service import GmailSendError, build_scorecard_email, send_html_email
 from app.models.scheduling import ScorecardConfigUpdate
 from app.services.google_auth_service import is_authenticated
+from app.utils.prompts import SCORECARD_COMMENT_SUMMARY_SYSTEM_PROMPT
 from app.utils.scorecard_structure import (
     SCORECARD_CATALOG,
     WEIGHTED_SCORECARD_STRUCTURE,
@@ -314,6 +317,27 @@ def get_team_submissions(cycle_id: str):
     }
 
 
+@router.delete("/submission/{cycle_id}/{attendee_id}")
+def delete_submission(cycle_id: str, attendee_id: str):
+    """Delete an attendee's scorecard submission for this cycle.
+
+    Lets the VMO re-open a scorecard at any time (e.g. it was filled in error, or the
+    attendee should redo it) — after deletion the `/submit` duplicate guard no longer
+    fires, so that attendee can submit again. Consolidated figures recompute from the
+    remaining submissions. Returns {deleted, attendee_id}."""
+    repo = _submissions_repo()
+    matches = [
+        s for s in repo.find_all()
+        if s.get("cycle_id") == cycle_id and s.get("attendee_id") == attendee_id
+    ]
+    if not matches:
+        raise HTTPException(status_code=404, detail="No submission found for this attendee")
+    for s in matches:
+        repo.delete_by_id("submission_id", s.get("submission_id"))
+    logger.info("SCORECARD: deleted %d submission(s) for attendee=%s cycle=%s", len(matches), attendee_id, cycle_id)
+    return {"deleted": True, "attendee_id": attendee_id, "count": len(matches)}
+
+
 # ── Weighted compiled scorecard ──────────────────────────────────────────────
 
 
@@ -425,6 +449,508 @@ def _compile_weighted(cycle_id: str) -> dict:
 @router.get("/weighted/{cycle_id}")
 def get_weighted_scorecard(cycle_id: str):
     return _compile_weighted(cycle_id)
+
+
+# ── Cross-cycle context (current + previous cycle, for LLM narration) ─────────
+
+
+_QUARTER_NUM = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
+
+
+def _cycle_sort_key(cycle: dict) -> tuple[int, int]:
+    try:
+        year = int(cycle.get("year") or 0)
+    except (TypeError, ValueError):
+        year = 0  # tolerate a non-numeric year rather than 500 the whole request
+    return (year, _QUARTER_NUM.get(cycle.get("quarter", ""), 0))
+
+
+def find_previous_cycle_id(cycle_id: str) -> Optional[str]:
+    """The most recent prior cycle for the SAME vendor (by year, then quarter),
+    strictly before this cycle and carrying at least one scorecard submission.
+    Returns None when there is no such cycle (first cycle for the vendor)."""
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    if not cycle:
+        return None
+    cur_key = _cycle_sort_key(cycle)
+    siblings = [
+        c for c in get_cycle_repo().find_all()
+        if c.get("vendor_id") == cycle.get("vendor_id")
+        and c.get("cycle_id") != cycle_id
+        and _cycle_sort_key(c) < cur_key
+    ]
+    siblings.sort(key=_cycle_sort_key, reverse=True)
+    for c in siblings:
+        # Only use a prior cycle that actually has consolidated data to compare against.
+        if _compile_weighted(c["cycle_id"]).get("submitted_count"):
+            return c["cycle_id"]
+    return None
+
+
+def _compact_scorecard(weighted: dict, cycle: Optional[dict]) -> dict:
+    """A compact, LLM-friendly view of a compiled weighted scorecard: per-theme and
+    per-measure consolidated scores, RAG consensus and the raw team comments."""
+    cats = []
+    for cat in weighted.get("categories", []):
+        measures = []
+        for m in cat.get("measures", []):
+            comments = [c.strip() for c in (m.get("comments") or {}).values() if (c or "").strip()]
+            measures.append({
+                "measure": m["label"],
+                "type": m.get("measure_type", "numeric"),
+                "consolidated_score": m.get("average"),
+                "rag": m.get("rag_consensus"),
+                "comments": comments,
+            })
+        cats.append({
+            "theme": cat["label"],
+            "weight": cat.get("weight"),
+            "consolidated_score": cat.get("category_average"),
+            "measures": measures,
+        })
+    label = ""
+    if cycle:
+        label = f"{cycle.get('quarter', '')} {cycle.get('year', '')}".strip()
+    return {
+        "label": label or weighted.get("cycle_id", ""),
+        "overall_score": weighted.get("overall_score"),
+        "team_count": weighted.get("submitted_count"),
+        "categories": cats,
+    }
+
+
+def compact_scorecard_context(cycle_id: str) -> dict:
+    """Current + previous cycle scorecards (compact, with comments) for cross-cycle
+    LLM narration. `previous` is None when this is the vendor's first cycle."""
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    current = _compact_scorecard(_compile_weighted(cycle_id), cycle)
+    prev_id = find_previous_cycle_id(cycle_id)
+    previous = None
+    if prev_id:
+        prev_cycle = get_cycle_repo().get_by_cycle_id(prev_id)
+        previous = _compact_scorecard(_compile_weighted(prev_id), prev_cycle)
+    return {"current": current, "previous": previous}
+
+
+# Score band used across the pre-meeting briefing / insights (1–5 scale).
+_LOW_SCORE = 3.0
+_TREND_DELTA = 0.25  # min overall/theme movement to call a trend (not noise)
+
+
+@router.get("/briefing/{cycle_id}")
+def scorecard_briefing(cycle_id: str):
+    """Pre-meeting trend briefing — computed live from THIS cycle's consolidated
+    scorecard and the previous cycle's (both from stored submissions; nothing here
+    is hardcoded). Powers the meeting tab's briefing card."""
+    ctx = compact_scorecard_context(cycle_id)
+    cur, prev = ctx["current"], ctx["previous"]
+
+    cur_themes = {
+        c["theme"]: c["consolidated_score"]
+        for c in cur.get("categories", []) if c.get("consolidated_score") is not None
+    }
+    prev_themes = {
+        c["theme"]: c["consolidated_score"]
+        for c in (prev.get("categories", []) if prev else []) if c.get("consolidated_score") is not None
+    }
+    overall = cur.get("overall_score")
+    prev_overall = prev.get("overall_score") if prev else None
+
+    # Trend of the overall consolidated score vs the previous cycle.
+    trend = "stable"
+    if overall is not None and prev_overall is not None:
+        d = overall - prev_overall
+        trend = "improving" if d >= _TREND_DELTA else "declining" if d <= -_TREND_DELTA else "stable"
+
+    # Per-theme movement (only where both cycles have a score).
+    deltas = {t: round(s - prev_themes[t], 2) for t, s in cur_themes.items() if t in prev_themes}
+    most_improved = None
+    most_concerning = None
+    if deltas:
+        mi_theme, mi_delta = max(deltas.items(), key=lambda kv: kv[1])
+        mc_theme, mc_delta = min(deltas.items(), key=lambda kv: kv[1])
+        if mi_delta > 0:
+            most_improved = mi_theme
+        if mc_delta < 0:
+            most_concerning = mc_theme
+    # Fallback for "most concerning": the lowest-scoring theme this cycle.
+    if most_concerning is None and cur_themes:
+        most_concerning = min(cur_themes.items(), key=lambda kv: kv[1])[0]
+
+    # Recurring issues: themes below target in BOTH cycles (or just this one if no prior).
+    if prev_themes:
+        recurring = [t for t, s in cur_themes.items() if s < _LOW_SCORE and prev_themes.get(t, 5) < _LOW_SCORE]
+    else:
+        recurring = [t for t, s in cur_themes.items() if s < _LOW_SCORE]
+
+    # Likely vendor challenge areas: lowest / declining themes (real, max 3).
+    challenges = [
+        t for t, s in sorted(cur_themes.items(), key=lambda kv: kv[1])
+        if s < _LOW_SCORE or deltas.get(t, 0) <= -0.5
+    ][:3]
+
+    return {
+        "cycle_id": cycle_id,
+        "overall_score": overall,
+        "trend": trend,
+        "most_improved": most_improved,
+        "most_concerning": most_concerning,
+        "recurring_issue_count": len(recurring),
+        "predicted_challenges": challenges,
+        "has_previous_cycle": prev is not None,
+        "team_count": cur.get("team_count") or 0,
+    }
+
+
+# ── Consolidated comment summary (LLM-narrated, deterministic fallback) ───────
+
+
+def _strip_markdown_json(text: str) -> str:
+    """Pull a JSON array/object out of an LLM response that may wrap it in fences."""
+    import re
+    m = re.search(r"```(?:json)?\s*\n(.*?)```", text, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    m = re.search(r"(\[.*\]|\{.*\})", text, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    return text.strip()
+
+
+def _collect_comments(weighted: dict) -> tuple[list[dict], int]:
+    """Per-measure comments (only measures that have any). Returns (measures, total).
+
+    Each item: {measure_key, theme, measure, entries:[{team, comment}]}."""
+    team_name = {
+        t["attendee_id"]: (t.get("team") or t.get("name") or t.get("email") or "Team")
+        for t in weighted.get("teams", [])
+    }
+    measures: list[dict] = []
+    total = 0
+    for cat in weighted.get("categories", []):
+        for m in cat.get("measures", []):
+            entries = [
+                {"team": team_name.get(aid, aid), "comment": txt.strip()}
+                for aid, txt in (m.get("comments") or {}).items()
+                if (txt or "").strip()
+            ]
+            if entries:
+                measures.append({
+                    "measure_key": m["key"],
+                    "theme": cat["label"],
+                    "measure": m["label"],
+                    "entries": entries,
+                })
+                total += len(entries)
+    return measures, total
+
+
+def _fallback_measure_summary(entries: list[dict]) -> str:
+    """Deterministic per-measure bullets (the raw comments) when the LLM is off."""
+    return "\n".join(f"- {e['team']}: {e['comment']}" for e in entries)
+
+
+def _compute_summaries(weighted: dict) -> tuple[dict[str, str], bool, list[dict], int]:
+    """Per-measure comment summaries. Returns (summaries, llm_used, collected, total).
+
+    Shared by the comment-summary endpoint and the Excel export so both stay in
+    sync. Deterministic baseline = the raw comments; the LLM (when enabled) turns
+    each measure's comments into point-wise bullets."""
+    collected, total = _collect_comments(weighted)
+    summaries: dict[str, str] = {c["measure_key"]: _fallback_measure_summary(c["entries"]) for c in collected}
+    llm_used = False
+    if total:
+        llm = get_llm_service() if settings.enable_llm else None
+        if llm and llm.is_enabled:
+            payload = [
+                {"measure_key": c["measure_key"], "measure": c["measure"], "theme": c["theme"], "comments": c["entries"]}
+                for c in collected
+            ]
+            prompt = (
+                "Summarise the following scorecard comments PER MEASURE. Each measure lists "
+                "the comments from Shell's internal teams, labelled by team.\n\n"
+                f"{json.dumps(payload, indent=2, ensure_ascii=False)}\n\n"
+                "Return the JSON array now, exactly as specified — one summary per measure_key."
+            )
+            try:
+                raw = llm.call_simple(prompt, system=SCORECARD_COMMENT_SUMMARY_SYSTEM_PROMPT, max_tokens=1200)
+                parsed = json.loads(_strip_markdown_json(raw))
+                if isinstance(parsed, list):
+                    for item in parsed:
+                        if isinstance(item, dict):
+                            mk, sm = item.get("measure_key"), item.get("summary")
+                            if mk in summaries and isinstance(sm, str) and sm.strip():
+                                summaries[mk] = sm.strip()
+                    llm_used = True
+            except Exception as exc:  # keep the raw-comment fallback on parse/LLM error
+                logger.warning("comment-summary: LLM failed, using raw-comment fallback: %s", exc)
+    return summaries, llm_used, collected, total
+
+
+@router.post("/comment-summary/{cycle_id}")
+def scorecard_comment_summary(cycle_id: str):
+    """Per-measure summary of the teams' scorecard comments for the consolidated view.
+
+    Uses the same LLM wiring as the Alignment / Vendor Prep modules
+    (ENABLE_LLM + get_llm_service). Falls back to the raw comments per measure when
+    the LLM is disabled or errors."""
+    weighted = _compile_weighted(cycle_id)
+    summaries, llm_used, collected, total = _compute_summaries(weighted)
+    team_count = len(weighted.get("teams", []))
+    now = datetime.now(timezone.utc).isoformat()
+
+    measures_out = [
+        {
+            "measure_key": c["measure_key"],
+            "theme": c["theme"],
+            "measure": c["measure"],
+            "comment_count": len(c["entries"]),
+            "summary": summaries[c["measure_key"]],
+        }
+        for c in collected
+    ]
+
+    logger.info("comment-summary — cycle=%s comments=%d teams=%d measures=%d llm=%s",
+                cycle_id, total, team_count, len(measures_out), llm_used)
+    return {
+        "cycle_id": cycle_id,
+        "measures": measures_out,
+        "comment_count": total,
+        "team_count": team_count,
+        "llm_used": llm_used,
+        "generated_at": now,
+    }
+
+
+# ── Excel export (two sheets: team-comments + AI-summary, both with the scorecard) ──
+# Written with the standard library only (zip + minimal OOXML) so the export never
+# depends on a third-party package (e.g. openpyxl) being present in the runtime.
+
+
+def _xl_col(n: int) -> str:
+    """1-based column index -> Excel column letters (1->A, 27->AA)."""
+    s = ""
+    while n > 0:
+        n, r = divmod(n - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+
+def _xl_esc(v: str) -> str:
+    return v.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _xl_cell(ref: str, value, style: Optional[int] = None) -> str:
+    s = f' s="{style}"' if style is not None else ""
+    if value is None or value == "":
+        return f'<c r="{ref}"{s}/>'
+    if isinstance(value, bool):
+        value = str(value)
+    if isinstance(value, (int, float)):
+        return f'<c r="{ref}"{s}><v>{value}</v></c>'
+    return f'<c r="{ref}"{s} t="inlineStr"><is><t xml:space="preserve">{_xl_esc(str(value))}</t></is></c>'
+
+
+def _xl_sheet(rows: list[list], col_widths: list, wrap_cols: set[int]) -> str:
+    HEADER_STYLE, WRAP_STYLE = 1, 2
+    cols = ""
+    width_parts = [
+        f'<col min="{i}" max="{i}" width="{w}" customWidth="1"/>'
+        for i, w in enumerate(col_widths, start=1) if w
+    ]
+    if width_parts:
+        cols = "<cols>" + "".join(width_parts) + "</cols>"
+    body = []
+    for r_idx, row in enumerate(rows, start=1):
+        cells = []
+        for c_idx, val in enumerate(row, start=1):
+            style = HEADER_STYLE if r_idx == 1 else (WRAP_STYLE if c_idx in wrap_cols else None)
+            cells.append(_xl_cell(f"{_xl_col(c_idx)}{r_idx}", val, style))
+        body.append(f'<row r="{r_idx}">' + "".join(cells) + "</row>")
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        + cols
+        + "<sheetData>" + "".join(body) + "</sheetData>"
+        + "</worksheet>"
+    )
+
+
+_XL_STYLES = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>'
+    '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
+    '<fills count="2"><fill><patternFill patternType="none"/></fill>'
+    '<fill><patternFill patternType="gray125"/></fill></fills>'
+    '<borders count="1"><border/></borders>'
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+    '<cellXfs count="3">'
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1">'
+    '<alignment wrapText="1" vertical="top"/></xf>'
+    '</cellXfs>'
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+    '</styleSheet>'
+)
+
+
+def _build_xlsx(sheets: list[dict]) -> bytes:
+    """sheets: [{name, rows, col_widths, wrap_cols}] -> .xlsx bytes (stdlib only)."""
+    import zipfile
+
+    content_types = [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+        '<Default Extension="xml" ContentType="application/xml"/>',
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>',
+        '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>',
+    ]
+    for i in range(len(sheets)):
+        content_types.append(
+            f'<Override PartName="/xl/worksheets/sheet{i + 1}.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        )
+    content_types.append("</Types>")
+
+    root_rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        '</Relationships>'
+    )
+
+    sheet_tags = "".join(
+        f'<sheet name="{_xl_esc(s["name"])[:31]}" sheetId="{i + 1}" r:id="rId{i + 1}"/>'
+        for i, s in enumerate(sheets)
+    )
+    workbook = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        f'<sheets>{sheet_tags}</sheets></workbook>'
+    )
+
+    rels = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">']
+    for i in range(len(sheets)):
+        rels.append(
+            f'<Relationship Id="rId{i + 1}" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+            f'Target="worksheets/sheet{i + 1}.xml"/>'
+        )
+    rels.append(
+        f'<Relationship Id="rId{len(sheets) + 1}" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+    )
+    rels.append("</Relationships>")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", "".join(content_types))
+        z.writestr("_rels/.rels", root_rels)
+        z.writestr("xl/workbook.xml", workbook)
+        z.writestr("xl/_rels/workbook.xml.rels", "".join(rels))
+        z.writestr("xl/styles.xml", _XL_STYLES)
+        for i, s in enumerate(sheets):
+            z.writestr(
+                f"xl/worksheets/sheet{i + 1}.xml",
+                _xl_sheet(s["rows"], s.get("col_widths", []), s.get("wrap_cols", set())),
+            )
+    return buf.getvalue()
+
+
+def _scorecard_workbook(cycle_id: str) -> bytes:
+    """Build a two-sheet .xlsx: (1) scorecard + team-wise comments, (2) scorecard
+    + per-measure AI summary. Both share the consolidated score matrix."""
+    weighted = _compile_weighted(cycle_id)
+    summaries, _llm_used, _collected, _total = _compute_summaries(weighted)
+    teams = weighted.get("teams", [])
+    team_ids = [t.get("attendee_id") for t in teams]
+    team_labels = [(t.get("team") or t.get("name") or t.get("email") or "Team") for t in teams]
+    n_teams = len(teams)
+
+    def score_cell(m: dict, aid: str):
+        if m.get("measure_type") == "rag":
+            v = (m.get("team_rag") or {}).get(aid)
+            return v.capitalize() if v else ""
+        v = (m.get("team_scores") or {}).get(aid)
+        return v if isinstance(v, (int, float)) else ""
+
+    def avg_cell(m: dict):
+        if m.get("measure_type") == "rag":
+            c = m.get("rag_consensus")
+            return c.capitalize() if c else ""
+        return m.get("average") if m.get("average") is not None else ""
+
+    def cat_avg_cell(cat: dict):
+        return cat.get("category_average") if cat.get("category_average") is not None else ""
+
+    base_widths = [22, 30, *([14] * n_teams), 11, 11, 11]
+
+    # Sheet 1 — scorecard + team-wise comments.
+    rows1 = [["Theme", "Measure", *team_labels, "Avg", "Cat Avg", "Weight %",
+              *[f"{lbl} — comment" for lbl in team_labels]]]
+    for cat in weighted["categories"]:
+        for m in cat["measures"]:
+            rows1.append([
+                cat["label"], m["label"],
+                *[score_cell(m, aid) for aid in team_ids],
+                avg_cell(m), cat_avg_cell(cat), cat.get("weight"),
+                *[(m.get("comments") or {}).get(aid, "") for aid in team_ids],
+            ])
+    rows1.append([])
+    rows1.append(["Overall (weighted average of theme averages)", "",
+                  *([""] * n_teams), weighted.get("overall_score")])
+    comment_cols = set(range(6 + n_teams, 6 + 2 * n_teams))  # 1-based comment columns
+    sheet1 = {
+        "name": "Scorecard & Comments",
+        "rows": rows1,
+        "col_widths": [*base_widths, *([55] * n_teams)],
+        "wrap_cols": comment_cols,
+    }
+
+    # Sheet 2 — scorecard + per-measure AI summary.
+    rows2 = [["Theme", "Measure", *team_labels, "Avg", "Cat Avg", "Weight %", "AI Summary"]]
+    for cat in weighted["categories"]:
+        for m in cat["measures"]:
+            rows2.append([
+                cat["label"], m["label"],
+                *[score_cell(m, aid) for aid in team_ids],
+                avg_cell(m), cat_avg_cell(cat), cat.get("weight"),
+                summaries.get(m["key"], ""),
+            ])
+    rows2.append([])
+    rows2.append(["Overall (weighted average of theme averages)", "",
+                  *([""] * n_teams), weighted.get("overall_score")])
+    summary_col = 6 + n_teams  # 1-based AI Summary column
+    sheet2 = {
+        "name": "Scorecard & AI Summary",
+        "rows": rows2,
+        "col_widths": [*base_widths, 70],
+        "wrap_cols": {summary_col},
+    }
+
+    return _build_xlsx([sheet1, sheet2])
+
+
+@router.get("/export/{cycle_id}")
+def export_scorecard(cycle_id: str):
+    """Download the consolidated scorecard as a two-sheet Excel workbook."""
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+
+    data = _scorecard_workbook(cycle_id)
+    vendor = (cycle.get("vendor_name") or "vendor").replace(" ", "_")
+    fname = f"SPR_Scorecard_{vendor}_{cycle.get('quarter', '')}_{cycle.get('year', '')}.xlsx"
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 def weighted_as_compiled(cycle_id: str) -> dict:

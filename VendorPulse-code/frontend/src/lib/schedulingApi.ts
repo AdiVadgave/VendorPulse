@@ -4,7 +4,6 @@
  */
 import { apiFetch } from './api'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
-import type { CycleMeeting, GovernanceCycle } from '@/types/cycle.types'
 
 // ── Response shapes ──────────────────────────────────────────────────────────
 
@@ -100,20 +99,6 @@ export async function setBackendWorkflowState(
     // remains the source of truth via localStorage.
     return null
   }
-}
-
-// ── Meeting plan ───────────────────────────────────────────────────────────
-
-/** Replace the cycle's meeting plan (which meetings are included in this cycle). */
-export async function updateMeetingPlan(
-  cycleId: string,
-  meetingPlan: CycleMeeting[]
-): Promise<CycleMeeting[]> {
-  const res = await apiFetch<{ cycle: GovernanceCycle; meeting_plan: CycleMeeting[] }>(
-    `/api/cycles/${cycleId}/meeting-plan`,
-    { method: 'PUT', body: JSON.stringify({ meeting_plan: meetingPlan }) }
-  )
-  return res.meeting_plan ?? meetingPlan
 }
 
 // ── Manual slot (create-only, pending invite approval) ───────────────────────

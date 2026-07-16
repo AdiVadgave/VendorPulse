@@ -64,5 +64,11 @@
     "name": "NOVSA",
     "category": "Managed Services",
     "status": "active"
+  },
+  {
+    "vendor_id": "v_2e9e0897",
+    "name": "Zensar21",
+    "category": "IT Infrastructure",
+    "status": "active"
   }
 ]

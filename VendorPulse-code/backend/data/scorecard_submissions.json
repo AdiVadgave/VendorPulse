@@ -202,5 +202,159 @@
     "skipped_measures": [],
     "skipped_themes": [],
     "submitted_at": "2026-07-14T06:07:00.098786+00:00"
+  },
+  {
+    "submission_id": "sub_0d90870a",
+    "cycle_id": "c_beb2c8b0",
+    "attendee_id": "att_12b2ba8f",
+    "respondent_email": "aditya.vadgave@zensar.com",
+    "respondent_name": "Aditya Vadgave",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 5,
+      "IRM_ASSURANCE_RISK": 4,
+      "RESOURCES_CAPABILITY": 5,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 4,
+      "PRICING": 5,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 5,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 2,
+      "ALIGNMENT": 5
+    },
+    "rag_scores": {
+      "DECARBONISATION": "green"
+    },
+    "comments": {
+      "PATCH_MANAGEMENT": "Hii",
+      "IRM_ASSURANCE_RISK": "Hii",
+      "DECARBONISATION": "Hii",
+      "RESOURCES_CAPABILITY": "Hii",
+      "RELEASE_DELIVERY": "Hii",
+      "OPERATIONS": "Hii",
+      "PRICING": "Hii",
+      "COMMERCIAL_EXCELLENCE": "Hii",
+      "COST_CONTROL": "Hii",
+      "FLEXIBILITY": "Hii",
+      "STAKEHOLDER_ENGAGEMENT": "Hii",
+      "ALIGNMENT": "Hii"
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2026-07-15T08:17:27.405102+00:00"
+  },
+  {
+    "submission_id": "sub_7fdbe228",
+    "cycle_id": "c_beb2c8b0",
+    "attendee_id": "att_b5dcdcb3",
+    "respondent_email": "kanishk.punekar@zensar.com",
+    "respondent_name": "Kanishk Punekar",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 5,
+      "IRM_ASSURANCE_RISK": 4,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 5,
+      "OPERATIONS": 4,
+      "PRICING": 5,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 5,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {
+      "DECARBONISATION": "amber"
+    },
+    "comments": {
+      "PATCH_MANAGEMENT": "Bye",
+      "IRM_ASSURANCE_RISK": "Bye",
+      "DECARBONISATION": "Bye",
+      "RESOURCES_CAPABILITY": "Bye",
+      "RELEASE_DELIVERY": "Bye",
+      "OPERATIONS": "Bye",
+      "PRICING": "Bye",
+      "COMMERCIAL_EXCELLENCE": "Bye",
+      "COST_CONTROL": "Bye",
+      "FLEXIBILITY": "Bye",
+      "STAKEHOLDER_ENGAGEMENT": "Bye",
+      "ALIGNMENT": "Bye"
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2026-07-15T08:18:18.167560+00:00"
+  },
+  {
+    "submission_id": "sub_5ae34a85",
+    "cycle_id": "c_1f6717cb",
+    "attendee_id": "att_f715f898",
+    "respondent_email": "aditya.vadgave@zensar.com",
+    "respondent_name": "Aditya Vadgave",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "IRM_ASSURANCE_RISK": 2,
+      "RESOURCES_CAPABILITY": 2,
+      "RELEASE_DELIVERY": 2,
+      "OPERATIONS": 2,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 2,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "All scheduled releases, anti-virus upgrades, and patch management activities execution are consistent with all tasks completed punctually. The overall knowledge of resources to be improved.",
+      "IRM_ASSURANCE_RISK": "Support teams must strengthen initial diagnostics, take proactive ownership of issues, deepen their investigation quality, change implementation & validation capabilities, rebuild urgency and transparency with stakeholders, and address skill and capacity gaps to drive consistent, high-quality incident resolution and change deployments.",
+      "RESOURCES_CAPABILITY": "Support teams must strengthen initial diagnostics, take proactive ownership of issues, deepen their investigation quality, change implementation & validation capabilities, rebuild urgency and transparency with stakeholders, and address skill and capacity gaps to drive consistent, high-quality incident resolution and change deployments.",
+      "RELEASE_DELIVERY": "Support teams must strengthen initial diagnostics, take proactive ownership of issues, deepen their investigation quality, change implementation & validation capabilities, rebuild urgency and transparency with stakeholders, and address skill and capacity gaps to drive consistent, high-quality incident resolution and change deployments.",
+      "OPERATIONS": "Support teams must strengthen initial diagnostics, take proactive ownership of issues, deepen their investigation quality, change implementation & validation capabilities, rebuild urgency and transparency with stakeholders, and address skill and capacity gaps to drive consistent, high-quality incident resolution and change deployments.",
+      "PRICING": "Pricing is competitive, transparent, and consistently well-managed. The vendor fully met all contractual pricing requirements and demonstrated strong discipline in cost management throughout the contract term. On multiple occasions, they agreed to adjust contractual elements (e.g. bonus timing) when delivery within the originally contracted framework was not feasible.",
+      "COMMERCIAL_EXCELLENCE": "The vendor fully complied with contractual requirements. The commercial contract structure was appropriate and well-aligned with business needs.",
+      "COST_CONTROL": "The vendor actively supported Shell in achieving the most efficient use of costs and available budgets. Cost changes were managed transparently, and the vendor repeatedly proposed optimization opportunities to maximize value while minimizing increases, demonstrating a strong cost-conscious and partnership-driven mindset.",
+      "FLEXIBILITY": "In general flexible to manage their own scope items but need little improvement when comes to cross team/stakehodler coordination. Vasu has been key in driving ops improvements in these areas. Vinish and Raghavendra has been very responsive and easy to engage during operation issues/Process challenges.",
+      "ALIGNMENT": "Communication challenges observed with support members, business empathy required."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2026-07-15T09:54:45.468879+00:00"
+  },
+  {
+    "submission_id": "sub_e17abdf1",
+    "cycle_id": "c_1f6717cb",
+    "attendee_id": "att_9787b736",
+    "respondent_email": "kanishk.punekar@zensar.com",
+    "respondent_name": "Kanishk Punekar",
+    "team": "SOM",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "IRM_ASSURANCE_RISK": 4,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 5,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 2,
+      "FLEXIBILITY": 5,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Hi",
+      "IRM_ASSURANCE_RISK": "Hi",
+      "RESOURCES_CAPABILITY": "Hi",
+      "RELEASE_DELIVERY": "Hi",
+      "OPERATIONS": "Hi",
+      "PRICING": "Hi",
+      "COMMERCIAL_EXCELLENCE": "Hi",
+      "COST_CONTROL": "Hi",
+      "FLEXIBILITY": "Hi",
+      "ALIGNMENT": "Hi"
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2026-07-15T12:08:11.358414+00:00"
   }
 ]

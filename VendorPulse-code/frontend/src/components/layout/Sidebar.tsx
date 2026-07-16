@@ -58,7 +58,7 @@ function NavItem({ to, icon, label, collapsed, end }: NavItemProps) {
 }
 
 export default function Sidebar() {
-  const { sidebarCollapsed, toggleSidebar } = useUIStore()
+  const { sidebarCollapsed, toggleSidebar, mobileNavOpen, setMobileNavOpen } = useUIStore()
   const cycles = useCycleStore((s) => s.cycles)
   const getWorkflowState = useCycleStore((s) => s.getWorkflowState)
   const lastTabs = useCycleStore((s) => s.lastTabs)
@@ -66,8 +66,12 @@ export default function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex flex-col shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300',
-        sidebarCollapsed ? 'w-16' : 'w-64'
+        'flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-transform duration-300',
+        // Below md: off-canvas drawer (fixed, full-height, slides in when open).
+        'fixed inset-y-0 left-0 z-40 w-64 md:static md:z-auto md:shrink-0 md:translate-x-0 md:transition-all',
+        mobileNavOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full',
+        // md+: collapsible width, always on-screen.
+        sidebarCollapsed ? 'md:w-16' : 'md:w-64'
       )}
     >
       {/* Brand */}
@@ -94,8 +98,8 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      {/* Navigation — clicking any link closes the mobile drawer. */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" onClick={() => setMobileNavOpen(false)}>
         <NavItem
           to="/"
           icon={<LayoutDashboard size={18} />}
@@ -160,8 +164,8 @@ export default function Sidebar() {
         )}
       </nav>
 
-      {/* Collapse toggle */}
-      <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+      {/* Collapse toggle — desktop only (the mobile drawer is full-width). */}
+      <div className="p-3 border-t border-slate-200 dark:border-slate-800 hidden md:block">
         <button
           onClick={toggleSidebar}
           className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"

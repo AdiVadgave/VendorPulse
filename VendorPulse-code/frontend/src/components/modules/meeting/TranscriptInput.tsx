@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Sparkles } from 'lucide-react'
+import { FileText, Sparkles, CheckCircle2, RotateCcw } from 'lucide-react'
 import type { MeetingNote } from '@/types/meeting.types'
 import { parseTranscript } from '@/lib/meetingApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
@@ -8,6 +8,12 @@ import type { AgentStatus } from '@/types/agent.types'
 interface Props {
   cycleId: string
   onParsed: (notes: MeetingNote[]) => void
+  /** Override the meeting id used when parsing (scopes minutes per meeting). */
+  meetingId?: string
+  /** True when this meeting has ALREADY had a transcript parsed (e.g. action items
+   *  already extracted). Starts the panel in its collapsed "done" state so it doesn't
+   *  re-prompt for an upload that already happened. */
+  alreadyExtracted?: boolean
 }
 
 const DEMO_TRANSCRIPT = `David Okafor [08:58]: Morning all. Quick housekeeping — this session is being recorded for minutes. We have six agenda items and 90 minutes. I'll be strict on time. Joining us remotely are Ananya Krishnan from Zensar's legal team and Tom Hargreaves from Shell's Group Procurement. Welcome both.
@@ -150,21 +156,30 @@ Raj Patel [11:00]: Appreciated, Sarah. Zensar values this programme and we want 
 
 David Okafor [11:01]: Thank you all. Minutes will be circulated within 48 hours for review before finalisation.`
 
-export default function TranscriptInput({ cycleId, onParsed }: Props) {
+export default function TranscriptInput({ cycleId, onParsed, meetingId, alreadyExtracted = false }: Props) {
   const [transcript, setTranscript] = useState('')
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [parsedCount, setParsedCount] = useState<number | null>(null)
+  const [reopened, setReopened] = useState(false)
+
+  // Collapse to the "done" state when a transcript has been parsed this session or
+  // was already parsed before — unless the user explicitly reopens to parse another.
+  const showDone = (parsedCount !== null || alreadyExtracted) && !reopened
 
   async function handleParse() {
     if (!transcript.trim()) return
     setAgentStatus('running')
     setError(null)
     try {
-      const meetingId = `mtg-${cycleId}`
-      const response = await parseTranscript(cycleId, meetingId, transcript)
+      const mid = meetingId ?? `mtg-${cycleId}`
+      const response = await parseTranscript(cycleId, mid, transcript)
       if (response.status === 'success' && response.data) {
+        const notes = response.data.notes ?? []
         setAgentStatus('complete')
-        onParsed(response.data.notes ?? [])
+        setParsedCount(notes.length)
+        setReopened(false)
+        onParsed(notes)
       } else {
         setError(response.summary || 'Failed to parse transcript')
         setAgentStatus('idle')
@@ -173,6 +188,32 @@ export default function TranscriptInput({ cycleId, onParsed }: Props) {
       setError(e instanceof Error ? e.message : 'Failed to reach backend')
       setAgentStatus('idle')
     }
+  }
+
+  if (showDone) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Transcript parsed</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {parsedCount !== null
+                  ? `${parsedCount} item${parsedCount === 1 ? '' : 's'} extracted into minutes and the action queue.`
+                  : 'This meeting already has a parsed transcript; its action items are in the queue below.'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => { setReopened(true); setTranscript(''); setAgentStatus('idle'); setError(null) }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shrink-0"
+          >
+            <RotateCcw size={13} /> Parse a different transcript
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

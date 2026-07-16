@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
-import { Users } from 'lucide-react'
+import { Users, ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { WeightedScorecard } from '@/types/scorecard.types'
 import { RagChip } from './rag'
@@ -16,6 +16,7 @@ function scoreColor(v: number | null): string {
 }
 
 export default function TeamScorecardsSection({ data }: Props) {
+  const [open, setOpen] = useState(false)
   const [activeId, setActiveId] = useState<string>(data.teams[0]?.attendee_id ?? '')
 
   const team = data.teams.find((t) => t.attendee_id === activeId) ?? data.teams[0]
@@ -49,21 +50,31 @@ export default function TeamScorecardsSection({ data }: Props) {
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+      <div
+        onClick={() => setOpen((o) => !o)}
+        className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap cursor-pointer select-none hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
+      >
         <div className="flex items-center gap-2">
+          <span className="text-slate-400 dark:text-slate-500">
+            {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </span>
           <Users size={14} className="text-slate-400" />
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Individual Team Scorecards</span>
+          <span className="text-xs text-slate-400">· {data.teams.length} team{data.teams.length !== 1 ? 's' : ''}</span>
         </div>
-        <div className="text-right">
-          <span className="text-xs text-slate-500 dark:text-slate-400 mr-2">Team overall</span>
-          <span className={cn('text-base font-bold', scoreColor(view.overall))}>
-            {view.overall != null ? `${view.overall.toFixed(1)}/5` : '—'}
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <span className="text-xs text-slate-500 dark:text-slate-400 mr-2">Team overall</span>
+            <span className={cn('text-base font-bold', scoreColor(view.overall))}>
+              {view.overall != null ? `${view.overall.toFixed(1)}/5` : '—'}
+            </span>
+          </div>
         </div>
       </div>
 
+      {open && <>
       {/* Team selector */}
-      <div className="px-5 py-2.5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap gap-1.5">
+      <div className="px-5 py-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1.5">
         {data.teams.map((t) => (
           <button
             key={t.attendee_id}
@@ -93,7 +104,7 @@ export default function TeamScorecardsSection({ data }: Props) {
             <col style={{ width: '38rem' }} />
           </colgroup>
           <thead>
-            <tr className="bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-500 dark:text-slate-400">
+            <tr className="bg-slate-50 dark:bg-slate-800/50 text-sm text-slate-600 dark:text-slate-300">
               <th className="text-left px-3 py-2 font-medium">Theme</th>
               <th className="text-left px-3 py-2 font-medium">Measure</th>
               <th className="text-left px-3 py-2 font-medium">Description</th>
@@ -140,6 +151,7 @@ export default function TeamScorecardsSection({ data }: Props) {
           </tbody>
         </table>
       </div>
+      </>}
     </div>
   )
 }

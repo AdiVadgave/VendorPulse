@@ -109,7 +109,8 @@ export async function scheduleAlignmentMeeting(
   slotId: string,
   startTime: string,
   durationMinutes = 30,
-  timeZone = 'UTC'
+  timeZone = 'UTC',
+  meetingIndex = 1
 ): Promise<ScheduleMeetingResponse> {
   return apiFetch<ScheduleMeetingResponse>(
     `/api/cycles/${cycleId}/alignment/schedule-meeting`,
@@ -122,6 +123,7 @@ export async function scheduleAlignmentMeeting(
         start_time: startTime,
         duration_minutes: durationMinutes,
         time_zone: timeZone,
+        meeting_index: meetingIndex,
       }),
     }
   )
@@ -129,23 +131,53 @@ export async function scheduleAlignmentMeeting(
 
 // ── Alignment Meeting State (persistence) ──────────────────────────────────
 
-export interface AlignmentMeetingState {
-  meeting: {
-    event_id: string
-    teams_meeting_url: string | null
-    web_link: string | null
-    attendee_count: number
-    status: string
-    time_slot: { date: string; startTime: string; endTime: string } | null
-    title: string
-  } | null
+export interface AlignmentMeeting {
+  meeting_index: number
+  event_id: string
+  teams_meeting_url: string | null
+  web_link: string | null
+  attendee_count: number
+  status: string
+  time_slot: { date: string; startTime: string; endTime: string } | null
+  title: string
 }
 
+export interface AlignmentMeetingState {
+  meeting: AlignmentMeeting | null
+}
+
+/** Fetch a single alignment meeting's persisted state by 1-based index. */
 export async function getAlignmentMeeting(
-  cycleId: string
+  cycleId: string,
+  meetingIndex = 1
 ): Promise<AlignmentMeetingState> {
   return apiFetch<AlignmentMeetingState>(
-    `/api/cycles/${cycleId}/alignment/meeting`
+    `/api/cycles/${cycleId}/alignment/meeting`,
+    { params: { index: String(meetingIndex) } }
+  )
+}
+
+/** List all alignment meetings scheduled for this cycle (ordered by index). */
+export async function listAlignmentMeetings(
+  cycleId: string
+): Promise<{ meetings: AlignmentMeeting[]; count: number }> {
+  return apiFetch<{ meetings: AlignmentMeeting[]; count: number }>(
+    `/api/cycles/${cycleId}/alignment/meetings`
+  )
+}
+
+/**
+ * Delete an alignment meeting the admin added by mistake. Cancels the underlying
+ * Teams event (best-effort) and removes the record. Safe to call even if nothing
+ * was scheduled at that index yet.
+ */
+export async function deleteAlignmentMeeting(
+  cycleId: string,
+  meetingIndex: number
+): Promise<{ deleted: boolean; cancelled: boolean; meeting_index?: number; message?: string }> {
+  return apiFetch<{ deleted: boolean; cancelled: boolean; meeting_index?: number; message?: string }>(
+    `/api/cycles/${cycleId}/alignment/meeting`,
+    { method: 'DELETE', params: { index: String(meetingIndex) } }
   )
 }
 

@@ -18,10 +18,12 @@ from typing import Optional
 
 from app.core.workflow_engine import WORKFLOW_STATES, WorkflowStateError, WorkflowViolationError, workflow_engine
 from app.dependencies import (
+    get_action_repo,
     get_attendee_repo,
     get_agent_run_repo,
     get_cycle_repo,
     get_llm_service,
+    get_meeting_repo,
     get_scheduling_service,
     get_slot_repo,
     get_vendor_repo,
@@ -33,9 +35,7 @@ from app.models.scheduling import (
     CycleAttendeeCreate,
     CycleAttendeeUpdate,
     CycleCreate,
-    MeetingPlanUpdate,
     RankSlotsRequest,
-    default_meeting_plan,
 )
 from app.utils.scorecard_structure import default_scorecard_config
 from app.services.scheduling_service import SchedulingService
@@ -152,10 +152,10 @@ def create_cycle(
         "cycle_type": payload.cycle_type,
         "quarter": payload.quarter,
         "year": payload.year,
+        "description": (payload.description or "").strip(),
         "workflow_state": "CYCLE_CREATED",
         "created_at": now,
         "updated_at": now,
-        "meeting_plan": [m.model_dump() for m in default_meeting_plan()],
         "scorecard_config": default_scorecard_config(),
     }
     result = cycle_repo.insert(cycle)
@@ -173,30 +173,13 @@ def get_cycle(cycleId: str, cycle_repo=Depends(get_cycle_repo)):
     cycle["meeting_scheduled"] = ws_idx >= WORKFLOW_STATES.index("MEETING_SCHEDULED")
     # Backfill defaults for cycles created before these fields existed.
     cycle.setdefault("cycle_type", "SPR")
-    if not cycle.get("meeting_plan"):
-        cycle["meeting_plan"] = [m.model_dump() for m in default_meeting_plan()]
+    cycle.setdefault("description", "")
+    # The cycle meeting-plan feature was removed; drop any stale field on older records.
+    cycle.pop("meeting_plan", None)
     if not (cycle.get("scorecard_config") or {}).get("categories"):
         cycle["scorecard_config"] = default_scorecard_config()
     logger.info("get_cycle success — cycleId=%s, workflow_state=%s", cycleId, ws)
     return {"cycle": cycle}
-
-
-@router.put("/api/cycles/{cycleId}/meeting-plan")
-def update_meeting_plan(
-    cycleId: str,
-    payload: MeetingPlanUpdate,
-    cycle_repo=Depends(get_cycle_repo),
-):
-    """Replace the cycle's meeting plan. The VMO can toggle which meetings are
-    included, rename them, or add multiple internal-alignment calls at any time."""
-    logger.info("update_meeting_plan called — cycleId=%s, meetings=%d", cycleId, len(payload.meeting_plan))
-    _get_cycle_or_404(cycleId, cycle_repo)
-    plan = [m.model_dump() for m in payload.meeting_plan]
-    now = datetime.now(timezone.utc).isoformat()
-    updated = cycle_repo.update_by_id(
-        "cycle_id", cycleId, {"meeting_plan": plan, "updated_at": now}
-    )
-    return {"cycle": updated, "meeting_plan": plan}
 
 
 @router.post("/api/cycles/{cycleId}/workflow-state")
@@ -249,19 +232,34 @@ def delete_cycle(
     cycle_repo=Depends(get_cycle_repo),
     attendee_repo=Depends(get_attendee_repo),
     slot_repo=Depends(get_slot_repo),
+    action_repo=Depends(get_action_repo),
+    meeting_repo=Depends(get_meeting_repo),
 ):
     logger.info("delete_cycle called — cycleId=%s", cycleId)
     _get_cycle_or_404(cycleId, cycle_repo)
 
+    # Cascade: remove every child record so nothing dangles keyed to a dead cycle
+    # (mirrors ON DELETE CASCADE for the eventual Postgres schema).
     removed_attendees = attendee_repo.delete_for_cycle(cycleId)
     slot_repo.clear_for_cycle(cycleId)
+    removed_actions = action_repo.delete_by_field("cycle_id", cycleId)
+    removed_meetings = meeting_repo.delete_by_field("cycleId", cycleId)
+    from app.api.routes.scorecard_v2 import _submissions_repo, _final_repo
+    removed_submissions = _submissions_repo().delete_by_field("cycle_id", cycleId)
+    _final_repo().delete_by_field("cycle_id", cycleId)
     cycle_repo.delete_by_id("cycle_id", cycleId)
 
-    logger.info("delete_cycle success — cycleId=%s, removed_attendees=%d", cycleId, removed_attendees)
+    logger.info(
+        "delete_cycle success — cycleId=%s, attendees=%d actions=%d meetings=%d submissions=%d",
+        cycleId, removed_attendees, removed_actions, removed_meetings, removed_submissions,
+    )
     return {
         "message": f"Cycle '{cycleId}' deleted",
         "cycle_id": cycleId,
         "removed_attendees": removed_attendees,
+        "removed_actions": removed_actions,
+        "removed_meetings": removed_meetings,
+        "removed_submissions": removed_submissions,
     }
 
 
@@ -338,6 +336,10 @@ def remove_attendee(
         raise HTTPException(status_code=404, detail="Attendee not found in this cycle")
     if not svc.remove_attendee(attendeeId):
         raise HTTPException(status_code=404, detail="Attendee not found")
+    # Cascade: drop any scorecard submission this attendee filed so it can't dangle
+    # (their column/score is removed from the consolidation on next compile).
+    from app.api.routes.scorecard_v2 import _submissions_repo
+    _submissions_repo().delete_by_field("attendee_id", attendeeId)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

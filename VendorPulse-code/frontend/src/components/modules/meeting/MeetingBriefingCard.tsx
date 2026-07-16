@@ -3,16 +3,15 @@ import { cn } from '@/utils/cn'
 
 interface Props {
   vendorName?: string
-  overallScore: number
+  overallScore: number | null
   trend: 'improving' | 'stable' | 'declining'
-  mostImproved: string
-  mostConcerning: string
+  mostImproved: string | null
+  mostConcerning: string | null
   recurringIssueCount: number
   predictedChallenges: string[]
 }
 
 export default function MeetingBriefingCard({
-  
   overallScore,
   trend,
   mostImproved,
@@ -34,12 +33,14 @@ export default function MeetingBriefingCard({
         <h3 className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">
           Pre-Meeting Trend Briefing
         </h3>
-        <span className="ml-auto text-xs text-indigo-500 dark:text-indigo-400">From Module F</span>
+        <span className="ml-auto text-xs text-indigo-500 dark:text-indigo-400">Consolidated scorecard</span>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="bg-white dark:bg-slate-900 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">{overallScore}</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">
+            {overallScore != null ? overallScore.toFixed(1) : '—'}
+          </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">Overall Score</p>
         </div>
         <div className={cn('rounded-lg p-3 text-center', trendColor)}>
@@ -47,11 +48,11 @@ export default function MeetingBriefingCard({
           <p className="text-xs font-medium capitalize">{trend}</p>
         </div>
         <div className="bg-white dark:bg-slate-900 rounded-lg p-3 text-center">
-          <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 truncate">{mostImproved}</p>
+          <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 truncate">{mostImproved ?? '—'}</p>
           <p className="text-xs text-slate-500 dark:text-slate-400">Most Improved</p>
         </div>
         <div className="bg-white dark:bg-slate-900 rounded-lg p-3 text-center">
-          <p className="text-sm font-semibold text-red-600 dark:text-red-400 truncate">{mostConcerning}</p>
+          <p className="text-sm font-semibold text-red-600 dark:text-red-400 truncate">{mostConcerning ?? '—'}</p>
           <p className="text-xs text-slate-500 dark:text-slate-400">Most Concerning</p>
         </div>
       </div>
@@ -65,7 +66,7 @@ export default function MeetingBriefingCard({
         </div>
       )}
 
-      <div>
+      <div className={predictedChallenges.length === 0 ? 'hidden' : ''}>
         <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 mb-1.5">
           Predicted Vendor Challenge Areas
         </p>

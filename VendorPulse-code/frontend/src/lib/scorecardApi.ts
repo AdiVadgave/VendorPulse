@@ -2,7 +2,7 @@
  * API functions for the Scorecard module (Module B).
  * Handles email dispatch via Gmail and Google Forms response polling.
  */
-import { apiFetch } from './api'
+import { apiFetch, apiFetchBlob } from './api'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -205,6 +205,43 @@ export async function getWeightedScorecard(cycleId: string): Promise<WeightedSco
   return apiFetch<WeightedScorecard>(`/api/scorecard/weighted/${cycleId}`)
 }
 
+export interface ScorecardMeasureSummary {
+  measure_key: string
+  theme: string
+  measure: string
+  comment_count: number
+  summary: string
+}
+
+export interface ScorecardCommentSummary {
+  cycle_id: string
+  measures: ScorecardMeasureSummary[]
+  comment_count: number
+  team_count: number
+  llm_used: boolean
+  generated_at: string
+}
+
+/** Per-measure LLM synthesis of the teams' scorecard comments (same wiring as Alignment/Vendor Prep). */
+export async function getScorecardCommentSummary(cycleId: string): Promise<ScorecardCommentSummary> {
+  return apiFetch<ScorecardCommentSummary>(`/api/scorecard/comment-summary/${cycleId}`, {
+    method: 'POST',
+  })
+}
+
+/** Download the two-sheet Excel export of the consolidated scorecard. */
+export async function downloadScorecardExcel(cycleId: string): Promise<void> {
+  const { blob, filename } = await apiFetchBlob(`/api/scorecard/export/${cycleId}`)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || `SPR_Scorecard_${cycleId}.xlsx`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export interface InAppDispatchRecipient {
   attendee_id: string
   name: string
@@ -225,6 +262,40 @@ export async function dispatchInAppScorecard(payload: {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+export interface ScorecardBriefing {
+  cycle_id: string
+  overall_score: number | null
+  trend: 'improving' | 'stable' | 'declining'
+  most_improved: string | null
+  most_concerning: string | null
+  recurring_issue_count: number
+  predicted_challenges: string[]
+  has_previous_cycle: boolean
+  team_count: number
+}
+
+/**
+ * Pre-meeting trend briefing — computed live from this cycle's consolidated
+ * scorecard and the previous cycle's. Nothing hardcoded.
+ */
+export async function getScorecardBriefing(cycleId: string): Promise<ScorecardBriefing> {
+  return apiFetch<ScorecardBriefing>(`/api/scorecard/briefing/${cycleId}`)
+}
+
+/**
+ * Delete an attendee's scorecard submission for a cycle. Re-opens the scorecard so
+ * that attendee can fill it again; consolidated figures recompute automatically.
+ */
+export async function deleteScorecardSubmission(
+  cycleId: string,
+  attendeeId: string
+): Promise<{ deleted: boolean; attendee_id: string; count: number }> {
+  return apiFetch<{ deleted: boolean; attendee_id: string; count: number }>(
+    `/api/scorecard/submission/${cycleId}/${attendeeId}`,
+    { method: 'DELETE' }
+  )
 }
 
 // ── Final (admin-adjusted) scorecard ─────────────────────────────────────────

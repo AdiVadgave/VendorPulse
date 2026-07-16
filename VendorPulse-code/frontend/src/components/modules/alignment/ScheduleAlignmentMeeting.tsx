@@ -18,9 +18,11 @@ interface Props {
   meetingResult: AlignmentMeetingResult | null
   onSlotsFound: (slots: SlotProposal[]) => void
   onMeetingScheduled: (result: AlignmentMeetingResult) => void
+  /** Which alignment meeting (1-based) — a cycle may have several. */
+  meetingIndex?: number
 }
 
-export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult, onSlotsFound, onMeetingScheduled }: Props) {
+export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult, onSlotsFound, onMeetingScheduled, meetingIndex = 1 }: Props) {
   const [dateStart, setDateStart] = useState('')
   const [dateEnd, setDateEnd] = useState('')
   const [findLoading, setFindLoading] = useState(false)
@@ -73,7 +75,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
     let cancelled = false
     ;(async () => {
       try {
-        const res = await getAlignmentMeeting(cycleId)
+        const res = await getAlignmentMeeting(cycleId, meetingIndex)
         if (!cancelled && res.meeting) {
           onMeetingScheduled({
             teamsUrl: res.meeting.teams_meeting_url,
@@ -88,7 +90,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
       }
     })()
     return () => { cancelled = true }
-  }, [cycleId, meetingResult, onMeetingScheduled, persistenceChecked])
+  }, [cycleId, meetingResult, onMeetingScheduled, persistenceChecked, meetingIndex])
 
   // Fetch attendees on mount
   useEffect(() => {
@@ -136,7 +138,8 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
         slotId,
         slot.proposed_time,
         slot.duration_minutes ?? durationMinutes,
-        timeZone
+        timeZone,
+        meetingIndex
       )
       onMeetingScheduled({
         teamsUrl: response.teams_meeting_url,
@@ -168,7 +171,8 @@ export default function ScheduleAlignmentMeeting({ cycleId, slots, meetingResult
         `align_manual_${Date.now()}`,
         startTime,
         durationMinutes,
-        timeZone
+        timeZone,
+        meetingIndex
       )
       onMeetingScheduled({
         teamsUrl: response.teams_meeting_url,

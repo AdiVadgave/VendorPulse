@@ -487,6 +487,41 @@ class GraphService:
             logger.exception("update_event: request failed — %s", e)
             return {"error": f"Request failed: {str(e)}"}
 
+    async def delete_event(self, event_id: str) -> dict:
+        """Cancel/delete a calendar event (best-effort).
+
+        Sends DELETE /me/events/{id}. Graph notifies attendees the meeting was
+        cancelled. Returns {"deleted": True} on success (204) or {"error": ...}.
+        """
+        logger.info("delete_event — event_id=%s", event_id)
+        if not httpx:
+            raise ImportError("httpx is required. Install with: pip install httpx")
+        if not event_id:
+            return {"error": "event_id is required"}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{self.BASE_URL}/me/events/{event_id}",
+                    headers=self.headers,
+                    timeout=30.0,
+                )
+                if response.status_code in (200, 202, 204):
+                    logger.info("delete_event: success — event_id=%s", event_id)
+                    return {"deleted": True}
+                if response.status_code == 404:
+                    # Event already gone — desired end-state already holds.
+                    logger.info("delete_event: event already absent — event_id=%s", event_id)
+                    return {"deleted": True, "already_absent": True}
+                result = response.json() if response.content else {}
+                logger.error("delete_event: Graph API error — status=%d", response.status_code)
+                return self._build_graph_error(
+                    response.status_code, result, fallback="Failed to delete event"
+                )
+        except Exception as e:
+            logger.exception("delete_event: request failed — %s", e)
+            return {"error": f"Request failed: {str(e)}"}
+
     async def get_me_profile(self) -> dict:
         """Fetch /me profile (debug helper).
 

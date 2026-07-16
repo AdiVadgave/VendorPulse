@@ -118,5 +118,155 @@
     "overall_score": 4.84,
     "note": "",
     "updated_at": "2026-07-13T10:33:41.410741+00:00"
+  },
+  {
+    "cycle_id": "c_1f6717cb",
+    "categories": [
+      {
+        "key": "RISK_COMPLIANCE",
+        "label": "Risk & Compliance",
+        "weight": 20,
+        "category_average": 3.25,
+        "measures": [
+          {
+            "key": "PATCH_MANAGEMENT",
+            "label": "Patch Management",
+            "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+            "measure_type": "numeric",
+            "team_scores": {},
+            "team_rag": {},
+            "rag_consensus": null,
+            "comments": {},
+            "average": 3.5
+          },
+          {
+            "key": "IRM_ASSURANCE_RISK",
+            "label": "IRM Assurance & Risk Management",
+            "description": "Information Risk Management assurance — effective identification, control and reporting of information and cyber risks",
+            "measure_type": "numeric",
+            "team_scores": {},
+            "team_rag": {},
+            "rag_consensus": null,
+            "comments": {},
+            "average": 3
+          }
+        ]
+      },
+      {
+        "key": "PERFORMANCE",
+        "label": "Performance",
+        "weight": 30,
+        "category_average": 3.17,
+        "measures": [
+          {
+            "key": "RESOURCES_CAPABILITY",
+            "label": "Resources & Capability",
+            "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+            "measure_type": "numeric",
+            "team_scores": {},
+            "team_rag": {},
+            "rag_consensus": null,
+            "comments": {},
+            "average": 3
+          },
+          {
+            "key": "RELEASE_DELIVERY",
+            "label": "Release & Delivery",
+            "description": "On-time, quality project delivery, resources and capability",
+            "measure_type": "numeric",
+            "team_scores": {},
+            "team_rag": {},
+            "rag_consensus": null,
+            "comments": {},
+            "average": 3
+          },
+          {
+            "key": "OPERATIONS",
+            "label": "Operations",
+            "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+            "measure_type": "numeric",
+            "team_scores": {},
+            "team_rag": {},
+            "rag_consensus": null,
+            "comments": {},
+            "average": 3.5
+          }
+        ]
+      },
+      {
+        "key": "COMMERCIAL",
+        "label": "Commercial",
+        "weight": 20,
+        "category_average": 3,
+        "measures": [
+          {
+            "key": "PRICING",
+            "label": "Pricing",
+            "description": "Cost is competitive and well-managed",
+            "measure_type": "numeric",
+            "team_scores": {},
+            "team_rag": {},
+            "rag_consensus": null,
+            "comments": {},
+            "average": 3.5
+          },
+          {
+            "key": "COMMERCIAL_EXCELLENCE",
+            "label": "Commercial Excellence",
+            "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+            "measure_type": "numeric",
+            "team_scores": {},
+            "team_rag": {},
+            "rag_consensus": null,
+            "comments": {},
+            "average": 3
+          },
+          {
+            "key": "COST_CONTROL",
+            "label": "Cost Control",
+            "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+            "measure_type": "numeric",
+            "team_scores": {},
+            "team_rag": {},
+            "rag_consensus": null,
+            "comments": {},
+            "average": 2.5
+          }
+        ]
+      },
+      {
+        "key": "RELATIONSHIP",
+        "label": "Relationship",
+        "weight": 30,
+        "category_average": 3.5,
+        "measures": [
+          {
+            "key": "FLEXIBILITY",
+            "label": "Flexibility",
+            "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+            "measure_type": "numeric",
+            "team_scores": {},
+            "team_rag": {},
+            "rag_consensus": null,
+            "comments": {},
+            "average": 3.5
+          },
+          {
+            "key": "ALIGNMENT",
+            "label": "Alignment",
+            "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+            "measure_type": "numeric",
+            "team_scores": {},
+            "team_rag": {},
+            "rag_consensus": null,
+            "comments": {},
+            "average": 3.5
+          }
+        ]
+      }
+    ],
+    "overall_score": 3.25,
+    "note": "",
+    "updated_at": "2026-07-15T12:10:14.770632+00:00"
   }
 ]

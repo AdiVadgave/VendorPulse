@@ -49,6 +49,7 @@ class ScheduleMeetingRequest(BaseModel):
     start_time: str = Field(..., description="ISO-8601 start time from the selected slot")
     duration_minutes: int = Field(30, description="Meeting duration in minutes")
     time_zone: str = Field("UTC", description="Timezone for meeting")
+    meeting_index: int = Field(1, description="Which alignment meeting (1-based) — a cycle may have several")
 
 
 @router.post("/extract-actions", response_model=AgentResponse)
@@ -73,7 +74,9 @@ def extract_actions(cycleId: str, payload: ExtractActionsRequest):
             "Extract all action items from the following internal alignment meeting notes.\n"
             "Return a JSON array where each item has:\n"
             "  action_id (generate a short id like 'a1','a2'...),\n"
-            "  description (the action to be taken),\n"
+            "  description (a short one-line title of the action, max ~12 words),\n"
+            "  details (a fuller 1-2 sentence description: the what, the why, and any "
+            "context needed to discuss it in the next meeting — never invent facts),\n"
             "  owner (person responsible — use the name from the notes),\n"
             "  due_date (YYYY-MM-DD if mentioned, otherwise null),\n"
             '  source: "alignment",\n'
@@ -102,6 +105,7 @@ def extract_actions(cycleId: str, payload: ExtractActionsRequest):
         a.setdefault("status", "OPEN")
         a.setdefault("owner", "TBD")
         a.setdefault("due_date", None)
+        a.setdefault("details", "")
 
     return AgentResponse(
         status="success",
@@ -314,14 +318,18 @@ def schedule_alignment_meeting(
     vendor_name = cycle.get("vendor_name", "TBD")
     quarter = cycle.get("quarter", "")
     year = cycle.get("year", "")
-    subject = f"Internal Alignment — {vendor_name} ({quarter} {year})"
+    meeting_index = max(1, int(payload.meeting_index or 1))
+    suffix = f" #{meeting_index}" if meeting_index > 1 else ""
+    subject = f"Internal Alignment{suffix} — {vendor_name} ({quarter} {year})"
 
-    # Reschedule-in-place: if an alignment meeting already exists for this cycle,
+    # Reschedule-in-place: if THIS alignment meeting (same index) already exists,
     # PATCH the existing Teams event (keeps the join link + invite thread) instead
     # of creating a duplicate. Mirrors the Scheduling module's reschedule.
     existing = next(
         (m for m in meeting_repo.get_for_cycle(cycleId)
-         if m.get("meetingType") == "INTERNAL_ALIGNMENT" and m.get("status") != "cancelled"),
+         if m.get("meetingType") == "INTERNAL_ALIGNMENT"
+         and int(m.get("alignmentIndex", 1)) == meeting_index
+         and m.get("status") != "cancelled"),
         None,
     )
     is_reschedule = bool(existing and existing.get("meetingId"))
@@ -378,6 +386,7 @@ def schedule_alignment_meeting(
             "createdAt": datetime.now(timezone.utc).isoformat(),
             "cycleId": cycleId,
             "meetingType": "INTERNAL_ALIGNMENT",
+            "alignmentIndex": meeting_index,
             "teamsMeetingUrl": teams_url,
             "webLink": web_link,
         }
@@ -405,34 +414,93 @@ def schedule_alignment_meeting(
 # ── Alignment meeting state retrieval ─────────────────────────────────────────
 
 
+def _alignment_meeting_dto(m: dict) -> dict:
+    return {
+        "meeting_index": int(m.get("alignmentIndex", 1)),
+        "event_id": m.get("meetingId"),
+        "teams_meeting_url": m.get("teamsMeetingUrl"),
+        "web_link": m.get("webLink"),
+        "attendee_count": len(m.get("participants", [])) + 1,
+        "status": m.get("status"),
+        "time_slot": m.get("timeSlot"),
+        "title": m.get("title"),
+    }
+
+
 @router.get("/meeting")
 def get_alignment_meeting(
     cycleId: str,
+    index: int = 1,
     meeting_repo=Depends(get_meeting_repo),
 ):
     """
-    Check if an internal alignment meeting already exists for this cycle.
-    Returns meeting details if scheduled, or null if not.
+    Check if the given internal-alignment meeting (by 1-based index) already
+    exists for this cycle. Returns meeting details if scheduled, or null if not.
     """
     meetings = meeting_repo.get_for_cycle(cycleId)
     alignment_meeting = next(
-        (m for m in meetings if m.get("meetingType") == "INTERNAL_ALIGNMENT" and m.get("status") != "cancelled"),
+        (m for m in meetings
+         if m.get("meetingType") == "INTERNAL_ALIGNMENT"
+         and int(m.get("alignmentIndex", 1)) == int(index)
+         and m.get("status") != "cancelled"),
         None,
     )
     if not alignment_meeting:
         return {"meeting": None}
+    return {"meeting": _alignment_meeting_dto(alignment_meeting)}
 
-    return {
-        "meeting": {
-            "event_id": alignment_meeting.get("meetingId"),
-            "teams_meeting_url": alignment_meeting.get("teamsMeetingUrl"),
-            "web_link": alignment_meeting.get("webLink"),
-            "attendee_count": len(alignment_meeting.get("participants", [])) + 1,
-            "status": alignment_meeting.get("status"),
-            "time_slot": alignment_meeting.get("timeSlot"),
-            "title": alignment_meeting.get("title"),
-        },
-    }
+
+@router.get("/meetings")
+def list_alignment_meetings(
+    cycleId: str,
+    meeting_repo=Depends(get_meeting_repo),
+):
+    """All internal-alignment meetings scheduled for this cycle, ordered by index."""
+    meetings = [
+        m for m in meeting_repo.get_for_cycle(cycleId)
+        if m.get("meetingType") == "INTERNAL_ALIGNMENT" and m.get("status") != "cancelled"
+    ]
+    dtos = sorted((_alignment_meeting_dto(m) for m in meetings), key=lambda d: d["meeting_index"])
+    return {"meetings": dtos, "count": len(dtos)}
+
+
+@router.delete("/meeting")
+def delete_alignment_meeting(
+    cycleId: str,
+    index: int = 1,
+    meeting_repo=Depends(get_meeting_repo),
+):
+    """Delete an internal-alignment meeting (e.g. one the admin added by mistake).
+
+    Cancels the underlying Teams event (best-effort so a Graph failure never blocks
+    removal) and deletes the local record. Returns {deleted: bool, cancelled: bool}.
+    If nothing was scheduled at that index yet, still returns 200 (nothing to do)."""
+    meeting = next(
+        (m for m in meeting_repo.get_for_cycle(cycleId)
+         if m.get("meetingType") == "INTERNAL_ALIGNMENT"
+         and int(m.get("alignmentIndex", 1)) == int(index)
+         and m.get("status") != "cancelled"),
+        None,
+    )
+    if not meeting:
+        return {"deleted": False, "cancelled": False, "message": "No scheduled meeting at that index."}
+
+    cancelled = False
+    event_id = meeting.get("meetingId")
+    token = _get_graph_token()
+    if event_id and token:
+        try:
+            result = asyncio.run(GraphService(token).delete_event(event_id))
+            cancelled = bool(result.get("deleted"))
+        except Exception as e:  # best-effort — never block local removal
+            logger.warning("ALIGNMENT: Graph cancel failed for %s: %s", event_id, e)
+
+    # Guard: only delete by a real id. delete_by_id(None) would match every record
+    # whose meetingId is None and wipe them all.
+    if event_id:
+        meeting_repo.delete_by_id("meetingId", event_id)
+    logger.info("ALIGNMENT: deleted meeting index=%s (event=%s, cancelled=%s)", index, event_id, cancelled)
+    return {"deleted": True, "cancelled": cancelled, "meeting_index": int(index)}
 
 
 # ── Internal attendees endpoint ───────────────────────────────────────────────
@@ -507,6 +575,9 @@ def remove_alignment_attendee(
         raise HTTPException(status_code=400, detail="Attendee does not belong to this cycle")
 
     attendee_repo.delete_by_id("attendee_id", payload.attendee_id)
+    # Cascade their scorecard submission so it can't dangle (same as the scheduling path).
+    from app.api.routes.scorecard_v2 import _submissions_repo
+    _submissions_repo().delete_by_field("attendee_id", payload.attendee_id)
     logger.info("ALIGNMENT: removed attendee %s from cycle %s", payload.attendee_id, cycleId)
     return {"message": f"Removed {attendee.get('name', '')} from alignment meeting", "attendee_id": payload.attendee_id}
 
@@ -661,33 +732,82 @@ def _deterministic_insights(w: dict) -> list[dict]:
     return insights
 
 
+def _trajectory_insights(current: dict, previous: dict) -> list[dict]:
+    """Deterministic cross-cycle movement insights: how each theme's consolidated
+    score moved versus the previous cycle. Numbers stay grounded (never LLM-guessed)."""
+    prev_cat = {c["key"]: c for c in previous.get("categories", [])}
+    out: list[dict] = []
+    i = 0
+    for cat in current.get("categories", []):
+        cur = cat.get("category_average")
+        prev = (prev_cat.get(cat["key"]) or {}).get("category_average")
+        if cur is None or prev is None:
+            continue
+        delta = round(cur - prev, 1)
+        if abs(delta) < 0.5:
+            continue
+        i += 1
+        if delta > 0:
+            direction, severity = "improved", "info"
+        else:
+            direction = "declined"
+            severity = "critical" if delta <= -1 else "warning"
+        out.append({
+            "insight_id": f"it-{i}", "type": "trajectory", "category": cat["key"],
+            "message": (
+                f"{cat['label']}: {direction} {abs(delta):.1f} pt since last cycle "
+                f"({prev:.1f} → {cur:.1f}/5)."
+            ),
+            "severity": severity,
+        })
+    return out
+
+
 @router.post("/insights", response_model=AgentResponse)
 def get_alignment_insights(cycleId: str, payload: InsightsRequest):
-    """Generate alignment insights from the CONSOLIDATED internal scorecard
-    (runtime — never hardcoded). LLM narrates when enabled; otherwise the
-    deterministic insights are returned as-is."""
+    """Generate alignment insights from the consolidated internal scorecard AND the
+    previous cycle (runtime — never hardcoded): low scores, cross-team divergence, and
+    cross-cycle trajectory. The LLM re-narrates with both cycles' scores + comments in
+    context when enabled; otherwise the deterministic insights are returned as-is."""
     if payload.cycle_id != cycleId:
         raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
 
-    from app.api.routes.scorecard_v2 import _compile_weighted
+    from app.api.routes.scorecard_v2 import _compile_weighted, find_previous_cycle_id, compact_scorecard_context
     weighted = _compile_weighted(cycleId)
-    insights = _deterministic_insights(weighted)
+
+    # Trajectory insights lead (most actionable for the alignment call), then the
+    # current-cycle low-score / divergence insights.
+    prev_id = find_previous_cycle_id(cycleId)
+    prev_weighted = _compile_weighted(prev_id) if prev_id else None
+    trajectory = _trajectory_insights(weighted, prev_weighted) if prev_weighted else []
+    insights = trajectory + _deterministic_insights(weighted)
 
     llm = get_llm_service() if settings.enable_llm else None
     if llm and llm.is_enabled and insights:
+        ctx = compact_scorecard_context(cycleId)
+        prev_block = (
+            f"Previous cycle ({ctx['previous']['label']}) scorecard + comments:\n"
+            f"{json.dumps(ctx['previous'], indent=2, ensure_ascii=False)}\n\n"
+            if ctx.get("previous") else
+            "Previous cycle: none (this is the vendor's first cycle — do not invent a trend).\n\n"
+        )
         prompt = (
-            "Below is the CONSOLIDATED internal scorecard (internal teams only; no "
-            "vendor self-report) and a set of deterministically-computed insights.\n\n"
-            f"Consolidated scorecard:\n{json.dumps(weighted.get('categories', []), indent=2)}\n\n"
-            f"Overall score: {weighted.get('overall_score')}\n\n"
-            f"Computed insights (ground truth — keep the same facts, severities and ids):\n"
+            "You are preparing insights for the INTERNAL alignment call. Below are the "
+            "current and previous consolidated scorecards (internal teams only; no vendor "
+            "self-report), the teams' written comments, and a set of "
+            "deterministically-computed insights.\n\n"
+            f"Current cycle ({ctx['current']['label']}) scorecard + comments:\n"
+            f"{json.dumps(ctx['current'], indent=2, ensure_ascii=False)}\n\n"
+            f"{prev_block}"
+            f"Computed insights (ground truth — keep the same facts, ids, types and severities):\n"
             f"{json.dumps(insights, indent=2)}\n\n"
             "Rewrite ONLY the 'message' of each insight to be sharper and more "
-            "decision-useful for the internal alignment call. Do NOT change any "
-            "number, id, severity, category or type, and do NOT add or remove items. "
+            "decision-useful, drawing on the trajectory (previous vs current) and the team "
+            "comments where relevant. Do NOT change any number, id, severity, category or "
+            "type, and do NOT add or remove items. "
             "Return ONLY a JSON array of the same objects with improved 'message' fields."
         )
-        raw = llm.call_simple(prompt, system=ALIGNMENT_SYSTEM_PROMPT, max_tokens=1200)
+        raw = llm.call_simple(prompt, system=ALIGNMENT_SYSTEM_PROMPT, max_tokens=1400)
         try:
             parsed = json.loads(_strip_markdown_json(raw))
             if isinstance(parsed, list) and len(parsed) == len(insights):
@@ -698,12 +818,16 @@ def get_alignment_insights(cycleId: str, payload: InsightsRequest):
         except json.JSONDecodeError:
             pass  # fall back to deterministic messages
 
+    warnings = [] if weighted.get("submitted_count") else ["No scorecards submitted yet."]
     return AgentResponse(
         status="success",
         agent="alignment_agent",
-        summary=f"{len(insights)} alignment insight(s) from the consolidated internal scorecard.",
-        data={"insights": insights},
-        warnings=[] if weighted.get("submitted_count") else ["No scorecards submitted yet."],
+        summary=(
+            f"{len(insights)} alignment insight(s) from the consolidated internal scorecard"
+            + (" and the previous cycle." if prev_weighted else ".")
+        ),
+        data={"insights": insights, "has_previous_cycle": bool(prev_weighted)},
+        warnings=warnings,
         next_actions=["REVIEW_INSIGHTS"],
         requires_approval=False,
     )

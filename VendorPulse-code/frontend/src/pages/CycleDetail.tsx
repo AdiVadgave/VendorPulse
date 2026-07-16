@@ -13,6 +13,11 @@ import {
   Building2,
   Clock,
   ArrowRight,
+  Plus,
+  Trash2,
+  AlertTriangle,
+  FileText,
+  Activity,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { getMockCycleById as getMockCycleById } from '@/mock/cycles.mock'
@@ -22,7 +27,8 @@ import {
   MOCK_ATTENDEES_RSVP,
 } from '@/mock/scheduling.mock'
 import { completeAttendanceConfirmation, fetchAttendeesSeeded, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
-import { getCompiledScorecard, getWeightedScorecard, getScorecardConfig } from '@/lib/scorecardApi'
+import { getCompiledScorecard, getWeightedScorecard, getScorecardConfig, getScorecardBriefing } from '@/lib/scorecardApi'
+import type { ScorecardBriefing } from '@/lib/scorecardApi'
 import { compiledScorecardToLegacy } from '@/mock/scorecard.mock'
 import type { CompiledCategoryScore, CompiledScorecard, WeightedScorecard, TeamSubmissionsData, ScorecardConfig } from '@/types/scorecard.types'
 import {
@@ -45,31 +51,28 @@ import {
 } from '@/mock/vendor-prep.mock'
 import {
   MOCK_MEETING_NOTES,
-  MOCK_MEETING_ACTIONS,
 } from '@/mock/meeting.mock'
-import { MOCK_ALL_ACTIONS } from '@/mock/analytics.mock'
 
 import WorkflowProgressBar from '@/components/shared/WorkflowProgressBar'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import AttendanceConfirmationPanel from '@/components/modules/scheduling/AttendanceConfirmationPanel'
 import AttendeeRefreshPanel from '@/components/modules/scheduling/AttendeeRefreshPanel'
+import CycleAttendeesPanel from '@/components/modules/scheduling/CycleAttendeesPanel'
 import SlotRankingPanel from '@/components/modules/scheduling/SlotRankingPanel'
 import InviteApprovalPanel from '@/components/modules/scheduling/InviteApprovalPanel'
 import ConfirmationTracker from '@/components/modules/scheduling/ConfirmationTracker'
-import MeetingPlanPanel from '@/components/modules/scheduling/MeetingPlanPanel'
 
 import ScorecardDispatchPanel from '@/components/modules/scorecard/ScorecardDispatchPanel'
 import SubmissionTracker from '@/components/modules/scorecard/SubmissionTracker'
-import WeightedScorecardTable from '@/components/modules/scorecard/WeightedScorecardTable'
 import FinalizeScorecardTable from '@/components/modules/scorecard/FinalizeScorecardTable'
 import TeamScorecardsSection from '@/components/modules/scorecard/TeamScorecardsSection'
 import ScorecardConfigPanel from '@/components/modules/scorecard/ScorecardConfigPanel'
+import ConsolidatedScorecardPanel from '@/components/modules/scorecard/ConsolidatedScorecardPanel'
 
 import ChangeHighlightsPanel from '@/components/modules/alignment/ChangeHighlightsPanel'
 import AlignmentFlagsPanel from '@/components/modules/alignment/AlignmentFlagsPanel'
 import FaceOffModelEditor from '@/components/modules/alignment/FaceOffModelEditor'
-import ScheduleAlignmentMeeting from '@/components/modules/alignment/ScheduleAlignmentMeeting'
-import NotesInputPanel from '@/components/modules/alignment/NotesInputPanel'
+import AlignmentMeetingPanel from '@/components/modules/alignment/AlignmentMeetingPanel'
 
 import VendorBriefPanel from '@/components/modules/vendor-prep/VendorBriefPanel'
 import PushbackInput from '@/components/modules/vendor-prep/PushbackInput'
@@ -81,16 +84,22 @@ import LiveCapturePanel from '@/components/modules/meeting/LiveCapturePanel'
 import TranscriptInput from '@/components/modules/meeting/TranscriptInput'
 import MeetingMinutesViewer from '@/components/modules/meeting/MeetingMinutesViewer'
 
-import ActionLog from '@/components/shared/ActionLog'
+import ActionLog, { type ActionEdit } from '@/components/shared/ActionLog'
+import ActionQueuePanel from '@/components/shared/ActionQueuePanel'
+import AddActionForm from '@/components/shared/AddActionForm'
 import EmptyState from '@/components/shared/EmptyState'
 import { cn } from '@/utils/cn'
 import type { TabKey, WorkflowState } from '@/utils/constants'
-import { WORKFLOW_STATES, TAB_KEYS, TAB_LABELS, TAB_MIN_STATE_INDEX, getDefaultTabFromState } from '@/utils/constants'
+import { WORKFLOW_STATES, TAB_KEYS, TAB_LABELS, TAB_MIN_STATE_INDEX, ACTION_ORIGIN, getDefaultTabFromState } from '@/utils/constants'
 import { useCycleStore } from '@/store/useCycleStore'
 import type { SchedulingPhase, CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 // scorecard types imported via CompiledCategoryScore and CompiledScorecard above
 import type { ExtractedAction, AlignmentInsight } from '@/types/alignment.types'
-import { getAlignmentInsights } from '@/lib/alignmentApi'
+import { getAlignmentInsights, listAlignmentMeetings, deleteAlignmentMeeting } from '@/lib/alignmentApi'
+import {
+  getActions, addAction, addActionsBulk, updateAction, deleteAction,
+  type ActionItem, type NewActionInput,
+} from '@/lib/actionsApi'
 import type { VendorBrief, PushbackItem, PushbackResponse } from '@/types/vendor-prep.types'
 import type { MeetingNote } from '@/types/meeting.types'
 
@@ -203,14 +212,11 @@ export default function CycleDetail() {
     }
   }, [advanceWorkflow, cycle])
 
-  // --- Module C state ---
-  const [alignmentActions, setAlignmentActions] = useState<ExtractedAction[]>([])
-  const [alignmentSlots, setAlignmentSlots] = useState<SlotProposal[]>([])
-  const [alignmentMeetingResult, setAlignmentMeetingResult] = useState<{
-    teamsUrl: string | null
-    webLink: string | null
-    attendeeCount: number
-  } | null>(null)
+  // --- Shared action queue (Modules C–E) ---
+  // ONE persistent queue carried across every meeting in the flow
+  // (Internal Alignment → Vendor Meeting → further Alignment → final QBR).
+  // Backend-persisted; mutations sync best-effort so demo cycles still work offline.
+  const [actions, setActions] = useState<ActionItem[]>([])
 
   // --- Module D state ---
   const [vendorBrief, setVendorBrief] = useState<VendorBrief | null>(
@@ -228,11 +234,6 @@ export default function CycleDetail() {
     cycle?.teams_meeting_url ?? null
   )
   const [minutesApproved, setMinutesApproved] = useState(false)
-  const [allActions, setAllActions] = useState(
-    cycle?.workflow_state === 'POST_MEETING_COMPLETE'
-      ? MOCK_ALL_ACTIONS
-      : alignmentActions.map(a => ({ ...a, cycle_ref: '' }))
-  )
 
   useEffect(() => {
     setSearchParams({ tab: activeTab }, { replace: true })
@@ -307,6 +308,68 @@ export default function CycleDetail() {
       })
       .catch(() => {/* backend may be offline — keep empty list */})
   }, [cycleId, isMockCycle])
+
+  // ── Shared action queue: load once, mutate optimistically + sync best-effort ──
+  // Declared before the early returns below so hook order stays stable across renders.
+  useEffect(() => {
+    if (!cycleId) return
+    getActions(cycleId)
+      .then((r) => setActions(r.actions))
+      .catch(() => { /* backend not ready / demo cycle — start empty */ })
+  }, [cycleId])
+
+  const dedupeMerge = (prev: ActionItem[], incoming: ActionItem[]) => {
+    const seen = new Set(prev.map((a) => a.action_id))
+    return [...prev, ...incoming.filter((a) => !seen.has(a.action_id))]
+  }
+
+  // Called by every meeting when its transcript yields action items.
+  const addActionsToQueue = useCallback((extracted: ExtractedAction[], origin?: string) => {
+    if (!cycleId || extracted.length === 0) return
+    const withOrigin: ActionItem[] = extracted.map((a) => ({ ...a, origin: origin ?? null }))
+    setActions((prev) => dedupeMerge(prev, withOrigin))
+    addActionsBulk(
+      cycleId,
+      extracted.map((a) => ({
+        action_id: a.action_id, description: a.description, owner: a.owner,
+        due_date: a.due_date, source: a.source, status: a.status, origin: origin ?? null,
+      }))
+    ).catch(() => { /* keep optimistic local copy */ })
+  }, [cycleId])
+
+  const handleAddAction = useCallback((input: NewActionInput) => {
+    if (!cycleId) return
+    const fallbackId = `act-${Date.now().toString(36)}`
+    addAction(cycleId, input)
+      .then((r) => setActions((prev) => dedupeMerge(prev, [r.action])))
+      .catch(() => {
+        const local: ActionItem = {
+          action_id: input.action_id ?? fallbackId,
+          description: input.description, owner: input.owner ?? 'TBD',
+          due_date: input.due_date ?? null, source: input.source ?? 'alignment',
+          status: input.status ?? 'OPEN', origin: input.origin ?? null,
+        }
+        setActions((prev) => dedupeMerge(prev, [local]))
+      })
+  }, [cycleId])
+
+  const handleActionEdit = useCallback((id: string, updates: ActionEdit) => {
+    if (!cycleId) return
+    setActions((prev) => prev.map((a) => (a.action_id === id ? { ...a, ...updates } : a)))
+    updateAction(cycleId, id, updates).catch(() => { /* keep optimistic local copy */ })
+  }, [cycleId])
+
+  const handleActionDelete = useCallback((id: string) => {
+    if (!cycleId) return
+    setActions((prev) => prev.filter((a) => a.action_id !== id))
+    deleteAction(cycleId, id).catch(() => { /* already removed locally */ })
+  }, [cycleId])
+
+  const handleActionStatusChange = useCallback((id: string, status: ExtractedAction['status']) => {
+    if (!cycleId) return
+    setActions((prev) => prev.map((a) => (a.action_id === id ? { ...a, status } : a)))
+    updateAction(cycleId, id, { status }).catch(() => { /* keep optimistic local copy */ })
+  }, [cycleId])
 
   if (isLoadingCycle) {
     return (
@@ -417,20 +480,11 @@ export default function CycleDetail() {
     setMeetingNotes(notes)
   }
 
-  // Module E: advance to POST_MEETING_COMPLETE when minutes are approved
+  // Module E: advance to POST_MEETING_COMPLETE when minutes are approved.
+  // Action items now come from the transcript extraction (shared queue), not mocks.
   function handleMinutesApproved() {
     setMinutesApproved(true)
     advanceWorkflow(cycle!.cycle_id, 'POST_MEETING_COMPLETE')
-    const newActions = MOCK_MEETING_ACTIONS.map(a => ({ ...a, cycle_ref: `${cycle!.vendor_name} ${cycle!.quarter} ${cycle!.year}` }))
-    setAllActions((prev) => {
-      const existing = prev.map(a => a.action_id)
-      const fresh = newActions.filter(a => !existing.includes(a.action_id))
-      return [...prev, ...fresh]
-    })
-  }
-
-  function handleActionStatusChange(id: string, status: ExtractedAction['status']) {
-    setAllActions((prev) => prev.map((a) => (a.action_id === id ? { ...a, status } : a)))
   }
 
   return (
@@ -445,13 +499,12 @@ export default function CycleDetail() {
             <h2 className="font-semibold text-slate-900 dark:text-white text-sm">
               {cycle.vendor_name}
             </h2>
-            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
               <span>{cycle.quarter} {cycle.year}</span>
               <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
               <span>EGB/QBR Governance Cycle</span>
-              <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
-              <Clock size={11} />
-              <span>Updated {format(new Date(cycle.updated_at), 'd MMM yyyy')}</span>
+              <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600 hidden sm:inline-block" />
+              <span className="hidden sm:inline-flex items-center gap-1"><Clock size={11} /> Updated {format(new Date(cycle.updated_at), 'd MMM yyyy')}</span>
             </div>
           </div>
         </div>
@@ -492,7 +545,7 @@ export default function CycleDetail() {
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto p-6">
         {activeTab === 'overview' && (
-          <OverviewTab cycle={cycle} currentStateIndex={currentStateIndex} isMockCycle={isMockCycle} />
+          <OverviewTab cycle={cycle} currentStateIndex={currentStateIndex} />
         )}
 
         {activeTab === 'scheduling' && (
@@ -540,20 +593,11 @@ export default function CycleDetail() {
           <AlignmentTab
             cycleId={cycle.cycle_id}
             cycle={cycle}
-            actions={alignmentActions}
+            actions={actions}
             compiledScores={compiledScores}
             compiledScorecard={compiledScorecard}
-            alignmentSlots={alignmentSlots}
-            alignmentMeetingResult={alignmentMeetingResult}
-            onAlignmentSlotsFound={setAlignmentSlots}
-            onAlignmentMeetingScheduled={setAlignmentMeetingResult}
-            onActionsExtracted={(extracted) => {
-              setAlignmentActions(extracted)
-              setAllActions((prev) => {
-                const existing = prev.map(a => a.action_id)
-                const fresh = extracted.filter(a => !existing.includes(a.action_id)).map(a => ({ ...a, cycle_ref: `${cycle.vendor_name} ${cycle.quarter} ${cycle.year}` }))
-                return [...prev, ...fresh]
-              })
+            onActionsExtracted={(extracted, origin) => {
+              addActionsToQueue(extracted, origin)
               // Module C: advance to INTERNAL_ALIGNMENT when actions are extracted
               advanceWorkflow(cycle!.cycle_id, 'INTERNAL_ALIGNMENT')
             }}
@@ -589,16 +633,39 @@ export default function CycleDetail() {
             onNoteAdd={handleNoteAdd}
             onTranscriptParsed={handleTranscriptParsed}
             onMinutesApproved={handleMinutesApproved}
-            allActions={allActions}
-            onActionStatusChange={handleActionStatusChange}
+            onActionsExtracted={(extracted) => addActionsToQueue(extracted, ACTION_ORIGIN.vendorMeeting)}
+            alreadyExtracted={actions.some((a) => a.source === 'meeting')}
           />
+        )}
+
+        {/* Shared action queue — always visible across the meeting flow so the
+            coordinator can see what is still pending as it carries forward. */}
+        {(activeTab === 'alignment' || activeTab === 'vendor-prep' || activeTab === 'meeting') && (
+          <div className="max-w-5xl mx-auto mt-5">
+            <ActionQueuePanel
+              actions={actions}
+              source={activeTab === 'vendor-prep' ? 'vendor_prep' : activeTab === 'meeting' ? 'meeting' : 'alignment'}
+              originLabel={
+                activeTab === 'vendor-prep' ? ACTION_ORIGIN.vendorPrep
+                  : activeTab === 'meeting' ? ACTION_ORIGIN.vendorMeeting
+                    : ACTION_ORIGIN.internalAlignment
+              }
+              onAdd={handleAddAction}
+              onStatusChange={handleActionStatusChange}
+              onEdit={handleActionEdit}
+              onDelete={handleActionDelete}
+            />
+          </div>
         )}
 
         {activeTab === 'actions' && (
           <ActionsTab
-            actions={allActions}
+            actions={actions}
             workflowState={workflowState}
             onStatusChange={handleActionStatusChange}
+            onEdit={handleActionEdit}
+            onDelete={handleActionDelete}
+            onAdd={handleAddAction}
             onArchive={() => advanceWorkflow(cycle!.cycle_id, 'ARCHIVED')}
           />
         )}
@@ -611,66 +678,142 @@ export default function CycleDetail() {
 function OverviewTab({
   cycle,
   currentStateIndex,
-  isMockCycle,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   currentStateIndex: number
-  isMockCycle: boolean
 }) {
+  const currentStateLabel = (WORKFLOW_STATES[currentStateIndex] ?? '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+  const progressPct = Math.round(((currentStateIndex + 1) / WORKFLOW_STATES.length) * 100)
+  const description = (cycle.description ?? '').trim()
+
+  const stats = [
+    { label: 'Current Stage', value: currentStateLabel, sub: `Step ${currentStateIndex + 1} of ${WORKFLOW_STATES.length}`, icon: <Activity size={16} /> },
+    { label: 'Governance Cycle', value: `${cycle.quarter} ${cycle.year}`, sub: `${cycle.cycle_type ?? 'SPR'} · Supplier Performance Review`, icon: <CalendarClock size={16} /> },
+    { label: 'Vendor', value: cycle.vendor_name, sub: 'Supplier under review', icon: <Building2 size={16} /> },
+  ]
+
   return (
     <div className="max-w-5xl mx-auto space-y-5">
+      {/* Hero summary — vendor, timeline, progress, and the cycle description. */}
+      <div className="bg-gradient-to-br from-indigo-50 via-white to-violet-50 dark:from-indigo-950/40 dark:via-slate-900 dark:to-violet-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <Building2 size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">{cycle.vendor_name}</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {cycle.cycle_type ?? 'SPR'} · {cycle.quarter} {cycle.year} · EGB/QBR Governance Cycle
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+            {currentStateLabel}
+          </span>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { label: 'Cycle Progress', value: `${currentStateIndex + 1} / ${WORKFLOW_STATES.length}`, sub: 'workflow steps' },
-          { label: `${cycle.cycle_type ?? 'SPR'} · Quarter`, value: `${cycle.quarter} ${cycle.year}`, sub: 'governance cycle' },
-          { label: 'Vendor', value: cycle.vendor_name, sub: 'IT Infrastructure' },
-        ].map((card) => (
-          <div key={card.label} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-            <p className="text-xs text-slate-500 dark:text-slate-400">{card.label}</p>
-            <p className="text-xl font-bold text-slate-900 dark:text-white mt-1">{card.value}</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500">{card.sub}</p>
+        {/* Progress bar */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1.5">
+            <span>Cycle progress</span>
+            <span className="font-medium text-slate-700 dark:text-slate-300">{progressPct}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-slate-200/70 dark:bg-slate-800 overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all" style={{ width: `${progressPct}%` }} />
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="mt-5 flex items-start gap-2.5">
+          <FileText size={15} className="text-indigo-500 dark:text-indigo-400 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-0.5">Description</p>
+            {description ? (
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{description}</p>
+            ) : (
+              <p className="text-sm text-slate-400 dark:text-slate-500 italic">
+                No description was added for this cycle.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Key facts */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {stats.map((card) => (
+          <div key={card.label} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-2">
+              {card.icon}
+              <p className="text-xs font-medium">{card.label}</p>
+            </div>
+            <p className="text-base font-bold text-slate-900 dark:text-white truncate" title={card.value}>{card.value}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{card.sub}</p>
           </div>
         ))}
       </div>
 
-      <MeetingPlanPanel
-        cycleId={cycle.cycle_id}
-        meetingPlan={cycle.meeting_plan ?? []}
-        isMockCycle={isMockCycle}
-      />
-
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Workflow Steps</h3>
-        <div className="space-y-2">
-          {WORKFLOW_STATES.map((state, idx) => (
-            <div key={state} className="flex items-center gap-3">
-              <div className={cn(
-                'w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold',
-                idx < currentStateIndex
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                  : idx === currentStateIndex
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
-              )}>
-                {idx < currentStateIndex ? <CheckCircle2 size={12} /> : idx + 1}
-              </div>
-              <span className={cn(
-                'text-sm',
-                idx < currentStateIndex ? 'text-slate-400 dark:text-slate-500 line-through'
-                  : idx === currentStateIndex ? 'text-slate-900 dark:text-white font-medium'
-                  : 'text-slate-500 dark:text-slate-400'
-              )}>
-                {state.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-              </span>
-              {idx === currentStateIndex && (
-                <span className="ml-auto text-xs bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-0.5 rounded-full font-medium">
-                  Current
-                </span>
-              )}
-            </div>
-          ))}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Workflow Steps</h3>
+          <span className="text-xs text-slate-400 dark:text-slate-500">
+            {currentStateIndex + 1} of {WORKFLOW_STATES.length} complete
+          </span>
         </div>
+        <ol className="relative">
+          {WORKFLOW_STATES.map((state, idx) => {
+            const done = idx < currentStateIndex
+            const current = idx === currentStateIndex
+            const isLast = idx === WORKFLOW_STATES.length - 1
+            const label = state.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+            return (
+              <li key={state} className="relative flex items-start gap-3 pb-4 last:pb-0">
+                {/* Connecting rail (coloured up to the completed point). */}
+                {!isLast && (
+                  <span
+                    className={cn(
+                      'absolute left-3 top-6 -bottom-0.5 w-px -translate-x-1/2',
+                      done ? 'bg-emerald-300 dark:bg-emerald-800' : 'bg-slate-200 dark:bg-slate-700'
+                    )}
+                  />
+                )}
+                <span
+                  className={cn(
+                    'relative z-10 w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold ring-4 ring-white dark:ring-slate-900',
+                    done ? 'bg-emerald-500 text-white'
+                      : current ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                  )}
+                >
+                  {done ? <CheckCircle2 size={13} /> : idx + 1}
+                </span>
+                <div className="flex-1 min-w-0 flex items-center justify-between gap-2 pt-0.5">
+                  <span
+                    className={cn(
+                      'text-sm truncate',
+                      current ? 'text-slate-900 dark:text-white font-semibold'
+                        : 'text-slate-500 dark:text-slate-400'
+                    )}
+                  >
+                    {label}
+                  </span>
+                  {current ? (
+                    <span className="shrink-0 text-xs bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-0.5 rounded-full font-medium">
+                      In progress
+                    </span>
+                  ) : done ? (
+                    <span className="shrink-0 text-xs text-emerald-600 dark:text-emerald-400 font-medium">Done</span>
+                  ) : (
+                    <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">Upcoming</span>
+                  )}
+                </div>
+              </li>
+            )
+          })}
+        </ol>
       </div>
     </div>
   )
@@ -728,6 +871,17 @@ function SchedulingTab({
           })}
         </div>
       </div>
+
+      {/* Manage cycle attendees at any time (the attendee-refresh phase has its own
+          fuller manager, so only show this persistent one outside that phase). */}
+      {schedulingPhase !== 'attendee_refresh' && (
+        <CycleAttendeesPanel
+          cycleId={cycle.cycle_id}
+          attendees={attendees}
+          onAttendeesChanged={onAttendeesUpdated}
+        />
+      )}
+
       {schedulingPhase === 'attendance_confirmation' && (
         <AttendanceConfirmationPanel
           cycleId={cycle.cycle_id}
@@ -898,7 +1052,7 @@ function ScorecardTab({
   )
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
+    <div className={cn('mx-auto space-y-5', subTab === 'finalize' ? 'max-w-[1600px]' : 'max-w-5xl')}>
       <div className="flex w-full gap-2.5 align-centre bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-1.5 w-full">
         {subTabBtn('collection', 'Scorecard Collection')}
         {subTabBtn('finalize', 'Comparison & Finalize')}
@@ -918,7 +1072,14 @@ function ScorecardTab({
             alreadyDispatched={dispatched}
             structure={config?.categories}
           />
-          <SubmissionTracker cycleId={cycleId} onSubmissionsUpdated={handleSubmissionsUpdated} />
+          <SubmissionTracker
+            cycleId={cycleId}
+            vendorName={cycle.vendor_name}
+            quarter={cycle.quarter}
+            year={cycle.year}
+            attendees={attendees}
+            onSubmissionsUpdated={handleSubmissionsUpdated}
+          />
         </>
       )}
 
@@ -928,7 +1089,7 @@ function ScorecardTab({
             <TeamScorecardsSection data={weighted} />
           )}
           {weighted ? (
-            <WeightedScorecardTable data={weighted} />
+            <ConsolidatedScorecardPanel cycleId={cycleId} weighted={weighted} />
           ) : (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center text-sm text-slate-500 dark:text-slate-400">
               Loading consolidated scorecard…
@@ -968,20 +1129,54 @@ function ScorecardTab({
 /* ── Alignment Tab ────────────────────────────────────────── */
 function AlignmentTab({
   cycleId, cycle, actions, onActionsExtracted, compiledScores, compiledScorecard,
-  alignmentSlots, alignmentMeetingResult, onAlignmentSlotsFound, onAlignmentMeetingScheduled,
 }: {
   cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
-  actions: ExtractedAction[]
-  onActionsExtracted: (a: ExtractedAction[]) => void
+  actions: (ExtractedAction & { origin?: string | null })[]
+  onActionsExtracted: (a: ExtractedAction[], origin?: string) => void
   compiledScores: CompiledCategoryScore[] | null
   compiledScorecard?: CompiledScorecard | null
-  alignmentSlots: SlotProposal[]
-  alignmentMeetingResult: { teamsUrl: string | null; webLink: string | null; attendeeCount: number } | null
-  onAlignmentSlotsFound: (slots: SlotProposal[]) => void
-  onAlignmentMeetingScheduled: (result: { teamsUrl: string | null; webLink: string | null; attendeeCount: number }) => void
 }) {
-  const [, setAlignmentNotesText] = useState('')
+  // Alignment meetings — a cycle can run several. Start with one; the VMO can add
+  // more (with a confirm step) and delete any added by mistake. `indices` holds the
+  // stable 1-based meeting indexes (kept even if non-contiguous after a delete).
+  const [indices, setIndices] = useState<number[]>([1])
+  const [activeMeeting, setActiveMeeting] = useState(1)
+  const [confirmAdd, setConfirmAdd] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
+  const [busyDelete, setBusyDelete] = useState(false)
+  useEffect(() => {
+    listAlignmentMeetings(cycleId)
+      .then((r) => {
+        if (r.count > 0) {
+          const scheduled = r.meetings.map((m) => m.meeting_index)
+          const merged = Array.from(new Set([1, ...scheduled])).sort((a, b) => a - b)
+          setIndices(merged)
+        }
+      })
+      .catch(() => { /* backend may not be ready */ })
+  }, [cycleId])
+
+  function handleConfirmAdd() {
+    const next = Math.max(...indices) + 1
+    setIndices((prev) => [...prev, next])
+    setActiveMeeting(next)
+    setConfirmAdd(false)
+  }
+
+  async function handleDeleteMeeting(idx: number) {
+    setBusyDelete(true)
+    try {
+      await deleteAlignmentMeeting(cycleId, idx).catch(() => { /* nothing scheduled — local only */ })
+      const remaining = indices.filter((n) => n !== idx)
+      const finalIndices = remaining.length > 0 ? remaining : [1]
+      setIndices(finalIndices)
+      if (activeMeeting === idx) setActiveMeeting(finalIndices[0])
+    } finally {
+      setBusyDelete(false)
+      setConfirmDelete(null)
+    }
+  }
 
   // Scorecards are collected from internal-stakeholder TEAMS only (no vendor
   // self-report). Alignment therefore works off the consolidated weighted
@@ -1040,36 +1235,111 @@ function AlignmentTab({
       />
       <AlignmentFlagsPanel flags={flags} />
       <FaceOffModelEditor positions={MOCK_FACE_OFF} />
-      <ScheduleAlignmentMeeting
-        cycleId={cycleId}
-        slots={alignmentSlots}
-        meetingResult={alignmentMeetingResult}
-        onSlotsFound={onAlignmentSlotsFound}
-        onMeetingScheduled={onAlignmentMeetingScheduled}
-      />
-      <NotesInputPanel cycleId={cycleId} onActionsExtracted={onActionsExtracted} onNotesChange={setAlignmentNotesText} />
-      {/* {alignmentNotesText.trim() && (
-        <MeetingMinutesViewer
-          cycleId={cycleId}
-          notes={[{
-            note_id: `alignment-notes-${cycleId}`,
-            meeting_id: `alignment-mtg-${cycleId}`,
-            note_type: 'DECISION' as const,
-            content: alignmentNotesText,
-            raised_by: 'Internal Stakeholders',
-            timestamp: new Date().toISOString(),
-          }]}
-          vendorName={cycle.vendor_name}
-          quarter={cycle.quarter}
-          year={cycle.year}
-          onApproved={() => setAlignmentMinutesApproved(true)}
-        />
-      )} */}
-      {actions.length > 0 && (
-        <ActionLog
-          actions={actions.map(a => ({ ...a, cycle_ref: `${cycle.vendor_name} ${cycle.quarter} ${cycle.year}` }))}
-        />
-      )}
+
+      {/* Alignment meetings — schedule + transcript + AI minutes per meeting.
+          Segmented tab bar (matches the scorecard two-part control). */}
+      <div>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Alignment Meetings</h3>
+        </div>
+
+        {/* Segmented control: one segment per meeting + trailing "Add" action. */}
+        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-1.5 mb-4">
+          {indices.map((n, pos) => (
+            <div key={n} className="relative flex-1 min-w-[180px]">
+              <button
+                onClick={() => setActiveMeeting(n)}
+                className={cn(
+                  'w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors',
+                  activeMeeting === n
+                    ? 'bg-violet-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800'
+                )}
+              >
+                Alignment Meeting {pos + 1}
+              </button>
+              {indices.length > 1 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDelete(n) }}
+                  title="Delete this alignment meeting"
+                  className={cn(
+                    'absolute -top-1.5 -right-1.5 p-1 rounded-full border shadow-sm transition-colors',
+                    activeMeeting === n
+                      ? 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50'
+                      : 'bg-white dark:bg-slate-800 text-slate-400 hover:text-rose-600 border-slate-200 dark:border-slate-700'
+                  )}
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </div>
+          ))}
+          {!confirmAdd ? (
+            <button
+              onClick={() => setConfirmAdd(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-lg text-violet-700 dark:text-violet-400 hover:bg-white/70 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Plus size={15} /> Add another alignment meeting
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 px-2 py-1">
+              <span className="text-xs text-slate-600 dark:text-slate-300 pl-1">Add a new alignment meeting?</span>
+              <button
+                onClick={handleConfirmAdd}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setConfirmAdd(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Delete confirmation banner. */}
+        {confirmDelete !== null && (
+          <div className="flex items-center justify-between gap-3 mb-4 px-4 py-3 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30">
+            <span className="text-sm text-rose-700 dark:text-rose-300">
+              Delete Alignment Meeting {indices.indexOf(confirmDelete) + 1}? Any scheduled Teams meeting will be cancelled.
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => handleDeleteMeeting(confirmDelete)}
+                disabled={busyDelete}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60"
+              >
+                {busyDelete ? 'Deleting…' : 'Delete'}
+              </button>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                disabled={busyDelete}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {indices.map((n) => (
+          <div key={n} className={activeMeeting === n ? '' : 'hidden'}>
+            <AlignmentMeetingPanel
+              cycleId={cycleId}
+              index={n}
+              vendorName={cycle.vendor_name}
+              quarter={cycle.quarter}
+              year={cycle.year}
+              onActionsExtracted={(acts) => onActionsExtracted(acts, ACTION_ORIGIN.alignmentMeeting(indices.indexOf(n) + 1))}
+              alreadyExtracted={actions.some((a) => a.origin === ACTION_ORIGIN.alignmentMeeting(indices.indexOf(n) + 1))}
+            />
+          </div>
+        ))}
+      </div>
+      {/* The shared action queue is rendered once, persistently, below the tab. */}
     </div>
   )
 }
@@ -1121,7 +1391,7 @@ function VendorPrepTab({
 
 /* ── Meeting Tab ──────────────────────────────────────────── */
 function MeetingTab({
-  cycleId, cycle, meetingNotes, minutesApproved, teamsMeetingUrl, onNoteAdd, onTranscriptParsed, onMinutesApproved, allActions, onActionStatusChange,
+  cycleId, cycle, meetingNotes, teamsMeetingUrl, onNoteAdd, onTranscriptParsed, onMinutesApproved, onActionsExtracted, alreadyExtracted,
 }: {
   cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
@@ -1131,25 +1401,47 @@ function MeetingTab({
   onNoteAdd: (n: Omit<MeetingNote, 'note_id' | 'meeting_id'>) => void
   onTranscriptParsed: (notes: MeetingNote[]) => void
   onMinutesApproved: () => void
-  allActions: (ExtractedAction & { cycle_ref?: string })[]
-  onActionStatusChange: (id: string, s: ExtractedAction['status']) => void
+  onActionsExtracted: (a: ExtractedAction[]) => void
+  alreadyExtracted: boolean
 }) {
+  // Pre-meeting briefing — computed live from the consolidated scorecard (this cycle
+  // vs the previous one). No hardcoded metrics.
+  const [briefing, setBriefing] = useState<ScorecardBriefing | null>(null)
+  useEffect(() => {
+    getScorecardBriefing(cycleId).then(setBriefing).catch(() => setBriefing(null))
+  }, [cycleId])
+
+  // Parsing the QBR/vendor-meeting transcript both stores the notes and feeds any
+  // ACTION items into the shared queue (carried forward from the earlier meetings).
+  function handleParsed(notes: MeetingNote[]) {
+    onTranscriptParsed(notes)
+    const acts: ExtractedAction[] = notes
+      .filter((n) => n.note_type === 'ACTION')
+      .map((n, i) => ({
+        action_id: n.note_id || `meeting-act-${i}`,
+        description: n.content,
+        owner: n.raised_by || 'TBD',
+        due_date: null,
+        source: 'meeting',
+        status: 'OPEN',
+      }))
+    if (acts.length) onActionsExtracted(acts)
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <MeetingBriefingCard
         vendorName={cycle.vendor_name}
-        overallScore={3.8}
-        trend="improving"
-        mostImproved="Innovation"
-        mostConcerning="Communication"
-        recurringIssueCount={0}
-        predictedChallenges={[
-          
-        ]}
+        overallScore={briefing?.overall_score ?? null}
+        trend={briefing?.trend ?? 'stable'}
+        mostImproved={briefing?.most_improved ?? null}
+        mostConcerning={briefing?.most_concerning ?? null}
+        recurringIssueCount={briefing?.recurring_issue_count ?? 0}
+        predictedChallenges={briefing?.predicted_challenges ?? []}
       />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <LiveCapturePanel notes={meetingNotes} onAdd={onNoteAdd} teamsMeetingUrl={teamsMeetingUrl} />
-        <TranscriptInput cycleId={cycleId} onParsed={onTranscriptParsed} />
+        <TranscriptInput cycleId={cycleId} onParsed={handleParsed} alreadyExtracted={alreadyExtracted} />
       </div>
       <MeetingMinutesViewer
         cycleId={cycleId}
@@ -1159,13 +1451,7 @@ function MeetingTab({
         year={cycle.year}
         onApproved={onMinutesApproved}
       />
-      {minutesApproved && (
-        <ActionLog
-          actions={allActions}
-          showCycleRef={false}
-          onStatusChange={onActionStatusChange}
-        />
-      )}
+      {/* The shared action queue is rendered once, persistently, below the tab. */}
     </div>
   )
 }
@@ -1175,55 +1461,132 @@ function ActionsTab({
   actions,
   workflowState,
   onStatusChange,
+  onEdit,
+  onDelete,
+  onAdd,
   onArchive,
 }: {
-  actions: (ExtractedAction & { cycle_ref?: string })[]
+  actions: (ExtractedAction & { cycle_ref?: string; origin?: string | null })[]
   workflowState: WorkflowState
   onStatusChange: (id: string, s: ExtractedAction['status']) => void
+  onEdit: (id: string, updates: ActionEdit) => void
+  onDelete: (id: string) => void
+  onAdd: (a: NewActionInput) => void
   onArchive: () => void
 }) {
-  const allClosed = actions.length > 0 && actions.every((a) => a.status === 'CLOSED')
+  const [adding, setAdding] = useState(false)
+  const [confirmArchive, setConfirmArchive] = useState(false)
+  const openCount = actions.filter((a) => a.status !== 'CLOSED').length
   const isArchived = workflowState === 'ARCHIVED'
+  // Archiving is only allowed once the final QBR meeting is done.
+  const finalMeetingDone =
+    WORKFLOW_STATES.indexOf(workflowState) >= WORKFLOW_STATES.indexOf('POST_MEETING_COMPLETE')
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="font-semibold text-slate-900 dark:text-white">Unified Action Log</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            All actions across Alignment, Vendor Prep, and Meeting modules
+            All actions across Alignment, Vendor Prep, and Meeting modules — carried across the whole cycle
           </p>
         </div>
-        <AgentStatusBadge status="complete" />
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setAdding((a) => !a)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-violet-300 dark:border-violet-800 text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+          >
+            <Plus size={13} /> Add action
+          </button>
+          <AgentStatusBadge status="complete" />
+        </div>
       </div>
+
+      {adding && (
+        <AddActionForm
+          source="alignment"
+          originLabel={ACTION_ORIGIN.manual}
+          onAdd={(a) => { onAdd(a); setAdding(false) }}
+          onCancel={() => setAdding(false)}
+        />
+      )}
+
       {actions.length === 0 ? (
         <EmptyState
           title="No actions yet"
-          description="Action items will appear here once extracted from alignment notes, vendor prep, and meeting minutes."
+          description="Action items appear here once extracted from a meeting transcript — or add one manually with “Add action”."
         />
       ) : (
-        <ActionLog actions={actions} showCycleRef onStatusChange={onStatusChange} />
+        <ActionLog actions={actions} showCycleRef onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} />
       )}
 
-      {/* Archive banner — shown when all actions closed and not yet archived */}
-      {allClosed && !isArchived && (
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">All actions closed</p>
-              <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
-                Archive this cycle to mark the governance process complete.
-              </p>
+      {/* Archive — only available once the final QBR meeting is completed, and
+          gated behind an explicit confirmation. */}
+      {!isArchived && (
+        !finalMeetingDone ? (
+          <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl p-5 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Lock size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Archive Cycle</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Archiving unlocks once the final QBR meeting is completed.
+                </p>
+              </div>
+            </div>
+            <button
+              disabled
+              className="shrink-0 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 text-sm font-medium rounded-lg cursor-not-allowed"
+            >
+              Archive Cycle
+            </button>
+          </div>
+        ) : confirmArchive ? (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-5">
+            <div className="flex items-start gap-3 mb-3">
+              <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Archive this cycle?</p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                  This marks the governance process complete and moves the cycle to ARCHIVED.
+                  {openCount > 0 && ` ${openCount} action item${openCount > 1 ? 's are' : ' is'} still open.`}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onArchive}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                Yes, archive cycle
+              </button>
+              <button
+                onClick={() => setConfirmArchive(false)}
+                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 text-sm font-medium rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-          <button
-            onClick={onArchive}
-            className="shrink-0 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            Archive Cycle
-          </button>
-        </div>
+        ) : (
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-5 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Final meeting complete</p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
+                  Archive this cycle to mark the governance process complete.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setConfirmArchive(true)}
+              className="shrink-0 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              Archive Cycle
+            </button>
+          </div>
+        )
       )}
 
       {isArchived && (

@@ -25,15 +25,6 @@ ShellDepartment = Literal["IDTM", "IDE", "SOM", "Business", "CP", "IRM", "Other"
 # Cycle type — currently SPR (Supplier Performance Review) is the only option.
 CycleType = Literal["SPR"]
 
-# Meeting types that can make up a governance cycle. The organiser toggles which
-# meetings are included and may add several INTERNAL_ALIGNMENT calls.
-MeetingType = Literal[
-    "INTERNAL_ALIGNMENT",
-    "SUPPLIER_PREP",
-    "LEADERSHIP_ALIGNMENT",
-    "MAIN_GOVERNANCE",
-]
-
 
 # ---------------------------------------------------------------------------
 # Cycle attendee models
@@ -189,44 +180,6 @@ class SimulateResponsesRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class CycleMeeting(BaseModel):
-    """One meeting in a cycle's meeting plan. The organiser decides which are
-    included (enabled) and may rename them or add several INTERNAL_ALIGNMENT
-    calls (one per product team)."""
-
-    meeting_key: str = Field(..., description="Stable id, e.g. 'internal_alignment_1'")
-    meeting_type: MeetingType
-    title: str
-    enabled: bool = True
-    order: int = 0
-
-
-def default_meeting_plan() -> list["CycleMeeting"]:
-    """Default meeting plan for a new SPR cycle.
-
-    Internal Alignment, Supplier Prep and Main Governance are enabled by
-    default; a Leadership-focused alignment call is available but off by
-    default. The Main Governance meeting is the one scheduled from the
-    Scheduling module via Graph; the others are scheduled in their own tabs.
-    """
-    return [
-        CycleMeeting(meeting_key="internal_alignment_1", meeting_type="INTERNAL_ALIGNMENT",
-                     title="Internal Alignment Call", enabled=True, order=1),
-        CycleMeeting(meeting_key="supplier_prep", meeting_type="SUPPLIER_PREP",
-                     title="Supplier Prep Call", enabled=True, order=2),
-        CycleMeeting(meeting_key="leadership_alignment", meeting_type="LEADERSHIP_ALIGNMENT",
-                     title="Leadership Alignment Call", enabled=False, order=3),
-        CycleMeeting(meeting_key="main_governance", meeting_type="MAIN_GOVERNANCE",
-                     title="Main Governance Meeting", enabled=True, order=4),
-    ]
-
-
-class MeetingPlanUpdate(BaseModel):
-    """Replace the cycle's meeting plan (VMO can change it at any time)."""
-
-    meeting_plan: list[CycleMeeting]
-
-
 # ---------------------------------------------------------------------------
 # Per-SPR scorecard configuration (which measures + per-theme weights)
 # ---------------------------------------------------------------------------
@@ -273,6 +226,7 @@ class CycleCreate(BaseModel):
     quarter: Literal["Q1", "Q2", "Q3", "Q4"]
     year: int
     category: str = "IT Infrastructure"
+    description: str = Field(default="", description="Free-text purpose/scope of this governance cycle")
 
 
 class Cycle(BaseModel):
@@ -282,10 +236,10 @@ class Cycle(BaseModel):
     cycle_type: CycleType = "SPR"
     quarter: Literal["Q1", "Q2", "Q3", "Q4"]
     year: int
+    description: str = ""
     workflow_state: str
     created_at: str
     updated_at: str
-    meeting_plan: list[CycleMeeting] = Field(default_factory=default_meeting_plan)
     # Per-SPR scorecard configuration (measures + per-theme weights). None until
     # seeded/backfilled with the default structure.
     scorecard_config: Optional[ScorecardConfig] = None

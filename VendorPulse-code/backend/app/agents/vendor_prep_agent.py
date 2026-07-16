@@ -105,17 +105,18 @@ class VendorPrepAgent(BaseAgent):
         vendor_name = params.get("vendor_name", "Vendor")
 
         scorecard = self._fetch_scorecard(self.cycle_id)
+        previous = _fetch_previous_compact(self.cycle_id)
 
         if self._llm and self._llm.is_enabled:
-            prompt = _build_brief_prompt(scorecard, vendor_name, self.cycle_id or "")
+            prompt = _build_brief_prompt(scorecard, vendor_name, self.cycle_id or "", previous)
             raw = self._llm.call_simple(prompt, system=VENDOR_PREP_SYSTEM_PROMPT, max_tokens=2048)
             try:
                 brief = json.loads(_strip_markdown_json(raw))
             except json.JSONDecodeError:
-                brief = _build_fallback_brief(scorecard)
+                brief = _build_fallback_brief(scorecard, previous)
                 brief["_llm_raw"] = raw
         else:
-            brief = _build_fallback_brief(scorecard)
+            brief = _build_fallback_brief(scorecard, previous)
 
         # Timestamps are stamped deterministically — never trust the LLM to generate
         # them (it fabricates/back-dates them). See Shell IRM 3.6.6 (hallucination).
@@ -189,18 +190,48 @@ def _strip_markdown_json(text: str) -> str:
     return text.strip()
 
 
-def _build_brief_prompt(scorecard: dict, vendor_name: str, cycle_id: str) -> str:
+def _fetch_previous_compact(cycle_id: Optional[str]) -> Optional[dict]:
+    """The previous cycle's compact scorecard (scores + comments) for the same vendor,
+    or None if this is the vendor's first cycle. Lazy import avoids a circular import."""
+    if not cycle_id:
+        return None
+    try:
+        from app.api.routes.scorecard_v2 import compact_scorecard_context
+        return compact_scorecard_context(cycle_id).get("previous")
+    except Exception:  # never let cross-cycle lookup break brief generation
+        return None
+
+
+def _build_brief_prompt(
+    scorecard: dict, vendor_name: str, cycle_id: str, previous: Optional[dict] = None
+) -> str:
     categories_text = json.dumps(scorecard.get("categories", []), indent=2)
     comments_text = json.dumps(scorecard.get("comments", {}), indent=2)
     recs = scorecard.get("key_recommendations", [])
+
+    if previous:
+        prev_block = (
+            f"PREVIOUS cycle ({previous.get('label', 'prior')}) — overall consolidated "
+            f"score {previous.get('overall_score')}. Per-theme scores + comments:\n"
+            f"{json.dumps(previous.get('categories', []), indent=2, ensure_ascii=False)}\n\n"
+            "Derive every 'trend' by comparing this cycle's consolidated score to the "
+            "previous cycle's for the same theme (and the overall_trend from the two "
+            "overall scores).\n\n"
+        )
+    else:
+        prev_block = (
+            "PREVIOUS cycle: none (this is the vendor's first cycle). Set overall_trend "
+            "and every category trend to 'stable' — do NOT guess a direction.\n\n"
+        )
 
     return (
         f"Generate a vendor brief for {vendor_name} (cycle: {cycle_id}).\n\n"
         "The scores below are the CONSOLIDATED INTERNAL assessment from Shell's "
         "stakeholder teams (a weighted scorecard). There is no vendor self-report.\n\n"
-        f"Overall consolidated score: {scorecard.get('overall_internal_avg')}\n\n"
-        f"Category scores (use 'internal_avg' as the consolidated score):\n{categories_text}\n\n"
-        f"Comments:\n{comments_text}\n\n"
+        f"CURRENT cycle — overall consolidated score: {scorecard.get('overall_internal_avg')}\n\n"
+        f"Current category scores (use 'internal_avg' as the consolidated score):\n{categories_text}\n\n"
+        f"Current comments:\n{comments_text}\n\n"
+        f"{prev_block}"
         f"Key recommendations: {recs}\n\n"
         "Return a valid JSON object with these exact keys:\n"
         "  overall_score (float 0-5), overall_trend (improving|declining|stable),\n"
@@ -236,12 +267,35 @@ def _build_pushback_prompt(
     )
 
 
-def _build_fallback_brief(scorecard: dict) -> dict:
-    """Build a deterministic brief when LLM is unavailable."""
+def _build_fallback_brief(scorecard: dict, previous: Optional[dict] = None) -> dict:
+    """Build a deterministic brief when LLM is unavailable.
+
+    When a previous cycle exists, trends are the REAL movement in the consolidated
+    score (not guessed from the absolute value); otherwise everything is 'stable'."""
     categories = scorecard.get("categories", [])
     overall_avg = scorecard.get("overall_internal_avg") or 0
 
-    if overall_avg >= 3.5:
+    # Map previous theme label -> consolidated score for real trend deltas.
+    prev_overall = previous.get("overall_score") if previous else None
+    prev_by_theme: dict[str, float] = {}
+    if previous:
+        for pc in previous.get("categories", []):
+            if pc.get("consolidated_score") is not None:
+                prev_by_theme[pc.get("theme")] = pc["consolidated_score"]
+
+    def _trend(cur: float, prev: Optional[float]) -> str:
+        if prev is None:
+            return "stable"
+        delta = cur - prev
+        if delta >= 0.25:
+            return "improving"
+        if delta <= -0.25:
+            return "declining"
+        return "stable"
+
+    if prev_overall is not None:
+        trend = _trend(overall_avg, prev_overall)
+    elif overall_avg >= 3.5:
         trend = "improving"
     elif overall_avg >= 2.5:
         trend = "stable"
@@ -254,18 +308,26 @@ def _build_fallback_brief(scorecard: dict) -> dict:
 
     for cat in categories:
         avg = cat.get("internal_avg") or 0
-        cat_trend = "flat"
+        label = cat["category_label"]
+        prev_score = prev_by_theme.get(label)
+        cat_trend = _trend(avg, prev_score) if prev_score is not None else "flat"
+        declined = prev_score is not None and avg - prev_score <= -0.5
         if avg >= 4.0:
-            cat_trend = "up"
-            positives.append(f"{cat['category_label']}: strong at {avg}/5")
+            positives.append(f"{label}: strong at {avg}/5")
         elif avg < 3.0:
-            cat_trend = "down"
-            concerns.append(f"{cat['category_label']}: below target at {avg}/5")
+            # One concern line per category: fold the decline into the below-target line.
+            trend_note = f" (down from {prev_score}/5 last cycle)" if declined else ""
+            concerns.append(f"{label}: below target at {avg}/5{trend_note}")
+        elif declined:
+            concerns.append(f"{label}: down {abs(round(avg - prev_score, 1))} pt vs last cycle ({prev_score}→{avg}/5)")
 
         category_ratings.append({
-            "category": cat["category_label"],
+            "category": label,
             "score": avg,
-            "rationale": f"Consolidated internal score: {avg}/5",
+            "rationale": (
+                f"Consolidated internal score: {avg}/5"
+                + (f" (was {prev_score}/5 last cycle)" if prev_score is not None else "")
+            ),
             "trend": cat_trend,
         })
 

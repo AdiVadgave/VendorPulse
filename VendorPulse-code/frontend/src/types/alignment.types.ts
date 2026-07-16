@@ -76,6 +76,8 @@ export interface FaceOffPosition {
 export interface ExtractedAction {
   action_id: string
   description: string
+  /** Fuller description / context of the action (the what & why). */
+  details?: string
   owner: string
   due_date: string | null
   source: 'alignment' | 'vendor_prep' | 'meeting'

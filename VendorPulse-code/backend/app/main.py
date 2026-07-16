@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import alignment, analytics, google_auth, graph_scheduling, meeting_agent, meetings, scheduling, scorecard, scorecard_agent, scorecard_v2, users, vendor_prep, vendors
+from app.api.routes import actions, alignment, analytics, google_auth, graph_scheduling, meeting_agent, meetings, scheduling, scorecard, scorecard_agent, scorecard_v2, users, vendor_prep, vendors
 from app.config import settings
 from app.core.logging_config import setup_logging
 from app.middleware.request_logging import RequestLoggingMiddleware
@@ -64,6 +64,7 @@ app.include_router(scorecard.router)
 app.include_router(scorecard_v2.router)
 app.include_router(vendors.router)
 app.include_router(alignment.router)
+app.include_router(actions.router)
 app.include_router(vendor_prep.router)
 app.include_router(meeting_agent.router)
 app.include_router(scorecard_agent.router)

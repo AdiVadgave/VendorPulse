@@ -100,5 +100,16 @@ class BaseRepository:
         self._write(filtered)
         return True
 
+    def delete_by_field(self, field: str, value: Any) -> int:
+        """Delete every record where record[field] == value; return how many were
+        removed. The JSON analogue of `DELETE FROM t WHERE field = value` — used for
+        cascade cleanup so child rows never dangle after a parent is removed."""
+        records = self._read()
+        kept = [r for r in records if r.get(field) != value]
+        removed = len(records) - len(kept)
+        if removed:
+            self._write(kept)
+        return removed
+
     def count(self) -> int:
         return len(self._read())

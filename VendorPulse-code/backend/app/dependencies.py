@@ -11,6 +11,7 @@ from functools import lru_cache
 
 
 from app.config import settings
+from app.repositories.action_repository import ActionRepository
 from app.repositories.agent_run_repository import AgentRunRepository
 from app.repositories.attendee_repository import AttendeeRepository
 from app.repositories.cycle_repository import CycleRepository
@@ -56,6 +57,11 @@ def get_attendee_repo() -> AttendeeRepository:
 @lru_cache(maxsize=None)
 def get_slot_repo() -> SlotRepository:
     return SlotRepository(settings.data_dir)
+
+
+@lru_cache(maxsize=None)
+def get_action_repo() -> ActionRepository:
+    return ActionRepository(settings.data_dir)
 
 
 @lru_cache(maxsize=None)

@@ -35,6 +35,18 @@ export const WORKFLOW_STATE_LABELS: Record<WorkflowState, string> = {
   ARCHIVED: 'Archived',
 }
 
+/**
+ * Provenance labels stamped on an action item's `origin` field (persisted). Kept in
+ * one place so the label shown in the queue and stored in the DB never drift apart.
+ */
+export const ACTION_ORIGIN = {
+  internalAlignment: 'Internal Alignment',
+  alignmentMeeting: (n: number) => `Alignment Meeting ${n}`,
+  vendorPrep: 'Vendor Prep',
+  vendorMeeting: 'QBR / Vendor Meeting',
+  manual: 'Manually added',
+} as const
+
 export const TAB_KEYS = [
   'overview',
   'scheduling',
@@ -65,7 +77,7 @@ export const TAB_MIN_STATE_INDEX: Record<TabKey, number> = {
   alignment: 6, // SCORECARD_COMPILED
   'vendor-prep': 7, // INTERNAL_ALIGNMENT
   meeting: 8, // VENDOR_PREP
-  actions: 10, // POST_MEETING_COMPLETE
+  actions: 0, // always open — the action queue is available at any point in the cycle
 }
 
 /**

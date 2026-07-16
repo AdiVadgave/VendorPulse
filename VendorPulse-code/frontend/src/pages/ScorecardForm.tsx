@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ClipboardList, CheckCircle2, AlertCircle, Loader2, Send, User, Zap } from 'lucide-react'
+import { ClipboardList, CheckCircle2, AlertCircle, AlertTriangle, Loader2, Send, User, Zap } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { ScorecardFormMeta, WeightedScorecard } from '@/types/scorecard.types'
 import { WEIGHTED_SCORECARD_STRUCTURE } from '@/types/scorecard.types'
@@ -24,8 +24,13 @@ function BrandHeader() {
 }
 
 const SCORE_OPTIONS = [1, 2, 3, 4, 5]
+// High-Level Summary scale (per the SPR rating guide).
 const SCORE_LABELS: Record<number, string> = {
-  1: 'Poor', 2: 'Below expectations', 3: 'Acceptable', 4: 'Good', 5: 'Excellent',
+  1: 'Systemic gaps',
+  2: 'Isolated gaps',
+  3: 'Meeting basic and/or contractual requirements',
+  4: 'Proactive or value-add activity or performance',
+  5: 'Significantly proactive or value-add with tangible business benefits',
 }
 
 export default function ScorecardForm() {
@@ -244,9 +249,22 @@ export default function ScorecardForm() {
                 {meta?.cycle_type ?? 'SPR'} Scorecard — {meta?.vendor_name}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {meta?.quarter} {meta?.year} · rate each measure 1 (Poor) – 5 (Excellent)
+                {meta?.quarter} {meta?.year} · rate each measure 1 (systemic gaps) – 5 (significantly proactive)
               </p>
             </div>
+          </div>
+
+          {/* Scoring guide (High-Level Summary) */}
+          <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">Scoring guide</p>
+            <ul className="space-y-1">
+              {SCORE_OPTIONS.map((n) => (
+                <li key={n} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
+                  <span className="w-4 h-4 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{n}</span>
+                  <span>{SCORE_LABELS[n]}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
           {/* Read-only reviewer identity */}
@@ -345,6 +363,15 @@ export default function ScorecardForm() {
                                 {scores[m.key] && (
                                   <span className="self-center text-xs text-slate-500 dark:text-slate-400">{SCORE_LABELS[scores[m.key]]}</span>
                                 )}
+                              </div>
+                            )}
+                            {m.measure_type !== 'rag' && (scores[m.key] < 2 || scores[m.key] > 4) && (
+                              <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-300">
+                                <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                                <span>
+                                  You rated this <strong>{scores[m.key]} — {SCORE_LABELS[scores[m.key]]}</strong>, an extreme of the scale.
+                                  Please make sure your comment clearly explains {scores[m.key] < 2 ? 'the specific gap' : 'the tangible business benefit'}.
+                                </span>
                               </div>
                             )}
                             <textarea

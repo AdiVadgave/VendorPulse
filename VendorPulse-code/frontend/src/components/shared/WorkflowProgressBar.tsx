@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { CheckCircle2, Lock } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import { WORKFLOW_STATES, WORKFLOW_STATE_LABELS } from '@/utils/constants'
@@ -24,7 +25,10 @@ export default function WorkflowProgressBar({
   const currentIndex = WORKFLOW_STATES.indexOf(currentState)
 
   const stages = (
-    <div className="flex items-center gap-1">
+    // Flat layout: every pill is an equal-width flex-1 child and every connector is
+    // the same fixed width — so the segments and the gaps between them stay uniform
+    // (the last stage no longer renders wider for lacking a connector).
+    <div className="flex items-center gap-2">
       {DISPLAY_STAGES.map((stage, stageIdx) => {
         const stageStateIndexes = stage.states.map((s) =>
           WORKFLOW_STATES.indexOf(s as WorkflowState)
@@ -38,10 +42,10 @@ export default function WorkflowProgressBar({
         const isLocked = currentIndex < minStateIndex
 
         return (
-          <div key={stage.label} className="flex items-center flex-1 min-w-0">
+          <Fragment key={stage.label}>
             <div
               className={cn(
-                'flex items-center gap-1.5 rounded-lg text-xs font-medium transition-colors flex-1 justify-center',
+                'flex items-center gap-1.5 rounded-lg text-xs font-medium transition-colors flex-1 min-w-0 justify-center',
                 compact ? 'px-2 py-1' : 'px-3 py-1.5',
                 isComplete &&
                   'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200 ring-1 ring-emerald-200 dark:ring-emerald-500/30',
@@ -65,7 +69,7 @@ export default function WorkflowProgressBar({
                 )}
               />
             )}
-          </div>
+          </Fragment>
         )
       })}
     </div>

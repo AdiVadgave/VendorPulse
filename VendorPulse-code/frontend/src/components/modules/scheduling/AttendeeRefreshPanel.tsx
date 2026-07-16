@@ -46,7 +46,7 @@ interface SearchAddAttendeeFormProps {
   onCancel: () => void
 }
 
-function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel }: SearchAddAttendeeFormProps) {
+export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel }: SearchAddAttendeeFormProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SystemUser[]>([])
   const [showDropdown, setShowDropdown] = useState(false)

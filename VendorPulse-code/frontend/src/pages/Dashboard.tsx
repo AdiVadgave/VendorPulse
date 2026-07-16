@@ -510,7 +510,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 rounded-full transition-all duration-500"
+              className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500"
               style={{ width: stateIdx >= 0 ? `${(stepNumber / WORKFLOW_STATES.length) * 100}%` : '0%' }}
             />
           </div>

@@ -63,6 +63,12 @@ export default function Sidebar() {
   const getWorkflowState = useCycleStore((s) => s.getWorkflowState)
   const lastTabs = useCycleStore((s) => s.lastTabs)
 
+  // "Active Cycles" = cycles still in flight. Archived (closed) cycles are hidden
+  // here; they remain reachable from the Dashboard and Analytics.
+  const activeCycles = cycles.filter(
+    (cycle) => getWorkflowState(cycle.cycle_id) !== 'ARCHIVED'
+  )
+
   return (
     <aside
       className={cn(
@@ -121,7 +127,12 @@ export default function Sidebar() {
               Active Cycles
             </p>
             <div className="space-y-1">
-              {cycles.map((cycle) => (
+              {activeCycles.length === 0 && (
+                <p className="text-xs text-slate-400 dark:text-slate-500 px-3 py-2">
+                  No active cycles.
+                </p>
+              )}
+              {activeCycles.map((cycle) => (
                 (() => {
                   const effectiveState = getWorkflowState(cycle.cycle_id)
                   const tab = lastTabs[cycle.cycle_id] ?? getDefaultTabFromState(effectiveState)

@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Building2, TrendingUp, TrendingDown, Minus, Users, BarChart3,
-  Loader2, AlertTriangle, CheckCircle2, Layers, Activity,
+  Loader2, AlertTriangle, CheckCircle2, Layers, Activity, Calendar,
 } from 'lucide-react'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, LabelList,
+  ResponsiveContainer, LabelList, Legend,
 } from 'recharts'
 import { getPortfolioAnalytics } from '@/lib/analyticsApi'
-import type { PortfolioAnalytics, AnalyticsVendor, Trajectory } from '@/lib/analyticsApi'
+import type { PortfolioAnalytics, AnalyticsVendor, AnalyticsCyclePoint, Trajectory } from '@/lib/analyticsApi'
+import { getWeightedScorecard } from '@/lib/scorecardApi'
+import type { WeightedScorecard } from '@/types/scorecard.types'
+import TeamScorecardsSection from '@/components/modules/scorecard/TeamScorecardsSection'
 import { useUIStore } from '@/store/useUIStore'
 import { cn } from '@/utils/cn'
 
@@ -111,6 +114,134 @@ function CrossVendorChart({ vendors }: { vendors: AnalyticsVendor[] }) {
   )
 }
 
+/* Categorical palette (dataviz reference, fixed order). Colour follows the vendor's
+   stable index — toggling selection never repaints the survivors. */
+const CAT_LIGHT = ['#2a78d6', '#008300', '#e87ba4', '#eda100', '#1baf7a', '#eb6834', '#4a3aa7', '#e34948']
+const CAT_DARK = ['#3987e5', '#008300', '#d55181', '#c98500', '#199e70', '#d95926', '#9085e9', '#e66767']
+
+function CompareVendorsChart({ vendors, themes }: { vendors: AnalyticsVendor[]; themes: string[] }) {
+  const pal = usePalette()
+  const cat = pal.dark ? CAT_DARK : CAT_LIGHT
+  const colorFor = (vendorId: string) => cat[Math.max(0, vendors.findIndex((v) => v.vendor_id === vendorId)) % cat.length]
+
+  // Quarters available across all vendors, ordered oldest→newest, with the count of
+  // vendors that have data in each (so we can default to the richest period).
+  const Q = { Q1: 1, Q2: 2, Q3: 3, Q4: 4 } as Record<string, number>
+  const periods = useMemo(() => {
+    const map = new Map<string, { label: string; year: number; q: string; count: number }>()
+    vendors.forEach((v) => v.cycles.forEach((c) => {
+      const e = map.get(c.label) ?? { label: c.label, year: c.year, q: c.quarter, count: 0 }
+      e.count += 1
+      map.set(c.label, e)
+    }))
+    return Array.from(map.values()).sort((a, b) => a.year - b.year || (Q[a.q] ?? 0) - (Q[b.q] ?? 0))
+  }, [vendors])
+
+  const richest = useMemo(() => [...periods].sort((a, b) => b.count - a.count || b.year - a.year || (Q[b.q] ?? 0) - (Q[a.q] ?? 0))[0], [periods]) // eslint-disable-line
+  const [period, setPeriod] = useState<string>('')
+  const activePeriod = period || richest?.label || ''
+
+  // Default-select up to the first 4 vendors that have data in the active period.
+  const inPeriod = useMemo(
+    () => vendors.filter((v) => v.cycles.some((c) => c.label === activePeriod)),
+    [vendors, activePeriod]
+  )
+  const [selected, setSelected] = useState<Set<string> | null>(null)
+  // Re-default the vendor selection whenever the quarter changes, so switching
+  // quarter never leaves the chart showing (or blank on) vendors absent that period.
+  useEffect(() => { setSelected(null) }, [activePeriod])
+  const selectedIds = selected ?? new Set(inPeriod.slice(0, 4).map((v) => v.vendor_id))
+  const chosen = vendors.filter((v) => selectedIds.has(v.vendor_id))
+
+  function toggle(id: string) {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else if (next.size < 6) next.add(id)
+    setSelected(next)
+  }
+
+  const categories = ['Overall', ...themes]
+  const data = categories.map((c) => {
+    const row: Record<string, string | number | null> = { category: c }
+    chosen.forEach((v) => {
+      const pt = v.cycles.find((cy) => cy.label === activePeriod)
+      if (pt) row[v.vendor_name] = c === 'Overall' ? pt.overall_score : (pt.themes[c] ?? null)
+    })
+    return row
+  })
+
+  return (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+      <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
+        <div className="flex items-center gap-2">
+          <BarChart3 size={15} className="text-slate-400" />
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Compare Vendors by Theme</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400 dark:text-slate-500">Quarter</span>
+          <select
+            value={activePeriod}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            {periods.map((p) => <option key={p.label} value={p.label}>{p.label} ({p.count})</option>)}
+          </select>
+        </div>
+      </div>
+      <p className="text-xs text-slate-400 dark:text-slate-500 mb-3">
+        Pick vendors to compare their consolidated theme scores for {activePeriod || 'the selected quarter'}.
+      </p>
+
+      {/* Vendor multi-select (colour = the vendor's fixed series colour) */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {vendors.map((v) => {
+          const on = selectedIds.has(v.vendor_id)
+          const has = v.cycles.some((c) => c.label === activePeriod)
+          return (
+            <button
+              key={v.vendor_id}
+              onClick={() => toggle(v.vendor_id)}
+              disabled={!has && !on}
+              title={has ? undefined : `No data for ${activePeriod}`}
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                on ? 'text-white border-transparent'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300',
+                !has && !on && 'opacity-40 cursor-not-allowed'
+              )}
+              style={on ? { background: colorFor(v.vendor_id) } : undefined}
+            >
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: on ? '#fff' : colorFor(v.vendor_id) }} />
+              {v.vendor_name}
+            </button>
+          )
+        })}
+      </div>
+
+      {chosen.length === 0 ? (
+        <p className="text-sm text-slate-400 dark:text-slate-500 py-8 text-center">Select one or more vendors to compare.</p>
+      ) : (
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 28 }} barGap={2} barCategoryGap="22%">
+              <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} vertical={false} />
+              <XAxis dataKey="category" tick={{ fontSize: 10, fill: pal.axis }} tickLine={false} axisLine={false} interval={0} angle={-20} textAnchor="end" height={52} />
+              <YAxis domain={[0, 5]} ticks={[0, 1, 2, 3, 4, 5]} tick={{ fontSize: 11, fill: pal.axis }} tickLine={false} axisLine={false} />
+              <Tooltip cursor={{ fill: pal.grid, opacity: 0.35 }} contentStyle={chartTooltipStyle(pal)} formatter={(v: number) => (typeof v === 'number' ? v.toFixed(2) : v)} />
+              <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: 11, paddingBottom: 10 }} />
+              {chosen.map((v) => (
+                // Function dataKey (not the raw name) so a vendor name containing a
+                // dot isn't misread by Recharts as a nested path.
+                <Bar key={v.vendor_id} name={v.vendor_name} dataKey={(row) => (row as Record<string, number | null>)[v.vendor_name] ?? null} fill={colorFor(v.vendor_id)} radius={[3, 3, 0, 0]} maxBarSize={34} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TrendChart({ vendor }: { vendor: AnalyticsVendor }) {
   const pal = usePalette()
   const themeOptions = useMemo(() => {
@@ -144,7 +275,7 @@ function TrendChart({ vendor }: { vendor: AnalyticsVendor }) {
       </div>
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 16, left: -16, bottom: 4 }}>
+          <LineChart data={data} margin={{ top: 18, right: 16, left: -16, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: pal.axis }} tickLine={false} axisLine={false} />
             <YAxis domain={[0, 5]} ticks={[0, 1, 2, 3, 4, 5]} tick={{ fontSize: 11, fill: pal.axis }} tickLine={false} axisLine={false} />
@@ -165,6 +296,7 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null)
+  const [view, setView] = useState<'cross' | 'vendor'>('cross')
 
   useEffect(() => {
     let mounted = true
@@ -224,68 +356,140 @@ export default function Analytics() {
 
       {!loading && !error && vendors.length > 0 && data && (
         <>
-          {/* Portfolio KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {kpiTiles.map((k) => (
-              <div key={k.label} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-2">
-                  <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center', k.bg)}><span className={k.tone}>{k.icon}</span></span>
-                  <span className="text-xs font-medium">{k.label}</span>
-                </div>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums">{k.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Cross-vendor comparison (only meaningful with 2+ vendors) */}
-          {vendors.filter((v) => v.latest.overall_score != null).length >= 2 && (
-            <CrossVendorChart vendors={vendors} />
-          )}
-
-          {/* Vendor selector */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Vendor:</span>
-            {vendors.map((v) => (
+          {/* Section toggle — Cross-Vendor (portfolio) vs Vendor-Wise (per-vendor detail) */}
+          <div className="flex w-full gap-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-1.5">
+            {([['cross', 'Cross-Vendor'], ['vendor', 'Vendor-Wise']] as const).map(([key, label]) => (
               <button
-                key={v.vendor_id}
-                onClick={() => setSelectedVendorId(v.vendor_id)}
+                key={key}
+                onClick={() => setView(key)}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border',
-                  selected?.vendor_id === v.vendor_id
-                    ? 'bg-indigo-600 border-indigo-600 text-white'
-                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-700'
+                  'flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
+                  view === key
+                    ? 'bg-violet-600 text-white'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                 )}
               >
-                <Building2 size={13} />
-                {v.vendor_name}
+                {label}
               </button>
             ))}
           </div>
 
-          {selected && <VendorDetail vendor={selected} />}
+          {view === 'cross' && (
+            <>
+              {/* Portfolio KPIs */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {kpiTiles.map((k) => (
+                  <div key={k.label} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-2">
+                      <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center', k.bg)}><span className={k.tone}>{k.icon}</span></span>
+                      <span className="text-xs font-medium">{k.label}</span>
+                    </div>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums">{k.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Cross-vendor comparison (only meaningful with 2+ vendors) */}
+              {vendors.filter((v) => v.latest.overall_score != null).length >= 2 && (
+                <CrossVendorChart vendors={vendors} />
+              )}
+
+              {/* Selectable per-theme vendor comparison for any quarter */}
+              {vendors.length >= 1 && <CompareVendorsChart vendors={vendors} themes={data.themes} />}
+            </>
+          )}
+
+          {view === 'vendor' && (
+            <>
+              {/* Vendor selector */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Vendor:</span>
+                {vendors.map((v) => (
+                  <button
+                    key={v.vendor_id}
+                    onClick={() => setSelectedVendorId(v.vendor_id)}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border',
+                      selected?.vendor_id === v.vendor_id
+                        ? 'bg-indigo-600 border-indigo-600 text-white'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-700'
+                    )}
+                  >
+                    <Building2 size={13} />
+                    {v.vendor_name}
+                  </button>
+                ))}
+              </div>
+
+              {selected && <VendorDetail key={selected.vendor_id} vendor={selected} />}
+            </>
+          )}
         </>
       )}
     </div>
   )
 }
 
+/* Derive a per-cycle trajectory label from a delta (mirrors the backend thresholds). */
+function trajFromDelta(delta: number | null): Trajectory {
+  if (delta == null) return 'n/a'
+  if (delta >= 0.25) return 'improving'
+  if (delta <= -0.25) return 'declining'
+  return 'stable'
+}
+
 function VendorDetail({ vendor }: { vendor: AnalyticsVendor }) {
-  const latest = vendor.latest
-  const st = scoreStatus(latest.overall_score)
-  const traj = TRAJ[vendor.trajectory]
-  const themeEntries = Object.entries(latest.themes)
+  // cycles arrive oldest→newest; default the selector to the latest quarter.
+  const cycles = vendor.cycles
+  const [selectedId, setSelectedId] = useState<string>(vendor.latest.cycle_id)
+  const idx = Math.max(0, cycles.findIndex((c) => c.cycle_id === selectedId))
+  const sel: AnalyticsCyclePoint = cycles[idx] ?? vendor.latest
+  const prev: AnalyticsCyclePoint | null = idx > 0 ? cycles[idx - 1] : null
+  const isLatest = sel.cycle_id === vendor.latest.cycle_id
+
+  // Delta vs the immediately-preceding scored quarter (so trajectory reflects the
+  // quarter you're actually looking at, not always the newest one).
+  const delta = prev && sel.overall_score != null && prev.overall_score != null
+    ? Math.round((sel.overall_score - prev.overall_score) * 100) / 100
+    : null
+
+  const st = scoreStatus(sel.overall_score)
+  const traj = TRAJ[trajFromDelta(delta)]
+  const themeEntries = Object.entries(sel.themes)
   const attention = themeEntries.filter(([, s]) => s < 3).sort((a, b) => a[1] - b[1])
 
   return (
     <div className="space-y-5">
+      {/* Quarter selector — lets an admin inspect any scored quarter for this vendor */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Calendar size={14} className="text-slate-400" />
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Quarter</span>
+        <select
+          value={sel.cycle_id}
+          onChange={(e) => setSelectedId(e.target.value)}
+          className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          {[...cycles].reverse().map((c) => (
+            <option key={c.cycle_id} value={c.cycle_id}>
+              {c.label}{c.cycle_id === vendor.latest.cycle_id ? ' (latest)' : ''}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-slate-400 dark:text-slate-500">
+          {cycles.length} scored quarter{cycles.length === 1 ? '' : 's'} on record
+        </span>
+      </div>
+
       {/* Hero */}
       <div className="bg-gradient-to-br from-indigo-50 via-white to-violet-50 dark:from-indigo-950/40 dark:via-slate-900 dark:to-violet-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Latest Overall Score</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              {isLatest ? 'Latest Overall Score' : 'Overall Score'}
+            </p>
             <div className="flex items-end gap-3 mt-1">
-              <span className="text-4xl font-bold tabular-nums" style={{ color: st.color }}>{fmt(latest.overall_score)}</span>
-              <span className="text-sm text-slate-400 dark:text-slate-500 mb-1">/ 5.0 · {latest.label}</span>
+              <span className="text-4xl font-bold tabular-nums" style={{ color: st.color }}>{fmt(sel.overall_score)}</span>
+              <span className="text-sm text-slate-400 dark:text-slate-500 mb-1">/ 5.0 · {sel.label}</span>
             </div>
             <p className="text-xs mt-1 font-medium" style={{ color: st.color }}>{st.label}</p>
           </div>
@@ -293,16 +497,16 @@ function VendorDetail({ vendor }: { vendor: AnalyticsVendor }) {
             <span className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border', traj.classes)}>
               {traj.icon}
               {traj.label}
-              {vendor.delta != null && <span className="tabular-nums">({vendor.delta > 0 ? '+' : ''}{vendor.delta})</span>}
+              {delta != null && <span className="tabular-nums">({delta > 0 ? '+' : ''}{delta})</span>}
             </span>
             <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-              {latest.team_count} team{latest.team_count === 1 ? '' : 's'} scored
+              {sel.team_count} team{sel.team_count === 1 ? '' : 's'} scored
             </span>
           </div>
         </div>
-        {vendor.previous_label && vendor.delta != null && (
+        {prev && delta != null && (
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
-            Compared to <span className="font-medium">{vendor.previous_label}</span> — the overall score moved {vendor.delta > 0 ? 'up' : vendor.delta < 0 ? 'down' : 'by'} {Math.abs(vendor.delta)} pt.
+            Compared to <span className="font-medium">{prev.label}</span> — the overall score moved {delta > 0 ? 'up' : delta < 0 ? 'down' : 'by'} {Math.abs(delta)} pt.
           </p>
         )}
       </div>
@@ -312,7 +516,7 @@ function VendorDetail({ vendor }: { vendor: AnalyticsVendor }) {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 size={15} className="text-slate-400" />
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Theme Breakdown — {latest.label}</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Theme Breakdown — {sel.label}</h3>
           </div>
           {themeEntries.length === 0 ? (
             <p className="text-sm text-slate-400 dark:text-slate-500">No numeric theme scores for this cycle.</p>
@@ -327,7 +531,7 @@ function VendorDetail({ vendor }: { vendor: AnalyticsVendor }) {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle size={15} className="text-slate-400" />
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Attention Areas</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Attention Areas — {sel.label}</h3>
           </div>
           {attention.length === 0 ? (
             <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
@@ -351,6 +555,9 @@ function VendorDetail({ vendor }: { vendor: AnalyticsVendor }) {
         </div>
       </div>
 
+      {/* Team-wise consolidated scorecard for the selected quarter */}
+      <QuarterTeamScorecards cycleId={sel.cycle_id} label={sel.label} />
+
       {/* Trend over cycles (needs 2+ scored cycles) */}
       {vendor.cycles.length >= 2 ? (
         <TrendChart vendor={vendor} />
@@ -362,4 +569,44 @@ function VendorDetail({ vendor }: { vendor: AnalyticsVendor }) {
       )}
     </div>
   )
+}
+
+/* Per-quarter team-level scorecard. Reuses the same weighted-scorecard payload and
+   TeamScorecardsSection component the Scorecard tab uses, so an admin sees each
+   team's scores for any quarter of any vendor — right here in the analytics view. */
+function QuarterTeamScorecards({ cycleId, label }: { cycleId: string; label: string }) {
+  const [data, setData] = useState<WeightedScorecard | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    setFailed(false)
+    setData(null)
+    getWeightedScorecard(cycleId)
+      .then((d) => mounted && setData(d))
+      .catch(() => mounted && setFailed(true))
+      .finally(() => mounted && setLoading(false))
+    return () => { mounted = false }
+  }, [cycleId])
+
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-4 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+        <Loader2 size={14} className="animate-spin text-slate-400" /> Loading team scorecards for {label}…
+      </div>
+    )
+  }
+
+  if (failed || !data || data.teams.length === 0) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-4 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+        <Users size={14} className="text-slate-400" />
+        No team-level scorecards recorded for {label}.
+      </div>
+    )
+  }
+
+  return <TeamScorecardsSection data={data} />
 }

@@ -356,5 +356,1353 @@
     "skipped_measures": [],
     "skipped_themes": [],
     "submitted_at": "2026-07-15T12:08:11.358414+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q12025_Kanishk",
+    "cycle_id": "c_demo_technoserve_Q12025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q12025_Kanishk",
+    "respondent_email": "kanishk@shell.com",
+    "respondent_name": "Kanishk",
+    "team": "SOM",
+    "scores": {
+      "PATCH_MANAGEMENT": 1,
+      "RESOURCES_CAPABILITY": 2,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 3,
+      "PRICING": 2,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 2,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 1,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: below target, likely to need escalation.",
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: agreed SLA missed again this quarter.",
+      "ALIGNMENT": "Relationship: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-01-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q12025_Anup",
+    "cycle_id": "c_demo_technoserve_Q12025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q12025_Anup",
+    "respondent_email": "anup@shell.com",
+    "respondent_name": "Anup",
+    "team": "CP",
+    "scores": {
+      "PATCH_MANAGEMENT": 1,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: repeated delays — an improvement plan is overdue.",
+      "COMMERCIAL_EXCELLENCE": "Commercial: below target, likely to need escalation.",
+      "COST_CONTROL": "Commercial: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-01-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q12025_Aditya",
+    "cycle_id": "c_demo_technoserve_Q12025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q12025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 2,
+      "RESOURCES_CAPABILITY": 2,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 3,
+      "PRICING": 2,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 2,
+      "ALIGNMENT": 2
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: agreed SLA missed again this quarter.",
+      "RESOURCES_CAPABILITY": "Performance: below target, likely to need escalation.",
+      "FLEXIBILITY": "Relationship: broadly on track, a few gaps to close."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-01-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q12025_Abhishek",
+    "cycle_id": "c_demo_technoserve_Q12025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q12025_Abhishek",
+    "respondent_email": "abhishek@shell.com",
+    "respondent_name": "Abhishek",
+    "team": "IRM",
+    "scores": {
+      "PATCH_MANAGEMENT": 2,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 3,
+      "PRICING": 1,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 2,
+      "STAKEHOLDER_ENGAGEMENT": 2,
+      "ALIGNMENT": 2
+    },
+    "rag_scores": {},
+    "comments": {
+      "PRICING": "Commercial: concerns raised last review still not addressed.",
+      "PATCH_MANAGEMENT": "Risk & Compliance: concerns raised last review still not addressed.",
+      "COST_CONTROL": "Commercial: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-01-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q22025_Kanishk",
+    "cycle_id": "c_demo_technoserve_Q22025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q22025_Kanishk",
+    "respondent_email": "kanishk@shell.com",
+    "respondent_name": "Kanishk",
+    "team": "SOM",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 2,
+      "RELEASE_DELIVERY": 2,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 2,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "RESOURCES_CAPABILITY": "Performance: below target, likely to need escalation.",
+      "RELEASE_DELIVERY": "Performance: concerns raised last review still not addressed.",
+      "OPERATIONS": "Performance: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-04-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q22025_Anup",
+    "cycle_id": "c_demo_technoserve_Q22025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q22025_Anup",
+    "respondent_email": "anup@shell.com",
+    "respondent_name": "Anup",
+    "team": "CP",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 4,
+      "PRICING": 2,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "PRICING": "Commercial: below target, likely to need escalation.",
+      "PATCH_MANAGEMENT": "Risk & Compliance: acceptable this cycle, room to improve.",
+      "FLEXIBILITY": "Relationship: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-04-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q22025_Aditya",
+    "cycle_id": "c_demo_technoserve_Q22025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q22025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 2,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 2
+    },
+    "rag_scores": {},
+    "comments": {
+      "OPERATIONS": "Performance: repeated delays — an improvement plan is overdue.",
+      "COMMERCIAL_EXCELLENCE": "Commercial: concerns raised last review still not addressed.",
+      "FLEXIBILITY": "Relationship: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-04-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q22025_Abhishek",
+    "cycle_id": "c_demo_technoserve_Q22025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q22025_Abhishek",
+    "respondent_email": "abhishek@shell.com",
+    "respondent_name": "Abhishek",
+    "team": "IRM",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: steady, no major issues.",
+      "RESOURCES_CAPABILITY": "Performance: steady, no major issues.",
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-04-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q32025_Kanishk",
+    "cycle_id": "c_demo_technoserve_Q32025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q32025_Kanishk",
+    "respondent_email": "kanishk@shell.com",
+    "respondent_name": "Kanishk",
+    "team": "SOM",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 5,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 2,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: repeated delays — an improvement plan is overdue.",
+      "PRICING": "Commercial: steady, no major issues.",
+      "COMMERCIAL_EXCELLENCE": "Commercial: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-07-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q32025_Anup",
+    "cycle_id": "c_demo_technoserve_Q32025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q32025_Anup",
+    "respondent_email": "anup@shell.com",
+    "respondent_name": "Anup",
+    "team": "CP",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 5,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 5,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 5,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 5
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: broadly on track, a few gaps to close.",
+      "RELEASE_DELIVERY": "Performance: steady, no major issues.",
+      "ALIGNMENT": "Relationship: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-07-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q32025_Aditya",
+    "cycle_id": "c_demo_technoserve_Q32025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q32025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 2,
+      "RESOURCES_CAPABILITY": 5,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 4,
+      "PRICING": 2,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: concerns raised last review still not addressed.",
+      "PRICING": "Commercial: repeated delays — an improvement plan is overdue.",
+      "RESOURCES_CAPABILITY": "Performance: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-07-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q32025_Abhishek",
+    "cycle_id": "c_demo_technoserve_Q32025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q32025_Abhishek",
+    "respondent_email": "abhishek@shell.com",
+    "respondent_name": "Abhishek",
+    "team": "IRM",
+    "scores": {
+      "PATCH_MANAGEMENT": 2,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 5,
+      "OPERATIONS": 5,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 5
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: agreed SLA missed again this quarter.",
+      "PRICING": "Commercial: steady, no major issues.",
+      "ALIGNMENT": "Relationship: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-07-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q42025_Kanishk",
+    "cycle_id": "c_demo_technoserve_Q42025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q42025_Kanishk",
+    "respondent_email": "kanishk@shell.com",
+    "respondent_name": "Kanishk",
+    "team": "SOM",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 4,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 5,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "RESOURCES_CAPABILITY": "Performance: broadly on track, a few gaps to close.",
+      "RELEASE_DELIVERY": "Performance: steady, no major issues.",
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-10-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q42025_Anup",
+    "cycle_id": "c_demo_technoserve_Q42025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q42025_Anup",
+    "respondent_email": "anup@shell.com",
+    "respondent_name": "Anup",
+    "team": "CP",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 5,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 4,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 5,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 5,
+      "ALIGNMENT": 5
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: acceptable this cycle, room to improve.",
+      "RELEASE_DELIVERY": "Performance: strong delivery, exceeded expectations.",
+      "ALIGNMENT": "Relationship: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-10-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q42025_Aditya",
+    "cycle_id": "c_demo_technoserve_Q42025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q42025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 4,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 5,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "FLEXIBILITY": "Relationship: broadly on track, a few gaps to close.",
+      "PATCH_MANAGEMENT": "Risk & Compliance: excellent responsiveness and quality.",
+      "COMMERCIAL_EXCELLENCE": "Commercial: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-10-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_technoserve_Q42025_Abhishek",
+    "cycle_id": "c_demo_technoserve_Q42025",
+    "attendee_id": "att_demo_c_demo_technoserve_Q42025_Abhishek",
+    "respondent_email": "abhishek@shell.com",
+    "respondent_name": "Abhishek",
+    "team": "IRM",
+    "scores": {
+      "PATCH_MANAGEMENT": 5,
+      "RESOURCES_CAPABILITY": 5,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 5,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "COMMERCIAL_EXCELLENCE": "Commercial: broadly on track, a few gaps to close.",
+      "COST_CONTROL": "Commercial: acceptable this cycle, room to improve.",
+      "OPERATIONS": "Performance: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-10-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q12025_Kanishk",
+    "cycle_id": "c_demo_databridge_Q12025",
+    "attendee_id": "att_demo_c_demo_databridge_Q12025_Kanishk",
+    "respondent_email": "kanishk@shell.com",
+    "respondent_name": "Kanishk",
+    "team": "SOM",
+    "scores": {
+      "PATCH_MANAGEMENT": 5,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 4,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 5,
+      "STAKEHOLDER_ENGAGEMENT": 5,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "RESOURCES_CAPABILITY": "Performance: broadly on track, a few gaps to close.",
+      "ALIGNMENT": "Relationship: acceptable this cycle, room to improve.",
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-01-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q12025_Aditya",
+    "cycle_id": "c_demo_databridge_Q12025",
+    "attendee_id": "att_demo_c_demo_databridge_Q12025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 2,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 4,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 2
+    },
+    "rag_scores": {},
+    "comments": {
+      "RESOURCES_CAPABILITY": "Performance: agreed SLA missed again this quarter.",
+      "ALIGNMENT": "Relationship: below target, likely to need escalation.",
+      "FLEXIBILITY": "Relationship: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-01-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q12025_Richa",
+    "cycle_id": "c_demo_databridge_Q12025",
+    "attendee_id": "att_demo_c_demo_databridge_Q12025_Richa",
+    "respondent_email": "richa@shell.com",
+    "respondent_name": "Richa",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 2,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 4,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "RESOURCES_CAPABILITY": "Performance: concerns raised last review still not addressed.",
+      "ALIGNMENT": "Relationship: acceptable this cycle, room to improve.",
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-01-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q22025_Kanishk",
+    "cycle_id": "c_demo_databridge_Q22025",
+    "attendee_id": "att_demo_c_demo_databridge_Q22025_Kanishk",
+    "respondent_email": "kanishk@shell.com",
+    "respondent_name": "Kanishk",
+    "team": "SOM",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 5,
+      "OPERATIONS": 2,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 2,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "OPERATIONS": "Performance: below target, likely to need escalation.",
+      "FLEXIBILITY": "Relationship: below target, likely to need escalation.",
+      "RELEASE_DELIVERY": "Performance: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-04-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q22025_Aditya",
+    "cycle_id": "c_demo_databridge_Q22025",
+    "attendee_id": "att_demo_c_demo_databridge_Q22025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 3,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "COMMERCIAL_EXCELLENCE": "Commercial: below target, likely to need escalation.",
+      "RESOURCES_CAPABILITY": "Performance: steady, no major issues.",
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-04-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q22025_Richa",
+    "cycle_id": "c_demo_databridge_Q22025",
+    "attendee_id": "att_demo_c_demo_databridge_Q22025_Richa",
+    "respondent_email": "richa@shell.com",
+    "respondent_name": "Richa",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 5,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 3,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 5,
+      "ALIGNMENT": 2
+    },
+    "rag_scores": {},
+    "comments": {
+      "ALIGNMENT": "Relationship: concerns raised last review still not addressed.",
+      "RESOURCES_CAPABILITY": "Performance: broadly on track, a few gaps to close.",
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-04-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q32025_Kanishk",
+    "cycle_id": "c_demo_databridge_Q32025",
+    "attendee_id": "att_demo_c_demo_databridge_Q32025_Kanishk",
+    "respondent_email": "kanishk@shell.com",
+    "respondent_name": "Kanishk",
+    "team": "SOM",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 2,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 2
+    },
+    "rag_scores": {},
+    "comments": {
+      "COMMERCIAL_EXCELLENCE": "Commercial: agreed SLA missed again this quarter.",
+      "FLEXIBILITY": "Relationship: repeated delays — an improvement plan is overdue.",
+      "COST_CONTROL": "Commercial: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-07-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q32025_Aditya",
+    "cycle_id": "c_demo_databridge_Q32025",
+    "attendee_id": "att_demo_c_demo_databridge_Q32025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 2,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 4,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 2,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: concerns raised last review still not addressed.",
+      "COMMERCIAL_EXCELLENCE": "Commercial: concerns raised last review still not addressed.",
+      "ALIGNMENT": "Relationship: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-07-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q32025_Richa",
+    "cycle_id": "c_demo_databridge_Q32025",
+    "attendee_id": "att_demo_c_demo_databridge_Q32025_Richa",
+    "respondent_email": "richa@shell.com",
+    "respondent_name": "Richa",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 3,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 2,
+      "ALIGNMENT": 2
+    },
+    "rag_scores": {},
+    "comments": {
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: below target, likely to need escalation.",
+      "ALIGNMENT": "Relationship: agreed SLA missed again this quarter.",
+      "FLEXIBILITY": "Relationship: broadly on track, a few gaps to close."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-07-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q42025_Kanishk",
+    "cycle_id": "c_demo_databridge_Q42025",
+    "attendee_id": "att_demo_c_demo_databridge_Q42025_Kanishk",
+    "respondent_email": "kanishk@shell.com",
+    "respondent_name": "Kanishk",
+    "team": "SOM",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 2,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 2,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 2,
+      "FLEXIBILITY": 2,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 2
+    },
+    "rag_scores": {},
+    "comments": {
+      "RESOURCES_CAPABILITY": "Performance: repeated delays — an improvement plan is overdue.",
+      "OPERATIONS": "Performance: below target, likely to need escalation.",
+      "RELEASE_DELIVERY": "Performance: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-10-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q42025_Aditya",
+    "cycle_id": "c_demo_databridge_Q42025",
+    "attendee_id": "att_demo_c_demo_databridge_Q42025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 2,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 2,
+      "FLEXIBILITY": 2,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 1
+    },
+    "rag_scores": {},
+    "comments": {
+      "ALIGNMENT": "Relationship: agreed SLA missed again this quarter.",
+      "OPERATIONS": "Performance: repeated delays — an improvement plan is overdue.",
+      "PRICING": "Commercial: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-10-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_databridge_Q42025_Richa",
+    "cycle_id": "c_demo_databridge_Q42025",
+    "attendee_id": "att_demo_c_demo_databridge_Q42025_Richa",
+    "respondent_email": "richa@shell.com",
+    "respondent_name": "Richa",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 2,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 2,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 1
+    },
+    "rag_scores": {},
+    "comments": {
+      "ALIGNMENT": "Relationship: agreed SLA missed again this quarter.",
+      "OPERATIONS": "Performance: below target, likely to need escalation.",
+      "COST_CONTROL": "Commercial: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-10-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q12025_Anup",
+    "cycle_id": "c_demo_cloudcore_Q12025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q12025_Anup",
+    "respondent_email": "anup@shell.com",
+    "respondent_name": "Anup",
+    "team": "CP",
+    "scores": {
+      "PATCH_MANAGEMENT": 2,
+      "RESOURCES_CAPABILITY": 2,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 3,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: agreed SLA missed again this quarter.",
+      "RESOURCES_CAPABILITY": "Performance: agreed SLA missed again this quarter.",
+      "ALIGNMENT": "Relationship: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-01-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q12025_Abhishek",
+    "cycle_id": "c_demo_cloudcore_Q12025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q12025_Abhishek",
+    "respondent_email": "abhishek@shell.com",
+    "respondent_name": "Abhishek",
+    "team": "IRM",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 2,
+      "OPERATIONS": 3,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 2
+    },
+    "rag_scores": {},
+    "comments": {
+      "RELEASE_DELIVERY": "Performance: concerns raised last review still not addressed.",
+      "ALIGNMENT": "Relationship: concerns raised last review still not addressed.",
+      "COMMERCIAL_EXCELLENCE": "Commercial: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-01-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q12025_Richa",
+    "cycle_id": "c_demo_cloudcore_Q12025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q12025_Richa",
+    "respondent_email": "richa@shell.com",
+    "respondent_name": "Richa",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 2,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "OPERATIONS": "Performance: repeated delays — an improvement plan is overdue.",
+      "PATCH_MANAGEMENT": "Risk & Compliance: broadly on track, a few gaps to close.",
+      "FLEXIBILITY": "Relationship: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-01-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q12025_Aditya",
+    "cycle_id": "c_demo_cloudcore_Q12025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q12025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 2,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 3,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 2,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 2
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: below target, likely to need escalation.",
+      "FLEXIBILITY": "Relationship: repeated delays — an improvement plan is overdue.",
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: broadly on track, a few gaps to close."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-01-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q22025_Anup",
+    "cycle_id": "c_demo_cloudcore_Q22025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q22025_Anup",
+    "respondent_email": "anup@shell.com",
+    "respondent_name": "Anup",
+    "team": "CP",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "COMMERCIAL_EXCELLENCE": "Commercial: agreed SLA missed again this quarter.",
+      "PATCH_MANAGEMENT": "Risk & Compliance: acceptable this cycle, room to improve.",
+      "ALIGNMENT": "Relationship: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-04-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q22025_Abhishek",
+    "cycle_id": "c_demo_cloudcore_Q22025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q22025_Abhishek",
+    "respondent_email": "abhishek@shell.com",
+    "respondent_name": "Abhishek",
+    "team": "IRM",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 4,
+      "PRICING": 2,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "PRICING": "Commercial: agreed SLA missed again this quarter.",
+      "COMMERCIAL_EXCELLENCE": "Commercial: agreed SLA missed again this quarter.",
+      "ALIGNMENT": "Relationship: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-04-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q22025_Richa",
+    "cycle_id": "c_demo_cloudcore_Q22025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q22025_Richa",
+    "respondent_email": "richa@shell.com",
+    "respondent_name": "Richa",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 4,
+      "PRICING": 4,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 2,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "COST_CONTROL": "Commercial: concerns raised last review still not addressed.",
+      "PATCH_MANAGEMENT": "Risk & Compliance: broadly on track, a few gaps to close.",
+      "ALIGNMENT": "Relationship: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-04-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q22025_Aditya",
+    "cycle_id": "c_demo_cloudcore_Q22025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q22025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 2,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 2,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "RESOURCES_CAPABILITY": "Performance: concerns raised last review still not addressed.",
+      "FLEXIBILITY": "Relationship: agreed SLA missed again this quarter.",
+      "ALIGNMENT": "Relationship: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-04-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q32025_Anup",
+    "cycle_id": "c_demo_cloudcore_Q32025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q32025_Anup",
+    "respondent_email": "anup@shell.com",
+    "respondent_name": "Anup",
+    "team": "CP",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 3,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "Risk & Compliance: acceptable this cycle, room to improve.",
+      "RELEASE_DELIVERY": "Performance: steady, no major issues.",
+      "FLEXIBILITY": "Relationship: excellent responsiveness and quality."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-07-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q32025_Abhishek",
+    "cycle_id": "c_demo_cloudcore_Q32025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q32025_Abhishek",
+    "respondent_email": "abhishek@shell.com",
+    "respondent_name": "Abhishek",
+    "team": "IRM",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 3,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 2,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "COST_CONTROL": "Commercial: below target, likely to need escalation.",
+      "PATCH_MANAGEMENT": "Risk & Compliance: steady, no major issues.",
+      "COMMERCIAL_EXCELLENCE": "Commercial: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-07-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q32025_Richa",
+    "cycle_id": "c_demo_cloudcore_Q32025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q32025_Richa",
+    "respondent_email": "richa@shell.com",
+    "respondent_name": "Richa",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 3,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 2,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: concerns raised last review still not addressed.",
+      "PATCH_MANAGEMENT": "Risk & Compliance: broadly on track, a few gaps to close.",
+      "COMMERCIAL_EXCELLENCE": "Commercial: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-07-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q32025_Aditya",
+    "cycle_id": "c_demo_cloudcore_Q32025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q32025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 3,
+      "PRICING": 2,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 2
+    },
+    "rag_scores": {},
+    "comments": {
+      "PRICING": "Commercial: below target, likely to need escalation.",
+      "COMMERCIAL_EXCELLENCE": "Commercial: below target, likely to need escalation.",
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-07-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q42025_Anup",
+    "cycle_id": "c_demo_cloudcore_Q42025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q42025_Anup",
+    "respondent_email": "anup@shell.com",
+    "respondent_name": "Anup",
+    "team": "CP",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 2,
+      "STAKEHOLDER_ENGAGEMENT": 2,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "FLEXIBILITY": "Relationship: repeated delays — an improvement plan is overdue.",
+      "STAKEHOLDER_ENGAGEMENT": "Relationship: repeated delays — an improvement plan is overdue.",
+      "ALIGNMENT": "Relationship: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-10-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q42025_Abhishek",
+    "cycle_id": "c_demo_cloudcore_Q42025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q42025_Abhishek",
+    "respondent_email": "abhishek@shell.com",
+    "respondent_name": "Abhishek",
+    "team": "IRM",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 2,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 2,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "RELEASE_DELIVERY": "Performance: concerns raised last review still not addressed.",
+      "COMMERCIAL_EXCELLENCE": "Commercial: below target, likely to need escalation.",
+      "ALIGNMENT": "Relationship: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-10-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q42025_Richa",
+    "cycle_id": "c_demo_cloudcore_Q42025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q42025_Richa",
+    "respondent_email": "richa@shell.com",
+    "respondent_name": "Richa",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "PRICING": "Commercial: steady, no major issues.",
+      "COST_CONTROL": "Commercial: acceptable this cycle, room to improve.",
+      "ALIGNMENT": "Relationship: consistently high performer."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-10-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_demo_c_demo_cloudcore_Q42025_Aditya",
+    "cycle_id": "c_demo_cloudcore_Q42025",
+    "attendee_id": "att_demo_c_demo_cloudcore_Q42025_Aditya",
+    "respondent_email": "aditya@shell.com",
+    "respondent_name": "Aditya",
+    "team": "IDE",
+    "scores": {
+      "PATCH_MANAGEMENT": 3,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 3,
+      "OPERATIONS": 2,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 3,
+      "FLEXIBILITY": 4,
+      "STAKEHOLDER_ENGAGEMENT": 3,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "OPERATIONS": "Performance: agreed SLA missed again this quarter.",
+      "PATCH_MANAGEMENT": "Risk & Compliance: broadly on track, a few gaps to close.",
+      "ALIGNMENT": "Relationship: strong delivery, exceeded expectations."
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2025-10-01T09:00:00+00:00"
+  },
+  {
+    "submission_id": "sub_dda48bb0",
+    "cycle_id": "c_67447327",
+    "attendee_id": "att_b17644ea",
+    "respondent_email": "kanishk.punekar@zensar.com",
+    "respondent_name": "Kanishk Punekar",
+    "team": "IDTM",
+    "scores": {
+      "PATCH_MANAGEMENT": 2,
+      "RESOURCES_CAPABILITY": 3,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 5,
+      "PRICING": 5,
+      "COMMERCIAL_EXCELLENCE": 3,
+      "COST_CONTROL": 2,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 4
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "HI",
+      "RESOURCES_CAPABILITY": "HI",
+      "RELEASE_DELIVERY": "HI",
+      "OPERATIONS": "HI",
+      "PRICING": "HI",
+      "COMMERCIAL_EXCELLENCE": "HI",
+      "COST_CONTROL": "HI",
+      "FLEXIBILITY": "HI",
+      "STAKEHOLDER_ENGAGEMENT": "HI",
+      "ALIGNMENT": "HI"
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2026-07-16T10:21:58.145504+00:00"
+  },
+  {
+    "submission_id": "sub_401ced95",
+    "cycle_id": "c_67447327",
+    "attendee_id": "att_e3614a60",
+    "respondent_email": "anup.kesarwani@zensar.com",
+    "respondent_name": "Anup Kesarwani",
+    "team": "SOM",
+    "scores": {
+      "PATCH_MANAGEMENT": 4,
+      "RESOURCES_CAPABILITY": 4,
+      "RELEASE_DELIVERY": 4,
+      "OPERATIONS": 4,
+      "PRICING": 3,
+      "COMMERCIAL_EXCELLENCE": 4,
+      "COST_CONTROL": 4,
+      "FLEXIBILITY": 3,
+      "STAKEHOLDER_ENGAGEMENT": 4,
+      "ALIGNMENT": 3
+    },
+    "rag_scores": {},
+    "comments": {
+      "PATCH_MANAGEMENT": "hi",
+      "RESOURCES_CAPABILITY": "hi",
+      "RELEASE_DELIVERY": "hi",
+      "OPERATIONS": "hi",
+      "PRICING": "hi",
+      "COMMERCIAL_EXCELLENCE": "hi",
+      "COST_CONTROL": "hi",
+      "FLEXIBILITY": "hi",
+      "STAKEHOLDER_ENGAGEMENT": "hi",
+      "ALIGNMENT": "hi"
+    },
+    "skipped_measures": [],
+    "skipped_themes": [],
+    "submitted_at": "2026-07-16T10:22:48.966479+00:00"
   }
 ]

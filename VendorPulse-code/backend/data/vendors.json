@@ -70,5 +70,29 @@
     "name": "Zensar21",
     "category": "IT Infrastructure",
     "status": "active"
+  },
+  {
+    "vendor_id": "v_17f05bc4",
+    "name": "TechnoServe",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_42a2e6b4",
+    "name": "DataBridge",
+    "category": "IT Infrastructure",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_cd6ceab9",
+    "name": "CloudCore",
+    "category": "Managed Services",
+    "status": "active"
+  },
+  {
+    "vendor_id": "v_0964421d",
+    "name": "Okta",
+    "category": "IT Infrastructure",
+    "status": "active"
   }
 ]

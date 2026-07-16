@@ -245,5 +245,1379 @@
       ],
       "configured": false
     }
+  },
+  {
+    "cycle_id": "c_demo_technoserve_Q12025",
+    "vendor_id": "v_17f05bc4",
+    "vendor_name": "TechnoServe",
+    "cycle_type": "SPR",
+    "quarter": "Q1",
+    "year": 2025,
+    "description": "Core infrastructure & managed services. Focus: closing risk & compliance gaps.",
+    "workflow_state": "ARCHIVED",
+    "created_at": "2025-01-01T09:00:00+00:00",
+    "updated_at": "2025-01-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_demo_technoserve_Q22025",
+    "vendor_id": "v_17f05bc4",
+    "vendor_name": "TechnoServe",
+    "cycle_type": "SPR",
+    "quarter": "Q2",
+    "year": 2025,
+    "description": "Core infrastructure & managed services. Focus: closing risk & compliance gaps.",
+    "workflow_state": "ARCHIVED",
+    "created_at": "2025-04-01T09:00:00+00:00",
+    "updated_at": "2025-04-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_demo_technoserve_Q32025",
+    "vendor_id": "v_17f05bc4",
+    "vendor_name": "TechnoServe",
+    "cycle_type": "SPR",
+    "quarter": "Q3",
+    "year": 2025,
+    "description": "Core infrastructure & managed services. Focus: closing risk & compliance gaps.",
+    "workflow_state": "ARCHIVED",
+    "created_at": "2025-07-01T09:00:00+00:00",
+    "updated_at": "2025-07-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_demo_technoserve_Q42025",
+    "vendor_id": "v_17f05bc4",
+    "vendor_name": "TechnoServe",
+    "cycle_type": "SPR",
+    "quarter": "Q4",
+    "year": 2025,
+    "description": "Core infrastructure & managed services. Focus: closing risk & compliance gaps.",
+    "workflow_state": "SCORECARD_COMPILED",
+    "created_at": "2025-10-01T09:00:00+00:00",
+    "updated_at": "2025-10-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_demo_databridge_Q12025",
+    "vendor_id": "v_42a2e6b4",
+    "vendor_name": "DataBridge",
+    "cycle_type": "SPR",
+    "quarter": "Q1",
+    "year": 2025,
+    "description": "Data platform & integration vendor. Watch: delivery performance decline.",
+    "workflow_state": "ARCHIVED",
+    "created_at": "2025-01-01T09:00:00+00:00",
+    "updated_at": "2025-01-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_demo_databridge_Q22025",
+    "vendor_id": "v_42a2e6b4",
+    "vendor_name": "DataBridge",
+    "cycle_type": "SPR",
+    "quarter": "Q2",
+    "year": 2025,
+    "description": "Data platform & integration vendor. Watch: delivery performance decline.",
+    "workflow_state": "ARCHIVED",
+    "created_at": "2025-04-01T09:00:00+00:00",
+    "updated_at": "2025-04-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_demo_databridge_Q32025",
+    "vendor_id": "v_42a2e6b4",
+    "vendor_name": "DataBridge",
+    "cycle_type": "SPR",
+    "quarter": "Q3",
+    "year": 2025,
+    "description": "Data platform & integration vendor. Watch: delivery performance decline.",
+    "workflow_state": "ARCHIVED",
+    "created_at": "2025-07-01T09:00:00+00:00",
+    "updated_at": "2025-07-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_demo_databridge_Q42025",
+    "vendor_id": "v_42a2e6b4",
+    "vendor_name": "DataBridge",
+    "cycle_type": "SPR",
+    "quarter": "Q4",
+    "year": 2025,
+    "description": "Data platform & integration vendor. Watch: delivery performance decline.",
+    "workflow_state": "SCORECARD_COMPILED",
+    "created_at": "2025-10-01T09:00:00+00:00",
+    "updated_at": "2025-10-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_demo_cloudcore_Q12025",
+    "vendor_id": "v_cd6ceab9",
+    "vendor_name": "CloudCore",
+    "cycle_type": "SPR",
+    "quarter": "Q1",
+    "year": 2025,
+    "description": "Cloud operations partner. Stable performer under commercial pressure.",
+    "workflow_state": "ARCHIVED",
+    "created_at": "2025-01-01T09:00:00+00:00",
+    "updated_at": "2025-01-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_demo_cloudcore_Q22025",
+    "vendor_id": "v_cd6ceab9",
+    "vendor_name": "CloudCore",
+    "cycle_type": "SPR",
+    "quarter": "Q2",
+    "year": 2025,
+    "description": "Cloud operations partner. Stable performer under commercial pressure.",
+    "workflow_state": "ARCHIVED",
+    "created_at": "2025-04-01T09:00:00+00:00",
+    "updated_at": "2025-04-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_demo_cloudcore_Q32025",
+    "vendor_id": "v_cd6ceab9",
+    "vendor_name": "CloudCore",
+    "cycle_type": "SPR",
+    "quarter": "Q3",
+    "year": 2025,
+    "description": "Cloud operations partner. Stable performer under commercial pressure.",
+    "workflow_state": "ARCHIVED",
+    "created_at": "2025-07-01T09:00:00+00:00",
+    "updated_at": "2025-07-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_demo_cloudcore_Q42025",
+    "vendor_id": "v_cd6ceab9",
+    "vendor_name": "CloudCore",
+    "cycle_type": "SPR",
+    "quarter": "Q4",
+    "year": 2025,
+    "description": "Cloud operations partner. Stable performer under commercial pressure.",
+    "workflow_state": "SCORECARD_COMPILED",
+    "created_at": "2025-10-01T09:00:00+00:00",
+    "updated_at": "2025-10-01T09:00:00+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_67447327",
+    "vendor_id": "v_0964421d",
+    "vendor_name": "Okta",
+    "cycle_type": "SPR",
+    "quarter": "Q1",
+    "year": 2026,
+    "description": "",
+    "workflow_state": "ARCHIVED",
+    "created_at": "2026-07-16T10:17:53.531681+00:00",
+    "updated_at": "2026-07-16T10:24:22.471923+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    },
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_N2EzZmJkZGItZTVkOS00ZWZlLWFlMzktMzBmMzA1MGZlMjFk%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABZkcTrQAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "teams_meeting_event_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABZkcTrQAAAA==",
+    "teams_meeting_scheduled_at": "2026-07-16T10:20:26.496947+00:00",
+    "scorecard_dispatched_at": "2026-07-16T10:20:50.424011+00:00",
+    "scorecard_dispatched_to": [
+      "kanishkpunekar54@gmail.com",
+      "anupkrsarwani3537@gmail.com"
+    ]
   }
 ]

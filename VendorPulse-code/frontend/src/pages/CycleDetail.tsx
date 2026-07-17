@@ -78,6 +78,7 @@ import VendorBriefPanel from '@/components/modules/vendor-prep/VendorBriefPanel'
 import PushbackInput from '@/components/modules/vendor-prep/PushbackInput'
 import PushbackResponseCards from '@/components/modules/vendor-prep/PushbackResponseCards'
 import UnresolvedItemTracker from '@/components/modules/vendor-prep/UnresolvedItemTracker'
+import VendorPrepMeetingPanel from '@/components/modules/vendor-prep/VendorPrepMeetingPanel'
 
 import MeetingBriefingCard from '@/components/modules/meeting/MeetingBriefingCard'
 import LiveCapturePanel from '@/components/modules/meeting/LiveCapturePanel'
@@ -620,6 +621,8 @@ export default function CycleDetail() {
             onGenerateResponses={handleGeneratePushbackResponses}
             onSelectResponse={handleSelectPushbackResponse}
             onPushbackStatusChange={handlePushbackStatusChange}
+            onActionsExtracted={(extracted) => addActionsToQueue(extracted, ACTION_ORIGIN.vendorPrep)}
+            alreadyExtracted={actions.some((a) => a.origin === ACTION_ORIGIN.vendorPrep)}
           />
         )}
 
@@ -1364,6 +1367,7 @@ function AlignmentTab({
 function VendorPrepTab({
   cycleId, cycle, vendorBrief, onBriefGenerated, onBriefApproved,
   pushbackItems, pushbackResponses, onPushbackAdd, onGenerateResponses, onSelectResponse, onPushbackStatusChange,
+  onActionsExtracted, alreadyExtracted,
 }: {
   cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
@@ -1376,6 +1380,8 @@ function VendorPrepTab({
   onGenerateResponses: (id: string, responses: PushbackResponse[]) => void
   onSelectResponse: (pid: string, rid: string) => void
   onPushbackStatusChange: (id: string, s: PushbackItem['status']) => void
+  onActionsExtracted: (a: ExtractedAction[]) => void
+  alreadyExtracted: boolean
 }) {
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -1401,6 +1407,14 @@ function VendorPrepTab({
         onStatusChange={onPushbackStatusChange}
       />
       <FaceOffModelEditor positions={MOCK_FACE_OFF} />
+      <VendorPrepMeetingPanel
+        cycleId={cycleId}
+        vendorName={cycle.vendor_name}
+        quarter={cycle.quarter}
+        year={cycle.year}
+        onActionsExtracted={onActionsExtracted}
+        alreadyExtracted={alreadyExtracted}
+      />
     </div>
   )
 }

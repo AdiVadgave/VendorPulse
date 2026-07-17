@@ -978,5 +978,61 @@
     "invite_status": "PENDING",
     "availability_submitted": false,
     "user_id": "u20"
+  },
+  {
+    "attendee_id": "att_3047bebd",
+    "cycle_id": "c_4b9a9199",
+    "stakeholder_id": "s_kanishk",
+    "name": "Kanishk",
+    "email": "kanishk@shell.com",
+    "role": "INTERNAL_LEAD",
+    "organisation": "Shell",
+    "is_key": true,
+    "invite_status": "PENDING",
+    "availability_submitted": false,
+    "user_id": null,
+    "confirmation_status": "CONFIRMED"
+  },
+  {
+    "attendee_id": "att_466c5538",
+    "cycle_id": "c_4b9a9199",
+    "stakeholder_id": "s_anup",
+    "name": "Anup",
+    "email": "anup@shell.com",
+    "role": "COMMERCIAL_LEAD",
+    "organisation": "Shell",
+    "is_key": true,
+    "invite_status": "PENDING",
+    "availability_submitted": false,
+    "user_id": null,
+    "confirmation_status": "CONFIRMED"
+  },
+  {
+    "attendee_id": "att_93ed6f1e",
+    "cycle_id": "c_4b9a9199",
+    "stakeholder_id": "s_aditya",
+    "name": "Aditya",
+    "email": "aditya@shell.com",
+    "role": "TECHNICAL_LEAD",
+    "organisation": "Shell",
+    "is_key": true,
+    "invite_status": "PENDING",
+    "availability_submitted": false,
+    "user_id": null,
+    "confirmation_status": "CONFIRMED"
+  },
+  {
+    "attendee_id": "att_077ab864",
+    "cycle_id": "c_4b9a9199",
+    "stakeholder_id": "s_abhishek",
+    "name": "Abhishek",
+    "email": "abhishek@shell.com",
+    "role": "INTERNAL_LEAD",
+    "organisation": "Shell",
+    "is_key": true,
+    "invite_status": "PENDING",
+    "availability_submitted": false,
+    "user_id": null,
+    "confirmation_status": "DECLINED"
   }
 ]

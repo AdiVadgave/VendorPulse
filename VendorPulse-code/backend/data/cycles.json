@@ -1619,5 +1619,110 @@
       "kanishkpunekar54@gmail.com",
       "anupkrsarwani3537@gmail.com"
     ]
+  },
+  {
+    "cycle_id": "c_4b9a9199",
+    "vendor_id": "v_17f05bc4",
+    "vendor_name": "TechnoServe",
+    "cycle_type": "SPR",
+    "quarter": "Q2",
+    "year": 2026,
+    "description": "QBR",
+    "workflow_state": "ATTENDEE_REFRESH_SENT",
+    "created_at": "2026-07-17T05:14:54.574840+00:00",
+    "updated_at": "2026-07-17T05:59:18.150731+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
   }
 ]

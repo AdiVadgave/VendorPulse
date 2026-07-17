@@ -1183,13 +1183,29 @@ function AlignmentTab({
   // scorecard: surface low consolidated scores and where internal teams diverge.
   const [weighted, setWeighted] = useState<WeightedScorecard | null>(null)
   const [serverInsights, setServerInsights] = useState<AlignmentInsight[] | null>(null)
-  useEffect(() => {
+  // Alignment comparisons are computed at runtime from the CURRENT consolidated
+  // scorecard, so any edit made after the alignment meeting is reflected. Refetch
+  // on mount (i.e. each time this tab is opened) and whenever the window/tab
+  // regains focus — e.g. after the scorecard was changed elsewhere.
+  const loadAlignment = useCallback(() => {
     getWeightedScorecard(cycleId).then(setWeighted).catch(() => { /* not ready */ })
     // Runtime AI insights from the consolidated internal scorecard (LLM narrates when enabled).
     getAlignmentInsights(cycleId)
       .then((r) => setServerInsights(r.data?.insights ?? null))
       .catch(() => setServerInsights(null))
   }, [cycleId])
+
+  useEffect(() => {
+    loadAlignment()
+    const onFocus = () => loadAlignment()
+    const onVisible = () => { if (document.visibilityState === 'visible') loadAlignment() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [loadAlignment])
   const hasWeighted = !!weighted && weighted.teams.length > 0
 
   // Legacy 2-column comparison (kept only as a fallback for mock cycles).

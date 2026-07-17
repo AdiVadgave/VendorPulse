@@ -140,6 +140,9 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
         className="w-full flex items-center justify-between gap-3 px-5 py-3.5"
       >
         <div className="flex items-center gap-3 min-w-0">
+          <span className="text-slate-400 dark:text-slate-500 shrink-0">
+            {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </span>
           <div className="w-9 h-9 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center shrink-0">
             <SlidersHorizontal size={18} className="text-indigo-600 dark:text-indigo-400" />
           </div>
@@ -155,7 +158,6 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
             </p>
           </div>
         </div>
-        {open ? <ChevronDown size={16} className="text-slate-400 shrink-0" /> : <ChevronRight size={16} className="text-slate-400 shrink-0" />}
       </button>
 
       {open && (

@@ -59,6 +59,12 @@ export interface AlignmentFlag {
   low_stakeholder: string
   low_score: number
   prompt_question: string
+  /**
+   * Every team that scored this measure (cross-team divergence path), sorted
+   * highest→lowest. When present the panel renders all of them, not just the
+   * high/low extremes. Absent for the legacy Stakeholder-vs-Vendor flags.
+   */
+  team_scores?: { label: string; score: number }[]
 }
 
 /* ── Face-off Model ────────────────────────────────────────── */

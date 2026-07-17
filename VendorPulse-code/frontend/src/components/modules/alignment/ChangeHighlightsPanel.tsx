@@ -165,6 +165,9 @@ export default function ChangeHighlightsPanel({ insights }: Props) {
             onClick={() => setInsightsOpen(!insightsOpen)}
             className="w-full px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
           >
+            <span className="text-slate-400 dark:text-slate-500 shrink-0">
+              {insightsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </span>
             <Sparkles size={15} className="text-indigo-500" />
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               AI-Generated Insights
@@ -172,9 +175,6 @@ export default function ChangeHighlightsPanel({ insights }: Props) {
             <span className="ml-auto flex items-center gap-2">
               <span className="text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-0.5 rounded-full font-medium">
                 {insights.length} insight{insights.length > 1 ? 's' : ''}
-              </span>
-              <span className="text-slate-400 dark:text-slate-500">
-                {insightsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </span>
             </span>
           </button>

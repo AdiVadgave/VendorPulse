@@ -48,6 +48,9 @@ export default function ScoreComparisonPanel({ comparisons }: Props) {
         onClick={() => setPanelOpen(!panelOpen)}
         className="w-full px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
       >
+        <span className="text-slate-400 dark:text-slate-500 shrink-0">
+          {panelOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </span>
         <BarChart3 size={15} className="text-indigo-500" />
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
           Internal Stakeholder vs Vendor — Score Comparison
@@ -58,9 +61,6 @@ export default function ScoreComparisonPanel({ comparisons }: Props) {
               Discrepancies found
             </span>
           )}
-          <span className="text-slate-400 dark:text-slate-500">
-            {panelOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </span>
         </span>
       </button>
 

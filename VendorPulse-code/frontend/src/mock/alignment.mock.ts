@@ -392,8 +392,11 @@ export function buildFlagsFromWeighted(w: WeightedScorecard): AlignmentFlag[] {
         .map((t) => ({ label: t.team || t.name || t.email, score: m.team_scores[t.attendee_id] }))
         .filter((e): e is { label: string; score: number } => e.score != null)
       if (entries.length < 2) continue
-      const high = entries.reduce((a, b) => (b.score > a.score ? b : a))
-      const low = entries.reduce((a, b) => (b.score < a.score ? b : a))
+      // Keep every participating team (sorted high→low) so the flag reflects all
+      // reviewers, not just the two extremes.
+      const ranked = [...entries].sort((a, b) => b.score - a.score)
+      const high = ranked[0]
+      const low = ranked[ranked.length - 1]
       const spread = high.score - low.score
       if (spread >= 1) {
         id++
@@ -407,7 +410,8 @@ export function buildFlagsFromWeighted(w: WeightedScorecard): AlignmentFlag[] {
           high_score: high.score,
           low_stakeholder: low.label,
           low_score: low.score,
-          prompt_question: `Teams disagree on ${m.label}: ${high.label} rated ${high.score}, ${low.label} rated ${low.score} — agree the internal position before the vendor meeting.`,
+          team_scores: ranked,
+          prompt_question: `Teams disagree on ${m.label}: ${ranked.map((e) => `${e.label} rated ${e.score}`).join(', ')} (${spread.toFixed(1)} pt spread) — agree the internal position before the vendor meeting.`,
         })
       }
     }

@@ -41,11 +41,11 @@ function CategoriesDropdown({ structure }: { structure: WeightedCategoryDef[] })
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
       >
-        <span>Scorecard Themes &amp; Measures</span>
-        <span className="flex items-center gap-1">
-          <span className="text-[10px] font-normal normal-case">{structure.length} themes &middot; {totalMeasures} measures</span>
+        <span className="flex items-center gap-1.5">
           {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          Scorecard Themes &amp; Measures
         </span>
+        <span className="text-[10px] font-normal normal-case">{structure.length} themes &middot; {totalMeasures} measures</span>
       </button>
       {open && (
         <div className="space-y-2">

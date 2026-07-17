@@ -18,15 +18,6 @@
     "avatar": "SC"
   },
   {
-    "userId": "u3",
-    "name": "Priya Sharma",
-    "email": "priya.sharma@zensar.com",
-    "gmail": "priyasharma@gmail.com",
-    "role": "INTERNAL_LEAD",
-    "organisation": "Zensar IDT",
-    "avatar": "PS"
-  },
-  {
     "userId": "u4",
     "name": "Marcus Williams",
     "email": "marcus.williams@zensar.com",
@@ -214,6 +205,27 @@
     "role": "",
     "organisation": "",
     "avatar": "GS"
+  },
+  {
+    "userId": "u5672f9ea",
+    "name": "Siddhi Pathak",
+    "email": "siddhi.pathak@zensar.com",
+    "role": "VMO_COORDINATOR",
+    "organisation": "Zensar",
+    "gmail": "siddhi.pathak@zensar.com",
+    "avatar": "SP",
+    "availability": [],
+    "createdAt": "2026-07-17T08:21:59.552602+00:00"
+  },
+  {
+    "userId": "ubd2a240b",
+    "name": "Ganesh Kende",
+    "email": "ganesh.kende@zensar.com",
+    "role": "INTERNAL_LEAD",
+    "organisation": "Zensar",
+    "gmail": "",
+    "avatar": "G",
+    "availability": [],
+    "createdAt": "2026-07-17T08:28:06.102705+00:00"
   }
-
 ]

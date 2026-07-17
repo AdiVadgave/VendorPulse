@@ -560,6 +560,54 @@ class GraphService:
         except Exception as e:
             return {"error": f"Request failed: {str(e)}"}
 
+    async def send_mail(
+        self,
+        *,
+        to_email: str,
+        subject: str,
+        html_body: str,
+        sender: Optional[str] = None,
+        text_body: Optional[str] = None,  # accepted for API-parity; Graph sends HTML
+    ) -> dict:
+        """Send an HTML email via Outlook using Graph `sendMail`.
+
+        - App-only (service account): pass `sender` (UPN) → POST /users/{sender}/sendMail.
+        - Delegated (dev): omit `sender` → POST /me/sendMail.
+
+        Requires the `Mail.Send` permission. Returns {"status": "sent", "id": None}
+        on success (Graph returns 202 with no body) or {"error": ...}.
+        """
+        _ = text_body  # HTML body already carries the content; kept for signature parity.
+        if not httpx:
+            raise ImportError("httpx is required. Install with: pip install httpx")
+
+        path = f"/users/{sender}/sendMail" if sender else "/me/sendMail"
+        body = {
+            "message": {
+                "subject": subject,
+                "body": {"contentType": "HTML", "content": html_body},
+                "toRecipients": [{"emailAddress": {"address": to_email}}],
+            },
+            "saveToSentItems": True,
+        }
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.BASE_URL}{path}",
+                    json=body,
+                    headers=self.headers,
+                    timeout=30.0,
+                )
+                if response.status_code in (200, 202):
+                    logger.info("send_mail: success — to=%s via %s", to_email, path)
+                    return {"status": "sent", "id": None, "to": to_email}
+                result = response.json() if response.content else {}
+                logger.error("send_mail: Graph API error — status=%d", response.status_code)
+                return self._build_graph_error(response.status_code, result, fallback="Failed to send mail")
+        except Exception as e:
+            logger.exception("send_mail: request failed — %s", e)
+            return {"error": f"Request failed: {str(e)}"}
+
     async def lookup_user(self, email: str) -> dict | None:
         """
         Look up user by email address.

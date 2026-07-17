@@ -3,6 +3,7 @@ import AppLayout from './components/layout/AppLayout'
 import Dashboard from './pages/Dashboard'
 import CycleDetail from './pages/CycleDetail'
 import Analytics from './pages/Analytics'
+import AdminUsers from './pages/AdminUsers'
 import NotFound from './pages/NotFound'
 import ScorecardForm from './pages/ScorecardForm'
 
@@ -17,6 +18,7 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="/cycles/:cycleId" element={<CycleDetail />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route path="/directory" element={<AdminUsers />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

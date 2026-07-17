@@ -307,10 +307,9 @@ def find_meeting_times_graph(
             require_all_attendees=settings.scheduling_require_all_attendees,
             activity_domain=settings.scheduling_activity_domain,
         ))
-    except Exception as e:
-        import traceback
-        error_detail = traceback.format_exc()
-        raise HTTPException(status_code=500, detail=f"Graph API error: {str(e)}\n{error_detail}")
+    except Exception:
+        logger.exception("Graph API request failed")
+        raise HTTPException(status_code=500, detail="Graph API request failed. Please retry.")
 
     # Check for API errors
     if "error" in result:
@@ -816,10 +815,9 @@ def send_meeting_invite_graph(
             time_zone=slot.get("proposed_time_zone") or "UTC",
             body=invite_body,
         ))
-    except Exception as e:
-        import traceback
-        error_detail = traceback.format_exc()
-        raise HTTPException(status_code=500, detail=f"Graph API error: {str(e)}\n{error_detail}")
+    except Exception:
+        logger.exception("Graph API request failed")
+        raise HTTPException(status_code=500, detail="Graph API request failed. Please retry.")
 
     # Check for API errors
     if "error" in result:
@@ -1078,9 +1076,9 @@ def schedule_meeting_manual_graph(
                 is_online_meeting=True,
                 time_zone=payload.time_zone,
             ))
-    except Exception as e:
-        import traceback
-        raise HTTPException(status_code=500, detail=f"Graph API error: {str(e)}\n{traceback.format_exc()}")
+    except Exception:
+        logger.exception("Graph API request failed")
+        raise HTTPException(status_code=500, detail="Graph API request failed. Please retry.")
 
     if "error" in result:
         status_code = int(result.get("status_code") or 400)

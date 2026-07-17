@@ -27,6 +27,7 @@ import type { StakeholderRole } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
 import { getPreferredOrganizerEmail, getTokenOwnerOrganizerEmail } from '@/lib/schedulingApi'
 import type { SystemUser } from '@/lib/schedulingApi'
+import { createUser } from '@/lib/usersApi'
 
 interface AttendeeRefreshPanelProps {
   cycleId: string
@@ -60,6 +61,46 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Inline "create a brand-new person" flow (when the search finds nobody).
+  const [creatingNew, setCreatingNew] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newOrg, setNewOrg] = useState('')
+  const [newGmail, setNewGmail] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  function openCreateNew() {
+    // Pre-fill from the current query: an "@"-containing query is an email, else a name.
+    const q = query.trim()
+    if (q.includes('@')) { setNewEmail(q); setNewName('') }
+    else { setNewName(q); setNewEmail('') }
+    setNewOrg('')
+    setNewGmail('')
+    setError(null)
+    setShowDropdown(false)
+    setCreatingNew(true)
+  }
+
+  async function handleCreateNew() {
+    const name = newName.trim()
+    const email = newEmail.trim()
+    if (!name) { setError('Name is required for the new person.'); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('Enter a valid work email for the new person.'); return }
+    setCreating(true)
+    setError(null)
+    try {
+      const created = await createUser({ name, email, role, organisation: newOrg.trim(), gmail: newGmail.trim() })
+      // Immediately select the freshly-created person so the normal add flow proceeds.
+      setSelected(created)
+      setQuery(created.name)
+      setCreatingNew(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create the new person (the email may already exist).')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   useEffect(() => {
     const q = query.trim().toLowerCase()
@@ -212,12 +253,69 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
           </div>
         )}
 
-        {showDropdown && results.length === 0 && query.trim() && (
-          <div className="absolute z-20 top-full mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
-            No users found matching "{query}"
+        {showDropdown && results.length === 0 && query.trim() && !creatingNew && (
+          <div className="absolute z-20 top-full mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden">
+            <div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
+              No users found matching "{query}"
+            </div>
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); openCreateNew() }}
+              className="w-full text-left px-3 py-2 border-t border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors flex items-center gap-2 text-xs font-medium text-indigo-600 dark:text-indigo-400"
+            >
+              <UserPlus size={13} /> Add "{query.trim()}" as a new person
+            </button>
           </div>
         )}
       </div>
+
+      {/* Inline create-new-person form (adds to the directory, then selects them) */}
+      {creatingNew && (
+        <div className="border border-indigo-200 dark:border-indigo-700 rounded-lg p-3 bg-white dark:bg-slate-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
+              <UserPlus size={12} /> New person
+            </span>
+            <button type="button" onClick={() => setCreatingNew(false)} className="text-slate-400 hover:text-slate-600">
+              <X size={13} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text" placeholder="Full name *" value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <input
+              type="email" placeholder="Work email *" value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <input
+              type="text" placeholder="Organisation" value={newOrg}
+              onChange={(e) => setNewOrg(e.target.value)}
+              className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <input
+              type="email" placeholder="Gmail (optional)" value={newGmail}
+              onChange={(e) => setNewGmail(e.target.value)}
+              className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleCreateNew}
+            disabled={creating}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-medium rounded-lg transition-colors"
+          >
+            {creating ? <Loader2 size={12} className="animate-spin" /> : <UserPlus size={12} />}
+            Create &amp; select
+          </button>
+          <p className="text-[10px] text-slate-400">
+            Saved to the directory — you can manage them later under Directory. Then set their role &amp; type below.
+          </p>
+        </div>
+      )}
 
       {selected && (
         <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-lg">

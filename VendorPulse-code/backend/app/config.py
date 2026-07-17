@@ -96,6 +96,19 @@ class Settings(BaseSettings):
     graph_access_token: str = ""
     graph_meeting_duration_minutes: int = 30   # configurable: 30, 60, 90, etc.
 
+    # CORS — comma-separated list of allowed browser origins. Never use "*" with
+    # credentials. Override in production with the deployed frontend origin(s).
+    cors_origins: str = "http://localhost:5173,http://localhost:5174"
+
+    # Mail provider — which channel sends scorecard links & meeting minutes (MOM).
+    # "gmail" (current) or "graph"/"outlook" (Microsoft Graph Mail.Send via a
+    # service account). Flip to "graph" once the tenant grants Mail.Send.
+    # See docs/MAIL_OUTLOOK_MIGRATION.md.
+    mail_provider: str = "gmail"
+    # Service-account mailbox (UPN) to send AS when mail_provider="graph" (app-only).
+    # Empty falls back to the token owner (/me) in dev.
+    graph_mail_sender: str = ""
+
     # Google OAuth2 (Gmail + Forms)
     google_client_id: str = ""
     google_client_secret: str = ""

@@ -51,6 +51,13 @@ function fmt(n: number | null | undefined) {
   return n == null ? '—' : n.toFixed(2)
 }
 
+/** Recharts 3 chart/label formatters receive varying value types across Tooltip
+ *  and LabelList. Accept `unknown` and coerce to a fixed-decimal string, passing
+ *  non-numbers through safely. */
+function num(v: unknown, dp = 2): string {
+  return typeof v === 'number' ? v.toFixed(dp) : String(v ?? '')
+}
+
 /* ── Theme meter (magnitude bar + reserved status chip) ───────────────────── */
 function ThemeMeter({ label, score }: { label: string; score: number }) {
   const st = scoreStatus(score)
@@ -103,9 +110,9 @@ function CrossVendorChart({ vendors }: { vendors: AnalyticsVendor[] }) {
             <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} horizontal={false} />
             <XAxis type="number" domain={[0, 5]} ticks={[0, 1, 2, 3, 4, 5]} tick={{ fontSize: 11, fill: pal.axis }} tickLine={false} axisLine={false} />
             <YAxis type="category" dataKey="vendor" width={130} tick={{ fontSize: 12, fill: pal.textDim }} tickLine={false} axisLine={false} />
-            <Tooltip cursor={{ fill: pal.grid, opacity: 0.4 }} contentStyle={chartTooltipStyle(pal)} formatter={(v: number) => [v.toFixed(2), 'Overall']} />
+            <Tooltip cursor={{ fill: pal.grid, opacity: 0.4 }} contentStyle={chartTooltipStyle(pal)} formatter={(v: unknown) => [num(v), 'Overall']} />
             <Bar dataKey="score" fill={pal.series} radius={[0, 4, 4, 0]} barSize={20}>
-              <LabelList dataKey="score" position="right" formatter={(v: number) => v.toFixed(2)} style={{ fill: pal.textDim, fontSize: 11, fontWeight: 600 }} />
+              <LabelList dataKey="score" position="right" formatter={(v: unknown) => num(v)} style={{ fill: pal.textDim, fontSize: 11, fontWeight: 600 }} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -227,7 +234,7 @@ function CompareVendorsChart({ vendors, themes }: { vendors: AnalyticsVendor[]; 
               <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} vertical={false} />
               <XAxis dataKey="category" tick={{ fontSize: 10, fill: pal.axis }} tickLine={false} axisLine={false} interval={0} angle={-20} textAnchor="end" height={52} />
               <YAxis domain={[0, 5]} ticks={[0, 1, 2, 3, 4, 5]} tick={{ fontSize: 11, fill: pal.axis }} tickLine={false} axisLine={false} />
-              <Tooltip cursor={{ fill: pal.grid, opacity: 0.35 }} contentStyle={chartTooltipStyle(pal)} formatter={(v: number) => (typeof v === 'number' ? v.toFixed(2) : v)} />
+              <Tooltip cursor={{ fill: pal.grid, opacity: 0.35 }} contentStyle={chartTooltipStyle(pal)} formatter={(v: unknown) => num(v)} />
               <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: 11, paddingBottom: 10 }} />
               {chosen.map((v) => (
                 // Function dataKey (not the raw name) so a vendor name containing a
@@ -279,9 +286,9 @@ function TrendChart({ vendor }: { vendor: AnalyticsVendor }) {
             <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: pal.axis }} tickLine={false} axisLine={false} />
             <YAxis domain={[0, 5]} ticks={[0, 1, 2, 3, 4, 5]} tick={{ fontSize: 11, fill: pal.axis }} tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={chartTooltipStyle(pal)} formatter={(v: number) => [v?.toFixed?.(2) ?? v, seriesLabel]} />
+            <Tooltip contentStyle={chartTooltipStyle(pal)} formatter={(v: unknown) => [num(v), seriesLabel]} />
             <Line type="monotone" dataKey="value" stroke={pal.series} strokeWidth={2} dot={{ r: 4, fill: pal.series }} activeDot={{ r: 6 }} connectNulls>
-              <LabelList dataKey="value" position="top" formatter={(v: number) => (v == null ? '' : v.toFixed(1))} style={{ fill: pal.textDim, fontSize: 11, fontWeight: 600 }} />
+              <LabelList dataKey="value" position="top" formatter={(v: unknown) => num(v, 1)} style={{ fill: pal.textDim, fontSize: 11, fontWeight: 600 }} />
             </Line>
           </LineChart>
         </ResponsiveContainer>

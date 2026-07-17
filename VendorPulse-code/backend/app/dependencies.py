@@ -22,10 +22,6 @@ from app.repositories.vendor_repository import VendorRepository
 from app.services.availability_service import AvailabilityService
 from app.services.llm_service import LLMService
 from app.services.meeting_service import MeetingService
-from app.services.mock.mock_calendar import MockCalendarService
-from app.services.mock.mock_email import MockEmailService
-from app.services.mock.mock_forms import MockFormService
-from app.services.mock.mock_notifications import MockNotificationService
 from app.services.scheduling_service import SchedulingService
 from app.services.slot_ranking_service import SlotRankingService
 from app.services.user_service import UserService
@@ -123,45 +119,7 @@ def get_llm_service() -> LLMService:
     return LLMService()
 
 
-# ── Mock external services (singletons — preserve in-process outbox/log) ─────
-
-
-@lru_cache(maxsize=None)
-def get_mock_calendar() -> MockCalendarService:
-    return MockCalendarService()
-
-
-@lru_cache(maxsize=None)
-def get_mock_email() -> MockEmailService:
-    return MockEmailService()
-
-
-@lru_cache(maxsize=None)
-def get_mock_forms() -> MockFormService:
-    return MockFormService()
-
-
-@lru_cache(maxsize=None)
-def get_mock_notifications() -> MockNotificationService:
-    return MockNotificationService()
-
-
 # ── Agent providers ───────────────────────────────────────────────────────────
-
-
-def get_scheduling_agent(cycle_id: str | None = None):
-    """
-    Returns a SchedulingAgent wired with all dependencies.
-    Pass cycle_id when the agent is scoped to a specific governance cycle.
-    """
-    from app.agents.scheduling_agent import SchedulingAgent
-
-    return SchedulingAgent(
-        scheduling_svc=get_scheduling_service(),
-        cycle_id=cycle_id,
-        llm_svc=get_llm_service() if settings.enable_llm else None,
-        agent_run_repo=get_agent_run_repo(),
-    )
 
 
 def _fetch_compiled_scorecard(cycle_id: str) -> dict:

@@ -42,10 +42,12 @@ app = FastAPI(
 
 # ── Middleware (order matters: last added = first executed) ────────────────────
 
-# Allow all origins during development. Restrict in production.
+# Explicit allow-list from settings (comma-separated). Never "*" with credentials —
+# a wildcard origin plus credentials lets any site make credentialed calls.
+_cors_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*" , "http://localhost:5173"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -543,7 +543,7 @@ def add_alignment_attendee(
     new_attendee = {
         "attendee_id": f"att_{uuid.uuid4().hex[:8]}",
         "cycle_id": cycleId,
-        "stakeholder_id": f"s_{int(datetime.now(timezone.utc).timestamp() * 1000)}",
+        "stakeholder_id": f"s_{uuid.uuid4().hex[:8]}",
         "name": payload.name,
         "email": payload.email,
         "role": payload.role,

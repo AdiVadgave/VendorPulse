@@ -1,10 +1,11 @@
 """
 User management routes.
 
-GET  /api/users                         List all users
-POST /api/users                         Create user
-GET  /api/users/{userId}                Get user
-PUT  /api/users/{userId}                Update user
+GET    /api/users                       List all users
+POST   /api/users                       Create user
+GET    /api/users/{userId}              Get user
+PUT    /api/users/{userId}              Update user
+DELETE /api/users/{userId}              Delete user (directory only)
 GET  /api/users/{userId}/availability   Get availability
 PUT  /api/users/{userId}/availability   Update availability for one date
 GET  /api/users/{userId}/meetings       Get user's meetings
@@ -65,6 +66,16 @@ def update_user(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return {"user": user}
+
+
+@router.delete("/{userId}")
+def delete_user(userId: str, svc: UserService = Depends(get_user_service)):
+    """Remove a person from the directory. Does not touch any cycle they were
+    already added to as an attendee (those are separate records)."""
+    if svc.get_user(userId) is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    svc.delete_user(userId)
+    return {"deleted": True, "user_id": userId}
 
 
 @router.get("/{userId}/availability")

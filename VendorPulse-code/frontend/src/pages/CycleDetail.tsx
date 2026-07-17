@@ -221,15 +221,15 @@ export default function CycleDetail() {
 
   // --- Module D state ---
   const [vendorBrief, setVendorBrief] = useState<VendorBrief | null>(
-    cycle?.workflow_state === 'POST_MEETING_COMPLETE' ? MOCK_VENDOR_BRIEF : null
+    isMockCycle && cycle?.workflow_state === 'POST_MEETING_COMPLETE' ? MOCK_VENDOR_BRIEF : null
   )
-  const [, setBriefApproved] = useState(cycle?.workflow_state === 'POST_MEETING_COMPLETE')
+  const [, setBriefApproved] = useState(isMockCycle && cycle?.workflow_state === 'POST_MEETING_COMPLETE')
   const [pushbackItems, setPushbackItems] = useState<PushbackItem[]>(MOCK_PUSHBACK_ITEMS)
   const [pushbackResponses, setPushbackResponses] = useState<Record<string, PushbackResponse[]>>({})
 
   // --- Module E state ---
   const [meetingNotes, setMeetingNotes] = useState<MeetingNote[]>(
-    cycle?.workflow_state === 'POST_MEETING_COMPLETE' ? MOCK_MEETING_NOTES : []
+    isMockCycle && cycle?.workflow_state === 'POST_MEETING_COMPLETE' ? MOCK_MEETING_NOTES : []
   )
   const [vendorMeetingTeamsUrl, setVendorMeetingTeamsUrl] = useState<string | null>(
     cycle?.teams_meeting_url ?? null

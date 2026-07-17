@@ -30,6 +30,8 @@ class UserService:
             "name": payload.name,
             "email": payload.email,
             "role": payload.role,
+            "organisation": payload.organisation or "",
+            "gmail": payload.gmail or "",
             "avatar": initials,
             "availability": [],
             "createdAt": datetime.now(timezone.utc).isoformat(),
@@ -41,6 +43,9 @@ class UserService:
         if not updates:
             return self._repo.get_by_user_id(user_id)
         return self._repo.update_by_id("userId", user_id, updates)
+
+    def delete_user(self, user_id: str) -> bool:
+        return self._repo.delete_by_id("userId", user_id)
 
     def update_availability(self, user_id: str, date: str, slots: list[str]) -> Optional[dict]:
         return self._repo.update_availability(user_id, date, slots)

@@ -149,9 +149,9 @@
     "cycle_type": "SPR",
     "quarter": "Q2",
     "year": 2026,
-    "workflow_state": "CYCLE_CREATED",
+    "workflow_state": "MEETING_SCHEDULED",
     "created_at": "2026-07-16T08:07:39.068528+00:00",
-    "updated_at": "2026-07-16T08:07:39.068528+00:00",
+    "updated_at": "2026-07-17T08:31:25.368450+00:00",
     "scorecard_config": {
       "categories": [
         {
@@ -244,7 +244,11 @@
         }
       ],
       "configured": false
-    }
+    },
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_NDdlZjdhZGItZTYxMy00MDU3LTk5ZjQtODFjODZjMmU2NDg2%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "teams_meeting_web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABZ4ZF9QAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "teams_meeting_event_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABZ4ZF9QAAAA==",
+    "teams_meeting_scheduled_at": "2026-07-17T08:31:25.368450+00:00"
   },
   {
     "cycle_id": "c_demo_technoserve_Q12025",
@@ -1631,6 +1635,111 @@
     "workflow_state": "ATTENDEE_REFRESH_SENT",
     "created_at": "2026-07-17T05:14:54.574840+00:00",
     "updated_at": "2026-07-17T05:59:18.150731+00:00",
+    "scorecard_config": {
+      "categories": [
+        {
+          "key": "RISK_COMPLIANCE",
+          "label": "Risk & Compliance",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PATCH_MANAGEMENT",
+              "label": "Patch Management",
+              "description": "Vendor support towards implementing latest Releases, Anti-virus upgrades and Patch Management",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "PERFORMANCE",
+          "label": "Performance",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "RESOURCES_CAPABILITY",
+              "label": "Resources & Capability",
+              "description": "Vendor proactive capability to leverage their resources to meet the organizational goals and anticipating the future requirements of an organization",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "RELEASE_DELIVERY",
+              "label": "Release & Delivery",
+              "description": "On-time, quality project delivery, resources and capability",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "OPERATIONS",
+              "label": "Operations",
+              "description": "Meets or exceeds contracted service levels with strong focus on user experience",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "COMMERCIAL",
+          "label": "Commercial",
+          "weight": 20,
+          "measures": [
+            {
+              "key": "PRICING",
+              "label": "Pricing",
+              "description": "Cost is competitive and well-managed",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COMMERCIAL_EXCELLENCE",
+              "label": "Commercial Excellence",
+              "description": "Appropriate commercial contract structure, invoices timely, accurate, and transparent",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "COST_CONTROL",
+              "label": "Cost Control",
+              "description": "Changes and increases are managed well and minimized; cost-saving ideas shared",
+              "measure_type": "numeric"
+            }
+          ]
+        },
+        {
+          "key": "RELATIONSHIP",
+          "label": "Relationship",
+          "weight": 30,
+          "measures": [
+            {
+              "key": "FLEXIBILITY",
+              "label": "Flexibility",
+              "description": "Vendor team demonstrates flexibility & Proactive responsiveness when required",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "STAKEHOLDER_ENGAGEMENT",
+              "label": "Stakeholder Engagement",
+              "description": "Vendor's ability to understand, communicate and respond to Shell's stakeholders in a professional, clear and timely manner",
+              "measure_type": "numeric"
+            },
+            {
+              "key": "ALIGNMENT",
+              "label": "Alignment",
+              "description": "Vendor understands the business needs and partners with Shell to meet the short- & long-term milestone roadmap timelines and ownership (includes innovation & sustainability)",
+              "measure_type": "numeric"
+            }
+          ]
+        }
+      ],
+      "configured": false
+    }
+  },
+  {
+    "cycle_id": "c_fa99b3c0",
+    "vendor_id": "v_42a2e6b4",
+    "vendor_name": "DataBridge",
+    "cycle_type": "SPR",
+    "quarter": "Q2",
+    "year": 2026,
+    "description": "",
+    "workflow_state": "AVAILABILITY_COLLECTED",
+    "created_at": "2026-07-17T09:41:50.922373+00:00",
+    "updated_at": "2026-07-17T09:42:12.387266+00:00",
     "scorecard_config": {
       "categories": [
         {

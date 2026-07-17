@@ -35,7 +35,6 @@ from app.models.scheduling import (
     CycleAttendeeCreate,
     CycleAttendeeUpdate,
     CycleCreate,
-    RankSlotsRequest,
 )
 from app.utils.scorecard_structure import default_scorecard_config
 from app.services.scheduling_service import SchedulingService
@@ -409,47 +408,6 @@ def get_attendance_outreach_messages(
         raise HTTPException(status_code=500, detail=f"Failed to query outreach messages: {str(exc)}")
 
 
-@router.post("/api/cycles/{cycleId}/scheduling/simulate-attendance-confirmation")
-def simulate_attendance_confirmation(
-    cycleId: str,
-    svc: SchedulingService = Depends(get_scheduling_service),
-    cycle_repo=Depends(get_cycle_repo),
-):
-    """
-    Simulate attendance confirmation responses from all attendees (demo helper).
-    Marks ~60% as CONFIRMED, ~25% as REPLACED, rest as CONFIRMED.
-    """
-    raise HTTPException(
-        status_code=410,
-        detail="This endpoint is disabled in Graph-only mode. Use attendance outreach + Graph scheduling flow.",
-    )
-
-
-@router.post("/api/cycles/{cycleId}/scheduling/simulate-responses")
-def simulate_responses(
-    cycleId: str,
-    svc: SchedulingService = Depends(get_scheduling_service),
-    cycle_repo=Depends(get_cycle_repo),
-):
-    raise HTTPException(
-        status_code=410,
-        detail="This endpoint is disabled in Graph-only mode. Use /api/cycles/{cycleId}/scheduling/graph/find-times.",
-    )
-
-
-@router.post("/api/cycles/{cycleId}/scheduling/rank-slots")
-def rank_slots(
-    cycleId: str,
-    payload: RankSlotsRequest,
-    svc: SchedulingService = Depends(get_scheduling_service),
-    cycle_repo=Depends(get_cycle_repo),
-):
-    raise HTTPException(
-        status_code=410,
-        detail="This endpoint is disabled in Graph-only mode. Use /api/cycles/{cycleId}/scheduling/graph/find-times.",
-    )
-
-
 @router.get("/api/cycles/{cycleId}/scheduling/slots")
 def get_slots(
     cycleId: str,
@@ -500,20 +458,6 @@ def approve_slot(
     return result
 
 
-@router.post("/api/cycles/{cycleId}/scheduling/send-invites")
-def send_invites(
-    cycleId: str,
-    organiser_id: str = Body(..., embed=True),
-    slot_id: str = Body(..., embed=True),
-    svc: SchedulingService = Depends(get_scheduling_service),
-    cycle_repo=Depends(get_cycle_repo),
-):
-    raise HTTPException(
-        status_code=410,
-        detail="This endpoint is disabled in Graph-only mode. Use /api/cycles/{cycleId}/scheduling/graph/send-invite.",
-    )
-
-
 @router.get("/api/cycles/{cycleId}/scheduling/rsvp")
 def get_rsvp(
     cycleId: str,
@@ -533,28 +477,6 @@ def update_rsvp(
     if updated is None:
         raise HTTPException(status_code=404, detail="Attendee not found")
     return {"attendee": updated}
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Scheduling Agent — autonomous run endpoint
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-@router.post("/api/cycles/{cycleId}/scheduling/agent/run")
-def run_scheduling_agent(
-    cycleId: str,
-    message: str = Body(
-        default="Simulate availability responses then rank the best meeting slots for this cycle.",
-        embed=True,
-    ),
-    svc: SchedulingService = Depends(get_scheduling_service),
-    cycle_repo=Depends(get_cycle_repo),
-    agent_run_repo=Depends(get_agent_run_repo),
-):
-    raise HTTPException(
-        status_code=410,
-        detail="This endpoint is disabled in Graph-only mode. Use /api/cycles/{cycleId}/scheduling/graph/find-times.",
-    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────

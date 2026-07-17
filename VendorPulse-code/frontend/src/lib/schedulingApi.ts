@@ -4,6 +4,7 @@
  */
 import { apiFetch } from './api'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
+import type { GovernanceCycle } from '@/types/cycle.types'
 
 // ── Response shapes ──────────────────────────────────────────────────────────
 

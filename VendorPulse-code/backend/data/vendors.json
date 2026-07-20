@@ -94,5 +94,11 @@
     "name": "Okta",
     "category": "IT Infrastructure",
     "status": "active"
+  },
+  {
+    "vendor_id": "v_a005e42ad5ae456783bcff41474f2310",
+    "name": "ABCD",
+    "category": "IT Infrastructure",
+    "status": "active"
   }
 ]

@@ -76,6 +76,5 @@ export interface SlotProposal {
 export type SchedulingPhase =
   | 'attendance_confirmation'
   | 'attendee_refresh'
-  | 'slot_ranking'
-  | 'invite_approval'
+  | 'schedule_meeting'
   | 'confirmation_tracking'

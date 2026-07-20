@@ -167,7 +167,7 @@ class SlotRankingService:
 
             results.append(
                 {
-                    "slot_id": f"sl_{uuid.uuid4().hex[:8]}",
+                    "slot_id": f"sl_{uuid.uuid4().hex}",
                     "cycle_id": cycle_id,
                     "proposed_time": slot_iso,
                     "organiser_available": True,

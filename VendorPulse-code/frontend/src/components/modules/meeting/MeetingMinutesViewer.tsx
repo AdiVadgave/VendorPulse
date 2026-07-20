@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FileText, Sparkles, Copy, CheckCircle2, Send, Users } from 'lucide-react'
 import type { MeetingMinutes } from '@/types/meeting.types'
 import type { MeetingNote } from '@/types/meeting.types'
@@ -11,15 +11,17 @@ import type { AgentStatus } from '@/types/agent.types'
 interface Props {
   cycleId: string
   notes: MeetingNote[]
+  /** Previously-generated minutes, restored on load so the MoM isn't regenerated. */
+  initialMinutes?: MeetingMinutes | null
   vendorName: string
   quarter: string
   year: number
   onApproved: () => void
 }
 
-export default function MeetingMinutesViewer({ cycleId, notes, vendorName, quarter, year, onApproved }: Props) {
-  const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
-  const [minutes, setMinutes] = useState<MeetingMinutes | null>(null)
+export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = null, vendorName, quarter, year, onApproved }: Props) {
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>(initialMinutes ? 'complete' : 'idle')
+  const [minutes, setMinutes] = useState<MeetingMinutes | null>(initialMinutes)
   const [showApproval, setShowApproval] = useState(false)
   const [approved, setApproved] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -29,6 +31,15 @@ export default function MeetingMinutesViewer({ cycleId, notes, vendorName, quart
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
   const [sentRecipients, setSentRecipients] = useState<SendMinutesRecipient[]>([])
   const [sendError, setSendError] = useState<string | null>(null)
+
+  // Hydrate persisted minutes when they arrive from the async load (after mount).
+  // Only fills an empty viewer — never clobbers a freshly-generated set.
+  useEffect(() => {
+    if (initialMinutes) {
+      setMinutes((prev) => prev ?? initialMinutes)
+      setAgentStatus((prev) => (prev === 'idle' ? 'complete' : prev))
+    }
+  }, [initialMinutes])
 
   async function handleGenerate() {
     setAgentStatus('running')

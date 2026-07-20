@@ -10,13 +10,11 @@ import {
   Loader2,
   Search,
   CalendarClock,
-  Globe,
   Trash2,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type {
   CycleAttendee,
-  SlotProposal,
   AttendanceRequirement,
   LTStatus,
   ShellDepartment,
@@ -25,7 +23,6 @@ import { SHELL_DEPARTMENTS } from '@/types/scheduling.types'
 import { ROLE_LABELS } from '@/types/cycle.types'
 import type { StakeholderRole } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
-import { getPreferredOrganizerEmail, getTokenOwnerOrganizerEmail } from '@/lib/schedulingApi'
 import type { SystemUser } from '@/lib/schedulingApi'
 import { createUser } from '@/lib/usersApi'
 
@@ -34,7 +31,8 @@ interface AttendeeRefreshPanelProps {
   attendees: CycleAttendee[]
   onAttendeesChanged: (updated: CycleAttendee[]) => void
   onDispatchComplete: () => void
-  onResponsesSimulated: (updated: CycleAttendee[], slots: SlotProposal[]) => void
+  /** Move on to the (manual) meeting-scheduling step. */
+  onProceed: () => void
   onBackToAttendance?: () => void
 }
 
@@ -444,24 +442,11 @@ export default function AttendeeRefreshPanel({
   cycleId,
   attendees,
   onAttendeesChanged,
-  onResponsesSimulated,
+  onProceed,
   onBackToAttendance,
 }: AttendeeRefreshPanelProps) {
-  const today = new Date()
-  const defaultStartDate = today.toISOString().split('T')[0]
-  const defaultEndDate = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split('T')[0]
-
   const [showAddForm, setShowAddForm] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [isGraphSearching, setIsGraphSearching] = useState(false)
-  const [graphStatus, setGraphStatus] = useState<string>('')
-  const [graphError, setGraphError] = useState<string | null>(null)
-  const [graphStartDate, setGraphStartDate] = useState(defaultStartDate)
-  const [graphEndDate, setGraphEndDate] = useState(defaultEndDate)
-  const [graphDurationHours, setGraphDurationHours] = useState(0.5)
-  const [graphTimeZone, setGraphTimeZone] = useState<'IST' | 'UTC' | 'GMT'>('IST')
 
   async function handleUpdateAttendee(
     attendee: CycleAttendee,
@@ -507,77 +492,6 @@ export default function AttendeeRefreshPanel({
     setShowAddForm(false)
   }
 
-  async function handleFindGraphSlots() {
-    setIsGraphSearching(true)
-    setGraphError(null)
-    setGraphStatus('Finding real calendar slots via Graph…')
-    try {
-      const attendeeEmails = attendees.map((a) => a.email)
-      const organiserEmail = await getTokenOwnerOrganizerEmail()
-      const fallbackOrganizer = getPreferredOrganizerEmail(attendees)
-      if (!organiserEmail) {
-        setGraphError(
-          fallbackOrganizer
-            ? 'Could not resolve token owner organizer from Graph token. Refresh GRAPH_ACCESS_TOKEN and retry.'
-            : 'No organiser email found. Add at least one attendee with an email address.'
-        )
-        return
-      }
-
-      const result = await apiFetch<{
-        message?: string
-        slot_proposals: SlotProposal[]
-        graph_summary?: { empty_suggestions_reason?: string; no_slots_reason?: string }
-      }>(
-        `/api/cycles/${cycleId}/scheduling/graph/find-times`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            organiser_email: organiserEmail,
-            date_range_start: graphStartDate,
-            date_range_end: graphEndDate,
-            duration_hours: graphDurationHours,
-            use_specific_attendees: attendeeEmails,
-            time_zone: graphTimeZone,
-            debug: true,
-          }),
-        }
-      )
-
-      const durationMinutes = Math.round(graphDurationHours * 60)
-      const slots = (result.slot_proposals ?? []).map((slot) => {
-        const withDuration = slot as SlotProposal & {
-          duration_minutes?: number
-          proposed_time_zone?: string
-        }
-        return {
-          ...slot,
-          duration_minutes: withDuration.duration_minutes ?? durationMinutes,
-          proposed_time_zone: withDuration.proposed_time_zone ?? graphTimeZone,
-        }
-      })
-
-      if (slots.length === 0) {
-        const reason = result.graph_summary?.no_slots_reason?.trim() || result.graph_summary?.empty_suggestions_reason?.trim()
-        const msg = result.message?.trim()
-        setGraphError(
-          reason
-            ? `No slots found. Reason: ${reason}`
-            : msg || 'No common slots found for the selected attendees/date range in working-hours mode.'
-        )
-        return
-      }
-
-      setGraphStatus(`Found ${slots.length} real calendar slots`)
-      onResponsesSimulated(attendees, slots)
-    } catch (err) {
-      setGraphError(err instanceof Error ? err.message : 'Graph API error')
-    } finally {
-      setIsGraphSearching(false)
-      setGraphStatus('')
-    }
-  }
-
   return (
     <div className="space-y-4 fade-in">
       {/* Header card */}
@@ -610,95 +524,25 @@ export default function AttendeeRefreshPanel({
         <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-400 flex items-start gap-2">
           <CalendarClock size={14} className="shrink-0 mt-0.5" />
           <span>
-            Add all attendees below. Once ready, click{' '}
-            <strong>Find Slots (Graph)</strong> — VendorPulse will query calendar availability
-            via Microsoft Graph and return the best common time slots.
+            Add or remove attendees for this cycle. When the list is ready, continue to set the
+            meeting date &amp; time.
           </span>
         </div>
 
-        {/* Proceed button */}
-        <div className="mt-4 space-y-2">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
-                Start date
-                <input
-                  type="date"
-                  value={graphStartDate}
-                  onChange={(e) => setGraphStartDate(e.target.value)}
-                  className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
-                End date
-                <input
-                  type="date"
-                  value={graphEndDate}
-                  onChange={(e) => setGraphEndDate(e.target.value)}
-                  className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
-                Meeting duration
-                <select
-                  value={graphDurationHours}
-                  onChange={(e) => setGraphDurationHours(Number(e.target.value))}
-                  className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value={0.5}>30 minutes</option>
-                  <option value={1}>60 minutes</option>
-                  <option value={1.5}>90 minutes</option>
-                  <option value={2}>120 minutes</option>
-                </select>
-              </label>
-            </div>
-            <div className="max-w-55">
-              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
-                Scheduling timezone
-                <select
-                  value={graphTimeZone}
-                  onChange={(e) => setGraphTimeZone(e.target.value as 'IST' | 'UTC' | 'GMT')}
-                  className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="IST">IST</option>
-                  <option value="UTC">UTC</option>
-                  <option value="GMT">GMT</option>
-                </select>
-              </label>
-            </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleFindGraphSlots}
-              disabled={isGraphSearching || attendees.length === 0}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors',
-                (isGraphSearching || attendees.length === 0) && 'opacity-60 cursor-not-allowed'
-              )}
-            >
-              {isGraphSearching ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Globe size={14} />
-              )}
-              {isGraphSearching ? (graphStatus || 'Finding slots…') : 'Find Slots (Graph)'}
-            </button>
-          </div>
-          {!isGraphSearching && attendees.length > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-              <ArrowRight size={12} />
-              Uses Microsoft Graph calendar availability
-            </span>
-          )}
+        <div className="mt-4 flex items-center gap-2 flex-wrap">
+          <button
+            onClick={onProceed}
+            disabled={attendees.length === 0}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors',
+              attendees.length === 0 && 'opacity-60 cursor-not-allowed'
+            )}
+          >
+            <ArrowRight size={14} />
+            Proceed to Schedule Meeting
+          </button>
           {attendees.length === 0 && (
-            <p className="text-xs text-slate-400 dark:text-slate-500">
-              Add at least one attendee to proceed.
-            </p>
-          )}
-          {graphError && (
-            <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
-              <AlertCircle size={12} />
-              {graphError}
-            </p>
+            <span className="text-xs text-slate-400 dark:text-slate-500">Add at least one attendee to proceed.</span>
           )}
         </div>
       </div>
@@ -758,7 +602,12 @@ export default function AttendeeRefreshPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {attendees.map((a) => (
+                {attendees.map((a) => {
+                  // Anything not explicitly a Vendor is treated as an internal
+                  // stakeholder — robust to legacy/missing `type` values so the Dept
+                  // and Key columns never collapse to "—" for a real internal member.
+                  const isInternal = a.type !== 'Vendor'
+                  return (
                   <tr
                     key={a.attendee_id}
                     className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
@@ -776,7 +625,7 @@ export default function AttendeeRefreshPanel({
                     </td>
                     <td className="px-4 py-3">
                       <select
-                        value={a.type}
+                        value={isInternal ? 'Internal Stakeholder' : 'Vendor'}
                         onChange={(e) => {
                           const newType = e.target.value as CycleAttendee['type']
                           handleUpdateAttendee(a, {
@@ -819,7 +668,7 @@ export default function AttendeeRefreshPanel({
                       </select>
                     </td>
                     <td className="px-4 py-3">
-                      {a.type === 'Internal Stakeholder' ? (
+                      {isInternal ? (
                         <select
                           value={a.shell_department ?? 'IDTM'}
                           onChange={(e) =>
@@ -838,7 +687,7 @@ export default function AttendeeRefreshPanel({
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {a.type === 'Internal Stakeholder' ? (
+                      {isInternal ? (
                         <select
                           value={a.is_key ? 'key' : 'not'}
                           onChange={(e) => handleUpdateAttendee(a, { is_key: e.target.value === 'key' })}
@@ -877,7 +726,8 @@ export default function AttendeeRefreshPanel({
                       </button>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

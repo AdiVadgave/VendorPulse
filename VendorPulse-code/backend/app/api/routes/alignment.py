@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.config import Settings, settings
-from app.dependencies import get_llm_service, get_cycle_repo, get_attendee_repo, get_alignment_agent, get_meeting_repo
+from app.dependencies import get_llm_service, get_cycle_repo, get_attendee_repo, get_meeting_repo, get_meeting_participant_repo
 from app.models.common import AgentResponse
 from app.services.graph_service import GraphService
 from app.utils.prompts import ALIGNMENT_SYSTEM_PROMPT
@@ -33,22 +33,14 @@ class ExtractActionsRequest(BaseModel):
     notes_text: str
 
 
-class FindTimesRequest(BaseModel):
-    cycle_id: str
-    organiser_email: str = Field(..., description="Email of the meeting organiser (must match Graph token owner)")
-    date_range_start: str = Field(..., description="YYYY-MM-DD")
-    date_range_end: str = Field(..., description="YYYY-MM-DD")
-    duration_hours: float = Field(0.5, description="Meeting duration (0.5 = 30 min)")
-    time_zone: str = Field("UTC", description="Timezone for meeting")
-
-
-class ScheduleMeetingRequest(BaseModel):
-    cycle_id: str
-    organiser_email: str = Field(..., description="Email of the meeting organiser (must match Graph token owner)")
-    slot_id: str = Field(..., description="Slot ID from find-times results")
-    start_time: str = Field(..., description="ISO-8601 start time from the selected slot")
+class ManualAlignmentMeetingRequest(BaseModel):
+    """Schedule an internal-alignment meeting at a coordinator-chosen time WITHOUT
+    Microsoft Graph / calendar access. Persists to the shared meetings store so the
+    UI can recover state after a refresh."""
+    start_time: str = Field(..., description="ISO-8601 start time chosen by the coordinator")
     duration_minutes: int = Field(30, description="Meeting duration in minutes")
-    time_zone: str = Field("UTC", description="Timezone for meeting")
+    time_zone: str = Field("IST", description="Timezone for meeting")
+    meeting_url: Optional[str] = Field(default=None, description="Optional meeting link the coordinator pastes")
     meeting_index: int = Field(1, description="Which alignment meeting (1-based) — a cycle may have several")
 
 
@@ -100,7 +92,7 @@ def extract_actions(cycleId: str, payload: ExtractActionsRequest):
 
     # Ensure each action has required fields
     for a in actions:
-        a.setdefault("action_id", f"a-{uuid.uuid4().hex[:6]}")
+        a.setdefault("action_id", f"a-{uuid.uuid4().hex}")
         a.setdefault("source", "alignment")
         a.setdefault("status", "OPEN")
         a.setdefault("owner", "TBD")
@@ -149,168 +141,25 @@ def _get_internal_attendees(attendee_repo, cycleId: str) -> list[dict]:
     return internal
 
 
-@router.post("/find-times")
-def find_alignment_times(
+@router.post("/manual-meeting")
+def schedule_alignment_meeting_manual(
     cycleId: str,
-    payload: FindTimesRequest,
-    cycle_repo=Depends(get_cycle_repo),
-    attendee_repo=Depends(get_attendee_repo),
-):
-    """
-    Find available meeting times for internal stakeholders using Graph findMeetingTimes.
-    Returns slot proposals compatible with SlotCard component.
-    """
-    logger.info("ALIGNMENT: find times — cycleId=%s, range=%s to %s", cycleId, payload.date_range_start, payload.date_range_end)
-
-    if payload.cycle_id != cycleId:
-        raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
-
-    cycle = cycle_repo.get_by_cycle_id(cycleId)
-    if not cycle:
-        raise HTTPException(status_code=404, detail=f"Cycle '{cycleId}' not found")
-
-    token = _get_graph_token()
-    if not token:
-        raise HTTPException(status_code=500, detail="GRAPH_ACCESS_TOKEN is not set in .env")
-
-    graph_service = GraphService(token)
-    internal_emails = _get_internal_emails(attendee_repo, cycleId)
-    if not internal_emails:
-        raise HTTPException(status_code=400, detail="No internal stakeholder emails found for this cycle")
-
-    try:
-        result = asyncio.run(graph_service.find_meeting_times(
-            attendee_emails=internal_emails,
-            date_range_start=payload.date_range_start,
-            date_range_end=payload.date_range_end,
-            duration_hours=payload.duration_hours,
-            time_zone=payload.time_zone,
-            max_candidates=10,
-        ))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Graph API error: {str(e)}")
-
-    if "error" in result:
-        status_code = int(result.get("status_code") or 400)
-        raise HTTPException(status_code=status_code, detail=result.get("error", "Graph API error"))
-
-    from app.utils.demo_attendees import get_attendee_name
-
-    suggestions = result.get("meetingTimeSuggestions", [])
-    slot_proposals = []
-
-    for idx, suggestion in enumerate(suggestions):
-        meeting_slot = suggestion.get("meetingTimeSlot", {})
-        start_info = meeting_slot.get("start", {})
-        local_start_str = start_info.get("dateTime", "")
-        graph_tz = start_info.get("timeZone") or payload.time_zone
-
-        # Convert to UTC ISO
-        proposed_time = local_start_str
-        try:
-            normalized = str(local_start_str).strip()
-            if "." in normalized:
-                normalized = normalized.split(".", 1)[0]
-            naive = datetime.fromisoformat(normalized)
-            try:
-                from zoneinfo import ZoneInfo
-                tz_map = {"IST": "Asia/Kolkata", "UTC": "UTC", "GMT": "Europe/London"}
-                tz_name = tz_map.get(graph_tz.upper(), graph_tz) if graph_tz else "UTC"
-                aware = naive.replace(tzinfo=ZoneInfo(tz_name))
-                proposed_time = aware.astimezone(timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
-            except Exception:
-                proposed_time = naive.isoformat(timespec="seconds") + "Z"
-        except Exception:
-            pass
-
-        # Compute attendee availability
-        availability = suggestion.get("attendeeAvailability", []) or []
-        attending_names = []
-        tentative_names = []
-        conflict_names = []
-
-        avail_by_email = {}
-        for item in availability:
-            attendee = (item or {}).get("attendee") or {}
-            email = ((attendee.get("emailAddress") or {}).get("address") or "").strip().lower()
-            status = ((item or {}).get("availability") or "unknown").lower()
-            if email:
-                avail_by_email[email] = status
-
-        for email in internal_emails:
-            status = avail_by_email.get(email, "unknown")
-            name = get_attendee_name(email) or email
-            if status == "free":
-                attending_names.append(name)
-            elif status == "tentative":
-                tentative_names.append(name)
-            else:
-                conflict_names.append(name)
-
-        # Compute rank_score using attendance-based formula (same as scheduling tab)
-        total = len(internal_emails)
-        attendance_pct = ((len(attending_names) + len(tentative_names)) / total * 100) if total > 0 else 0
-        conflict_penalty = len(conflict_names) * 10
-        # Bonus if all attendees are free (no tentative/conflicts)
-        full_attendance_bonus = 10 if len(conflict_names) == 0 and len(tentative_names) == 0 else 0
-        # Penalty for tentative attendees (softer than conflicts)
-        tentative_penalty = len(tentative_names) * 5
-        score = max(0, min(100, round(attendance_pct - conflict_penalty - tentative_penalty + full_attendance_bonus, 1)))
-
-        slot_id = f"align_{uuid.uuid4().hex[:8]}"
-        slot_proposals.append({
-            "slot_id": slot_id,
-            "cycle_id": cycleId,
-            "proposed_time": proposed_time,
-            "proposed_time_zone": payload.time_zone,
-            "duration_minutes": int(payload.duration_hours * 60),
-            "organiser_available": True,
-            "exec_sponsor_available": True,
-            "rank_score": score,
-            "is_approved": False,
-            "attendance_count": len(attending_names) + len(tentative_names),
-            "total_attendees": len(internal_emails),
-            "conflict_count": len(conflict_names),
-            "attending": attending_names,
-            "tentative": tentative_names,
-            "conflicts": conflict_names,
-        })
-
-    slot_proposals.sort(key=lambda s: (-s["rank_score"], s["proposed_time"]))
-
-    return {
-        "message": f"Found {len(slot_proposals)} available slots for internal alignment",
-        "slot_proposals": slot_proposals,
-        "attendee_count": len(internal_emails),
-    }
-
-
-@router.post("/schedule-meeting")
-def schedule_alignment_meeting(
-    cycleId: str,
-    payload: ScheduleMeetingRequest,
+    payload: ManualAlignmentMeetingRequest,
     cycle_repo=Depends(get_cycle_repo),
     attendee_repo=Depends(get_attendee_repo),
     meeting_repo=Depends(get_meeting_repo),
+    participant_repo=Depends(get_meeting_participant_repo),
 ):
-    """
-    Create a Teams meeting for internal alignment using a selected slot.
-    Invites all internal stakeholders. Persists to meetings.json for state recovery.
-    """
-    logger.info("ALIGNMENT: schedule meeting — cycleId=%s, slot=%s", cycleId, payload.slot_id)
-
-    if payload.cycle_id != cycleId:
-        raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
+    """Record an internal-alignment meeting at a coordinator-chosen time with no
+    Microsoft Graph / calendar access. Invites all internal stakeholders and
+    persists to the shared meetings store (meeting_type=INTERNAL_ALIGNMENT) so the
+    state survives a refresh. Reschedules the same index in place."""
+    logger.info("ALIGNMENT: manual meeting — cycleId=%s, index=%s", cycleId, payload.meeting_index)
 
     cycle = cycle_repo.get_by_cycle_id(cycleId)
     if not cycle:
         raise HTTPException(status_code=404, detail=f"Cycle '{cycleId}' not found")
 
-    token = _get_graph_token()
-    if not token:
-        raise HTTPException(status_code=500, detail="GRAPH_ACCESS_TOKEN is not set in .env")
-
-    graph_service = GraphService(token)
     internal_emails = _get_internal_emails(attendee_repo, cycleId)
     if not internal_emails:
         raise HTTPException(status_code=400, detail="No internal stakeholder emails found for this cycle")
@@ -321,91 +170,63 @@ def schedule_alignment_meeting(
     meeting_index = max(1, int(payload.meeting_index or 1))
     suffix = f" #{meeting_index}" if meeting_index > 1 else ""
     subject = f"Internal Alignment{suffix} — {vendor_name} ({quarter} {year})"
+    meeting_url = (payload.meeting_url or "").strip() or None
 
-    # Reschedule-in-place: if THIS alignment meeting (same index) already exists,
-    # PATCH the existing Teams event (keeps the join link + invite thread) instead
-    # of creating a duplicate. Mirrors the Scheduling module's reschedule.
+    # Reschedule-in-place: keep the same record (and meeting_id) for this index.
     existing = next(
         (m for m in meeting_repo.get_for_cycle(cycleId)
-         if m.get("meetingType") == "INTERNAL_ALIGNMENT"
-         and int(m.get("alignmentIndex", 1)) == meeting_index
+         if m.get("meeting_type") == "INTERNAL_ALIGNMENT"
+         and int(m.get("alignment_index", 1)) == meeting_index
          and m.get("status") != "cancelled"),
         None,
     )
-    is_reschedule = bool(existing and existing.get("meetingId"))
+    is_reschedule = bool(existing and existing.get("meeting_id"))
+    event_id = (existing.get("meeting_id") if existing else None) or f"m{uuid.uuid4().hex}"
+
+    # Treat the first internal stakeholder as the organiser so the attendee_count
+    # (participant rows + 1) matches the internal-stakeholder count.
+    organiser = internal_emails[0]
 
     try:
-        duration_hours = float(payload.duration_minutes) / 60.0
-        if is_reschedule:
-            result = asyncio.run(graph_service.update_event(
-                event_id=existing["meetingId"],
-                start_time=payload.start_time,
-                duration_hours=duration_hours,
-                time_zone=payload.time_zone,
-            ))
-        else:
-            result = asyncio.run(graph_service.create_event(
-                subject=subject,
-                attendee_emails=internal_emails,
-                start_time=payload.start_time,
-                duration_hours=duration_hours,
-                organiser_email=payload.organiser_email.strip().lower(),
-                is_online_meeting=True,
-                time_zone=payload.time_zone,
-            ))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Graph API error: {str(e)}")
-
-    if "error" in result:
-        status_code = int(result.get("status_code") or 400)
-        raise HTTPException(status_code=status_code, detail=result.get("error", "Graph API error"))
-
-    # On reschedule, Graph's PATCH may not echo the online-meeting URL — keep the old one.
-    teams_url = result.get("onlineMeetingUrl") or (existing.get("teamsMeetingUrl") if existing else None)
-    web_link = result.get("webLink") or (existing.get("webLink") if existing else None)
-    event_id = result.get("id") or (existing.get("meetingId") if existing else None) or f"m{uuid.uuid4().hex[:8]}"
-
-    # Persist meeting to meetings.json so state survives refresh
-    try:
-        # Parse start time for the time slot
         start_dt = datetime.fromisoformat(payload.start_time.replace("Z", "+00:00"))
         end_dt = start_dt + timedelta(minutes=payload.duration_minutes)
         meeting_record = {
-            "meetingId": event_id,
+            "meeting_id": event_id,
             "title": subject,
             "description": f"Internal alignment meeting for cycle {cycleId}",
             "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-            "organizerId": payload.organiser_email,
-            "participants": [{"userId": e, "status": "pending"} for e in internal_emails if e != payload.organiser_email.strip().lower()],
-            "timeSlot": {
+            "organizer_id": organiser,
+            "time_slot": {
                 "date": start_dt.strftime("%Y-%m-%d"),
-                "startTime": start_dt.strftime("%H:%M"),
-                "endTime": end_dt.strftime("%H:%M"),
+                "start_time": start_dt.strftime("%H:%M"),
+                "end_time": end_dt.strftime("%H:%M"),
             },
+            "time_zone": payload.time_zone,
+            "duration_minutes": payload.duration_minutes,
             "status": "scheduled",
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-            "cycleId": cycleId,
-            "meetingType": "INTERNAL_ALIGNMENT",
-            "alignmentIndex": meeting_index,
-            "teamsMeetingUrl": teams_url,
-            "webLink": web_link,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "cycle_id": cycleId,
+            "meeting_type": "INTERNAL_ALIGNMENT",
+            "alignment_index": meeting_index,
+            "teams_meeting_url": meeting_url,
+            "web_link": meeting_url,
         }
         if is_reschedule:
-            meeting_repo.replace_by_id("meetingId", event_id, meeting_record)
-            logger.info("ALIGNMENT: meeting rescheduled — meetingId=%s", event_id)
+            meeting_repo.replace_by_id("meeting_id", event_id, meeting_record)
+            logger.info("ALIGNMENT: manual meeting rescheduled — meeting_id=%s", event_id)
         else:
             meeting_repo.insert(meeting_record)
-            logger.info("ALIGNMENT: meeting persisted — meetingId=%s", event_id)
+            logger.info("ALIGNMENT: manual meeting persisted — meeting_id=%s", event_id)
+        # Participants (everyone except the organiser) live in the child store.
+        participant_repo.set_for_meeting(event_id, internal_emails[1:], status="pending")
     except Exception as e:
-        logger.warning("ALIGNMENT: failed to persist meeting: %s", e)
-
-    logger.info("ALIGNMENT: meeting scheduled — event_id=%s, attendees=%d", event_id, len(internal_emails))
+        raise HTTPException(status_code=500, detail=f"Failed to persist meeting: {e}")
 
     return {
-        "message": "Internal alignment meeting created",
+        "message": "Internal alignment meeting scheduled",
         "event_id": event_id,
-        "teams_meeting_url": teams_url,
-        "web_link": web_link,
+        "teams_meeting_url": meeting_url,
+        "web_link": meeting_url,
         "attendee_count": len(internal_emails),
         "attendee_emails": internal_emails,
     }
@@ -414,15 +235,16 @@ def schedule_alignment_meeting(
 # ── Alignment meeting state retrieval ─────────────────────────────────────────
 
 
-def _alignment_meeting_dto(m: dict) -> dict:
+def _alignment_meeting_dto(m: dict, participant_repo) -> dict:
+    participant_count = len(participant_repo.get_for_meeting(m.get("meeting_id", "")))
     return {
-        "meeting_index": int(m.get("alignmentIndex", 1)),
-        "event_id": m.get("meetingId"),
-        "teams_meeting_url": m.get("teamsMeetingUrl"),
-        "web_link": m.get("webLink"),
-        "attendee_count": len(m.get("participants", [])) + 1,
+        "meeting_index": int(m.get("alignment_index", 1)),
+        "event_id": m.get("meeting_id"),
+        "teams_meeting_url": m.get("teams_meeting_url"),
+        "web_link": m.get("web_link"),
+        "attendee_count": participant_count + 1,
         "status": m.get("status"),
-        "time_slot": m.get("timeSlot"),
+        "time_slot": m.get("time_slot"),
         "title": m.get("title"),
     }
 
@@ -432,6 +254,7 @@ def get_alignment_meeting(
     cycleId: str,
     index: int = 1,
     meeting_repo=Depends(get_meeting_repo),
+    participant_repo=Depends(get_meeting_participant_repo),
 ):
     """
     Check if the given internal-alignment meeting (by 1-based index) already
@@ -440,27 +263,28 @@ def get_alignment_meeting(
     meetings = meeting_repo.get_for_cycle(cycleId)
     alignment_meeting = next(
         (m for m in meetings
-         if m.get("meetingType") == "INTERNAL_ALIGNMENT"
-         and int(m.get("alignmentIndex", 1)) == int(index)
+         if m.get("meeting_type") == "INTERNAL_ALIGNMENT"
+         and int(m.get("alignment_index", 1)) == int(index)
          and m.get("status") != "cancelled"),
         None,
     )
     if not alignment_meeting:
         return {"meeting": None}
-    return {"meeting": _alignment_meeting_dto(alignment_meeting)}
+    return {"meeting": _alignment_meeting_dto(alignment_meeting, participant_repo)}
 
 
 @router.get("/meetings")
 def list_alignment_meetings(
     cycleId: str,
     meeting_repo=Depends(get_meeting_repo),
+    participant_repo=Depends(get_meeting_participant_repo),
 ):
     """All internal-alignment meetings scheduled for this cycle, ordered by index."""
     meetings = [
         m for m in meeting_repo.get_for_cycle(cycleId)
-        if m.get("meetingType") == "INTERNAL_ALIGNMENT" and m.get("status") != "cancelled"
+        if m.get("meeting_type") == "INTERNAL_ALIGNMENT" and m.get("status") != "cancelled"
     ]
-    dtos = sorted((_alignment_meeting_dto(m) for m in meetings), key=lambda d: d["meeting_index"])
+    dtos = sorted((_alignment_meeting_dto(m, participant_repo) for m in meetings), key=lambda d: d["meeting_index"])
     return {"meetings": dtos, "count": len(dtos)}
 
 
@@ -469,16 +293,17 @@ def delete_alignment_meeting(
     cycleId: str,
     index: int = 1,
     meeting_repo=Depends(get_meeting_repo),
+    participant_repo=Depends(get_meeting_participant_repo),
 ):
     """Delete an internal-alignment meeting (e.g. one the admin added by mistake).
 
     Cancels the underlying Teams event (best-effort so a Graph failure never blocks
-    removal) and deletes the local record. Returns {deleted: bool, cancelled: bool}.
-    If nothing was scheduled at that index yet, still returns 200 (nothing to do)."""
+    removal) and deletes the local record + its participant rows. If nothing was
+    scheduled at that index yet, still returns 200 (nothing to do)."""
     meeting = next(
         (m for m in meeting_repo.get_for_cycle(cycleId)
-         if m.get("meetingType") == "INTERNAL_ALIGNMENT"
-         and int(m.get("alignmentIndex", 1)) == int(index)
+         if m.get("meeting_type") == "INTERNAL_ALIGNMENT"
+         and int(m.get("alignment_index", 1)) == int(index)
          and m.get("status") != "cancelled"),
         None,
     )
@@ -486,7 +311,7 @@ def delete_alignment_meeting(
         return {"deleted": False, "cancelled": False, "message": "No scheduled meeting at that index."}
 
     cancelled = False
-    event_id = meeting.get("meetingId")
+    event_id = meeting.get("meeting_id")
     token = _get_graph_token()
     if event_id and token:
         try:
@@ -496,9 +321,10 @@ def delete_alignment_meeting(
             logger.warning("ALIGNMENT: Graph cancel failed for %s: %s", event_id, e)
 
     # Guard: only delete by a real id. delete_by_id(None) would match every record
-    # whose meetingId is None and wipe them all.
+    # whose meeting_id is None and wipe them all.
     if event_id:
-        meeting_repo.delete_by_id("meetingId", event_id)
+        meeting_repo.delete_by_id("meeting_id", event_id)
+        participant_repo.delete_for_meeting(event_id)
     logger.info("ALIGNMENT: deleted meeting index=%s (event=%s, cancelled=%s)", index, event_id, cancelled)
     return {"deleted": True, "cancelled": cancelled, "meeting_index": int(index)}
 
@@ -541,15 +367,19 @@ def add_alignment_attendee(
         raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
 
     new_attendee = {
-        "attendee_id": f"att_{uuid.uuid4().hex[:8]}",
+        "attendee_id": f"att_{uuid.uuid4().hex}",
         "cycle_id": cycleId,
-        "stakeholder_id": f"s_{uuid.uuid4().hex[:8]}",
+        "stakeholder_id": f"s_{uuid.uuid4().hex}",
         "name": payload.name,
         "email": payload.email,
         "role": payload.role,
         "organisation": payload.organisation,
         "type": "Internal Stakeholder",
         "is_key": payload.is_key,
+        # Complete the record so the scheduling table always renders Dept/LT/Attendance.
+        "attendance_requirement": "Required",
+        "lt_status": "Non-LT",
+        "shell_department": "IDTM",
         "invite_status": "PENDING",
         "availability_submitted": False,
     }
@@ -630,62 +460,6 @@ def _fallback_extract(notes_text: str) -> list[dict]:
             counter += 1
 
     return actions
-
-
-# ── Agent-powered alignment endpoints ───────────────────────────────────────
-
-
-class ScoreDiffRequest(BaseModel):
-    cycle_id: str
-    previous_cycle_id: Optional[str] = None
-
-
-class AlignmentFlagsRequest(BaseModel):
-    cycle_id: str
-
-
-class WhatChangedRequest(BaseModel):
-    cycle_id: str
-    previous_cycle_id: Optional[str] = None
-
-
-@router.post("/score-diff", response_model=AgentResponse)
-def get_score_diff(cycleId: str, payload: ScoreDiffRequest):
-    """Compare current cycle scorecard against a previous cycle to identify significant changes."""
-    logger.info("ALIGNMENT: score diff — cycleId=%s, previous=%s", cycleId, payload.previous_cycle_id)
-
-    if payload.cycle_id != cycleId:
-        raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
-
-    agent = get_alignment_agent(cycle_id=cycleId)
-    return agent.run(
-        user_message="Compute score differences between cycles",
-        context={
-            "action": "get_score_diff",
-            "params": {
-                "current_cycle_id": cycleId,
-                "previous_cycle_id": payload.previous_cycle_id,
-            },
-        },
-    )
-
-
-@router.post("/flags", response_model=AgentResponse)
-def get_alignment_flags(cycleId: str, payload: AlignmentFlagsRequest):
-    """Identify parameters where internal vs vendor scores diverge significantly."""
-    logger.info("ALIGNMENT: flags — cycleId=%s", cycleId)
-
-    if payload.cycle_id != cycleId:
-        raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
-
-    agent = get_alignment_agent(cycle_id=cycleId)
-    return agent.run(
-        user_message="Identify alignment flags",
-        context={
-            "action": "get_alignment_flags",
-            "params": {"cycle_id": cycleId},
-        },
-    )
 
 
 class InsightsRequest(BaseModel):
@@ -830,25 +604,4 @@ def get_alignment_insights(cycleId: str, payload: InsightsRequest):
         warnings=warnings,
         next_actions=["REVIEW_INSIGHTS"],
         requires_approval=False,
-    )
-
-
-@router.post("/what-changed", response_model=AgentResponse)
-def get_what_changed(cycleId: str, payload: WhatChangedRequest):
-    """Generate a 'What Changed' summary for the internal alignment meeting."""
-    logger.info("ALIGNMENT: what-changed — cycleId=%s", cycleId)
-
-    if payload.cycle_id != cycleId:
-        raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
-
-    agent = get_alignment_agent(cycle_id=cycleId)
-    return agent.run(
-        user_message="Generate What Changed summary",
-        context={
-            "action": "generate_what_changed",
-            "params": {
-                "cycle_id": cycleId,
-                "previous_cycle_id": payload.previous_cycle_id,
-            },
-        },
     )

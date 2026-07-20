@@ -33,6 +33,8 @@ export interface GovernanceCycle {
   teams_meeting_web_link?: string | null
   teams_meeting_event_id?: string | null
   teams_meeting_scheduled_at?: string | null
+  meeting_time_zone?: string | null
+  meeting_duration_minutes?: number | null
 }
 
 export type StakeholderRole =

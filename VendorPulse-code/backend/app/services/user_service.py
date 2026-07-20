@@ -5,12 +5,14 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.models.user import UserCreate, UserUpdate
+from app.repositories.user_availability_repository import UserAvailabilityRepository
 from app.repositories.user_repository import UserRepository
 
 
 class UserService:
-    def __init__(self, repo: UserRepository) -> None:
+    def __init__(self, repo: UserRepository, availability_repo: UserAvailabilityRepository) -> None:
         self._repo = repo
+        self._availability = availability_repo
 
     def list_users(self, query: Optional[str] = None) -> list[dict]:
         if query:
@@ -26,15 +28,14 @@ class UserService:
 
         initials = "".join(p[0] for p in payload.name.split() if p).upper()[:2]
         user = {
-            "userId": f"u{uuid.uuid4().hex[:8]}",
+            "user_id": f"u{uuid.uuid4().hex}",
             "name": payload.name,
             "email": payload.email,
             "role": payload.role,
             "organisation": payload.organisation or "",
             "gmail": payload.gmail or "",
             "avatar": initials,
-            "availability": [],
-            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         return self._repo.insert(user)
 
@@ -42,23 +43,30 @@ class UserService:
         updates = payload.model_dump(exclude_none=True)
         if not updates:
             return self._repo.get_by_user_id(user_id)
-        return self._repo.update_by_id("userId", user_id, updates)
+        return self._repo.update_by_id("user_id", user_id, updates)
 
     def delete_user(self, user_id: str) -> bool:
-        return self._repo.delete_by_id("userId", user_id)
+        self._availability.delete_for_user(user_id)  # cascade
+        return self._repo.delete_by_id("user_id", user_id)
 
-    def update_availability(self, user_id: str, date: str, slots: list[str]) -> Optional[dict]:
-        return self._repo.update_availability(user_id, date, slots)
+    def update_availability(self, user_id: str, date: str, slots: list[str]) -> list[dict]:
+        self._availability.upsert(user_id, date, slots)
+        return self._availability.get_for_user(user_id)
 
     def get_availability(self, user_id: str) -> Optional[dict]:
         user = self._repo.get_by_user_id(user_id)
         if user is None:
             return None
         return {
-            "userId": user["userId"],
+            "user_id": user["user_id"],
             "name": user["name"],
-            "availability": user.get("availability", []),
+            "availability": self._availability.get_for_user(user_id),
         }
 
-    def get_user_meetings(self, user_id: str, meeting_repo) -> list[dict]:
-        return meeting_repo.get_for_user(user_id)
+    def get_user_meetings(self, user_id: str, meeting_repo, participant_repo) -> list[dict]:
+        """Meetings where the user is organiser or a (non-cancelled) participant."""
+        meeting_ids = participant_repo.user_meeting_ids(user_id)
+        return [
+            m for m in meeting_repo.find_all()
+            if m.get("organizer_id") == user_id or m.get("meeting_id") in meeting_ids
+        ]

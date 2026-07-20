@@ -2,8 +2,6 @@ import { useState } from 'react'
 import ScheduleAlignmentMeeting from './ScheduleAlignmentMeeting'
 import type { AlignmentMeetingResult } from './ScheduleAlignmentMeeting'
 import TranscriptInput from '@/components/modules/meeting/TranscriptInput'
-import MeetingMinutesViewer from '@/components/modules/meeting/MeetingMinutesViewer'
-import type { SlotProposal } from '@/types/scheduling.types'
 import type { MeetingNote } from '@/types/meeting.types'
 import type { ExtractedAction } from '@/types/alignment.types'
 
@@ -22,17 +20,15 @@ interface Props {
 }
 
 /**
- * One internal-alignment meeting: schedule it (Teams via Graph), paste its
- * transcript, and generate AI minutes + action items. Each instance is scoped by
- * its 1-based index so a cycle can run several independent alignment meetings.
+ * One internal-alignment meeting: schedule it (manual time), paste its transcript,
+ * and extract action items. Meeting minutes are generated only in the final Meeting
+ * section — not here. Each instance is scoped by its 1-based index so a cycle can
+ * run several independent alignment meetings.
  */
-export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quarter, year, onActionsExtracted, alreadyExtracted }: Props) {
-  const [slots, setSlots] = useState<SlotProposal[]>([])
+export default function AlignmentMeetingPanel({ cycleId, index, onActionsExtracted, alreadyExtracted }: Props) {
   const [meetingResult, setMeetingResult] = useState<AlignmentMeetingResult | null>(null)
-  const [notes, setNotes] = useState<MeetingNote[]>([])
 
   function handleParsed(parsed: MeetingNote[]) {
-    setNotes(parsed)
     const actions: ExtractedAction[] = parsed
       .filter((n) => n.note_type === 'ACTION')
       .map((n, i) => ({
@@ -51,9 +47,7 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
       <ScheduleAlignmentMeeting
         cycleId={cycleId}
         meetingIndex={index}
-        slots={slots}
         meetingResult={meetingResult}
-        onSlotsFound={setSlots}
         onMeetingScheduled={setMeetingResult}
       />
       <TranscriptInput
@@ -62,16 +56,6 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
         onParsed={handleParsed}
         alreadyExtracted={alreadyExtracted}
       />
-      {notes.length > 0 && (
-        <MeetingMinutesViewer
-          cycleId={cycleId}
-          notes={notes}
-          vendorName={vendorName}
-          quarter={quarter}
-          year={year}
-          onApproved={() => { /* per-meeting minutes approved */ }}
-        />
-      )}
     </div>
   )
 }

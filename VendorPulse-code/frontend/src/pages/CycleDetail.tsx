@@ -58,8 +58,7 @@ import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import AttendanceConfirmationPanel from '@/components/modules/scheduling/AttendanceConfirmationPanel'
 import AttendeeRefreshPanel from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import CycleAttendeesPanel from '@/components/modules/scheduling/CycleAttendeesPanel'
-import SlotRankingPanel from '@/components/modules/scheduling/SlotRankingPanel'
-import InviteApprovalPanel from '@/components/modules/scheduling/InviteApprovalPanel'
+import ManualMeetingPanel from '@/components/modules/scheduling/ManualMeetingPanel'
 import ConfirmationTracker from '@/components/modules/scheduling/ConfirmationTracker'
 
 import ScorecardDispatchPanel from '@/components/modules/scorecard/ScorecardDispatchPanel'
@@ -101,8 +100,13 @@ import {
   getActions, addAction, addActionsBulk, updateAction, deleteAction,
   type ActionItem, type NewActionInput,
 } from '@/lib/actionsApi'
+import {
+  getPushback, addPushback, updatePushbackStatus, updatePushback, deletePushback,
+  savePushbackResponses,
+} from '@/lib/pushbackApi'
 import type { VendorBrief, PushbackItem, PushbackResponse } from '@/types/vendor-prep.types'
-import type { MeetingNote } from '@/types/meeting.types'
+import type { MeetingNote, MeetingMinutes } from '@/types/meeting.types'
+import { getMeetingArtifact } from '@/lib/meetingApi'
 
 const TAB_ICONS: Record<TabKey, React.ReactNode> = {
   overview:      <LayoutDashboard size={14} />,
@@ -117,7 +121,7 @@ const TAB_ICONS: Record<TabKey, React.ReactNode> = {
 function getInitialSchedulingPhase(state: string): SchedulingPhase {
   const idx = WORKFLOW_STATES.indexOf(state as never)
   if (idx >= WORKFLOW_STATES.indexOf('MEETING_SCHEDULED')) return 'confirmation_tracking'
-  if (idx >= WORKFLOW_STATES.indexOf('AVAILABILITY_COLLECTED')) return 'slot_ranking'
+  if (idx >= WORKFLOW_STATES.indexOf('AVAILABILITY_COLLECTED')) return 'schedule_meeting'
   if (idx >= WORKFLOW_STATES.indexOf('ATTENDEE_REFRESH_SENT')) return 'attendee_refresh'
   return 'attendance_confirmation'
 }
@@ -125,12 +129,11 @@ function getInitialSchedulingPhase(state: string): SchedulingPhase {
 const SCHEDULING_STEPS: { key: SchedulingPhase; label: string }[] = [
   { key: 'attendance_confirmation', label: 'Attendance' },
   { key: 'attendee_refresh', label: 'Attendees' },
-  { key: 'slot_ranking', label: 'Slot Ranking' },
-  { key: 'invite_approval', label: 'Invite Approval' },
+  { key: 'schedule_meeting', label: 'Schedule Meeting' },
   { key: 'confirmation_tracking', label: 'Confirmation' },
 ]
 const PHASE_ORDER: SchedulingPhase[] = [
-  'attendance_confirmation', 'attendee_refresh', 'slot_ranking', 'invite_approval', 'confirmation_tracking',
+  'attendance_confirmation', 'attendee_refresh', 'schedule_meeting', 'confirmation_tracking',
 ]
 
 export default function CycleDetail() {
@@ -231,6 +234,9 @@ export default function CycleDetail() {
   const [meetingNotes, setMeetingNotes] = useState<MeetingNote[]>(
     isMockCycle && cycle?.workflow_state === 'POST_MEETING_COMPLETE' ? MOCK_MEETING_NOTES : []
   )
+  // Persisted minutes for the QBR/vendor meeting — hydrated on load so the MoM isn't
+  // regenerated after a refresh.
+  const [meetingMinutes, setMeetingMinutes] = useState<MeetingMinutes | null>(null)
   const [vendorMeetingTeamsUrl, setVendorMeetingTeamsUrl] = useState<string | null>(
     cycle?.teams_meeting_url ?? null
   )
@@ -266,6 +272,31 @@ export default function CycleDetail() {
         const state = (localState ?? backendCycle.workflow_state) as WorkflowState
         const idx = WORKFLOW_STATES.indexOf(state)
         setSchedulingPhase(getInitialSchedulingPhase(state))
+        // Rehydrate the manually-scheduled meeting slot so the Confirmation view
+        // survives a page refresh (selectedSlot is otherwise in-session only).
+        if (idx >= WORKFLOW_STATES.indexOf('MEETING_SCHEDULED') && backendCycle.teams_meeting_scheduled_at) {
+          const tz = (backendCycle.meeting_time_zone as 'IST' | 'UTC' | 'GMT') ?? 'IST'
+          const restored: SlotProposal = {
+            slot_id: `manual-${cycleId}`,
+            cycle_id: cycleId,
+            proposed_time: backendCycle.teams_meeting_scheduled_at,
+            proposed_time_zone: tz,
+            duration_minutes: backendCycle.meeting_duration_minutes ?? 60,
+            organiser_available: true,
+            exec_sponsor_available: true,
+            rank_score: 100,
+            is_approved: true,
+            attendance_count: 0,
+            total_attendees: 0,
+            conflict_count: 0,
+            attending: [],
+            tentative: [],
+            conflicts: [],
+          }
+          setApiSlots([restored])
+          setSelectedSlotId(restored.slot_id)
+          setSelectedSlotTimeZone(tz)
+        }
         // Preserve the user's last tab if it's still reachable at the merged state.
         // Only override if an explicit ?tab= was provided, or if no valid tab is already selected.
         if (requestedTab && idx >= TAB_MIN_STATE_INDEX[requestedTab]) {
@@ -317,6 +348,35 @@ export default function CycleDetail() {
     getActions(cycleId)
       .then((r) => setActions(r.actions))
       .catch(() => { /* backend not ready / demo cycle — start empty */ })
+  }, [cycleId])
+
+  // Load persisted vendor pushback items (+ their drafted responses) on mount, so
+  // the state survives a refresh. Demo/mock cycles fall back to their seeded items.
+  useEffect(() => {
+    if (!cycleId) return
+    getPushback(cycleId)
+      .then((r) => {
+        // PushbackItemWithResponses is a superset of PushbackItem — safe to store directly.
+        setPushbackItems(r.items)
+        const map: Record<string, PushbackResponse[]> = {}
+        for (const it of r.items) {
+          if (it.responses?.length) map[it.pushback_id] = it.responses
+        }
+        setPushbackResponses(map)
+      })
+      .catch(() => { /* backend not ready / demo cycle — keep seeded items */ })
+  }, [cycleId])
+
+  // Restore the Meeting tab's parsed transcript + generated minutes on mount, so a
+  // refresh shows "Transcript parsed" (not a re-prompt) and doesn't regenerate the MoM.
+  useEffect(() => {
+    if (!cycleId) return
+    getMeetingArtifact(cycleId)
+      .then((a) => {
+        if (a.notes?.length) setMeetingNotes(a.notes)
+        if (a.minutes) setMeetingMinutes(a.minutes)
+      })
+      .catch(() => { /* backend not ready / demo cycle — keep seeded notes */ })
   }, [cycleId])
 
   const dedupeMerge = (prev: ActionItem[], incoming: ActionItem[]) => {
@@ -440,32 +500,76 @@ export default function CycleDetail() {
 
   // Module B: workflow advance handled via onCompiled callback in ScorecardTab
 
-  function handlePushbackAdd(item: Omit<PushbackItem, 'pushback_id' | 'cycle_id' | 'created_at'>) {
-    const newItem: PushbackItem = {
-      ...item,
-      pushback_id: `pb${pushbackItems.length + 1}`,
-      cycle_id: cycle!.cycle_id,
-      created_at: new Date().toISOString(),
+  async function handlePushbackAdd(item: Omit<PushbackItem, 'pushback_id' | 'cycle_id' | 'created_at'>) {
+    if (!cycleId) return
+    // Optimistic insert with a temporary id; reconcile to the server id on success.
+    const tempId = `pb-temp-${Date.now()}`
+    const optimistic: PushbackItem = {
+      ...item, pushback_id: tempId, cycle_id: cycleId, created_at: new Date().toISOString(),
     }
-    setPushbackItems((prev) => [...prev, newItem])
+    setPushbackItems((prev) => [...prev, optimistic])
+    try {
+      const { item: saved } = await addPushback(cycleId, {
+        category: item.category,
+        description: item.description,
+        raised_by: item.raised_by,
+        needs_legal_review: item.needs_legal_review,
+        status: item.status,
+      })
+      setPushbackItems((prev) => prev.map((p) => (p.pushback_id === tempId ? saved : p)))
+    } catch {
+      /* keep the optimistic item so the coordinator's entry isn't lost offline */
+    }
   }
 
   function handlePushbackStatusChange(id: string, status: PushbackItem['status']) {
     setPushbackItems((prev) => prev.map((p) => (p.pushback_id === id ? { ...p, status } : p)))
+    if (cycleId) updatePushbackStatus(cycleId, id, status).catch(() => { /* optimistic */ })
+  }
+
+  function handlePushbackEdit(
+    id: string,
+    patch: Partial<Pick<PushbackItem, 'category' | 'description' | 'raised_by' | 'needs_legal_review'>>
+  ) {
+    setPushbackItems((prev) => prev.map((p) => (p.pushback_id === id ? { ...p, ...patch } : p)))
+    if (cycleId) updatePushback(cycleId, id, patch).catch(() => { /* optimistic */ })
+  }
+
+  function handlePushbackDelete(id: string) {
+    setPushbackItems((prev) => prev.filter((p) => p.pushback_id !== id))
+    setPushbackResponses((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+    if (cycleId) deletePushback(cycleId, id).catch(() => { /* optimistic */ })
   }
 
   function handleGeneratePushbackResponses(pushbackId: string, generated: PushbackResponse[]) {
     setPushbackResponses((prev) => ({ ...prev, [pushbackId]: generated }))
+    if (cycleId) {
+      savePushbackResponses(
+        cycleId,
+        pushbackId,
+        generated.map((r) => ({ stance: r.stance, content: r.content, is_selected: r.is_selected })),
+      )
+        .then((res) => setPushbackResponses((prev) => ({ ...prev, [pushbackId]: res.responses })))
+        .catch(() => { /* keep in-memory copy */ })
+    }
   }
 
-  function handleSelectPushbackResponse(pushbackId: string, responseId: string) {
-    setPushbackResponses((prev) => ({
-      ...prev,
-      [pushbackId]: (prev[pushbackId] ?? []).map((r) => ({
-        ...r,
-        is_selected: r.response_id === responseId,
-      })),
-    }))
+  // Edit the drafted responses (content + which one is selected) from the Unresolved Item Tracker.
+  function handleEditPushbackResponses(pushbackId: string, edited: PushbackResponse[]) {
+    setPushbackResponses((prev) => ({ ...prev, [pushbackId]: edited }))
+    if (cycleId) {
+      savePushbackResponses(
+        cycleId,
+        pushbackId,
+        edited.map((r) => ({ stance: r.stance, content: r.content, is_selected: r.is_selected })),
+      )
+        .then((res) => setPushbackResponses((prev) => ({ ...prev, [pushbackId]: res.responses })))
+        .catch(() => { /* keep in-memory copy */ })
+    }
   }
 
   function handleNoteAdd(note: Omit<MeetingNote, 'note_id' | 'meeting_id'>) {
@@ -554,7 +658,6 @@ export default function CycleDetail() {
             cycle={cycle}
             schedulingPhase={schedulingPhase}
             attendees={schedulingAttendees}
-            slots={activeSlots}
             selectedSlot={selectedSlot}
             selectedSlotTimeZone={selectedSlotTimeZone}
             onPhaseChange={advanceScheduling}
@@ -563,7 +666,9 @@ export default function CycleDetail() {
             onSlotSelected={setSelectedSlotId}
             onSlotTimeZoneSelected={setSelectedSlotTimeZone}
             isMockCycle={isMockCycle}
+            meetingUrl={vendorMeetingTeamsUrl}
             onTeamsMeetingUrlCaptured={setVendorMeetingTeamsUrl}
+            onMeetingScheduled={() => advanceWorkflow(cycle!.cycle_id, 'MEETING_SCHEDULED')}
             onScorecardProceed={() => {
               advanceWorkflow(cycle!.cycle_id, 'SCORECARD_REQUEST_SENT')
               changeTab('scorecard')
@@ -619,8 +724,10 @@ export default function CycleDetail() {
             pushbackResponses={pushbackResponses}
             onPushbackAdd={handlePushbackAdd}
             onGenerateResponses={handleGeneratePushbackResponses}
-            onSelectResponse={handleSelectPushbackResponse}
+            onEditResponses={handleEditPushbackResponses}
             onPushbackStatusChange={handlePushbackStatusChange}
+            onPushbackEdit={handlePushbackEdit}
+            onPushbackDelete={handlePushbackDelete}
             onActionsExtracted={(extracted) => addActionsToQueue(extracted, ACTION_ORIGIN.vendorPrep)}
             alreadyExtracted={actions.some((a) => a.origin === ACTION_ORIGIN.vendorPrep)}
           />
@@ -631,13 +738,14 @@ export default function CycleDetail() {
             cycleId={cycle.cycle_id}
             cycle={cycle}
             meetingNotes={meetingNotes}
+            initialMinutes={meetingMinutes}
             minutesApproved={minutesApproved}
             teamsMeetingUrl={vendorMeetingTeamsUrl}
             onNoteAdd={handleNoteAdd}
             onTranscriptParsed={handleTranscriptParsed}
             onMinutesApproved={handleMinutesApproved}
             onActionsExtracted={(extracted) => addActionsToQueue(extracted, ACTION_ORIGIN.vendorMeeting)}
-            alreadyExtracted={actions.some((a) => a.source === 'meeting')}
+            alreadyExtracted={meetingNotes.length > 0}
           />
         )}
 
@@ -824,15 +932,14 @@ function OverviewTab({
 
 /* ── Scheduling Tab ───────────────────────────────────────── */
 function SchedulingTab({
-  cycle, schedulingPhase, attendees, slots, selectedSlot, onPhaseChange,
+  cycle, schedulingPhase, attendees, selectedSlot, onPhaseChange,
   onAttendeesUpdated, onSlotsReceived, onSlotSelected,
   selectedSlotTimeZone, onSlotTimeZoneSelected,
-  isMockCycle, onScorecardProceed, onTeamsMeetingUrlCaptured,
+  isMockCycle, onScorecardProceed, onTeamsMeetingUrlCaptured, onMeetingScheduled, meetingUrl,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   schedulingPhase: SchedulingPhase
   attendees: CycleAttendee[]
-  slots: SlotProposal[]
   selectedSlot: SlotProposal | null
   selectedSlotTimeZone: 'IST' | 'UTC' | 'GMT'
   onPhaseChange: (p: SchedulingPhase) => void
@@ -843,6 +950,8 @@ function SchedulingTab({
   isMockCycle: boolean
   onScorecardProceed: () => void
   onTeamsMeetingUrlCaptured: (url: string | null) => void
+  onMeetingScheduled: () => void
+  meetingUrl: string | null
 }) {
   const currentPhaseIndex = PHASE_ORDER.indexOf(schedulingPhase)
   return (
@@ -910,59 +1019,42 @@ function SchedulingTab({
           onAttendeesChanged={onAttendeesUpdated}
           onDispatchComplete={() => {}}
           onBackToAttendance={() => onPhaseChange('attendance_confirmation')}
-          onResponsesSimulated={(updated, rankedSlots) => {
-            onAttendeesUpdated(updated)
-            onSlotsReceived(rankedSlots)
-            onPhaseChange('slot_ranking')
-          }}
+          onProceed={() => onPhaseChange('schedule_meeting')}
         />
       )}
-      {schedulingPhase === 'slot_ranking' && (
-        <SlotRankingPanel
+      {schedulingPhase === 'schedule_meeting' && (
+        <ManualMeetingPanel
           cycleId={cycle.cycle_id}
-          slots={slots}
-          onBackToAttendees={() => onPhaseChange('attendee_refresh')}
-          onSlotApproved={(slotId, tz) => {
-            onSlotSelected(slotId)
-            onSlotTimeZoneSelected(tz)
-            onPhaseChange('invite_approval')
-          }}
-          onManualScheduled={(manualSlot, tz) => {
-            // Coordinator bypassed the ranked slots and set their own time.
-            // Route to Invite Approval so they can review/edit the invite before
-            // it is sent (the Teams meeting is created on approval, like a ranked slot).
+          attendees={attendees}
+          onBack={() => onPhaseChange('attendee_refresh')}
+          onScheduled={({ startTime, timeZone, durationMinutes, meetingUrl }) => {
+            // Build a synthetic approved slot from the manual date so the
+            // Confirmation view can render the scheduled time + attendee list.
+            const manualSlot: SlotProposal = {
+              slot_id: `manual-${cycle.cycle_id}`,
+              cycle_id: cycle.cycle_id,
+              proposed_time: startTime,
+              proposed_time_zone: timeZone,
+              duration_minutes: durationMinutes,
+              organiser_available: true,
+              exec_sponsor_available: true,
+              rank_score: 100,
+              is_approved: true,
+              attendance_count: attendees.length,
+              total_attendees: attendees.length,
+              conflict_count: 0,
+              attending: attendees.map((a) => a.name),
+              tentative: [],
+              conflicts: [],
+            }
             onSlotsReceived([manualSlot])
             onSlotSelected(manualSlot.slot_id)
-            onSlotTimeZoneSelected(tz)
-            onPhaseChange('invite_approval')
+            onSlotTimeZoneSelected(timeZone)
+            if (meetingUrl) onTeamsMeetingUrlCaptured(meetingUrl)
+            onMeetingScheduled()  // advance the workflow store to MEETING_SCHEDULED
+            onPhaseChange('confirmation_tracking')
           }}
         />
-      )}
-      {schedulingPhase === 'invite_approval' && (
-        selectedSlot ? (
-          <InviteApprovalPanel
-            cycleId={cycle.cycle_id}
-            slot={selectedSlot}
-            attendees={attendees}
-            vendorName={cycle.vendor_name}
-            quarter={cycle.quarter}
-            year={cycle.year}
-            timeZoneOverride={selectedSlotTimeZone}
-            onBack={() => {
-              onSlotSelected(null)
-              onPhaseChange('slot_ranking')
-            }}
-            onInviteSent={(teamsMeetingUrl) => {
-              // Persist the Teams join URL so the Meeting tab can open it via "Start Meeting".
-              onTeamsMeetingUrlCaptured(teamsMeetingUrl)
-              // For mock cycles seed pre-built RSVP data; for new cycles keep attendees as-is
-              if (isMockCycle) {
-                onAttendeesUpdated(MOCK_ATTENDEES_RSVP)
-              }
-              onPhaseChange('confirmation_tracking')
-            }}
-          />
-        ) : null
       )}
       {schedulingPhase === 'confirmation_tracking' && (
         selectedSlot ? (
@@ -971,15 +1063,16 @@ function SchedulingTab({
             attendees={attendees.length > 0 ? attendees : MOCK_ATTENDEES_RSVP}
             slot={selectedSlot}
             timeZoneOverride={selectedSlotTimeZone}
+            meetingUrl={meetingUrl}
             onProceed={onScorecardProceed}
-            onRescheduled={isMockCycle ? undefined : (newSlot, tz, teamsUrl) => {
-              onSlotsReceived([newSlot])
-              onSlotSelected(newSlot.slot_id)
-              onSlotTimeZoneSelected(tz)
-              onTeamsMeetingUrlCaptured(teamsUrl)
-            }}
+            onReschedule={() => onPhaseChange('schedule_meeting')}
           />
-        ) : null
+        ) : (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 text-sm text-slate-500 dark:text-slate-400">
+            No meeting scheduled yet.{' '}
+            <button onClick={() => onPhaseChange('schedule_meeting')} className="text-indigo-600 dark:text-indigo-400 underline">Schedule the meeting</button>.
+          </div>
+        )
       )}
     </div>
   )
@@ -1366,8 +1459,8 @@ function AlignmentTab({
 /* ── Vendor Prep Tab ──────────────────────────────────────── */
 function VendorPrepTab({
   cycleId, cycle, vendorBrief, onBriefGenerated, onBriefApproved,
-  pushbackItems, pushbackResponses, onPushbackAdd, onGenerateResponses, onSelectResponse, onPushbackStatusChange,
-  onActionsExtracted, alreadyExtracted,
+  pushbackItems, pushbackResponses, onPushbackAdd, onGenerateResponses, onEditResponses, onPushbackStatusChange,
+  onPushbackEdit, onPushbackDelete, onActionsExtracted, alreadyExtracted,
 }: {
   cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
@@ -1378,8 +1471,10 @@ function VendorPrepTab({
   pushbackResponses: Record<string, PushbackResponse[]>
   onPushbackAdd: (item: Omit<PushbackItem, 'pushback_id' | 'cycle_id' | 'created_at'>) => void
   onGenerateResponses: (id: string, responses: PushbackResponse[]) => void
-  onSelectResponse: (pid: string, rid: string) => void
+  onEditResponses: (id: string, responses: PushbackResponse[]) => void
   onPushbackStatusChange: (id: string, s: PushbackItem['status']) => void
+  onPushbackEdit: (id: string, patch: Partial<Pick<PushbackItem, 'category' | 'description' | 'raised_by' | 'needs_legal_review'>>) => void
+  onPushbackDelete: (id: string) => void
   onActionsExtracted: (a: ExtractedAction[]) => void
   alreadyExtracted: boolean
 }) {
@@ -1400,11 +1495,14 @@ function VendorPrepTab({
         items={pushbackItems}
         responses={pushbackResponses}
         onGenerate={onGenerateResponses}
-        onSelectResponse={onSelectResponse}
       />
       <UnresolvedItemTracker
         items={pushbackItems}
+        responses={pushbackResponses}
         onStatusChange={onPushbackStatusChange}
+        onEdit={onPushbackEdit}
+        onEditResponses={onEditResponses}
+        onDelete={onPushbackDelete}
       />
       <FaceOffModelEditor positions={MOCK_FACE_OFF} />
       <VendorPrepMeetingPanel
@@ -1421,11 +1519,12 @@ function VendorPrepTab({
 
 /* ── Meeting Tab ──────────────────────────────────────────── */
 function MeetingTab({
-  cycleId, cycle, meetingNotes, teamsMeetingUrl, onNoteAdd, onTranscriptParsed, onMinutesApproved, onActionsExtracted, alreadyExtracted,
+  cycleId, cycle, meetingNotes, initialMinutes, teamsMeetingUrl, onNoteAdd, onTranscriptParsed, onMinutesApproved, onActionsExtracted, alreadyExtracted,
 }: {
   cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   meetingNotes: MeetingNote[]
+  initialMinutes: MeetingMinutes | null
   minutesApproved: boolean
   teamsMeetingUrl: string | null
   onNoteAdd: (n: Omit<MeetingNote, 'note_id' | 'meeting_id'>) => void
@@ -1476,6 +1575,7 @@ function MeetingTab({
       <MeetingMinutesViewer
         cycleId={cycleId}
         notes={meetingNotes}
+        initialMinutes={initialMinutes}
         vendorName={cycle.vendor_name}
         quarter={cycle.quarter}
         year={cycle.year}

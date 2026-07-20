@@ -15,8 +15,15 @@ from app.repositories.action_repository import ActionRepository
 from app.repositories.agent_run_repository import AgentRunRepository
 from app.repositories.attendee_repository import AttendeeRepository
 from app.repositories.cycle_repository import CycleRepository
-from app.repositories.meeting_repository import MeetingRepository
+from app.repositories.meeting_artifact_repository import MeetingArtifactRepository
+from app.repositories.meeting_repository import MeetingParticipantRepository, MeetingRepository
+from app.repositories.pushback_repository import PushbackRepository, PushbackResponseRepository
+from app.repositories.scorecard_repository import (
+    FinalScorecardRepository,
+    ScorecardSubmissionRepository,
+)
 from app.repositories.slot_repository import SlotRepository
+from app.repositories.user_availability_repository import UserAvailabilityRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.vendor_repository import VendorRepository
 from app.services.availability_service import AvailabilityService
@@ -70,16 +77,53 @@ def get_vendor_repo() -> VendorRepository:
     return VendorRepository(settings.data_dir)
 
 
+@lru_cache(maxsize=None)
+def get_scorecard_submission_repo() -> ScorecardSubmissionRepository:
+    return ScorecardSubmissionRepository(settings.data_dir)
+
+
+@lru_cache(maxsize=None)
+def get_final_scorecard_repo() -> FinalScorecardRepository:
+    return FinalScorecardRepository(settings.data_dir)
+
+
+@lru_cache(maxsize=None)
+def get_user_availability_repo() -> UserAvailabilityRepository:
+    return UserAvailabilityRepository(settings.data_dir)
+
+
+@lru_cache(maxsize=None)
+def get_meeting_participant_repo() -> MeetingParticipantRepository:
+    return MeetingParticipantRepository(settings.data_dir)
+
+
+@lru_cache(maxsize=None)
+def get_pushback_repo() -> PushbackRepository:
+    return PushbackRepository(settings.data_dir)
+
+
+@lru_cache(maxsize=None)
+def get_pushback_response_repo() -> PushbackResponseRepository:
+    return PushbackResponseRepository(settings.data_dir)
+
+
+@lru_cache(maxsize=None)
+def get_meeting_artifact_repo() -> MeetingArtifactRepository:
+    return MeetingArtifactRepository(settings.data_dir)
+
+
 # ── Core services ─────────────────────────────────────────────────────────────
 
 
 def get_user_service() -> UserService:
-    return UserService(get_user_repo())
+    return UserService(get_user_repo(), get_user_availability_repo())
 
 
 def get_availability_service() -> AvailabilityService:
     return AvailabilityService(
         user_repo=get_user_repo(),
+        availability_repo=get_user_availability_repo(),
+        participant_repo=get_meeting_participant_repo(),
     )
 
 
@@ -93,6 +137,7 @@ def get_slot_ranking_service() -> SlotRankingService:
 def get_meeting_service() -> MeetingService:
     return MeetingService(
         meeting_repo=get_meeting_repo(),
+        participant_repo=get_meeting_participant_repo(),
         user_repo=get_user_repo(),
         availability_svc=get_availability_service(),
     )
@@ -120,15 +165,6 @@ def get_llm_service() -> LLMService:
 
 
 # ── Agent providers ───────────────────────────────────────────────────────────
-
-
-def _fetch_compiled_scorecard(cycle_id: str) -> dict:
-    """
-    Legacy 2-column compiled scorecard (Google Forms era). Kept for agents that
-    still reference it; new flows should use _fetch_weighted_compiled.
-    """
-    from app.api.routes.scorecard import get_compiled_scorecard
-    return get_compiled_scorecard(cycle_id)
 
 
 def _fetch_weighted_compiled(cycle_id: str) -> dict:
@@ -165,38 +201,3 @@ def get_meeting_agent(cycle_id: str | None = None):
     )
 
 
-def get_scorecard_agent(cycle_id: str | None = None):
-    """Returns a ScorecardAgent wired with all dependencies."""
-    from app.agents.scorecard_agent import ScorecardAgent
-
-    return ScorecardAgent(
-        scorecard_fetcher=_fetch_compiled_scorecard,
-        cycle_id=cycle_id,
-        llm_svc=get_llm_service() if settings.enable_llm else None,
-        agent_run_repo=get_agent_run_repo(),
-    )
-
-
-def get_alignment_agent(cycle_id: str | None = None):
-    """Returns an AlignmentAgent wired with all dependencies."""
-    from app.agents.alignment_agent import AlignmentAgent
-
-    return AlignmentAgent(
-        scorecard_fetcher=_fetch_compiled_scorecard,
-        cycle_id=cycle_id,
-        llm_svc=get_llm_service() if settings.enable_llm else None,
-        agent_run_repo=get_agent_run_repo(),
-    )
-
-
-def get_memory_agent(cycle_id: str | None = None):
-    """Returns a MemoryAgent wired with all dependencies."""
-    from app.agents.memory_agent import MemoryAgent
-
-    return MemoryAgent(
-        cycle_repo=get_cycle_repo(),
-        scorecard_fetcher=_fetch_compiled_scorecard,
-        cycle_id=cycle_id,
-        llm_svc=get_llm_service() if settings.enable_llm else None,
-        agent_run_repo=get_agent_run_repo(),
-    )

@@ -84,9 +84,11 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   const [addingId, setAddingId] = useState<string | null>(null)
 
   // Recipients ARE the key internal stakeholders (one scorecard per team).
-  const recipients = attendees.filter((a) => a.is_key && a.type === 'Internal Stakeholder')
+  // Anything not explicitly a Vendor counts as internal — robust to legacy/missing
+  // `type` values so a key stakeholder never silently drops from the recipient list.
+  const recipients = attendees.filter((a) => a.is_key && a.type !== 'Vendor')
   // Internal stakeholders that could be added as recipients (not yet key).
-  const addable = attendees.filter((a) => a.type === 'Internal Stakeholder' && !a.is_key)
+  const addable = attendees.filter((a) => a.type !== 'Vendor' && !a.is_key)
 
   async function markKey(attendeeId: string) {
     setAddingId(attendeeId)

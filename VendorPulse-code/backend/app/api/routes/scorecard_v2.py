@@ -28,8 +28,14 @@ from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.core.workflow_engine import WORKFLOW_STATES, workflow_engine
-from app.dependencies import get_attendee_repo, get_cycle_repo, get_llm_service, get_user_repo
-from app.repositories.base_repository import BaseRepository
+from app.dependencies import (
+    get_attendee_repo,
+    get_cycle_repo,
+    get_final_scorecard_repo,
+    get_llm_service,
+    get_scorecard_submission_repo,
+    get_user_repo,
+)
 from app.services.gmail_service import GmailSendError, build_scorecard_email, send_html_email
 from app.models.scheduling import ScorecardConfigUpdate
 from app.services.google_auth_service import is_authenticated
@@ -65,12 +71,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/scorecard", tags=["scorecard-v2"])
 
 
-def _submissions_repo() -> BaseRepository:
-    return BaseRepository("scorecard_submissions.json", settings.data_dir)
+def _submissions_repo():
+    """The scorecard-submission store, behind the repository layer (DI singleton)."""
+    return get_scorecard_submission_repo()
 
 
-def _final_repo() -> BaseRepository:
-    return BaseRepository("scorecard_final.json", settings.data_dir)
+def _final_repo():
+    """The admin-adjusted final-scorecard store, behind the repository layer."""
+    return get_final_scorecard_repo()
 
 
 # ── Models ───────────────────────────────────────────────────────────────────
@@ -225,11 +233,7 @@ def submit_scorecard(payload: ScorecardSubmission):
 
     now = datetime.now(timezone.utc).isoformat()
     repo = _submissions_repo()
-    existing = next(
-        (r for r in repo.find_all()
-         if r.get("cycle_id") == payload.cycle_id and r.get("attendee_id") == payload.attendee_id),
-        None,
-    )
+    existing = repo.get_by_cycle_and_attendee(payload.cycle_id, payload.attendee_id)
     # One submission per attendee per cycle — a reviewer cannot fill it twice.
     if existing:
         raise HTTPException(
@@ -239,7 +243,7 @@ def submit_scorecard(payload: ScorecardSubmission):
 
     # Snapshot identity from the attendee record (authoritative — never trust the client).
     record = {
-        "submission_id": f"sub_{uuid.uuid4().hex[:8]}",
+        "submission_id": f"sub_{uuid.uuid4().hex}",
         "cycle_id": payload.cycle_id,
         "attendee_id": payload.attendee_id,
         "respondent_email": (att.get("email") or "").lower(),
@@ -270,10 +274,7 @@ def submitted_check(cycle_id: str, attendee: str = ""):
     """Return whether the given attendee has already submitted for this cycle."""
     if not attendee:
         return {"submitted": False}
-    found = any(
-        s.get("cycle_id") == cycle_id and s.get("attendee_id") == attendee
-        for s in _submissions_repo().find_all()
-    )
+    found = _submissions_repo().get_by_cycle_and_attendee(cycle_id, attendee) is not None
     return {"submitted": found}
 
 
@@ -287,10 +288,10 @@ def get_team_submissions(cycle_id: str):
     attendees = [a for a in attendee_repo.find_all() if a.get("cycle_id") == cycle_id]
     key_internal = [
         a for a in attendees
-        if a.get("is_key") and a.get("type", "Internal Stakeholder") == "Internal Stakeholder"
+        if a.get("is_key") and a.get("type") != "Vendor"
     ]
 
-    submissions = [s for s in _submissions_repo().find_all() if s.get("cycle_id") == cycle_id]
+    submissions = _submissions_repo().get_for_cycle(cycle_id)
     # Submissions are keyed by the stable attendee_id — no fragile email matching.
     subs_by_attendee = {s.get("attendee_id"): s for s in submissions if s.get("attendee_id")}
 
@@ -326,16 +327,11 @@ def delete_submission(cycle_id: str, attendee_id: str):
     fires, so that attendee can submit again. Consolidated figures recompute from the
     remaining submissions. Returns {deleted, attendee_id}."""
     repo = _submissions_repo()
-    matches = [
-        s for s in repo.find_all()
-        if s.get("cycle_id") == cycle_id and s.get("attendee_id") == attendee_id
-    ]
-    if not matches:
+    removed = repo.delete_for_cycle_attendee(cycle_id, attendee_id)
+    if not removed:
         raise HTTPException(status_code=404, detail="No submission found for this attendee")
-    for s in matches:
-        repo.delete_by_id("submission_id", s.get("submission_id"))
-    logger.info("SCORECARD: deleted %d submission(s) for attendee=%s cycle=%s", len(matches), attendee_id, cycle_id)
-    return {"deleted": True, "attendee_id": attendee_id, "count": len(matches)}
+    logger.info("SCORECARD: deleted %d submission(s) for attendee=%s cycle=%s", removed, attendee_id, cycle_id)
+    return {"deleted": True, "attendee_id": attendee_id, "count": removed}
 
 
 # ── Weighted compiled scorecard ──────────────────────────────────────────────
@@ -349,10 +345,10 @@ def _compile_weighted(cycle_id: str) -> dict:
     attendees = [a for a in attendee_repo.find_all() if a.get("cycle_id") == cycle_id]
     key_internal = [
         a for a in attendees
-        if a.get("is_key") and a.get("type", "Internal Stakeholder") == "Internal Stakeholder"
+        if a.get("is_key") and a.get("type") != "Vendor"
     ]
 
-    all_submissions = [s for s in _submissions_repo().find_all() if s.get("cycle_id") == cycle_id]
+    all_submissions = _submissions_repo().get_for_cycle(cycle_id)
     subs_by_attendee = {s.get("attendee_id"): s for s in all_submissions if s.get("attendee_id")}
 
     # Columns = key internal attendees who have submitted (stable attendee_id).
@@ -1075,31 +1071,32 @@ def dispatch_inapp(payload: InAppDispatchRequest):
 
 @router.get("/final/{cycle_id}")
 def get_final_scorecard(cycle_id: str):
-    rec = _final_repo().find_by_id("cycle_id", cycle_id)
+    rec = _final_repo().get_for_cycle(cycle_id)
     return {"cycle_id": cycle_id, "final": rec}
 
 
 @router.post("/final/{cycle_id}")
 def save_final_scorecard(cycle_id: str, payload: dict = Body(...)):
-    """Save the admin-adjusted (final) scorecard. Overwrites any prior copy."""
+    """Save the admin-adjusted (final) scorecard. Overwrites any prior copy.
+
+    This is an explicit point-in-time snapshot — `computed_at` records when it was
+    frozen. The live consolidated view (`_compile_weighted`) remains the source of
+    truth and always recomputes from submissions; this snapshot can go stale by design."""
     now = datetime.now(timezone.utc).isoformat()
-    repo = _final_repo()
     record = {
         "cycle_id": cycle_id,
         "categories": payload.get("categories", []),
         "overall_score": payload.get("overall_score"),
         "note": payload.get("note", ""),
+        "computed_at": now,
         "updated_at": now,
     }
-    if repo.find_by_id("cycle_id", cycle_id):
-        repo.replace_by_id("cycle_id", cycle_id, record)
-    else:
-        repo.insert(record)
+    _final_repo().upsert(cycle_id, record)
     return {"status": "saved", "final": record}
 
 
 @router.delete("/final/{cycle_id}")
 def reset_final_scorecard(cycle_id: str):
     """Reset (delete) the admin-adjusted scorecard so it reverts to consolidated."""
-    _final_repo().delete_by_id("cycle_id", cycle_id)
+    _final_repo().delete_for_cycle(cycle_id)
     return {"status": "reset", "cycle_id": cycle_id}

@@ -4,7 +4,6 @@
  */
 import { apiFetch } from './api'
 import type { VendorBrief, PushbackResponse, PushbackCategory } from '@/types/vendor-prep.types'
-import type { SlotProposal } from '@/types/scheduling.types'
 
 // ── Response shape ──────────────────────────────────────────────────────────
 
@@ -109,13 +108,7 @@ export async function approvePushbackResponse(
   )
 }
 
-// ── Vendor Prep Meeting (Teams via Graph — shares the meetings store) ─────────
-
-export interface VPFindTimesResponse {
-  message: string
-  slot_proposals: SlotProposal[]
-  attendee_count: number
-}
+// ── Vendor Prep Meeting (manual scheduling — shares the meetings store) ───────
 
 export interface VPScheduleResponse {
   message: string
@@ -138,56 +131,31 @@ export interface VendorPrepMeeting {
   attendee_emails: string[]
 }
 
-/** Find candidate times for the vendor-prep call. `attendeeEmails` = the edited
- *  subset to invite (omit to check everyone: internal team + vendor). */
-export async function findVendorPrepTimes(
+/**
+ * Schedule (or reschedule) the vendor-prep call at a coordinator-chosen time — no
+ * Microsoft Graph / calendar access. Persists the time and an optional pasted
+ * meeting link so the state survives a refresh.
+ */
+export async function scheduleVendorPrepMeetingManual(
   cycleId: string,
-  organiserEmail: string,
-  dateRangeStart: string,
-  dateRangeEnd: string,
-  durationHours = 0.5,
-  timeZone = 'UTC',
-  attendeeEmails?: string[]
-): Promise<VPFindTimesResponse> {
-  return apiFetch<VPFindTimesResponse>(
-    `/api/cycles/${cycleId}/vendor-prep/find-times`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        cycle_id: cycleId,
-        organiser_email: organiserEmail,
-        date_range_start: dateRangeStart,
-        date_range_end: dateRangeEnd,
-        duration_hours: durationHours,
-        time_zone: timeZone,
-        attendee_emails: attendeeEmails,
-      }),
-    }
-  )
-}
-
-/** Create (or reschedule) the single vendor-prep Teams meeting. */
-export async function scheduleVendorPrepMeeting(
-  cycleId: string,
-  organiserEmail: string,
-  slotId: string,
-  startTime: string,
-  durationMinutes = 30,
-  timeZone = 'UTC',
-  attendeeEmails?: string[]
+  opts: {
+    startTime: string
+    durationMinutes?: number
+    timeZone?: string
+    attendeeEmails?: string[]
+    meetingUrl?: string | null
+  }
 ): Promise<VPScheduleResponse> {
   return apiFetch<VPScheduleResponse>(
-    `/api/cycles/${cycleId}/vendor-prep/schedule-meeting`,
+    `/api/cycles/${cycleId}/vendor-prep/manual-meeting`,
     {
       method: 'POST',
       body: JSON.stringify({
-        cycle_id: cycleId,
-        organiser_email: organiserEmail,
-        slot_id: slotId,
-        start_time: startTime,
-        duration_minutes: durationMinutes,
-        time_zone: timeZone,
-        attendee_emails: attendeeEmails,
+        start_time: opts.startTime,
+        duration_minutes: opts.durationMinutes ?? 30,
+        time_zone: opts.timeZone ?? 'IST',
+        attendee_emails: opts.attendeeEmails,
+        meeting_url: opts.meetingUrl ?? null,
       }),
     }
   )
@@ -199,10 +167,4 @@ export async function getVendorPrepMeeting(
   return apiFetch<{ meeting: VendorPrepMeeting | null }>(
     `/api/cycles/${cycleId}/vendor-prep/meeting`
   )
-}
-
-export async function deleteVendorPrepMeeting(
-  cycleId: string
-): Promise<{ deleted: boolean; cancelled: boolean; meeting_index?: number; message?: string }> {
-  return apiFetch(`/api/cycles/${cycleId}/vendor-prep/meeting`, { method: 'DELETE' })
 }

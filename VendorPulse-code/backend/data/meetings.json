@@ -1,613 +1,455 @@
 [
   {
-    "meetingId": "m1",
     "title": "Q1 EGB Governance Review — NovaTech",
     "description": "Quarterly Executive Governance Board review for NovaTech vendor performance. All key stakeholders required.",
     "agenda": "1. Q1 Scorecard Review\n2. SLA Compliance Update\n3. Innovation KPIs Discussion\n4. Open Action Items Review",
-    "organizerId": "u1",
-    "participants": [
-      {
-        "userId": "u2",
-        "status": "accepted",
-        "respondedAt": "2026-04-01T09:00:00Z"
-      },
-      {
-        "userId": "u3",
-        "status": "accepted",
-        "respondedAt": "2026-04-01T10:30:00Z"
-      },
-      {
-        "userId": "u4",
-        "status": "accepted",
-        "respondedAt": "2026-04-02T09:00:00Z"
-      },
-      {
-        "userId": "u5",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-10",
-      "startTime": "10:00",
-      "endTime": "11:30"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-01T08:00:00Z",
-    "cycleId": "c1",
-    "meetingType": "EGB_QBR"
+    "meeting_id": "m1",
+    "organizer_id": "u1",
+    "cycle_id": "c1",
+    "meeting_type": "EGB_QBR",
+    "created_at": "2026-04-01T08:00:00Z",
+    "time_slot": {
+      "date": "2026-04-10",
+      "start_time": "10:00",
+      "end_time": "11:30"
+    }
   },
   {
-    "meetingId": "m2",
     "title": "Internal Alignment Call — NovaTech Q1",
     "description": "Internal team alignment session before the vendor prep call.",
     "agenda": "1. Score diff analysis vs Q4\n2. Alignment flags review\n3. Pushback strategy planning",
-    "organizerId": "u2",
-    "participants": [
-      {
-        "userId": "u1",
-        "status": "pending"
-      },
-      {
-        "userId": "u3",
-        "status": "accepted",
-        "respondedAt": "2026-04-01T14:00:00Z"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-09",
-      "startTime": "11:00",
-      "endTime": "12:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-01T11:00:00Z",
-    "cycleId": "c1",
-    "meetingType": "INTERNAL_ALIGNMENT"
+    "meeting_id": "m2",
+    "organizer_id": "u2",
+    "cycle_id": "c1",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "created_at": "2026-04-01T11:00:00Z",
+    "time_slot": {
+      "date": "2026-04-09",
+      "start_time": "11:00",
+      "end_time": "12:00"
+    }
   },
   {
-    "meetingId": "m3",
     "title": "Vendor Prep Call — NovaTech",
     "description": "Pre-EGB preparation call with NovaTech team to walk through vendor brief.",
     "agenda": "1. Vendor brief walkthrough\n2. Pushback items discussion\n3. Open action item updates",
-    "organizerId": "u4",
-    "participants": [
-      {
-        "userId": "u1",
-        "status": "accepted",
-        "respondedAt": "2026-04-02T09:00:00Z"
-      },
-      {
-        "userId": "u7",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-09",
-      "startTime": "14:00",
-      "endTime": "15:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-01T15:00:00Z",
-    "cycleId": "c1",
-    "meetingType": "VENDOR_PREP"
+    "meeting_id": "m3",
+    "organizer_id": "u4",
+    "cycle_id": "c1",
+    "meeting_type": "VENDOR_PREP",
+    "created_at": "2026-04-01T15:00:00Z",
+    "time_slot": {
+      "date": "2026-04-09",
+      "start_time": "14:00",
+      "end_time": "15:00"
+    }
   },
   {
-    "meetingId": "m4",
     "title": "Q4 QBR Follow-up — CoreSystems",
     "description": "Follow-up on Q4 QBR action items for CoreSystems.",
     "agenda": "1. Open action items review\n2. Issue resolution status\n3. Next steps and owners",
-    "organizerId": "u2",
-    "participants": [
-      {
-        "userId": "u1",
-        "status": "accepted",
-        "respondedAt": "2026-03-20T09:00:00Z"
-      },
-      {
-        "userId": "u3",
-        "status": "accepted",
-        "respondedAt": "2026-03-20T10:00:00Z"
-      },
-      {
-        "userId": "u4",
-        "status": "declined",
-        "respondedAt": "2026-03-21T09:00:00Z"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-03-28",
-      "startTime": "10:00",
-      "endTime": "11:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-03-19T08:00:00Z",
-    "cycleId": "c2",
-    "meetingType": "EGB_QBR"
+    "meeting_id": "m4",
+    "organizer_id": "u2",
+    "cycle_id": "c2",
+    "meeting_type": "EGB_QBR",
+    "created_at": "2026-03-19T08:00:00Z",
+    "time_slot": {
+      "date": "2026-03-28",
+      "start_time": "10:00",
+      "end_time": "11:00"
+    }
   },
   {
-    "meetingId": "m5391af26",
     "title": "Governance Review — Meridian IT",
     "description": "Governance meeting for cycle c3",
     "agenda": "1) Scorecard Review\n2) Actions\n3) Next Steps",
-    "organizerId": "u1",
-    "participants": [
-      {
-        "userId": "u2",
-        "status": "accepted",
-        "respondedAt": "2026-04-02T10:19:22.660590+00:00"
-      },
-      {
-        "userId": "u3",
-        "status": "pending"
-      },
-      {
-        "userId": "u4",
-        "status": "pending"
-      },
-      {
-        "userId": "u5",
-        "status": "pending"
-      },
-      {
-        "userId": "u6",
-        "status": "pending"
-      },
-      {
-        "userId": "u7",
-        "status": "pending"
-      },
-      {
-        "userId": "u8",
-        "status": "pending"
-      },
-      {
-        "userId": "u9",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-09",
-      "startTime": "09:00",
-      "endTime": "10:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-02T10:19:02.385020+00:00",
-    "cycleId": "c3",
-    "meetingType": "EGB_QBR"
+    "meeting_id": "m5391af26",
+    "organizer_id": "u1",
+    "cycle_id": "c3",
+    "meeting_type": "EGB_QBR",
+    "created_at": "2026-04-02T10:19:02.385020+00:00",
+    "time_slot": {
+      "date": "2026-04-09",
+      "start_time": "09:00",
+      "end_time": "10:00"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2egAAAAA==",
     "title": "Internal Alignment — Zensar5 (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_6348ccbd",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "v.kulkarni3@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "richa.sankpal@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "rituraj.patil@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-16",
-      "startTime": "04:30",
-      "endTime": "05:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-13T06:58:44.904077+00:00",
-    "cycleId": "c_6348ccbd",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YmQxYWQ4M2YtODE3Ni00NTQzLTk0MGItNGNkN2FiMDBlNTQw%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2egAAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2egAAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_6348ccbd",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YmQxYWQ4M2YtODE3Ni00NTQzLTk0MGItNGNkN2FiMDBlNTQw%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2egAAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-13T06:58:44.904077+00:00",
+    "time_slot": {
+      "date": "2026-04-16",
+      "start_time": "04:30",
+      "end_time": "05:00"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2egwAAAA==",
     "title": "Internal Alignment — Zensar (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_248865b4",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "v.kulkarni3@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "richa.sankpal@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-15",
-      "startTime": "05:30",
-      "endTime": "06:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-13T09:23:33.258581+00:00",
-    "cycleId": "c_248865b4",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_OWFmNDllYWMtYTdmOC00MjkyLTk5YjYtMjMwZDI1MjgyZWQy%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2egwAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2egwAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_248865b4",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_OWFmNDllYWMtYTdmOC00MjkyLTk5YjYtMjMwZDI1MjgyZWQy%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2egwAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-13T09:23:33.258581+00:00",
+    "time_slot": {
+      "date": "2026-04-15",
+      "start_time": "05:30",
+      "end_time": "06:00"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2eiAAAAA==",
     "title": "Internal Alignment — TCS (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_1ef88978",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-16",
-      "startTime": "03:30",
-      "endTime": "05:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-14T04:59:06.171456+00:00",
-    "cycleId": "c_1ef88978",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_OTkwMDM3ZTMtZmFlNS00OWI3LWFhYjUtZGIyOTAyZDg1OGMw%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2eiAAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2eiAAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_1ef88978",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_OTkwMDM3ZTMtZmFlNS00OWI3LWFhYjUtZGIyOTAyZDg1OGMw%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2eiAAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-14T04:59:06.171456+00:00",
+    "time_slot": {
+      "date": "2026-04-16",
+      "start_time": "03:30",
+      "end_time": "05:00"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2eiwAAAA==",
     "title": "Internal Alignment — abc (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_d9668d78",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-15",
-      "startTime": "03:30",
-      "endTime": "04:15"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-14T05:50:45.413986+00:00",
-    "cycleId": "c_d9668d78",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YzYwZThjYTUtMWRiNC00OTQyLWFiZjctOTVlYjBhNzQ5YThl%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2eiwAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABKF2eiwAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_d9668d78",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YzYwZThjYTUtMWRiNC00OTQyLWFiZjctOTVlYjBhNzQ5YThl%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABKF2eiwAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-14T05:50:45.413986+00:00",
+    "time_slot": {
+      "date": "2026-04-15",
+      "start_time": "03:30",
+      "end_time": "04:15"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QALQAAAA==",
     "title": "Internal Alignment — abcd (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_18ddd7f8",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-18",
-      "startTime": "03:30",
-      "endTime": "04:15"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-17T04:53:10.564080+00:00",
-    "cycleId": "c_18ddd7f8",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YTRjMGZjYTYtY2E4MC00MTM1LWFlOWQtNmU1N2Y5NzQ1ODUy%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QALQAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QALQAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_18ddd7f8",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YTRjMGZjYTYtY2E4MC00MTM1LWFlOWQtNmU1N2Y5NzQ1ODUy%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QALQAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-17T04:53:10.564080+00:00",
+    "time_slot": {
+      "date": "2026-04-18",
+      "start_time": "03:30",
+      "end_time": "04:15"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QALwAAAA==",
     "title": "Internal Alignment — abc (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_80ade886",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-18",
-      "startTime": "04:30",
-      "endTime": "05:30"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-17T05:15:18.960640+00:00",
-    "cycleId": "c_80ade886",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YjAwNmQ2MzgtYjQxOC00MjZkLWI5NDctYjUyNTQxYjU0N2Zl%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QALwAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QALwAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_80ade886",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YjAwNmQ2MzgtYjQxOC00MjZkLWI5NDctYjUyNTQxYjU0N2Zl%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QALwAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-17T05:15:18.960640+00:00",
+    "time_slot": {
+      "date": "2026-04-18",
+      "start_time": "04:30",
+      "end_time": "05:30"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QANAAAAA==",
     "title": "Internal Alignment — Zen (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_1a4d4780",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-18",
-      "startTime": "05:30",
-      "endTime": "06:15"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-17T06:16:06.065095+00:00",
-    "cycleId": "c_1a4d4780",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_N2Q1OWE2ZGItNDk3Mi00Mjc3LTkxOTMtYjJhZWZiYTE4ZDE3%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QANAAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QANAAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_1a4d4780",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_N2Q1OWE2ZGItNDk3Mi00Mjc3LTkxOTMtYjJhZWZiYTE4ZDE3%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QANAAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-17T06:16:06.065095+00:00",
+    "time_slot": {
+      "date": "2026-04-18",
+      "start_time": "05:30",
+      "end_time": "06:15"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QAOAAAAA==",
     "title": "Internal Alignment — Dell (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_18e684b3",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-18",
-      "startTime": "03:30",
-      "endTime": "04:15"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-17T06:39:44.371037+00:00",
-    "cycleId": "c_18e684b3",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_Zjk1MGUzNmItNWFiMi00YzZjLTg1NTMtYWI4Yzk2OTIwY2Q3%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QAOAAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QAOAAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_18e684b3",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_Zjk1MGUzNmItNWFiMi00YzZjLTg1NTMtYWI4Yzk2OTIwY2Q3%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QAOAAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-17T06:39:44.371037+00:00",
+    "time_slot": {
+      "date": "2026-04-18",
+      "start_time": "03:30",
+      "end_time": "04:15"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QAOgAAAA==",
     "title": "Internal Alignment — Its (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_92f36b5d",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-18",
-      "startTime": "04:15",
-      "endTime": "05:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-17T07:39:30.698632+00:00",
-    "cycleId": "c_92f36b5d",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MGY3ODE2YmItOWY0Yi00ZmFmLTkwNWMtZjEyMjM0YzY5ODAz%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QAOgAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QAOgAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_92f36b5d",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MGY3ODE2YmItOWY0Yi00ZmFmLTkwNWMtZjEyMjM0YzY5ODAz%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QAOgAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-17T07:39:30.698632+00:00",
+    "time_slot": {
+      "date": "2026-04-18",
+      "start_time": "04:15",
+      "end_time": "05:00"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QAPAAAAA==",
     "title": "Internal Alignment — Zensar1 (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_27bcfc91",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-19",
-      "startTime": "03:30",
-      "endTime": "04:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-17T09:21:33.357413+00:00",
-    "cycleId": "c_27bcfc91",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_NjcwNmY2NDgtOTJjMS00NjEyLWI4NjEtMGUzNzhjZTBlZDMz%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QAPAAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QAPAAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_27bcfc91",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_NjcwNmY2NDgtOTJjMS00NjEyLWI4NjEtMGUzNzhjZTBlZDMz%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QAPAAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-17T09:21:33.357413+00:00",
+    "time_slot": {
+      "date": "2026-04-19",
+      "start_time": "03:30",
+      "end_time": "04:00"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QAPgAAAA==",
     "title": "Internal Alignment — zensar2 (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_98c6a758",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-18",
-      "startTime": "05:00",
-      "endTime": "06:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-17T10:28:10.170295+00:00",
-    "cycleId": "c_98c6a758",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YTAxZTMzYWEtODRjZi00YTQ0LTllZmQtZDRjMjYwMjA5Y2Y4%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QAPgAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QAPgAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_98c6a758",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_YTAxZTMzYWEtODRjZi00YTQ0LTllZmQtZDRjMjYwMjA5Y2Y4%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QAPgAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-17T10:28:10.170295+00:00",
+    "time_slot": {
+      "date": "2026-04-18",
+      "start_time": "05:00",
+      "end_time": "06:00"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QAQQAAAA==",
     "title": "Internal Alignment — Zensar (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_2bbd2146",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-04-18",
-      "startTime": "03:30",
-      "endTime": "04:30"
-    },
     "status": "scheduled",
-    "createdAt": "2026-04-17T11:14:46.708328+00:00",
-    "cycleId": "c_2bbd2146",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_NWQ1MGM0ZmYtMzYzMC00YzViLWI4M2QtY2Y2NTk0ZjRiNDIz%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QAQQAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABK0QAQQAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_2bbd2146",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_NWQ1MGM0ZmYtMzYzMC00YzViLWI4M2QtY2Y2NTk0ZjRiNDIz%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABK0QAQQAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-04-17T11:14:46.708328+00:00",
+    "time_slot": {
+      "date": "2026-04-18",
+      "start_time": "03:30",
+      "end_time": "04:30"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABSngD6gAAAA==",
     "title": "Internal Alignment — abc (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_e785abd9",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-06-05",
-      "startTime": "04:30",
-      "endTime": "05:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-06-03T06:13:30.615526+00:00",
-    "cycleId": "c_e785abd9",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MzI5YTkwZWUtNTMwYy00MWM4LWI2NTktZmNjZDYxNGI1ZWY4%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABSngD6gAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABSngD6gAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_e785abd9",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MzI5YTkwZWUtNTMwYy00MWM4LWI2NTktZmNjZDYxNGI1ZWY4%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABSngD6gAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-06-03T06:13:30.615526+00:00",
+    "time_slot": {
+      "date": "2026-06-05",
+      "start_time": "04:30",
+      "end_time": "05:00"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABSngD7AAAAA==",
     "title": "Internal Alignment — zensar2 (Q1 2026)",
     "description": "Internal alignment meeting for cycle c_e61d9a14",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "aditya.vadgave@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-06-04",
-      "startTime": "03:30",
-      "endTime": "04:15"
-    },
     "status": "scheduled",
-    "createdAt": "2026-06-03T09:18:40.727420+00:00",
-    "cycleId": "c_e61d9a14",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_Yjc0NGQ0MjItZWZiNi00YTE5LTkwNmMtNTdjOTA4NzYwOThh%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABSngD7AAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABSngD7AAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_e61d9a14",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_Yjc0NGQ0MjItZWZiNi00YTE5LTkwNmMtNTdjOTA4NzYwOThh%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABSngD7AAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-06-03T09:18:40.727420+00:00",
+    "time_slot": {
+      "date": "2026-06-04",
+      "start_time": "03:30",
+      "end_time": "04:15"
+    }
   },
   {
-    "meetingId": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABZXxoNAAAAA==",
     "title": "Internal Alignment — Zensar4 (Q2 2026)",
     "description": "Internal alignment meeting for cycle c_95e783c1",
     "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
-    "organizerId": "chinmay.kotkar@zensar.com",
-    "participants": [
-      {
-        "userId": "anup.kesarwani@zensar.com",
-        "status": "pending"
-      },
-      {
-        "userId": "kanishk.punekar@zensar.com",
-        "status": "pending"
-      }
-    ],
-    "timeSlot": {
-      "date": "2026-07-20",
-      "startTime": "03:30",
-      "endTime": "04:00"
-    },
     "status": "scheduled",
-    "createdAt": "2026-07-13T12:44:39.454843+00:00",
-    "cycleId": "c_95e783c1",
-    "meetingType": "INTERNAL_ALIGNMENT",
-    "teamsMeetingUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MDgxMGRiMjctNDNlNi00YWVmLTg1OGUtOWMyNGIyYzBmNDkx%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
-    "webLink": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABZXxoNAAAAA%3D%3D&exvsurl=1&path=/calendar/item"
+    "meeting_id": "AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU-jWAcAcu5_Dwrrm0_8Sktz4LwGEgAAAgENAAAAcu5_Dwrrm0_8Sktz4LwGEgABZXxoNAAAAA==",
+    "organizer_id": "chinmay.kotkar@zensar.com",
+    "cycle_id": "c_95e783c1",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "teams_meeting_url": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MDgxMGRiMjctNDNlNi00YWVmLTg1OGUtOWMyNGIyYzBmNDkx%40thread.v2/0?context=%7b%22Tid%22%3a%22207c3e32-7115-4ed3-8a55-22f7edb77dc9%22%2c%22Oid%22%3a%2245ba1cd9-af86-41d8-bcf4-4f2c029bae04%22%7d",
+    "web_link": "https://outlook.office365.com/owa/?itemid=AQMkAGM0ODA0ZjAxLTk2NWItNDEwMy1hYjJlLTE5M2I5MDZmYTFkYwBGAAADuWv3RmsIZkGOmSXSLU%2FjWAcAcu5%2BDwrrm0%2B8Sktz4LwGEgAAAgENAAAAcu5%2BDwrrm0%2B8Sktz4LwGEgABZXxoNAAAAA%3D%3D&exvsurl=1&path=/calendar/item",
+    "created_at": "2026-07-13T12:44:39.454843+00:00",
+    "time_slot": {
+      "date": "2026-07-20",
+      "start_time": "03:30",
+      "end_time": "04:00"
+    }
+  },
+  {
+    "title": "Internal Alignment — CloudCore (Q4 2025)",
+    "description": "Internal alignment meeting for cycle c_demo_cloudcore_Q42025",
+    "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
+    "status": "scheduled",
+    "meeting_id": "ma698c383",
+    "organizer_id": "anup@shell.com",
+    "cycle_id": "c_demo_cloudcore_Q42025",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "alignment_index": 1,
+    "teams_meeting_url": null,
+    "web_link": null,
+    "created_at": "2026-07-20T06:20:41.656034+00:00",
+    "time_zone": "IST",
+    "duration_minutes": 45,
+    "time_slot": {
+      "date": "2026-07-23",
+      "start_time": "11:50",
+      "end_time": "12:35"
+    }
+  },
+  {
+    "meeting_id": "mfb258142d94f4f2987ccd778a5928630",
+    "title": "Internal Alignment — DataBridge (Q1 2026)",
+    "description": "Internal alignment meeting for cycle c_300ff5df95664206ba1fe1a561b6aea9",
+    "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
+    "organizer_id": "kanishk@shell.com",
+    "time_slot": {
+      "date": "2026-07-22",
+      "start_time": "13:17",
+      "end_time": "13:47"
+    },
+    "time_zone": "IST",
+    "duration_minutes": 30,
+    "status": "scheduled",
+    "created_at": "2026-07-20T07:48:01.523844+00:00",
+    "cycle_id": "c_300ff5df95664206ba1fe1a561b6aea9",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "alignment_index": 1,
+    "teams_meeting_url": null,
+    "web_link": null
+  },
+  {
+    "meeting_id": "m06a234bfefe442fe9f940da528607483",
+    "title": "Vendor Prep Call — DataBridge (Q1 2026)",
+    "description": "Vendor prep call for cycle c_300ff5df95664206ba1fe1a561b6aea9",
+    "agenda": "1. Vendor brief review\n2. Anticipated pushback & responses\n3. Roles for the vendor call\n4. Action items",
+    "organizer_id": "kanishk@shell.com",
+    "time_slot": {
+      "date": "2026-07-23",
+      "start_time": "13:19",
+      "end_time": "15:19"
+    },
+    "time_zone": "IST",
+    "duration_minutes": 120,
+    "status": "scheduled",
+    "created_at": "2026-07-20T07:49:33.011207+00:00",
+    "cycle_id": "c_300ff5df95664206ba1fe1a561b6aea9",
+    "meeting_type": "VENDOR_PREP",
+    "teams_meeting_url": null,
+    "web_link": null
+  },
+  {
+    "meeting_id": "m94d842515e044cd3b5345d7c387e991a",
+    "title": "Internal Alignment — ABCD (Q1 2026)",
+    "description": "Internal alignment meeting for cycle c_576aa34428fd43449153eebee3b28724",
+    "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
+    "organizer_id": "anup.kesarwani@zensar.com",
+    "time_slot": {
+      "date": "2026-07-22",
+      "start_time": "14:37",
+      "end_time": "15:07"
+    },
+    "time_zone": "IST",
+    "duration_minutes": 30,
+    "status": "scheduled",
+    "created_at": "2026-07-20T09:07:53.240598+00:00",
+    "cycle_id": "c_576aa34428fd43449153eebee3b28724",
+    "meeting_type": "INTERNAL_ALIGNMENT",
+    "alignment_index": 1,
+    "teams_meeting_url": null,
+    "web_link": null
+  },
+  {
+    "meeting_id": "mf424d695bf1d444facceb37a8062674a",
+    "title": "Vendor Prep Call — ABCD (Q1 2026)",
+    "description": "Vendor prep call for cycle c_576aa34428fd43449153eebee3b28724",
+    "agenda": "1. Vendor brief review\n2. Anticipated pushback & responses\n3. Roles for the vendor call\n4. Action items",
+    "organizer_id": "anup.kesarwani@zensar.com",
+    "time_slot": {
+      "date": "2026-07-24",
+      "start_time": "14:40",
+      "end_time": "16:10"
+    },
+    "time_zone": "IST",
+    "duration_minutes": 90,
+    "status": "scheduled",
+    "created_at": "2026-07-20T09:10:16.421253+00:00",
+    "cycle_id": "c_576aa34428fd43449153eebee3b28724",
+    "meeting_type": "VENDOR_PREP",
+    "teams_meeting_url": null,
+    "web_link": null
   }
 ]

@@ -10,26 +10,26 @@ ParticipantStatus = Literal["pending", "accepted", "declined"]
 
 class MeetingTimeSlot(BaseModel):
     date: str = Field(..., description="YYYY-MM-DD", examples=["2026-04-10"])
-    startTime: str = Field(..., description="HH:MM", examples=["10:00"])
-    endTime: str = Field(..., description="HH:MM", examples=["11:00"])
+    start_time: str = Field(..., description="HH:MM", examples=["10:00"])
+    end_time: str = Field(..., description="HH:MM", examples=["11:00"])
 
 
 class MeetingParticipant(BaseModel):
-    userId: str
+    user_id: str
     status: ParticipantStatus = "pending"
-    respondedAt: Optional[str] = None
+    responded_at: Optional[str] = None
 
 
 class MeetingCreate(BaseModel):
     title: str = Field(..., examples=["Q1 EGB Review — NovaTech"])
     description: Optional[str] = Field(default="", examples=["Quarterly governance review"])
     agenda: Optional[str] = Field(default="", examples=["1) Scorecard\n2) Actions"])
-    organizerId: str = Field(..., examples=["u1"])
-    participantIds: list[str] = Field(..., examples=[["u2", "u3"]])
-    timeSlot: MeetingTimeSlot
+    organizer_id: str = Field(..., examples=["u1"])
+    participant_ids: list[str] = Field(..., examples=[["u2", "u3"]])
+    time_slot: MeetingTimeSlot
     # VendorPulse governance context (optional)
-    cycleId: Optional[str] = Field(default=None, description="Governance cycle this meeting belongs to")
-    meetingType: Optional[str] = Field(
+    cycle_id: Optional[str] = Field(default=None, description="Governance cycle this meeting belongs to")
+    meeting_type: Optional[str] = Field(
         default=None,
         description="INTERNAL_ALIGNMENT | VENDOR_PREP | EGB_QBR",
     )
@@ -39,29 +39,29 @@ class MeetingUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     agenda: Optional[str] = None
-    timeSlot: Optional[MeetingTimeSlot] = None
+    time_slot: Optional[MeetingTimeSlot] = None
 
 
 class MeetingRespond(BaseModel):
-    userId: str = Field(..., examples=["u2"])
+    user_id: str = Field(..., examples=["u2"])
     status: Literal["accepted", "declined"] = Field(..., examples=["accepted"])
 
 
 class CancelMeeting(BaseModel):
-    organizerId: str = Field(..., examples=["u1"])
+    organizer_id: str = Field(..., examples=["u1"])
 
 
 class Meeting(BaseModel):
-    """Full meeting record as stored in meetings.json."""
+    """Full meeting record as stored in meetings.json. Participants live in the
+    meeting_participants child store, not embedded here."""
 
-    meetingId: str
+    meeting_id: str
     title: str
     description: str
     agenda: str
-    organizerId: str
-    participants: list[MeetingParticipant]
-    timeSlot: MeetingTimeSlot
+    organizer_id: str
+    time_slot: MeetingTimeSlot
     status: MeetingStatus
-    createdAt: str
-    cycleId: Optional[str] = None
-    meetingType: Optional[str] = None
+    created_at: str
+    cycle_id: Optional[str] = None
+    meeting_type: Optional[str] = None

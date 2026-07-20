@@ -14,6 +14,7 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from app.core.workflow_engine import WORKFLOW_STATES, WorkflowStateError, WorkflowViolationError, workflow_engine
@@ -23,6 +24,7 @@ from app.dependencies import (
     get_agent_run_repo,
     get_cycle_repo,
     get_llm_service,
+    get_meeting_participant_repo,
     get_meeting_repo,
     get_scheduling_service,
     get_slot_repo,
@@ -136,7 +138,7 @@ def create_cycle(
 
     if vendor_id == "v_custom":
         # Check if a vendor with this name already exists; reuse its id if so.
-        new_vid = f"v_{uuid.uuid4().hex[:8]}"
+        new_vid = f"v_{uuid.uuid4().hex}"
         persisted = vendor_repo.find_or_create(
             vendor_name, vendor_id=new_vid, category=payload.category
         )
@@ -145,7 +147,7 @@ def create_cycle(
 
     now = datetime.now(timezone.utc).isoformat()
     cycle = {
-        "cycle_id": f"c_{uuid.uuid4().hex[:8]}",
+        "cycle_id": f"c_{uuid.uuid4().hex}",
         "vendor_id": vendor_id,
         "vendor_name": vendor_name,
         "cycle_type": payload.cycle_type,
@@ -225,6 +227,56 @@ def set_workflow_state(
     return {"cycle": updated, "message": f"Advanced {current} -> {target}"}
 
 
+class ManualMeetingRequest(BaseModel):
+    start_time: str = Field(..., description="ISO-8601 start time chosen by the coordinator")
+    time_zone: str = Field(default="IST")
+    duration_minutes: int = Field(default=60)
+    meeting_url: Optional[str] = Field(default=None, description="Optional meeting link the coordinator pastes")
+
+
+@router.post("/api/cycles/{cycleId}/scheduling/manual-meeting")
+def set_manual_meeting(
+    cycleId: str,
+    payload: ManualMeetingRequest,
+    cycle_repo=Depends(get_cycle_repo),
+):
+    """Record a manually-chosen meeting date/time (no Microsoft Graph / calendar access
+    required). Persists the scheduled time — and an optional pasted meeting link — on the
+    cycle, then advances the workflow to MEETING_SCHEDULED so the date lives in the DB."""
+    from datetime import datetime, timezone
+
+    cycle = _get_cycle_or_404(cycleId, cycle_repo)
+    cycle_repo.mark_teams_meeting_scheduled(
+        cycleId,
+        teams_meeting_url=(payload.meeting_url or None),
+        web_link=None,
+        event_id=None,
+        scheduled_at=payload.start_time,
+    )
+    # Persist the chosen timezone + duration so the Confirmation view rehydrates
+    # correctly after a refresh.
+    cycle_repo.update_by_id("cycle_id", cycleId, {
+        "meeting_time_zone": payload.time_zone,
+        "meeting_duration_minutes": payload.duration_minutes,
+    })
+    # Advance forward to MEETING_SCHEDULED (never regress if already past it).
+    current = cycle.get("workflow_state", "CYCLE_CREATED")
+    current_idx = WORKFLOW_STATES.index(current) if current in WORKFLOW_STATES else 0
+    target_idx = WORKFLOW_STATES.index("MEETING_SCHEDULED")
+    updated = cycle_repo.get_by_cycle_id(cycleId)
+    if current_idx < target_idx:
+        for _ in range(target_idx - current_idx):
+            updated = workflow_engine.advance(updated, cycle_repo)
+    logger.info("MANUAL-MEETING — cycleId=%s scheduled_at=%s tz=%s", cycleId, payload.start_time, payload.time_zone)
+    return {
+        "cycle": updated,
+        "scheduled_at": payload.start_time,
+        "time_zone": payload.time_zone,
+        "duration_minutes": payload.duration_minutes,
+        "meeting_url": payload.meeting_url or None,
+    }
+
+
 @router.delete("/api/cycles/{cycleId}")
 def delete_cycle(
     cycleId: str,
@@ -233,6 +285,7 @@ def delete_cycle(
     slot_repo=Depends(get_slot_repo),
     action_repo=Depends(get_action_repo),
     meeting_repo=Depends(get_meeting_repo),
+    participant_repo=Depends(get_meeting_participant_repo),
 ):
     logger.info("delete_cycle called — cycleId=%s", cycleId)
     _get_cycle_or_404(cycleId, cycle_repo)
@@ -242,10 +295,21 @@ def delete_cycle(
     removed_attendees = attendee_repo.delete_for_cycle(cycleId)
     slot_repo.clear_for_cycle(cycleId)
     removed_actions = action_repo.delete_by_field("cycle_id", cycleId)
-    removed_meetings = meeting_repo.delete_by_field("cycleId", cycleId)
+    # Meeting participants are a child of meetings — drop them before the meetings.
+    for _m in meeting_repo.get_for_cycle(cycleId):
+        participant_repo.delete_for_meeting(_m.get("meeting_id", ""))
+    removed_meetings = meeting_repo.delete_by_field("cycle_id", cycleId)
     from app.api.routes.scorecard_v2 import _submissions_repo, _final_repo
     removed_submissions = _submissions_repo().delete_by_field("cycle_id", cycleId)
     _final_repo().delete_by_field("cycle_id", cycleId)
+    # Pushback items + their drafted responses (child).
+    from app.dependencies import get_pushback_repo, get_pushback_response_repo, get_meeting_artifact_repo
+    _pb_repo, _pr_repo = get_pushback_repo(), get_pushback_response_repo()
+    for _pb in _pb_repo.get_for_cycle(cycleId):
+        _pr_repo.delete_for_pushback(_pb.get("pushback_id", ""))
+    _pb_repo.delete_by_field("cycle_id", cycleId)
+    # Persisted meeting artifacts (parsed notes + minutes).
+    get_meeting_artifact_repo().delete_for_cycle(cycleId)
     cycle_repo.delete_by_id("cycle_id", cycleId)
 
     logger.info(

@@ -15,6 +15,7 @@ DELETE /api/cycles/{cycleId}/actions/{actionId} Delete an action item
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -32,20 +33,52 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/cycles/{cycleId}/actions", tags=["actions"])
 
+# Two action items count as "the same" for de-duplication when their content words
+# overlap at least this much (Jaccard on non-stopword tokens). Deliberately strict so
+# genuinely different tasks are never merged, but paraphrases of one task collapse into
+# one queue entry across ALL meetings (alignment, vendor prep, second alignment, QBR).
+_SIMILARITY_THRESHOLD = 0.7
+
+# Filler words stripped before comparison so wording differences don't defeat de-dup.
+_STOPWORDS = frozenset({
+    "the", "a", "an", "to", "of", "and", "for", "on", "in", "by", "with", "is", "are",
+    "be", "will", "shall", "that", "this", "we", "our", "their", "it", "as", "at", "from",
+    "into", "should", "must", "need", "needs", "please", "ensure", "provide", "submit",
+})
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
 def _new_id() -> str:
-    return f"act-{uuid.uuid4().hex[:8]}"
+    return f"act-{uuid.uuid4().hex}"
 
 
-def _content_sig(source: str, description: str, origin) -> tuple:
-    """Identity of an action by CONTENT, not by client id — so re-parsing the same
-    transcript never doubles the queue, while genuinely different items from different
-    meetings are always added (client-supplied ids are not globally unique)."""
-    return (source or "", (description or "").strip().lower(), (origin or "").strip().lower())
+def _normalize_text(text: str) -> str:
+    """Lowercase, drop punctuation, collapse whitespace — a stable comparison key."""
+    t = re.sub(r"[^a-z0-9\s]", " ", (text or "").lower())
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _token_set(text: str) -> set[str]:
+    return {w for w in _normalize_text(text).split() if w and w not in _STOPWORDS}
+
+
+def _is_duplicate(new_desc: str, existing_desc: str) -> bool:
+    """True when two action descriptions describe the same task — exact after
+    normalisation, or a close paraphrase by content-word overlap. Source/meeting is
+    intentionally ignored so a vendor-prep item never re-adds an alignment item."""
+    na, nb = _normalize_text(new_desc), _normalize_text(existing_desc)
+    if not na or not nb:
+        return False
+    if na == nb:
+        return True
+    ta, tb = _token_set(new_desc), _token_set(existing_desc)
+    if not ta or not tb:
+        return False
+    jaccard = len(ta & tb) / len(ta | tb)
+    return jaccard >= _SIMILARITY_THRESHOLD
 
 
 def _build_record(cycle_id: str, payload: ActionItemCreate, *, force_new_id: bool = False) -> dict:
@@ -92,29 +125,43 @@ def add_action(cycleId: str, payload: ActionItemCreate, action_repo=Depends(get_
 
 @router.post("/bulk")
 def add_actions_bulk(cycleId: str, payload: ActionItemBulkCreate, action_repo=Depends(get_action_repo)):
-    """Add several action items (e.g. extracted from a transcript).
+    """Add several action items (e.g. extracted from a transcript), de-duplicated
+    against the WHOLE cycle queue regardless of which meeting produced them.
 
-    Identity is by CONTENT (source + description + origin), and ids are generated
-    server-side — so re-parsing the same transcript never doubles the queue, and two
-    different meetings never collide just because a client/LLM reused an id."""
+    A new item is dropped when it repeats one already in the queue (exact or a close
+    paraphrase) — so the items surfaced at vendor prep are genuinely new relative to
+    internal alignment, with no repetition. When a dropped item carries a description
+    the existing entry lacks, that detail is consolidated onto the existing entry.
+    Ids are generated server-side, so a reused client/LLM id never collides."""
     _require_cycle(cycleId)
-    seen = {
-        _content_sig(a.get("source"), a.get("description"), a.get("origin"))
-        for a in action_repo.get_for_cycle(cycleId)
-    }
+    # Live view of the queue; newly-inserted items are appended so later items in the
+    # SAME batch also de-dup against them.
+    existing: list[dict] = list(action_repo.get_for_cycle(cycleId))
     added: list[dict] = []
+    consolidated = 0
     for item in payload.actions:
-        if not (item.description or "").strip():
+        desc = (item.description or "").strip()
+        if not desc:
             continue
-        sig = _content_sig(item.source, item.description, item.origin)
-        if sig in seen:
+        match = next((e for e in existing if _is_duplicate(desc, e.get("description", ""))), None)
+        if match:
+            # Consolidate: enrich the kept entry's empty details from the duplicate.
+            new_details = (item.details or "").strip()
+            if new_details and not (match.get("details") or "").strip():
+                action_repo.update_by_id("action_id", match["action_id"],
+                                         {"details": new_details, "updated_at": _now()})
+                match["details"] = new_details
+                consolidated += 1
             continue
         record = _build_record(cycleId, item, force_new_id=True)
         action_repo.insert(record)
-        seen.add(sig)
+        existing.append(record)
         added.append(record)
-    logger.info("ACTIONS: bulk-added %d of %d item(s) to cycle %s", len(added), len(payload.actions), cycleId)
-    return {"added": added, "count": len(added)}
+    logger.info(
+        "ACTIONS: bulk %d submitted -> %d added, %d duplicate(s) skipped, %d consolidated (cycle %s)",
+        len(payload.actions), len(added), len(payload.actions) - len(added), consolidated, cycleId,
+    )
+    return {"added": added, "count": len(added), "consolidated": consolidated}
 
 
 @router.patch("/{actionId}")

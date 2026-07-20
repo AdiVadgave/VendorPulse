@@ -42,12 +42,12 @@ class AvailabilityUpdate(BaseModel):
 
 
 class User(BaseModel):
-    """Full user record as stored in users.json."""
+    """Full user record as stored in users.json. Availability lives in its own
+    store (user_availability), not embedded here."""
 
-    userId: str
+    user_id: str
     name: str
     email: str
     role: str
     avatar: str
-    availability: list[AvailabilitySlot] = Field(default_factory=list)
-    createdAt: str
+    created_at: str

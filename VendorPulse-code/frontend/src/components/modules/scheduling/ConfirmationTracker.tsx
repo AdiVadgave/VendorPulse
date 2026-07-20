@@ -7,14 +7,14 @@ import {
   CalendarCheck,
   Key,
   ArrowRight,
+  CalendarClock,
+  ExternalLink,
+  Link2Off,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
-import RescheduleControl from './RescheduleControl'
 import type { CycleAttendee, InviteStatus, SlotProposal } from '@/types/scheduling.types'
 import { ROLE_LABELS } from '@/types/cycle.types'
-
-// Replaced Mock Teams integration
 
 interface ConfirmationTrackerProps {
   cycleId: string
@@ -22,8 +22,10 @@ interface ConfirmationTrackerProps {
   slot: SlotProposal
   timeZoneOverride?: 'IST' | 'UTC' | 'GMT'
   onProceed?: () => void
-  /** Reschedule the meeting to a new coordinator-chosen time via Graph. */
-  onRescheduled?: (slot: SlotProposal, timeZone: 'IST' | 'UTC' | 'GMT', teamsUrl: string | null) => void
+  /** Go back and change the manually-set meeting date/time. */
+  onReschedule?: () => void
+  /** The meeting join link the coordinator pasted (if any). */
+  meetingUrl?: string | null
 }
 
 const STATUS_CONFIG: Record<
@@ -48,16 +50,17 @@ const STATUS_CONFIG: Record<
 }
 
 export default function ConfirmationTracker({
-  cycleId,
   attendees,
   slot,
   timeZoneOverride,
   onProceed,
-  onRescheduled,
+  onReschedule,
+  meetingUrl,
 }: ConfirmationTrackerProps) {
   const [nudgeSent, setNudgeSent] = useState<Set<string>>(new Set())
   const [nudgingId, setNudgingId] = useState<string | null>(null)
   const dateObj = new Date(slot.proposed_time)
+  const durationMin = slot.duration_minutes ?? 60
 
   const slotTimeZone = timeZoneOverride ?? slot.proposed_time_zone ?? 'UTC'
   const displayZone = slotTimeZone.toUpperCase().includes('IST') ? 'IST'
@@ -87,7 +90,6 @@ export default function ConfirmationTracker({
   const accepted = attendees.filter((a) => a.invite_status === 'ACCEPTED')
   const declined = attendees.filter((a) => a.invite_status === 'DECLINED')
   const pending   = attendees.filter((a) => a.invite_status === 'PENDING')
-  const allResponded = pending.length === 0
 
 
 
@@ -103,33 +105,47 @@ export default function ConfirmationTracker({
 
   return (
     <div className="space-y-4 fade-in">
-      {/* Meeting confirmed banner */}
+      {/* Meeting scheduled banner */}
       <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-5">
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 flex-wrap">
           <div className="w-9 h-9 bg-emerald-100 dark:bg-emerald-900/40 rounded-lg flex items-center justify-center shrink-0">
             <CalendarCheck size={18} className="text-emerald-600 dark:text-emerald-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-emerald-800 dark:text-emerald-300 text-sm">
-              Meeting Scheduled — Invites Sent via Teams
-            </h3>
+            <h3 className="font-semibold text-emerald-800 dark:text-emerald-300 text-sm">Meeting Scheduled</h3>
             <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
-              {displayDate} at {displayTime} {displayZone} · Conference Room B / Teams
+              {displayDate} at {displayTime} {displayZone} · {durationMin} min
             </p>
+            <div className="mt-1.5">
+              {meetingUrl ? (
+                <a
+                  href={meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+                >
+                  <ExternalLink size={12} /> Join meeting link
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700/70 dark:text-emerald-400/70">
+                  <Link2Off size={12} /> No meeting link added
+                </span>
+              )}
+            </div>
           </div>
-          <AgentStatusBadge status="complete" label="Invite Sent" />
+          <div className="flex items-center gap-2 shrink-0">
+            {onReschedule && (
+              <button
+                onClick={onReschedule}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-white/60 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+              >
+                <CalendarClock size={13} /> Reschedule
+              </button>
+            )}
+            <AgentStatusBadge status="complete" label="Scheduled" />
+          </div>
         </div>
       </div>
-
-      {/* Reschedule — find new Graph slots to pick from, or set your own time */}
-      {onRescheduled && (
-        <RescheduleControl
-          cycleId={cycleId}
-          attendees={attendees}
-          defaultTimeZone={timeZoneOverride ?? 'IST'}
-          onRescheduled={onRescheduled}
-        />
-      )}
 
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -244,23 +260,20 @@ export default function ConfirmationTracker({
               <Bell size={12} />
               <span>
                 {pending.length} attendee{pending.length > 1 ? 's have' : ' has'} not
-                responded yet. Use{' '}
-                <strong>Send nudge</strong> — a reminder will appear in their Teams notifications.
+                responded yet. Use <strong>Send nudge</strong> to log a reminder for them.
               </span>
             </p>
           </div>
         )}
       </div>
 
-      {/* Proceed to Scorecard — shown once all attendees have responded */}
-      {allResponded && onProceed && (
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-5 flex items-center justify-between gap-4">
+      {/* Proceed to Scorecard — the meeting date is saved; move on whenever ready. */}
+      {onProceed && (
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-5 flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-              All attendees have responded
-            </p>
+            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Meeting date saved</p>
             <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
-              {accepted.length} accepted · {declined.length} declined. Ready to move to the next phase.
+              You can move on to collecting scorecards whenever you&rsquo;re ready.
             </p>
           </div>
           <button

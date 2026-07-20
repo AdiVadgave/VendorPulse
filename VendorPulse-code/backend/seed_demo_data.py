@@ -114,7 +114,7 @@ def seed() -> None:
     cleanup()
     total_cycles = total_subs = 0
     for v in VENDORS:
-        vendor_id = f"v_{uuid.uuid4().hex[:8]}"
+        vendor_id = f"v_{uuid.uuid4().hex}"
         vrepo.insert({"vendor_id": vendor_id, "name": v["name"], "category": v["category"], "status": "active"})
         quarters = [("Q1", 2025), ("Q2", 2025), ("Q3", 2025), ("Q4", 2025)]
         for idx, ((q, year), target) in enumerate(zip(quarters, v["targets"])):

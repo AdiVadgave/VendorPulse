@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from app.repositories.meeting_repository import MeetingParticipantRepository
+from app.repositories.user_availability_repository import UserAvailabilityRepository
 from app.repositories.user_repository import UserRepository
 
 
@@ -28,13 +30,19 @@ def _slot_covers(avail_start: str, avail_end: str, req_start: str, req_end: str)
 
 
 class AvailabilityService:
-    def __init__(self, user_repo: UserRepository) -> None:
+    def __init__(
+        self,
+        user_repo: UserRepository,
+        availability_repo: UserAvailabilityRepository,
+        participant_repo: MeetingParticipantRepository,
+    ) -> None:
         self._user_repo = user_repo
+        self._availability_repo = availability_repo
+        self._participant_repo = participant_repo
 
     def _get_user_availability(self, user_id: str) -> list[dict]:
-        """Fetch availability from local repo."""
-        user = self._user_repo.get_by_user_id(user_id)
-        return user.get("availability", []) if user else []
+        """Fetch availability from the user_availability child store."""
+        return self._availability_repo.get_for_user(user_id)
 
     # ------------------------------------------------------------------
     # Core availability checks
@@ -101,24 +109,25 @@ class AvailabilityService:
         for meeting in existing_meetings:
             if meeting.get("status") == "cancelled":
                 continue
-            if exclude_meeting_id and meeting.get("meetingId") == exclude_meeting_id:
+            if exclude_meeting_id and meeting.get("meeting_id") == exclude_meeting_id:
                 continue
 
-            ts = meeting.get("timeSlot", {})
+            ts = meeting.get("time_slot", {})
             if ts.get("date") != date:
                 continue
 
-            m_start = ts.get("startTime", "")
-            m_end = ts.get("endTime", "")
+            m_start = ts.get("start_time", "")
+            m_end = ts.get("end_time", "")
 
             if not _slots_overlap(m_start, m_end, start_time, end_time):
                 continue
 
-            # Is this user involved (and not declined)?
-            is_organiser = meeting.get("organizerId") == user_id
+            # Is this user involved (and not declined)? Participants live in the child store.
+            is_organiser = meeting.get("organizer_id") == user_id
+            participants = self._participant_repo.get_for_meeting(meeting.get("meeting_id", ""))
             is_participant = any(
-                p.get("userId") == user_id and p.get("status") != "declined"
-                for p in meeting.get("participants", [])
+                p.get("user_id") == user_id and p.get("status") != "declined"
+                for p in participants
             )
             if is_organiser or is_participant:
                 return True

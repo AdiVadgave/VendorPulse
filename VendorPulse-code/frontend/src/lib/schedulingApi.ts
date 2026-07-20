@@ -6,24 +6,6 @@ import { apiFetch } from './api'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import type { GovernanceCycle } from '@/types/cycle.types'
 
-// ── Response shapes ──────────────────────────────────────────────────────────
-
-export interface AgentRunResponse {
-  status: 'success' | 'failed'
-  agent: string
-  summary: string
-  data: { slots?: SlotProposal[]; [key: string]: unknown } | null
-  warnings: string[]
-  next_actions: string[]
-  requires_approval: boolean
-  run_id?: string
-}
-
-export interface GraphTokenInfo {
-  token_present: boolean
-  user?: string
-}
-
 // ── Cycles ───────────────────────────────────────────────────────────────────
 
 export async function fetchCycle(cycleId: string): Promise<GovernanceCycle | null> {
@@ -102,93 +84,6 @@ export async function setBackendWorkflowState(
   }
 }
 
-// ── Manual slot (create-only, pending invite approval) ───────────────────────
-
-/**
- * Create an approved slot at a coordinator-chosen time WITHOUT creating the
- * Teams meeting. The UI then routes to Invite Approval, where the coordinator
- * reviews/edits the invite before it is sent.
- */
-export async function createManualSlot(
-  cycleId: string,
-  params: { startTime: string; durationHours: number; timeZone: 'IST' | 'UTC' | 'GMT' }
-): Promise<SlotProposal> {
-  const res = await apiFetch<{ slot: SlotProposal }>(
-    `/api/cycles/${cycleId}/scheduling/manual-slot`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        start_time: params.startTime,
-        duration_hours: params.durationHours,
-        time_zone: params.timeZone,
-      }),
-    }
-  )
-  return res.slot
-}
-
-// ── Manual / reschedule (main governance meeting) ────────────────────────────
-
-export interface ScheduleManualResult {
-  message: string
-  event_id?: string
-  teams_meeting_url?: string | null
-  web_link?: string | null
-  slot?: SlotProposal
-  rescheduled: boolean
-}
-
-/**
- * Manually schedule (or reschedule) the main governance meeting at a
- * coordinator-chosen time, bypassing the ranked slot recommendations.
- * Creates/updates a real Teams meeting via Microsoft Graph.
- */
-export async function scheduleMeetingManual(
-  cycleId: string,
-  params: {
-    organiserEmail: string
-    startTime: string // local wall-clock, e.g. "2026-07-20T14:30:00"
-    durationHours: number
-    timeZone: 'IST' | 'UTC' | 'GMT'
-    reschedule?: boolean
-  }
-): Promise<ScheduleManualResult> {
-  return apiFetch<ScheduleManualResult>(
-    `/api/cycles/${cycleId}/scheduling/graph/schedule-manual`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        organiser_email: params.organiserEmail,
-        start_time: params.startTime,
-        duration_hours: params.durationHours,
-        time_zone: params.timeZone,
-        reschedule: params.reschedule ?? false,
-      }),
-    }
-  )
-}
-
-export function getPreferredOrganizerEmail(attendees: CycleAttendee[]): string | null {
-  const coordinator = attendees.find((attendee) => attendee.role === 'VMO_COORDINATOR')
-  if (coordinator?.email) return coordinator.email
-
-  const keyAttendee = attendees.find((attendee) => attendee.is_key)
-  if (keyAttendee?.email) return keyAttendee.email
-
-  return attendees[0]?.email ?? null
-}
-
-export async function getTokenOwnerOrganizerEmail(): Promise<string | null> {
-  try {
-    const info = await apiFetch<GraphTokenInfo>(`/api/graph/token-info`)
-    if (!info?.token_present) return null
-    const user = (info.user ?? '').trim().toLowerCase()
-    return user || null
-  } catch {
-    return null
-  }
-}
-
 export async function approveAttendeeKey(
   cycleId: string,
   attendeeId: string,
@@ -210,18 +105,31 @@ export async function fetchSlots(cycleId: string): Promise<SlotProposal[]> {
   return res.proposals ?? []
 }
 
-export async function approveSlot(
+// ── Manual meeting (no Graph / calendar access) ──────────────────────────────
+
+export interface ManualMeetingResult {
+  cycle: { workflow_state: string; teams_meeting_scheduled_at?: string | null; teams_meeting_url?: string | null }
+  scheduled_at: string
+  time_zone: string
+  duration_minutes: number
+  meeting_url: string | null
+}
+
+/** Record a manually-chosen meeting date/time on the cycle (persists to the DB and
+ *  advances the workflow to MEETING_SCHEDULED). No calendar.readwrite required. */
+export async function scheduleManualMeeting(
   cycleId: string,
-  slotId: string,
-  approvedBy = 'coordinator',
-  timeZone?: 'IST' | 'UTC' | 'GMT'
-): Promise<AgentRunResponse> {
-  const payload: Record<string, unknown> = { approved_by: approvedBy }
-  if (timeZone) payload.time_zone = timeZone
-  return apiFetch<AgentRunResponse>(
-    `/api/cycles/${cycleId}/scheduling/slots/${slotId}/approve`,
-    { method: 'PUT', body: JSON.stringify(payload) }
-  )
+  input: { startTime: string; timeZone: string; durationMinutes?: number; meetingUrl?: string | null }
+): Promise<ManualMeetingResult> {
+  return apiFetch<ManualMeetingResult>(`/api/cycles/${cycleId}/scheduling/manual-meeting`, {
+    method: 'POST',
+    body: JSON.stringify({
+      start_time: input.startTime,
+      time_zone: input.timeZone,
+      duration_minutes: input.durationMinutes ?? 60,
+      meeting_url: input.meetingUrl ?? null,
+    }),
+  })
 }
 
 // ── RSVP ─────────────────────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import settings
-from app.dependencies import get_meeting_repo, get_user_service
+from app.dependencies import get_meeting_participant_repo, get_meeting_repo, get_user_service
 from app.models.user import AvailabilityUpdate, UserCreate, UserUpdate
 from app.services.user_service import UserService
 
@@ -29,7 +29,7 @@ def list_users(search: Optional[str] = None, svc: UserService = Depends(get_user
     # Return as an array of SystemUsers for the frontend search
     return [
         {
-            "user_id": u["userId"],
+            "user_id": u["user_id"],
             "name": u["name"],
             "email": u["email"],
             "gmail": u.get("gmail", ""),
@@ -95,8 +95,8 @@ def update_availability(
     user = svc.get_user(userId)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    updated = svc.update_availability(userId, payload.date, payload.slots)
-    return {"userId": userId, "availability": updated.get("availability", [])}
+    availability = svc.update_availability(userId, payload.date, payload.slots)
+    return {"user_id": userId, "availability": availability}
 
 
 @router.get("/{userId}/meetings")
@@ -104,9 +104,10 @@ def get_user_meetings(
     userId: str,
     svc: UserService = Depends(get_user_service),
     meeting_repo=Depends(get_meeting_repo),
+    participant_repo=Depends(get_meeting_participant_repo),
 ):
     user = svc.get_user(userId)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    meetings = svc.get_user_meetings(userId, meeting_repo)
+    meetings = svc.get_user_meetings(userId, meeting_repo, participant_repo)
     return {"meetings": meetings}

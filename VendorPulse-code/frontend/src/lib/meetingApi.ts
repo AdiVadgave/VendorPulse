@@ -42,6 +42,25 @@ export async function parseTranscript(
   )
 }
 
+// ── Persisted meeting artifact (parsed notes + generated minutes) ────────────
+
+export interface MeetingArtifact {
+  meeting_id: string
+  notes: MeetingNote[]
+  minutes: MeetingMinutes | null
+  parsed_at: string | null
+}
+
+/** Fetch the persisted parsed notes + minutes for a meeting (empty if never parsed). */
+export async function getMeetingArtifact(
+  cycleId: string,
+  meetingId?: string
+): Promise<MeetingArtifact> {
+  return apiFetch<MeetingArtifact>(`/api/cycles/${cycleId}/meeting/artifact`, {
+    params: meetingId ? { meeting_id: meetingId } : undefined,
+  })
+}
+
 // ── Generate Meeting Minutes ────────────────────────────────────────────────
 
 export interface MinutesPayload {

@@ -1,231 +1,239 @@
 [
   {
-    "userId": "u1",
     "name": "Alex Thompson",
     "email": "alex.thompson@zensar.com",
     "gmail": "alexthompson@gmail.com",
     "role": "VMO_COORDINATOR",
     "organisation": "Zensar VMO",
-    "avatar": "AT"
+    "avatar": "AT",
+    "user_id": "u1"
   },
   {
-    "userId": "u2",
     "name": "Sarah Chen",
     "email": "sarah.chen@zensar.com",
     "gmail": "sarahchen@gmail.com",
     "role": "EGB_CHAIR",
     "organisation": "Zensar IDT",
-    "avatar": "SC"
+    "avatar": "SC",
+    "user_id": "u2"
   },
   {
-    "userId": "u4",
     "name": "Marcus Williams",
     "email": "marcus.williams@zensar.com",
     "gmail": "",
     "role": "VENDOR_MANAGER",
     "organisation": "Zensar VMO",
-    "avatar": "MW"
+    "avatar": "MW",
+    "user_id": "u4"
   },
   {
-    "userId": "u5",
     "name": "James O'Brien",
     "email": "james.obrien@zensar.com",
     "gmail": "",
     "role": "TECHNICAL_LEAD",
     "organisation": "Zensar IDT",
-    "avatar": "JO"
+    "avatar": "JO",
+    "user_id": "u5"
   },
   {
-    "userId": "u6",
     "name": "Emma Davies",
     "email": "emma.davies@zensar.com",
     "gmail": "",
     "role": "COMMERCIAL_LEAD",
     "organisation": "Zensar VMO",
-    "avatar": "ED"
+    "avatar": "ED",
+    "user_id": "u6"
   },
   {
-    "userId": "u7",
     "name": "Raj Patel",
     "email": "raj.patel@novatech.com",
     "gmail": "",
     "role": "VENDOR_MANAGER",
     "organisation": "NovaTech Services",
-    "avatar": "RP"
+    "avatar": "RP",
+    "user_id": "u7"
   },
   {
-    "userId": "u8",
     "name": "Lisa Wang",
     "email": "lisa.wang@novatech.com",
     "gmail": "",
     "role": "TECHNICAL_LEAD",
     "organisation": "NovaTech Services",
-    "avatar": "LW"
+    "avatar": "LW",
+    "user_id": "u8"
   },
   {
-    "userId": "u9",
     "name": "David Kim",
     "email": "david.kim@novatech.com",
     "gmail": "",
     "role": "COMMERCIAL_LEAD",
     "organisation": "NovaTech Services",
-    "avatar": "DK"
+    "avatar": "DK",
+    "user_id": "u9"
   },
   {
-    "userId": "u10",
     "name": "Tom Baker",
     "email": "tom.baker@zensar.com",
     "gmail": "",
     "role": "VENDOR_MANAGER",
     "organisation": "Zensar VMO",
-    "avatar": "TB"
+    "avatar": "TB",
+    "user_id": "u10"
   },
   {
-    "userId": "u11",
     "name": "Nina Okafor",
     "email": "nina.okafor@coresystems.com",
     "gmail": "",
     "role": "Member",
     "organisation": "CoreSystems Ltd",
-    "avatar": "NO"
+    "avatar": "NO",
+    "user_id": "u11"
   },
   {
-    "userId": "u12",
     "name": "Liam Nguyen",
     "email": "liam.nguyen@meridianit.com",
     "gmail": "",
     "role": "Member",
     "organisation": "Meridian IT",
-    "avatar": "LN"
+    "avatar": "LN",
+    "user_id": "u12"
   },
   {
-    "userId": "u13",
     "name": "Sophie Hart",
     "email": "sophie.hart@zensar.com",
     "gmail": "",
     "role": "INTERNAL_LEAD",
     "organisation": "Zensar IDT",
-    "avatar": "SH"
+    "avatar": "SH",
+    "user_id": "u13"
   },
   {
-    "userId": "u14",
     "name": "Carlos Rivera",
     "email": "carlos.rivera@novatech.com",
     "gmail": "",
     "role": "Member",
     "organisation": "NovaTech Services",
-    "avatar": "CR"
+    "avatar": "CR",
+    "user_id": "u14"
   },
   {
-    "userId": "u15",
     "name": "Aisha Malik",
     "email": "aisha.malik@coresystems.com",
     "gmail": "",
     "role": "Member",
     "organisation": "CoreSystems Ltd",
-    "avatar": "AM"
+    "avatar": "AM",
+    "user_id": "u15"
   },
   {
-    "userId": "u16",
     "name": "Anup Kesarwani",
     "email": "anup.kesarwani@zensar.com",
     "gmail": "anupkrsarwani3537@gmail.com",
     "role": "INTERNAL_LEAD",
     "organisation": "Shell ",
-    "avatar": "AK"
+    "avatar": "AK",
+    "user_id": "u16"
   },
   {
-    "userId": "u17",
     "name": "Kanishk Punekar",
     "email": "kanishk.punekar@zensar.com",
     "gmail": "kanishkpunekar54@gmail.com",
     "role": "TECHNICAL_LEAD",
     "organisation": "Zensar IDT",
-    "avatar": "KP"
+    "avatar": "KP",
+    "user_id": "u17"
   },
   {
-    "userId": "u18",
     "name": "Aditya Vadgave",
     "email": "aditya.vadgave@zensar.com",
     "gmail": "adivadgave16@gmail.com",
     "role": "VENDOR_MANAGER",
     "organisation": "Shell ",
-    "avatar": "AV"
+    "avatar": "AV",
+    "user_id": "u18"
   },
   {
-    "userId": "u19",
     "name": "Vivek Kulkarni",
     "email": "v.kulkarni3@zensar.com",
     "gmail": "vivekkulkarni@gmail.com",
     "role": "VENDOR_MANAGER",
     "organisation": "Zensar ",
-    "avatar": "VK"
+    "avatar": "VK",
+    "user_id": "u19"
   },
   {
-    "userId": "u20",
     "name": "abhishek Biyani",
     "email": "abhishek.biyani@zensar.com",
     "gmail": "",
     "role": "VENDOR_MANAGER",
     "organisation": "Zensar VMO",
-    "avatar": "AB"
+    "avatar": "AB",
+    "user_id": "u20"
   },
   {
-    "userId": "u21",
     "name": "Hrushikesh Sardesai",
     "email": "hrushikesh.sardesai@zensar.com",
     "gmail": "",
     "role": "",
     "organisation": "",
-    "avatar": "HS"
+    "avatar": "HS",
+    "user_id": "u21"
   },
   {
-    "userId": "u22",
     "name": "Rituraj Patil",
     "email": "rituraj.patil@zensar.com",
     "gmail": "",
     "role": "",
     "organisation": "",
-    "avatar": "RP"
+    "avatar": "RP",
+    "user_id": "u22"
   },
   {
-    "userId": "u23",
     "name": "Richa Sankpal",
     "email": "richa.sankpal@zensar.com",
     "gmail": "",
     "role": "",
     "organisation": "",
-    "avatar": "RS"
+    "avatar": "RS",
+    "user_id": "u23"
   },
   {
-    "userId": "u24",
     "name": "Gaurav Shukla",
     "email": "gaurav.shukla1@zensar.com",
     "gmail": "",
     "role": "",
     "organisation": "",
-    "avatar": "GS"
+    "avatar": "GS",
+    "user_id": "u24"
   },
   {
-    "userId": "u5672f9ea",
     "name": "Siddhi Pathak",
     "email": "siddhi.pathak@zensar.com",
     "role": "VMO_COORDINATOR",
     "organisation": "Zensar",
     "gmail": "siddhi.pathak@zensar.com",
     "avatar": "SP",
-    "availability": [],
-    "createdAt": "2026-07-17T08:21:59.552602+00:00"
+    "user_id": "u5672f9ea",
+    "created_at": "2026-07-17T08:21:59.552602+00:00"
   },
   {
-    "userId": "ubd2a240b",
     "name": "Ganesh Kende",
     "email": "ganesh.kende@zensar.com",
     "role": "INTERNAL_LEAD",
     "organisation": "Zensar",
     "gmail": "",
     "avatar": "G",
-    "availability": [],
-    "createdAt": "2026-07-17T08:28:06.102705+00:00"
+    "user_id": "ubd2a240b",
+    "created_at": "2026-07-17T08:28:06.102705+00:00"
+  },
+  {
+    "user_id": "u8a092fbde6e34b098645a0948693030d",
+    "name": "Chinmay Kotkar",
+    "email": "chinmay.kotkar@zensar.com",
+    "role": "VMO_COORDINATOR",
+    "organisation": "Zensar",
+    "gmail": "",
+    "avatar": "CK",
+    "created_at": "2026-07-20T09:03:53.446598+00:00"
   }
 ]

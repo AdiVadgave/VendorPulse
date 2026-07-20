@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react'
 import {
-  CalendarPlus, Users, ExternalLink, CheckCircle2, Loader2, RotateCcw, Building2,
+  CalendarPlus, Users, ExternalLink, CheckCircle2, Loader2, RotateCcw, Building2, Link2Off, UserPlus, X,
 } from 'lucide-react'
 import {
-  findVendorPrepTimes, scheduleVendorPrepMeeting, getVendorPrepMeeting,
+  scheduleVendorPrepMeetingManual, getVendorPrepMeeting,
 } from '@/lib/vendorPrepApi'
-import { getTokenOwnerOrganizerEmail, fetchAttendees } from '@/lib/schedulingApi'
-import SlotCard from '@/components/modules/scheduling/SlotCard'
+import { fetchAttendees } from '@/lib/schedulingApi'
+import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import TranscriptInput from '@/components/modules/meeting/TranscriptInput'
-import MeetingMinutesViewer from '@/components/modules/meeting/MeetingMinutesViewer'
-import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
+import type { CycleAttendee } from '@/types/scheduling.types'
 import type { MeetingNote } from '@/types/meeting.types'
 import type { ExtractedAction } from '@/types/alignment.types'
 import { cn } from '@/utils/cn'
@@ -33,31 +32,29 @@ interface MeetingResult {
 type TZ = 'IST' | 'UTC' | 'GMT'
 
 /**
- * The single Vendor Prep meeting for a cycle: schedule the prep call (Teams via
- * Graph) with the internal team + vendor (attendees editable), then attach its
- * transcript and generate AI minutes + action items.
+ * The single Vendor Prep meeting for a cycle: pick when the prep call is scheduled
+ * and who is invited (internal team + vendor), then attach its transcript and
+ * generate AI minutes + action items.
  *
  * Persisted server-side in the SHARED meetings store as meetingType=VENDOR_PREP
- * (see docs/GRAPH_SCHEDULING_HANDOVER.md) — no separate meetings table.
+ * (see docs/GRAPH_SCHEDULING_HANDOVER.md) — no separate meetings table. Scheduling
+ * is manual (no Microsoft Graph / calendar access required).
  */
 export default function VendorPrepMeetingPanel({
-  cycleId, vendorName, quarter, year, onActionsExtracted, alreadyExtracted,
+  cycleId, onActionsExtracted, alreadyExtracted,
 }: Props) {
   const [attendees, setAttendees] = useState<CycleAttendee[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [slots, setSlots] = useState<SlotProposal[]>([])
   const [meetingResult, setMeetingResult] = useState<MeetingResult | null>(null)
-  const [notes, setNotes] = useState<MeetingNote[]>([])
 
-  const [dateStart, setDateStart] = useState('')
-  const [dateEnd, setDateEnd] = useState('')
   const [timeZone, setTimeZone] = useState<TZ>('IST')
   const [durationMinutes, setDurationMinutes] = useState(30)
-
-  const [findLoading, setFindLoading] = useState(false)
-  const [scheduleLoading, setScheduleLoading] = useState<string | null>(null)
   const [manualStart, setManualStart] = useState('')
+  const [meetingLink, setMeetingLink] = useState('')
+
+  const [scheduleLoading, setScheduleLoading] = useState(false)
   const [rescheduling, setRescheduling] = useState(false)
+  const [addingInvitee, setAddingInvitee] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [persistenceChecked, setPersistenceChecked] = useState(false)
 
@@ -107,75 +104,50 @@ export default function VendorPrepMeetingPanel({
     })
   }
 
-  async function resolveOrganiser(): Promise<string | null> {
-    const organiser = await getTokenOwnerOrganizerEmail()
-    if (!organiser) {
-      setError('Could not determine the organiser from the Graph token. Refresh GRAPH_ACCESS_TOKEN in backend .env and retry.')
-    }
-    return organiser
+  // A last-moment invitee added to the cycle roster — append it and auto-select
+  // so it's included the next time the meeting is (re)scheduled.
+  function handleInviteeAdded(attendee: CycleAttendee) {
+    setAttendees((prev) =>
+      prev.some((a) => a.attendee_id === attendee.attendee_id) ? prev : [...prev, attendee]
+    )
+    const email = (attendee.email || '').toLowerCase()
+    if (email) setSelected((prev) => new Set(prev).add(email))
+    setAddingInvitee(false)
   }
 
-  async function handleFindTimes() {
-    if (!dateStart || !dateEnd) return
-    if (selectedEmails.length === 0) { setError('Select at least one attendee to invite.'); return }
-    setFindLoading(true)
-    setError(null)
-    try {
-      const organiser = await resolveOrganiser()
-      if (!organiser) return
-      const res = await findVendorPrepTimes(cycleId, organiser, dateStart, dateEnd, durationMinutes / 60, timeZone, selectedEmails)
-      setSlots(res.slot_proposals)
-      if (res.slot_proposals.length === 0) setError(res.message || 'No available slots found in the selected range.')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to find available times')
-    } finally {
-      setFindLoading(false)
-    }
-  }
-
-  async function handleApproveSlot(slotId: string) {
-    const slot = slots.find((s) => s.slot_id === slotId)
-    if (!slot) return
-    setScheduleLoading(slotId)
-    setError(null)
-    try {
-      const organiser = await resolveOrganiser()
-      if (!organiser) return
-      const res = await scheduleVendorPrepMeeting(
-        cycleId, organiser, slotId, slot.proposed_time,
-        slot.duration_minutes ?? durationMinutes, timeZone, selectedEmails,
-      )
-      setMeetingResult({ teamsUrl: res.teams_meeting_url, webLink: res.web_link, attendeeCount: res.attendee_count })
-      setRescheduling(false)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to schedule meeting')
-    } finally {
-      setScheduleLoading(null)
-    }
-  }
+  const addInviteeForm = addingInvitee && (
+    <SearchAddAttendeeForm
+      cycleId={cycleId}
+      existingAttendeeIds={attendees.map((a) => a.user_id ?? a.attendee_id)}
+      onAdded={handleInviteeAdded}
+      onCancel={() => setAddingInvitee(false)}
+    />
+  )
 
   async function handleManualSchedule() {
     if (!manualStart) return
-    setScheduleLoading('manual')
+    if (selectedEmails.length === 0) { setError('Select at least one attendee to invite.'); return }
+    setScheduleLoading(true)
     setError(null)
     try {
-      const organiser = await resolveOrganiser()
-      if (!organiser) return
       const startTime = manualStart.length === 16 ? `${manualStart}:00` : manualStart
-      const res = await scheduleVendorPrepMeeting(
-        cycleId, organiser, `vprep_manual_${Date.now()}`, startTime, durationMinutes, timeZone, selectedEmails,
-      )
+      const res = await scheduleVendorPrepMeetingManual(cycleId, {
+        startTime,
+        durationMinutes,
+        timeZone,
+        attendeeEmails: selectedEmails,
+        meetingUrl: meetingLink.trim() || null,
+      })
       setMeetingResult({ teamsUrl: res.teams_meeting_url, webLink: res.web_link, attendeeCount: res.attendee_count })
       setRescheduling(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to schedule meeting')
     } finally {
-      setScheduleLoading(null)
+      setScheduleLoading(false)
     }
   }
 
   function handleParsed(parsed: MeetingNote[]) {
-    setNotes(parsed)
     const actions: ExtractedAction[] = parsed
       .filter((n) => n.note_type === 'ACTION')
       .map((n, i) => ({
@@ -204,26 +176,38 @@ export default function VendorPrepMeetingPanel({
           {meetingResult && !rescheduling ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 font-medium">
-                <CheckCircle2 size={16} /> Vendor prep meeting scheduled — invites sent via Teams to {meetingResult.attendeeCount} attendee{meetingResult.attendeeCount === 1 ? '' : 's'}.
+                <CheckCircle2 size={16} /> Vendor prep meeting scheduled — {meetingResult.attendeeCount} attendee{meetingResult.attendeeCount === 1 ? '' : 's'} invited.
               </div>
-              {meetingResult.teamsUrl && (
+              {meetingResult.teamsUrl ? (
                 <a
                   href={meetingResult.teamsUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 text-sm text-orange-600 dark:text-orange-400 hover:underline"
                 >
-                  <ExternalLink size={14} /> Join Teams meeting
+                  <ExternalLink size={14} /> Join meeting link
                 </a>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500">
+                  <Link2Off size={14} /> No meeting link added
+                </span>
               )}
-              <div>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => { setRescheduling(true); setSlots([]) }}
+                  onClick={() => { setRescheduling(true); setManualStart(''); setMeetingLink(meetingResult.teamsUrl ?? '') }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <RotateCcw size={13} /> Reschedule
                 </button>
+                <button
+                  onClick={() => setAddingInvitee((v) => !v)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                >
+                  {addingInvitee ? <X size={13} /> : <UserPlus size={13} />}
+                  {addingInvitee ? 'Cancel' : 'Add invitee'}
+                </button>
               </div>
+              {addInviteeForm}
             </div>
           ) : (
             <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -235,12 +219,22 @@ export default function VendorPrepMeetingPanel({
             <>
               {/* Attendee selection (internal + vendor, editable) */}
               <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users size={13} className="text-slate-400" />
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                    Invitees ({selectedEmails.length}/{attendees.length})
-                  </span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Users size={13} className="text-slate-400" />
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                      Invitees ({selectedEmails.length}/{attendees.length})
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setAddingInvitee((v) => !v)}
+                    className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 hover:text-orange-700 font-medium"
+                  >
+                    {addingInvitee ? <X size={12} /> : <UserPlus size={12} />}
+                    {addingInvitee ? 'Cancel' : 'Add invitee'}
+                  </button>
                 </div>
+                {addingInvitee && <div className="mb-3">{addInviteeForm}</div>}
                 {attendees.length === 0 ? (
                   <p className="text-xs text-slate-400">No attendees found for this cycle.</p>
                 ) : (
@@ -282,83 +276,52 @@ export default function VendorPrepMeetingPanel({
                 )}
               </div>
 
-              {/* Date range + timezone + duration */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <label className="text-xs text-slate-500 dark:text-slate-400">
-                  From
-                  <input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)}
-                    className="mt-1 w-full text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-orange-500" />
-                </label>
-                <label className="text-xs text-slate-500 dark:text-slate-400">
-                  To
-                  <input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)}
-                    className="mt-1 w-full text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-orange-500" />
-                </label>
-                <label className="text-xs text-slate-500 dark:text-slate-400">
-                  Timezone
-                  <select value={timeZone} onChange={(e) => setTimeZone(e.target.value as TZ)}
-                    className="mt-1 w-full text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-orange-500">
-                    <option value="IST">IST</option>
-                    <option value="UTC">UTC</option>
-                    <option value="GMT">GMT</option>
-                  </select>
-                </label>
-                <label className="text-xs text-slate-500 dark:text-slate-400">
-                  Duration
-                  <select value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                    className="mt-1 w-full text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-orange-500">
-                    <option value={30}>30 min</option>
-                    <option value={60}>1 hour</option>
-                    <option value={90}>1.5 hours</option>
-                    <option value={120}>2 hours</option>
-                  </select>
-                </label>
-              </div>
-
-              <button
-                onClick={handleFindTimes}
-                disabled={findLoading || !dateStart || !dateEnd}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                {findLoading ? <Loader2 size={14} className="animate-spin" /> : <CalendarPlus size={14} />}
-                {findLoading ? 'Finding times…' : 'Find Slots (Graph)'}
-              </button>
-
-              {/* Ranked slots */}
-              {slots.length > 0 && (
-                <div className="space-y-2 pt-2">
-                  {slots.slice(0, 6).map((slot, i) => (
-                    <SlotCard
-                      key={slot.slot_id}
-                      slot={slot}
-                      rank={i + 1}
-                      onApprove={handleApproveSlot}
-                      isProcessing={scheduleLoading === slot.slot_id}
-                      timeZoneView={timeZone}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Manual time fallback */}
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
-                  Or set the time manually
+              {/* Manual date/time + timezone + duration */}
+              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4 space-y-3">
+                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                  When is the meeting scheduled?
                 </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    Date &amp; time
+                    <input type="datetime-local" value={manualStart} onChange={(e) => setManualStart(e.target.value)}
+                      className="mt-1 w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                  </label>
+                  <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    Timezone
+                    <select value={timeZone} onChange={(e) => setTimeZone(e.target.value as TZ)}
+                      className="mt-1 w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                      <option value="IST">IST</option>
+                      <option value="UTC">UTC</option>
+                      <option value="GMT">GMT</option>
+                    </select>
+                  </label>
+                  <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    Duration
+                    <select value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                      className="mt-1 w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                      <option value={30}>30 min</option>
+                      <option value={60}>1 hour</option>
+                      <option value={90}>1.5 hours</option>
+                      <option value={120}>2 hours</option>
+                    </select>
+                  </label>
+                </div>
+                <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Meeting link (optional)
+                  <input type="url" placeholder="https://… (Teams, Meet, Zoom — paste if you have one)"
+                    value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)}
+                    className="mt-1 w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500" />
+                </label>
+
                 <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="datetime-local"
-                    value={manualStart}
-                    onChange={(e) => setManualStart(e.target.value)}
-                    className="text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  />
                   <button
                     onClick={handleManualSchedule}
-                    disabled={scheduleLoading === 'manual' || !manualStart}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-800 disabled:opacity-60 text-white text-xs font-medium rounded-lg"
+                    disabled={scheduleLoading || !manualStart}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                   >
-                    {scheduleLoading === 'manual' ? <Loader2 size={13} className="animate-spin" /> : <CalendarPlus size={13} />}
-                    Schedule at this time
+                    {scheduleLoading ? <Loader2 size={14} className="animate-spin" /> : <CalendarPlus size={14} />}
+                    {scheduleLoading ? 'Scheduling…' : 'Schedule at this time'}
                   </button>
                   {rescheduling && (
                     <button
@@ -379,23 +342,14 @@ export default function VendorPrepMeetingPanel({
         </div>
       </div>
 
-      {/* Transcript → AI minutes + action items (same wiring as the other meetings) */}
+      {/* Transcript → action items only. Meeting minutes are generated in the
+          final Meeting section, not here. */}
       <TranscriptInput
         cycleId={cycleId}
         meetingId={`vprep-${cycleId}`}
         onParsed={handleParsed}
         alreadyExtracted={alreadyExtracted}
       />
-      {notes.length > 0 && (
-        <MeetingMinutesViewer
-          cycleId={cycleId}
-          notes={notes}
-          vendorName={vendorName}
-          quarter={quarter}
-          year={year}
-          onApproved={() => { /* per-meeting minutes approved */ }}
-        />
-      )}
     </div>
   )
 }

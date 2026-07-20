@@ -4,7 +4,7 @@
  */
 import { apiFetch } from './api'
 import type { ExtractedAction, AlignmentInsight } from '@/types/alignment.types'
-import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
+import type { CycleAttendee } from '@/types/scheduling.types'
 
 // ── Response shape ──────────────────────────────────────────────────────────
 
@@ -60,39 +60,7 @@ export async function getAlignmentInsights(
   )
 }
 
-// ── Find Available Times ────────────────────────────────────────────────────
-
-export interface FindTimesResponse {
-  message: string
-  slot_proposals: SlotProposal[]
-  attendee_count: number
-}
-
-export async function findAlignmentTimes(
-  cycleId: string,
-  organiserEmail: string,
-  dateRangeStart: string,
-  dateRangeEnd: string,
-  durationHours = 0.5,
-  timeZone = 'UTC'
-): Promise<FindTimesResponse> {
-  return apiFetch<FindTimesResponse>(
-    `/api/cycles/${cycleId}/alignment/find-times`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        cycle_id: cycleId,
-        organiser_email: organiserEmail,
-        date_range_start: dateRangeStart,
-        date_range_end: dateRangeEnd,
-        duration_hours: durationHours,
-        time_zone: timeZone,
-      }),
-    }
-  )
-}
-
-// ── Schedule Meeting (send invite for selected slot) ────────────────────────
+// ── Schedule Meeting (manual, coordinator-chosen time) ──────────────────────
 
 export interface ScheduleMeetingResponse {
   message: string
@@ -103,27 +71,31 @@ export interface ScheduleMeetingResponse {
   attendee_emails: string[]
 }
 
-export async function scheduleAlignmentMeeting(
+/**
+ * Schedule an alignment meeting at a coordinator-chosen time (no Microsoft Graph /
+ * calendar access). Persists the time — and an optional pasted meeting link — so
+ * the state survives a refresh. Reschedules the same index in place.
+ */
+export async function scheduleAlignmentMeetingManual(
   cycleId: string,
-  organiserEmail: string,
-  slotId: string,
-  startTime: string,
-  durationMinutes = 30,
-  timeZone = 'UTC',
-  meetingIndex = 1
+  opts: {
+    startTime: string
+    durationMinutes?: number
+    timeZone?: string
+    meetingUrl?: string | null
+    meetingIndex?: number
+  }
 ): Promise<ScheduleMeetingResponse> {
   return apiFetch<ScheduleMeetingResponse>(
-    `/api/cycles/${cycleId}/alignment/schedule-meeting`,
+    `/api/cycles/${cycleId}/alignment/manual-meeting`,
     {
       method: 'POST',
       body: JSON.stringify({
-        cycle_id: cycleId,
-        organiser_email: organiserEmail,
-        slot_id: slotId,
-        start_time: startTime,
-        duration_minutes: durationMinutes,
-        time_zone: timeZone,
-        meeting_index: meetingIndex,
+        start_time: opts.startTime,
+        duration_minutes: opts.durationMinutes ?? 30,
+        time_zone: opts.timeZone ?? 'IST',
+        meeting_url: opts.meetingUrl ?? null,
+        meeting_index: opts.meetingIndex ?? 1,
       }),
     }
   )

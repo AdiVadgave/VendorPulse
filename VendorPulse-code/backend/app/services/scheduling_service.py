@@ -168,7 +168,7 @@ class SchedulingService:
                 continue
 
             new_record = {
-                "attendee_id": f"att_{uuid.uuid4().hex[:8]}",
+                "attendee_id": f"att_{uuid.uuid4().hex}",
                 "cycle_id": cycle_id,
                 "stakeholder_id": old.get("stakeholder_id"),
                 "name": old.get("name"),
@@ -198,7 +198,7 @@ class SchedulingService:
         inserted: list[dict] = []
         for a in attendees:
             record = {
-                "attendee_id": f"att_{uuid.uuid4().hex[:8]}",
+                "attendee_id": f"att_{uuid.uuid4().hex}",
                 "cycle_id": cycle_id,
                 "stakeholder_id": a.stakeholder_id,
                 "name": a.name,
@@ -718,11 +718,11 @@ class SchedulingService:
             title=f"Governance Review — {vendor_name}",
             description=f"Governance meeting for cycle {cycle_id}",
             agenda="1) Scorecard Review\n2) Actions\n3) Next Steps",
-            organizerId=organiser_id,
-            participantIds=participant_ids,
-            timeSlot=MeetingTimeSlot(date=slot_date, startTime=slot_start, endTime=slot_end),
-            cycleId=cycle_id,
-            meetingType="EGB_QBR",
+            organizer_id=organiser_id,
+            participant_ids=participant_ids,
+            time_slot=MeetingTimeSlot(date=slot_date, start_time=slot_start, end_time=slot_end),
+            cycle_id=cycle_id,
+            meeting_type="EGB_QBR",
         )
 
         try:

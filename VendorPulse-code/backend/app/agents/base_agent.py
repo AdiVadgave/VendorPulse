@@ -491,8 +491,8 @@ class BaseAgent(ABC):
             "run_id": self._run_id,
             "agent_name": self.agent_name,
             "cycle_id": self.cycle_id,
-            "input_payload": json.dumps(input_payload),
-            "output_payload": "{}",
+            "input_payload": input_payload,
+            "output_payload": {},
             "status": "PENDING",
             "triggered_by": "USER",
             "error_message": None,
@@ -514,7 +514,7 @@ class BaseAgent(ABC):
             self._run_id,
             {
                 "status": status,
-                "output_payload": json.dumps(response.model_dump()),
+                "output_payload": response.model_dump(),
                 "error_message": error,
             },
         )

@@ -16,7 +16,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.dependencies import get_meeting_agent, get_agent_run_repo, get_attendee_repo
+from app.dependencies import (
+    get_agent_run_repo,
+    get_attendee_repo,
+    get_meeting_agent,
+    get_meeting_artifact_repo,
+)
 from app.models.common import AgentResponse
 from app.models.meeting_agent import GenerateMinutesRequest, ParseTranscriptRequest
 from app.services.gmail_service import build_minutes_email, send_html_email, GmailSendError
@@ -26,10 +31,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/cycles/{cycleId}/meeting", tags=["meeting-agent"])
 
 
+@router.get("/artifact")
+def get_meeting_artifact(
+    cycleId: str,
+    meeting_id: str = "",
+    artifact_repo=Depends(get_meeting_artifact_repo),
+):
+    """Return the persisted parsed notes + generated minutes for a meeting, so the
+    Meeting tab restores its state after a refresh (no re-parse / re-generate)."""
+    mid = meeting_id or f"mtg-{cycleId}"
+    artifact = artifact_repo.get(cycleId, mid)
+    if not artifact:
+        return {"meeting_id": mid, "notes": [], "minutes": None, "parsed_at": None}
+    return {
+        "meeting_id": mid,
+        "notes": artifact.get("notes", []),
+        "minutes": artifact.get("minutes"),
+        "parsed_at": artifact.get("parsed_at"),
+    }
+
+
 @router.post("/minutes", response_model=AgentResponse)
 def generate_minutes(
     cycleId: str,
     payload: GenerateMinutesRequest,
+    artifact_repo=Depends(get_meeting_artifact_repo),
 ):
     """
     Generate formal meeting minutes from captured notes.
@@ -56,6 +82,12 @@ def generate_minutes(
             },
         },
     )
+    # Persist the generated minutes so the MoM survives a refresh.
+    if response.status == "success" and isinstance(response.data, dict) and response.data.get("minutes"):
+        artifact_repo.upsert(cycleId, payload.meeting_id, {
+            "minutes": response.data["minutes"],
+            "minutes_generated_at": datetime.now(timezone.utc).isoformat(),
+        })
     logger.info("MEETING-AGENT: minutes generated — status=%s", response.status)
     return response
 
@@ -90,6 +122,7 @@ def extract_actions(
 def parse_transcript(
     cycleId: str,
     payload: ParseTranscriptRequest,
+    artifact_repo=Depends(get_meeting_artifact_repo),
 ):
     """
     Parse a raw meeting transcript into structured notes.
@@ -116,6 +149,12 @@ def parse_transcript(
             },
         },
     )
+    # Persist the parsed notes so the Meeting tab shows "already parsed" after refresh.
+    if response.status == "success" and isinstance(response.data, dict):
+        artifact_repo.upsert(cycleId, payload.meeting_id, {
+            "notes": response.data.get("notes", []),
+            "parsed_at": datetime.now(timezone.utc).isoformat(),
+        })
     logger.info("MEETING-AGENT: transcript parsed — status=%s", response.status)
     return response
 

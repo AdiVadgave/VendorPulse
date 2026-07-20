@@ -1,0 +1,65 @@
+[
+  {
+    "response_id": "pr_2ab1a67bc27f4770b241878d719ab389",
+    "pushback_id": "pb_eb0a5f0bd70a4cbda0684983bcab40e2",
+    "stance": "factual",
+    "content": "Thank you for raising this concern. Based on the most recent performance data, the 'Operations' parameter under the Performance category has an average score of 3.0, reflecting an area that may require improvement. However, there is no data explicitly linked to personnel punctuality impacting delivery timelines. We recommend discussing any specific examples during the upcoming governance review.",
+    "is_selected": false
+  },
+  {
+    "response_id": "pr_690f3363eca142b58d3bd479eabd93f0",
+    "pushback_id": "pb_eb0a5f0bd70a4cbda0684983bcab40e2",
+    "stance": "neutral",
+    "content": "We understand your concern regarding personnel punctuality. While our scorecard data does not explicitly measure time-of-arrival impacts, related metrics, such as 'Operations' (3.0), indicate room for improvement in overall delivery consistency. Let us review this further and explore practical actions to address any underlying issues.",
+    "is_selected": false
+  },
+  {
+    "response_id": "pr_c3789e93ea164541be49c38359141d97",
+    "pushback_id": "pb_eb0a5f0bd70a4cbda0684983bcab40e2",
+    "stance": "escalation",
+    "content": "We take feedback seriously and will review the concern you’ve raised. However, punctuality is expected under the standards outlined in your contractual obligations. If there is a persistent issue that impedes performance, it needs to be addressed as it could indirectly influence metrics like 'Operations,' currently scored at 3.0. Please ensure compliance with SLA commitments moving forward.",
+    "is_selected": true
+  },
+  {
+    "response_id": "pr_83a551f16fe74725888e180d3345dae5",
+    "pushback_id": "pb_066f4cdbd17e47f7be6e31cb324e6621",
+    "stance": "factual",
+    "content": "Thank you for raising this concern. Our internal evaluation under the Risk & Compliance category, specifically for the Patch Management parameter, resulted in an average score of 3.75. This score was derived from assessments by four internal teams. Similarly, within the Performance category, scores across Resources & Capability, Release & Delivery, and Operations ranged from 3.0 to 4.0 based on consistent internal feedback. Please clarify if there is specific performance data that your team believes was overlooked.",
+    "is_selected": false
+  },
+  {
+    "response_id": "pr_6acddb72394842a8914ff7acb1767e50",
+    "pushback_id": "pb_066f4cdbd17e47f7be6e31cb324e6621",
+    "stance": "neutral",
+    "content": "We understand your concern about the evaluations and are open to discussing any discrepancies or areas that require further clarification. For the current cycle, internal teams scored the Patch Management parameter at 3.75, based on consistent feedback from four assessors. If there is additional context or data you would like us to consider, we encourage you to share it so we can take a more informed view moving forward.",
+    "is_selected": true
+  },
+  {
+    "response_id": "pr_ee09f9e3221b4b8f84b3acb4193f444e",
+    "pushback_id": "pb_066f4cdbd17e47f7be6e31cb324e6621",
+    "stance": "escalation",
+    "content": "We note your pushback regarding the data dispute. However, the evaluation results reflect input from four internal teams and are consistent across the Risk & Compliance and Performance categories. Specifically, the Patch Management parameter achieved an average score of 3.75 based on this rigorous assessment approach. If this score deviates from the contractual or SLA benchmarks, please share any supporting evidence so that we can jointly address discrepancies.",
+    "is_selected": false
+  },
+  {
+    "response_id": "pr_e350eaca13a64ef1a74afc161fd61cb2",
+    "pushback_id": "pb_ed2074dead69453181a89cadebc6f1ed",
+    "stance": "factual",
+    "content": "Thank you for raising your concern. Based on our consolidated internal scorecard, the Risk & Compliance category achieved an average score of 4.33, with the Patch Management parameter scoring consistently at 4.33. These evaluations were derived from three internal reviewers, and we noted no vendor contributions for this measure. Please let us know if additional supporting information would help clarify this assessment.",
+    "is_selected": true
+  },
+  {
+    "response_id": "pr_09e4eb83a2d0439bb073e49fecd88f48",
+    "pushback_id": "pb_ed2074dead69453181a89cadebc6f1ed",
+    "stance": "neutral",
+    "content": "We appreciate your feedback and understand that discrepancies in data interpretation can arise. In the Risk & Compliance category, our internal scoring reflects a strong alignment with expectations, resulting in an average score of 4.33 for Patch Management. If you can provide any additional context or data from your perspective, we are open to a collaborative discussion to ensure mutual understanding.",
+    "is_selected": false
+  },
+  {
+    "response_id": "pr_8f03126a2c8a4831be397187f9b215da",
+    "pushback_id": "pb_ed2074dead69453181a89cadebc6f1ed",
+    "stance": "escalation",
+    "content": "The consolidated scorecard for Risk & Compliance, including Patch Management, reflects an average score of 4.33 based on feedback from three internal reviewers. As per our SLA requirements, vendor-provided data should accompany any disputes raised. We kindly request supporting evidence if you believe the current assessment is inaccurate, in line with the agreed governance framework.",
+    "is_selected": false
+  }
+]

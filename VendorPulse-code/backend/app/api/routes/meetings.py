@@ -41,15 +41,15 @@ def create_meeting(
     svc: MeetingService = Depends(get_meeting_service),
 ):
     logger.info(
-        "create_meeting called — title=%s, organizerId=%s, participants=%s, timeSlot=%s",
-        payload.title, payload.organizerId, payload.participantIds, payload.timeSlot,
+        "create_meeting called — title=%s, organizer_id=%s, participants=%s, time_slot=%s",
+        payload.title, payload.organizer_id, payload.participant_ids, payload.time_slot,
     )
     try:
         meeting, warnings = svc.create_meeting(payload)
     except ValueError as exc:
         logger.warning("create_meeting validation error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc))
-    logger.info("create_meeting success — meetingId=%s, warnings=%s", meeting.get("meetingId"), warnings)
+    logger.info("create_meeting success — meeting_id=%s, warnings=%s", meeting.get("meeting_id"), warnings)
     return {
         "meeting": meeting,
         "warnings": warnings,
@@ -88,9 +88,9 @@ def cancel_meeting(
     payload: CancelMeeting = Body(...),
     svc: MeetingService = Depends(get_meeting_service),
 ):
-    logger.info("cancel_meeting called — meetingId=%s, organizerId=%s", meetingId, payload.organizerId)
+    logger.info("cancel_meeting called — meetingId=%s, organizer_id=%s", meetingId, payload.organizer_id)
     try:
-        meeting = svc.cancel_meeting(meetingId, payload.organizerId)
+        meeting = svc.cancel_meeting(meetingId, payload.organizer_id)
     except PermissionError as exc:
         logger.warning("cancel_meeting permission denied: %s", exc)
         raise HTTPException(status_code=403, detail=str(exc))
@@ -107,9 +107,9 @@ def respond_to_meeting(
     payload: MeetingRespond,
     svc: MeetingService = Depends(get_meeting_service),
 ):
-    logger.info("respond_to_meeting called — meetingId=%s, userId=%s, status=%s", meetingId, payload.userId, payload.status)
+    logger.info("respond_to_meeting called — meetingId=%s, user_id=%s, status=%s", meetingId, payload.user_id, payload.status)
     try:
-        meeting = svc.respond_to_meeting(meetingId, payload.userId, payload.status)
+        meeting = svc.respond_to_meeting(meetingId, payload.user_id, payload.status)
     except PermissionError as exc:
         logger.warning("respond_to_meeting permission denied: %s", exc)
         raise HTTPException(status_code=403, detail=str(exc))

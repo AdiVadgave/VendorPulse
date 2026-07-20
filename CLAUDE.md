@@ -32,6 +32,7 @@ Run them directly: `python test_cycles.py`
 ### Environment Variables
 **Backend** (`.env` in `VendorPulse-code/backend/`):
 ```
+DATABASE_URL=postgresql://user:pass@host:5432/vendorpulse?sslmode=require  # or PG_HOST/PG_USER/... parts
 ENABLE_LLM=true
 AI_PROVIDER=azure                          # "azure" or "openai"
 AZURE_OPENAI_API_KEY=...
@@ -101,7 +102,7 @@ State transitions are enforced in `backend/app/core/workflow_engine.py`. Invalid
 - **Human-approval gate:** All AI-generated content (invites, briefs, minutes, responses) is surfaced via `ApprovalPanel` before any external action is taken.
 - **AgentResponse contract:** A single response schema shared across all agents ensures the frontend never guesses output shape.
 - **Mock-first integrations:** Calendar, email, forms, and notifications have mock service implementations behind clean interfaces. Real integrations (Graph API, Gmail) can be toggled via env vars without changing agent code.
-- **Database:** SQLite for development. Schema is Postgres-compatible for production.
+- **Database:** PostgreSQL, normalized **3NF** schema — 16 tables with typed columns, domain primary keys, and FK constraints (`ON DELETE CASCADE`). Nested/variable data lives in `JSONB` columns ("relational core + JSONB"). De-duplicated: a `persons` table (email natural key) referenced by the `attendees` junction, and `vendors` referenced by `cycles` (vendor_name derived, not stored). All data access goes through `repositories/base_repository.py` — a column-mapping engine keeping the dict-in/dict-out contract; the `AttendeeRepository`/`CycleRepository` decompose on write and reconstruct via join on read. The app requires a reachable Postgres (`DATABASE_URL` / `PG_*` in `.env`) and fails fast otherwise. `python scripts/create_database.py` then `python scripts/migrate_json_to_postgres.py` to set up + seed. See `backend/docs/POSTGRES_MIGRATION.md`.
 
 ### Demo Data
 3 vendors with intentional trajectories seeded: NovaTech (improving), CoreSystems (declining), Meridian IT (stable). 4 historical cycles pre-seeded for analytics.

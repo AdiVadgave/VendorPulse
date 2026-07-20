@@ -1,25 +1,25 @@
 """
-Meeting artifacts — the parsed transcript notes and generated minutes for a meeting.
+Meeting artifacts — parsed transcript notes + generated minutes for a meeting.
 
-One document per (cycle_id, meeting_id) so the Meeting tab can restore its parsed
-state after a refresh (transcript shows as already parsed; minutes are not
-regenerated). `notes` and `minutes` are JSON blobs (jsonb in Postgres).
-
-Row shape: {artifact_id, cycle_id, meeting_id, notes: [...], minutes: {...}|null,
-            parsed_at, minutes_generated_at}
+One row per (cycle_id, meeting_id) so the Meeting tab restores its parsed state
+after a refresh. `notes` and `minutes` are JSONB.
 """
 from __future__ import annotations
 
 import uuid
-from pathlib import Path
 from typing import Optional
 
 from app.repositories.base_repository import BaseRepository
 
 
 class MeetingArtifactRepository(BaseRepository):
-    def __init__(self, data_dir: Path) -> None:
-        super().__init__("meeting_artifacts.json", data_dir)
+    table = "meeting_artifacts"
+    pk = "artifact_id"
+    columns = (
+        "artifact_id", "cycle_id", "meeting_id", "notes", "minutes",
+        "parsed_at", "minutes_generated_at",
+    )
+    json_columns = frozenset({"notes", "minutes"})
 
     def get(self, cycle_id: str, meeting_id: str) -> Optional[dict]:
         return next(

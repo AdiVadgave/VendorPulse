@@ -1,21 +1,24 @@
 """
 Vendor pushback persistence.
 
-Two stores mirroring a relational parent/child:
-  pushback_items.json      PK pushback_id   FK cycle_id
-  pushback_responses.json  PK response_id   FK pushback_id
+Two tables mirroring a relational parent/child:
+  pushback_items      PK pushback_id   FK cycle_id     -> cycles
+  pushback_responses  PK response_id   FK pushback_id  -> pushback_items (cascade)
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Optional
 
 from app.repositories.base_repository import BaseRepository
 
 
 class PushbackRepository(BaseRepository):
-    def __init__(self, data_dir: Path) -> None:
-        super().__init__("pushback_items.json", data_dir)
+    table = "pushback_items"
+    pk = "pushback_id"
+    columns = (
+        "pushback_id", "cycle_id", "category", "description", "raised_by",
+        "needs_legal_review", "status", "created_at", "updated_at",
+    )
 
     def get_for_cycle(self, cycle_id: str) -> list[dict]:
         items = self.find_by_field("cycle_id", cycle_id)
@@ -26,8 +29,9 @@ class PushbackRepository(BaseRepository):
 
 
 class PushbackResponseRepository(BaseRepository):
-    def __init__(self, data_dir: Path) -> None:
-        super().__init__("pushback_responses.json", data_dir)
+    table = "pushback_responses"
+    pk = "response_id"
+    columns = ("response_id", "pushback_id", "stance", "content", "is_selected")
 
     def get_for_pushback(self, pushback_id: str) -> list[dict]:
         return self.find_by_field("pushback_id", pushback_id)

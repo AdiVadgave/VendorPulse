@@ -16,7 +16,24 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
-    # Data storage — JSON files (swap path to SQLite DB later)
+    # ── Database (PostgreSQL) ────────────────────────────────────────────────
+    # The app stores every entity in Postgres (one JSONB table per entity). A
+    # full DSN in DATABASE_URL takes precedence; otherwise it is assembled from
+    # the PG_* parts below. Azure Database for PostgreSQL requires SSL.
+    #   DATABASE_URL=postgresql://user:pass@host:5432/vendorpulse?sslmode=require
+    database_url: str = ""
+    pg_host: str = ""
+    pg_port: int = 5432
+    pg_database: str = "vendorpulse"
+    pg_user: str = ""
+    pg_password: str = ""
+    pg_sslmode: str = "require"        # Azure requires "require"; use "disable" for a local box
+    pg_pool_min: int = 1
+    pg_pool_max: int = 10
+
+    # Legacy JSON data directory — no longer the live store; still read by the
+    # one-time migration script (scripts/migrate_json_to_postgres.py) to seed
+    # Postgres from the historical *.json files.
     data_dir: Path = Path(__file__).parent.parent / "data"
 
     # ── Scheduling: legacy / deterministic algorithm ─────────────────────────
@@ -127,6 +144,27 @@ class Settings(BaseSettings):
 
     # Scorecard polling
     scorecard_poll_interval_seconds: int = 90
+
+    @property
+    def effective_database_url(self) -> str:
+        """The Postgres DSN to connect with. Prefers DATABASE_URL; otherwise
+        assembles one from the PG_* parts. Returns "" if nothing is configured."""
+        if self.database_url:
+            return self.database_url
+        if not self.pg_host:
+            return ""
+        from urllib.parse import quote_plus
+
+        auth = ""
+        if self.pg_user:
+            auth = quote_plus(self.pg_user)
+            if self.pg_password:
+                auth += f":{quote_plus(self.pg_password)}"
+            auth += "@"
+        return (
+            f"postgresql://{auth}{self.pg_host}:{self.pg_port}/{self.pg_database}"
+            f"?sslmode={self.pg_sslmode}"
+        )
 
 
 settings = Settings()

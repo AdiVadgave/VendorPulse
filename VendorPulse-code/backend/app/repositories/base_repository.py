@@ -1,115 +1,161 @@
 """
-Generic JSON-backed repository.
+Generic relational repository (column-mapped).
 
-All read/write operations go through this class.  When the project migrates
-to SQLite (or Postgres), only this layer needs to change — services and routes
-remain untouched.
+This is the single data-access seam. The database is fully normalized (3NF):
+every entity is a real table with typed columns, a domain PRIMARY KEY, and
+FOREIGN KEY constraints to its parents. Genuinely nested / variable data
+(meeting time slots, score maps, agent payloads, meeting plans) is kept in
+JSONB columns — the standard "relational core + JSONB" pattern.
+
+The public CRUD surface is byte-for-byte the same dict-in / dict-out contract
+the services, routes, models, and agents already depend on. Each subclass
+declares its table shape (``table``, ``pk``, ``columns``, ``json_columns``) and
+the generic engine maps dicts to/from columns. Repositories whose entity was
+de-duplicated into a shared table (cycles→vendors, attendees→stakeholders)
+override ``insert``/reads to decompose on write and reconstruct on read, so
+callers still see the same "fat" record.
+
+Every table also carries a ``seq BIGSERIAL`` column used only for ordering, so
+``find_all`` / field lookups return rows in insertion order exactly like the
+previous store did.
 """
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Any, Callable, Optional
+
+from psycopg.types.json import Jsonb
+
+from app.db.pool import get_pool
 
 logger = logging.getLogger(__name__)
 
 
 class BaseRepository:
-    """
-    Thread-safe (enough for single-process demos) JSON file store.
+    """Column-mapped CRUD over a single normalized table.
 
-    Every sub-class receives the data directory via dependency injection so
-    it can be swapped in tests without touching the filesystem.
+    Subclasses set the class attributes below. ``data_dir`` is accepted for
+    signature compatibility with the historical JSON store but is unused.
     """
 
-    def __init__(self, filename: str, data_dir: Path) -> None:
-        self._filepath = data_dir / filename
-        self._filepath.parent.mkdir(parents=True, exist_ok=True)
-        logger.debug("Repository initialized — file=%s", self._filepath)
+    #: Table name.
+    table: str = ""
+    #: Domain primary-key column (e.g. "cycle_id").
+    pk: str = ""
+    #: Every column this repository reads/writes, in a stable order. Excludes
+    #: the internal ``seq``.
+    columns: tuple[str, ...] = ()
+    #: Subset of ``columns`` stored as JSONB.
+    json_columns: frozenset[str] = frozenset()
+
+    def __init__(self, data_dir: Optional[Path] = None) -> None:
+        if not self.table or not self.pk or not self.columns:
+            raise TypeError(f"{type(self).__name__} must define table, pk and columns")
+        logger.debug("Repository initialized — table=%s", self.table)
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _read(self) -> list[dict]:
-        if not self._filepath.exists():
-            return []
-        return json.loads(self._filepath.read_text(encoding="utf-8"))
+    def _collist(self) -> str:
+        return ", ".join(f'"{c}"' for c in self.columns)
 
-    def _write(self, data: list[dict]) -> None:
-        self._filepath.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    def _row_to_dict(self, row: tuple) -> dict:
+        # psycopg already decodes JSONB columns to Python dict/list and
+        # bool/int/float columns to native types.
+        return {col: val for col, val in zip(self.columns, row)}
+
+    def _adapt(self, col: str, value: Any) -> Any:
+        return Jsonb(value) if col in self.json_columns else value
+
+    def _select(self, where: str = "", params: tuple = ()) -> list[dict]:
+        sql = f'SELECT {self._collist()} FROM "{self.table}"{where} ORDER BY seq'
+        with get_pool().connection() as conn:
+            cur = conn.execute(sql, params)
+            return [self._row_to_dict(r) for r in cur.fetchall()]
 
     # ------------------------------------------------------------------
     # Public CRUD interface
     # ------------------------------------------------------------------
 
     def find_all(self) -> list[dict]:
-        return self._read()
+        return self._select()
 
-    def find_by_id(self, id_field: str, id_value: str) -> Optional[dict]:
-        return next(
-            (r for r in self._read() if r.get(id_field) == id_value),
-            None,
-        )
+    def find_by_id(self, id_field: str, id_value: Any) -> Optional[dict]:
+        rows = self._select(f' WHERE "{id_field}" = %s', (id_value,))
+        return rows[0] if rows else None
 
     def find_by_field(self, field: str, value: Any) -> list[dict]:
-        return [r for r in self._read() if r.get(field) == value]
+        return self._select(f' WHERE "{field}" = %s', (value,))
 
     def find_by_predicate(self, predicate: Callable[[dict], bool]) -> list[dict]:
-        return [r for r in self._read() if predicate(r)]
+        return [r for r in self.find_all() if predicate(r)]
 
     def insert(self, record: dict) -> dict:
-        logger.debug("insert — file=%s", self._filepath.name)
-        records = self._read()
-        records.append(record)
-        self._write(records)
+        cols = [c for c in self.columns if c in record]
+        values = [self._adapt(c, record[c]) for c in cols]
+        collist = ", ".join(f'"{c}"' for c in cols)
+        placeholders = ", ".join(["%s"] * len(cols))
+        with get_pool().connection() as conn:
+            conn.execute(
+                f'INSERT INTO "{self.table}" ({collist}) VALUES ({placeholders})',
+                values,
+            )
         return record
 
-    def update_by_id(self, id_field: str, id_value: str, updates: dict) -> Optional[dict]:
-        """Shallow-merge *updates* into the matching record."""
-        logger.debug("update_by_id — file=%s, %s=%s, updates=%s", self._filepath.name, id_field, id_value, list(updates.keys()))
-        records = self._read()
-        idx = next((i for i, r in enumerate(records) if r.get(id_field) == id_value), None)
-        if idx is None:
-            logger.warning("update_by_id: record not found — %s=%s in %s", id_field, id_value, self._filepath.name)
+    def update_by_id(self, id_field: str, id_value: Any, updates: dict) -> Optional[dict]:
+        """Update only the supplied columns (the relational analogue of the old
+        shallow dict merge)."""
+        sets = [c for c in updates if c in self.columns and c != id_field]
+        if not sets:
+            return self.find_by_id(id_field, id_value)
+        assignments = ", ".join(f'"{c}" = %s' for c in sets)
+        values = [self._adapt(c, updates[c]) for c in sets]
+        sql = (
+            f'UPDATE "{self.table}" SET {assignments} WHERE "{id_field}" = %s '
+            f'RETURNING {self._collist()}'
+        )
+        with get_pool().connection() as conn:
+            cur = conn.execute(sql, (*values, id_value))
+            row = cur.fetchone()
+        if row is None:
+            logger.warning("update_by_id: not found — %s=%s in %s", id_field, id_value, self.table)
             return None
-        records[idx].update(updates)
-        self._write(records)
-        return records[idx]
+        return self._row_to_dict(row)
 
-    def replace_by_id(self, id_field: str, id_value: str, new_record: dict) -> Optional[dict]:
-        """Full replace of the matching record."""
-        logger.debug("replace_by_id — file=%s, %s=%s", self._filepath.name, id_field, id_value)
-        records = self._read()
-        idx = next((i for i, r in enumerate(records) if r.get(id_field) == id_value), None)
-        if idx is None:
-            logger.warning("replace_by_id: record not found — %s=%s in %s", id_field, id_value, self._filepath.name)
+    def replace_by_id(self, id_field: str, id_value: Any, new_record: dict) -> Optional[dict]:
+        """Full replace: every column is set from *new_record* (absent → NULL)."""
+        sets = [c for c in self.columns if c != id_field]
+        assignments = ", ".join(f'"{c}" = %s' for c in sets)
+        values = [self._adapt(c, new_record.get(c)) for c in sets]
+        sql = (
+            f'UPDATE "{self.table}" SET {assignments} WHERE "{id_field}" = %s '
+            f'RETURNING {self._collist()}'
+        )
+        with get_pool().connection() as conn:
+            cur = conn.execute(sql, (*values, id_value))
+            row = cur.fetchone()
+        if row is None:
+            logger.warning("replace_by_id: not found — %s=%s in %s", id_field, id_value, self.table)
             return None
-        records[idx] = new_record
-        self._write(records)
-        return new_record
+        return self._row_to_dict(row)
 
-    def delete_by_id(self, id_field: str, id_value: str) -> bool:
-        logger.debug("delete_by_id — file=%s, %s=%s", self._filepath.name, id_field, id_value)
-        records = self._read()
-        filtered = [r for r in records if r.get(id_field) != id_value]
-        if len(filtered) == len(records):
-            logger.warning("delete_by_id: record not found — %s=%s in %s", id_field, id_value, self._filepath.name)
-            return False
-        self._write(filtered)
-        return True
+    def delete_by_id(self, id_field: str, id_value: Any) -> bool:
+        with get_pool().connection() as conn:
+            cur = conn.execute(
+                f'DELETE FROM "{self.table}" WHERE "{id_field}" = %s', (id_value,)
+            )
+            return cur.rowcount > 0
 
     def delete_by_field(self, field: str, value: Any) -> int:
-        """Delete every record where record[field] == value; return how many were
-        removed. The JSON analogue of `DELETE FROM t WHERE field = value` — used for
-        cascade cleanup so child rows never dangle after a parent is removed."""
-        records = self._read()
-        kept = [r for r in records if r.get(field) != value]
-        removed = len(records) - len(kept)
-        if removed:
-            self._write(kept)
-        return removed
+        with get_pool().connection() as conn:
+            cur = conn.execute(
+                f'DELETE FROM "{self.table}" WHERE "{field}" = %s', (value,)
+            )
+            return cur.rowcount
 
     def count(self) -> int:
-        return len(self._read())
+        with get_pool().connection() as conn:
+            cur = conn.execute(f'SELECT count(*) FROM "{self.table}"')
+            return cur.fetchone()[0]

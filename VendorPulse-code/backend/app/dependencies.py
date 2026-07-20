@@ -17,6 +17,7 @@ from app.repositories.attendee_repository import AttendeeRepository
 from app.repositories.cycle_repository import CycleRepository
 from app.repositories.meeting_artifact_repository import MeetingArtifactRepository
 from app.repositories.meeting_repository import MeetingParticipantRepository, MeetingRepository
+from app.repositories.person_repository import PersonRepository
 from app.repositories.pushback_repository import PushbackRepository, PushbackResponseRepository
 from app.repositories.scorecard_repository import (
     FinalScorecardRepository,
@@ -48,13 +49,23 @@ def get_meeting_repo() -> MeetingRepository:
 
 
 @lru_cache(maxsize=None)
+def get_vendor_repo() -> VendorRepository:
+    return VendorRepository(settings.data_dir)
+
+
+@lru_cache(maxsize=None)
+def get_person_repo() -> PersonRepository:
+    return PersonRepository(settings.data_dir)
+
+
+@lru_cache(maxsize=None)
 def get_cycle_repo() -> CycleRepository:
-    return CycleRepository(settings.data_dir)
+    return CycleRepository(vendor_repo=get_vendor_repo())
 
 
 @lru_cache(maxsize=None)
 def get_attendee_repo() -> AttendeeRepository:
-    return AttendeeRepository(settings.data_dir)
+    return AttendeeRepository(person_repo=get_person_repo())
 
 
 @lru_cache(maxsize=None)
@@ -70,11 +81,6 @@ def get_action_repo() -> ActionRepository:
 @lru_cache(maxsize=None)
 def get_agent_run_repo() -> AgentRunRepository:
     return AgentRunRepository(settings.data_dir)
-
-
-@lru_cache(maxsize=None)
-def get_vendor_repo() -> VendorRepository:
-    return VendorRepository(settings.data_dir)
 
 
 @lru_cache(maxsize=None)

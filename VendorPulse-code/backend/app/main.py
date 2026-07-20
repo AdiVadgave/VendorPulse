@@ -14,6 +14,7 @@ import truststore
 truststore.inject_into_ssl()
 
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
@@ -22,11 +23,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import actions, alignment, analytics, google_auth, meeting_agent, meetings, pushback, scheduling, scorecard, scorecard_v2, users, vendor_prep, vendors
 from app.config import settings
 from app.core.logging_config import setup_logging
+from app.db.pool import close_pool, get_pool
+from app.db.schema import ensure_schema
 from app.middleware.request_logging import RequestLoggingMiddleware
 
 # ── Initialize logging before anything else ───────────────────────────────────
 setup_logging()
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Postgres-only: fail fast if the database is unreachable, then guarantee the
+    # schema exists before serving any request.
+    pool = get_pool()
+    pool.wait()
+    ensure_schema(pool)
+    logger.info("VendorPulse backend ready — PostgreSQL connected, schema ensured")
+    yield
+    close_pool()
+
 
 app = FastAPI(
     title="VendorPulse Backend",
@@ -38,6 +54,7 @@ app = FastAPI(
     ),
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # ── Middleware (order matters: last added = first executed) ────────────────────
@@ -77,11 +94,19 @@ logger.info("VendorPulse backend initialized — routers registered, middleware 
 # ── Health check ──────────────────────────────────────────────────────────────
 @app.get("/api/health", tags=["system"])
 def health():
+    try:
+        with get_pool().connection() as conn:
+            conn.execute("SELECT 1")
+        db_status = "connected"
+    except Exception as exc:  # noqa: BLE001 — health must never raise
+        logger.warning("Health check DB probe failed: %s", exc)
+        db_status = "unavailable"
     return {
-        "status": "ok",
+        "status": "ok" if db_status == "connected" else "degraded",
         "service": "vendorpulse-backend",
         "version": "1.0.0",
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database": db_status,
         "llm_enabled": settings.enable_llm,
         "endpoints": {
             "users": "GET|POST /api/users",

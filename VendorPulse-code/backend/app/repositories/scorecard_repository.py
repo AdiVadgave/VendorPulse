@@ -1,19 +1,17 @@
 """
-Scorecard persistence — the internal-stakeholder submissions and the admin-adjusted
+Scorecard persistence — internal-stakeholder submissions + the admin-adjusted
 "final" snapshot.
 
-These two stores were previously instantiated ad-hoc inside the route module, which
-meant the single most business-critical data in the app bypassed the repository layer
-that the JSON→Postgres migration hinges on. They now live here like every other
-entity, so migrating this layer covers them too.
+Tables:
+  scorecard_submissions  PK submission_id   FK cycle_id -> cycles
+  scorecard_final        PK cycle_id        (one snapshot per cycle)
 
-Tables (future Postgres):
-  scorecard_submissions  PK submission_id   FK cycle_id, attendee_id
-  scorecard_final        PK cycle_id        (one point-in-time snapshot per cycle)
+The denormalized respondent_email / respondent_name / team fields are NOT
+stored — the app always re-derives them from the live attendee record, so they
+were pure duplication. `scores`/`comments`/`rag`/skipped-* are JSONB.
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Optional
 
 from app.repositories.base_repository import BaseRepository
@@ -22,8 +20,13 @@ from app.repositories.base_repository import BaseRepository
 class ScorecardSubmissionRepository(BaseRepository):
     """One row per (cycle, attendee): the scores/RAG/comments a reviewer submitted."""
 
-    def __init__(self, data_dir: Path) -> None:
-        super().__init__("scorecard_submissions.json", data_dir)
+    table = "scorecard_submissions"
+    pk = "submission_id"
+    columns = (
+        "submission_id", "cycle_id", "attendee_id", "scores", "rag",
+        "comments", "skipped_measures", "skipped_themes", "submitted_at",
+    )
+    json_columns = frozenset({"scores", "rag", "comments", "skipped_measures", "skipped_themes"})
 
     def get_for_cycle(self, cycle_id: str) -> list[dict]:
         return self.find_by_field("cycle_id", cycle_id)
@@ -35,10 +38,8 @@ class ScorecardSubmissionRepository(BaseRepository):
         )
 
     def delete_for_cycle_attendee(self, cycle_id: str, attendee_id: str) -> int:
-        """Remove an attendee's submission(s) for a cycle; return how many were removed."""
         matches = [
-            s for s in self.get_for_cycle(cycle_id)
-            if s.get("attendee_id") == attendee_id
+            s for s in self.get_for_cycle(cycle_id) if s.get("attendee_id") == attendee_id
         ]
         for s in matches:
             self.delete_by_id("submission_id", s.get("submission_id"))
@@ -48,8 +49,10 @@ class ScorecardSubmissionRepository(BaseRepository):
 class FinalScorecardRepository(BaseRepository):
     """The admin-adjusted final scorecard — at most one snapshot per cycle."""
 
-    def __init__(self, data_dir: Path) -> None:
-        super().__init__("scorecard_final.json", data_dir)
+    table = "scorecard_final"
+    pk = "cycle_id"
+    columns = ("cycle_id", "categories", "overall_score", "note", "updated_at")
+    json_columns = frozenset({"categories"})
 
     def get_for_cycle(self, cycle_id: str) -> Optional[dict]:
         return self.find_by_id("cycle_id", cycle_id)

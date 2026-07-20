@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from app.repositories.base_repository import BaseRepository
 
 
 class ActionRepository(BaseRepository):
-    """Persistent store for the cross-meeting action queue (action_items.json)."""
+    """Persistent store for the cross-meeting action queue (action_items)."""
 
-    def __init__(self, data_dir: Path) -> None:
-        super().__init__("action_items.json", data_dir)
+    table = "action_items"
+    pk = "action_id"
+    columns = (
+        "action_id", "cycle_id", "description", "owner", "due_date",
+        "source", "status", "origin", "created_at", "updated_at",
+    )
 
     def get_for_cycle(self, cycle_id: str) -> list[dict]:
         items = self.find_by_field("cycle_id", cycle_id)

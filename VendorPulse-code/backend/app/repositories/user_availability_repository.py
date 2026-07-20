@@ -1,22 +1,22 @@
 """
 User availability — one row per (user, date), the relational child of a user.
 
-Previously an in-place-mutated nested array inside each users.json record; now its
-own store so it maps cleanly to a `user_availability` child table in Postgres.
-
-Row shape: {"user_id": str, "date": "YYYY-MM-DD", "slots": ["HH:MM-HH:MM", ...]}
+Row shape: {"row_id", "user_id", "date", "slots": ["HH:MM-HH:MM", ...]}
+`slots` is a JSONB array.
 """
 from __future__ import annotations
 
-from pathlib import Path
+import uuid
 from typing import Optional
 
 from app.repositories.base_repository import BaseRepository
 
 
 class UserAvailabilityRepository(BaseRepository):
-    def __init__(self, data_dir: Path) -> None:
-        super().__init__("user_availability.json", data_dir)
+    table = "user_availability"
+    pk = "row_id"
+    columns = ("row_id", "user_id", "date", "slots")
+    json_columns = frozenset({"slots"})
 
     def get_for_user(self, user_id: str) -> list[dict]:
         """All {date, slots} entries for a user, ordered by date."""
@@ -36,7 +36,6 @@ class UserAvailabilityRepository(BaseRepository):
         if existing:
             self.replace_by_id("row_id", existing["row_id"], {**row, "row_id": existing["row_id"]})
             return row
-        import uuid
         self.insert({**row, "row_id": f"ua_{uuid.uuid4().hex}"})
         return row
 

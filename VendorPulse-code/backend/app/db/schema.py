@@ -126,6 +126,8 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             teams_meeting_scheduled_at TEXT,
             scorecard_dispatched_at    TEXT,
             scorecard_dispatched_to    JSONB,
+            meeting_time_zone          TEXT,
+            meeting_duration_minutes   INTEGER,
             seq                        BIGSERIAL UNIQUE NOT NULL
         )
         """,
@@ -148,7 +150,13 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             availability_submitted BOOLEAN,
             user_id                TEXT,
             replaced_by            TEXT,
+            replaced_by_email      TEXT,
             replacement_note       TEXT,
+            confirmation_status    TEXT,
+            confirmation_note      TEXT,
+            outreach_message_id    TEXT,
+            outreach_conversation_id TEXT,
+            outreach_sent_at       TEXT,
             seq                    BIGSERIAL UNIQUE NOT NULL
         )
         """,
@@ -170,6 +178,11 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             created_at   TEXT,
             cycle_id     TEXT REFERENCES cycles(cycle_id) ON DELETE CASCADE,
             meeting_type TEXT,
+            time_zone         TEXT,
+            duration_minutes  INTEGER,
+            alignment_index   INTEGER,
+            teams_meeting_url TEXT,
+            web_link          TEXT,
             seq          BIGSERIAL UNIQUE NOT NULL
         )
         """,
@@ -210,6 +223,8 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             conflicts              JSONB,
             approved_by            TEXT,
             approved_at            TEXT,
+            tentative              JSONB,
+            ranking_rationale      TEXT,
             seq                    BIGSERIAL UNIQUE NOT NULL
         )
         """,
@@ -224,7 +239,7 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             cycle_id         TEXT NOT NULL REFERENCES cycles(cycle_id) ON DELETE CASCADE,
             attendee_id      TEXT,
             scores           JSONB,
-            rag              JSONB,
+            rag_scores       JSONB,
             comments         JSONB,
             skipped_measures JSONB,
             skipped_themes   JSONB,
@@ -245,6 +260,7 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             overall_score DOUBLE PRECISION,
             note          TEXT,
             updated_at    TEXT,
+            computed_at   TEXT,
             seq           BIGSERIAL UNIQUE NOT NULL
         )
         """,
@@ -291,6 +307,7 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             source      TEXT,
             status      TEXT,
             origin      TEXT,
+            details     TEXT,
             created_at  TEXT,
             updated_at  TEXT,
             seq         BIGSERIAL UNIQUE NOT NULL
@@ -322,11 +339,14 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             cycle_id       TEXT REFERENCES cycles(cycle_id) ON DELETE SET NULL,
             input_payload  JSONB,
             output_payload JSONB,
-            status         TEXT,
-            triggered_by   TEXT,
-            error_message  TEXT,
-            created_at     TEXT,
-            seq            BIGSERIAL UNIQUE NOT NULL
+            status          TEXT,
+            triggered_by    TEXT,
+            error_message   TEXT,
+            created_at      TEXT,
+            approval_status TEXT,
+            approved_by     TEXT,
+            approved_at     TEXT,
+            seq             BIGSERIAL UNIQUE NOT NULL
         )
         """,
         [
@@ -338,8 +358,55 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
 }
 
 
+# Columns added after a table's original CREATE. `ensure_schema` runs
+# `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for each on every startup, so a
+# live database (with real data) picks up new columns without a destructive
+# re-migration. Adding a column here is the safe way to evolve the schema.
+_ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
+    "attendees": [
+        ("replaced_by_email", "TEXT"),
+        ("confirmation_status", "TEXT"),
+        ("confirmation_note", "TEXT"),
+        ("outreach_message_id", "TEXT"),
+        ("outreach_conversation_id", "TEXT"),
+        ("outreach_sent_at", "TEXT"),
+    ],
+    "cycles": [
+        ("meeting_time_zone", "TEXT"),
+        ("meeting_duration_minutes", "INTEGER"),
+    ],
+    "meetings": [
+        ("time_zone", "TEXT"),
+        ("duration_minutes", "INTEGER"),
+        ("alignment_index", "INTEGER"),
+        ("teams_meeting_url", "TEXT"),
+        ("web_link", "TEXT"),
+    ],
+    "slot_proposals": [
+        ("tentative", "JSONB"),
+        ("ranking_rationale", "TEXT"),
+    ],
+    "scorecard_submissions": [
+        ("rag_scores", "JSONB"),
+    ],
+    "scorecard_final": [
+        ("computed_at", "TEXT"),
+    ],
+    "action_items": [
+        ("details", "TEXT"),
+    ],
+    "agent_runs": [
+        ("approval_status", "TEXT"),
+        ("approved_by", "TEXT"),
+        ("approved_at", "TEXT"),
+    ],
+}
+
+
 def ensure_schema(pool: Optional[ConnectionPool] = None) -> None:
-    """Create every table + index if absent (parent→child order). Idempotent."""
+    """Create every table + index if absent (parent→child order), then additively
+    add any columns in `_ADDITIVE_COLUMNS` that a pre-existing table is missing.
+    Fully idempotent and non-destructive — safe on a live database."""
     pool = pool or get_pool()
     with pool.connection() as conn:
         for table in KNOWN_TABLES:
@@ -347,4 +414,7 @@ def ensure_schema(pool: Optional[ConnectionPool] = None) -> None:
             conn.execute(create_sql)
             for idx in indexes:
                 conn.execute(idx)
+        for table, cols in _ADDITIVE_COLUMNS.items():
+            for col, col_type in cols:
+                conn.execute(f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS "{col}" {col_type}')
     logger.info("PostgreSQL schema ensured — %d tables (3NF)", len(KNOWN_TABLES))

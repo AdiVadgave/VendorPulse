@@ -14,6 +14,7 @@ class AgentRunRepository(BaseRepository):
     columns = (
         "run_id", "agent_name", "cycle_id", "input_payload", "output_payload",
         "status", "triggered_by", "error_message", "created_at",
+        "approval_status", "approved_by", "approved_at",
     )
     json_columns = frozenset({"input_payload", "output_payload"})
 

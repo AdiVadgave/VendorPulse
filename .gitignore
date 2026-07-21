@@ -62,6 +62,13 @@ client_secret.json
 **/.env.*
 !**/.env.example
 
+# certificates / private keys (never commit)
+**/secrets/
+**/*.pfx
+**/*.p12
+**/*.pem
+**/*.key
+
 # --- Python (repo has scripts in dev artifacts) ---
 **/__pycache__/
 **/*.py[cod]

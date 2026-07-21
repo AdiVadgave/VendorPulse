@@ -23,10 +23,10 @@ class ScorecardSubmissionRepository(BaseRepository):
     table = "scorecard_submissions"
     pk = "submission_id"
     columns = (
-        "submission_id", "cycle_id", "attendee_id", "scores", "rag",
+        "submission_id", "cycle_id", "attendee_id", "scores", "rag_scores",
         "comments", "skipped_measures", "skipped_themes", "submitted_at",
     )
-    json_columns = frozenset({"scores", "rag", "comments", "skipped_measures", "skipped_themes"})
+    json_columns = frozenset({"scores", "rag_scores", "comments", "skipped_measures", "skipped_themes"})
 
     def get_for_cycle(self, cycle_id: str) -> list[dict]:
         return self.find_by_field("cycle_id", cycle_id)
@@ -51,7 +51,7 @@ class FinalScorecardRepository(BaseRepository):
 
     table = "scorecard_final"
     pk = "cycle_id"
-    columns = ("cycle_id", "categories", "overall_score", "note", "updated_at")
+    columns = ("cycle_id", "categories", "overall_score", "note", "updated_at", "computed_at")
     json_columns = frozenset({"categories"})
 
     def get_for_cycle(self, cycle_id: str) -> Optional[dict]:

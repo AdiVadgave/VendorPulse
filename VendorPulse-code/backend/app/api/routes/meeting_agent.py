@@ -24,7 +24,8 @@ from app.dependencies import (
 )
 from app.models.common import AgentResponse
 from app.models.meeting_agent import GenerateMinutesRequest, ParseTranscriptRequest
-from app.services.gmail_service import build_minutes_email, send_html_email, GmailSendError
+from app.services.gmail_service import build_minutes_email
+from app.services.mail_provider import get_mail_provider, MailSendError
 
 logger = logging.getLogger(__name__)
 
@@ -243,7 +244,7 @@ def send_minutes(cycleId: str, payload: SendMinutesRequest):
         )
 
         try:
-            send_html_email(
+            get_mail_provider().send_html_email(
                 to_email=gmail_addr,
                 subject=email_content["subject"],
                 html_body=email_content["html_body"],
@@ -251,7 +252,7 @@ def send_minutes(cycleId: str, payload: SendMinutesRequest):
             )
             sent_to.append({"name": name, "email": gmail_addr})
             logger.info("MEETING-AGENT: minutes sent to %s (%s)", name, gmail_addr)
-        except GmailSendError as exc:
+        except MailSendError as exc:
             logger.warning("MEETING-AGENT: failed to send to %s — %s", gmail_addr, exc)
             failed.append({"name": name, "email": gmail_addr, "error": str(exc)})
 

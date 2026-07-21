@@ -10,7 +10,7 @@ class ActionRepository(BaseRepository):
     pk = "action_id"
     columns = (
         "action_id", "cycle_id", "description", "owner", "due_date",
-        "source", "status", "origin", "created_at", "updated_at",
+        "source", "status", "origin", "details", "created_at", "updated_at",
     )
 
     def get_for_cycle(self, cycle_id: str) -> list[dict]:

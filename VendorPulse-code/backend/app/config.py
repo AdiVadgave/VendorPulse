@@ -126,6 +126,16 @@ class Settings(BaseSettings):
     # Empty falls back to the token owner (/me) in dev.
     graph_mail_sender: str = ""
 
+    # ── Microsoft Graph app-only auth (certificate client-credentials) ───────
+    # Used by mail_provider="graph" to obtain an app token via MSAL, signing with
+    # the SPN certificate's private key (the .pfx). Falls back to the static
+    # graph_access_token only if graph_cert_path is empty.
+    graph_client_id: str = ""
+    graph_tenant_id: str = ""
+    graph_cert_path: str = ""          # path to the .pfx / .p12 (private key)
+    graph_cert_password: str = ""      # PFX password (empty if none)
+    graph_cert_thumbprint: str = ""    # SHA-1 thumbprint (optional; derived from the cert if blank)
+
     # Google OAuth2 (Gmail + Forms)
     google_client_id: str = ""
     google_client_secret: str = ""

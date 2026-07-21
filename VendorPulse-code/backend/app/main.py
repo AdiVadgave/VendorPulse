@@ -16,9 +16,12 @@ truststore.inject_into_ssl()
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import actions, alignment, analytics, google_auth, meeting_agent, meetings, pushback, scheduling, scorecard, scorecard_v2, users, vendor_prep, vendors
 from app.config import settings
@@ -135,3 +138,29 @@ def health():
             "analyticsPortfolio": "GET /api/analytics/portfolio",
         },
     }
+
+
+# ── Serve the built React frontend (single App Service deployment) ─────────────
+# The Vite build (`frontend/dist`) is copied into `backend/static/` at deploy
+# time. When that folder is present we serve it: hashed asset bundles under
+# /assets, and an index.html fallback for every non-API path so the client-side
+# router (react-router) can take over. All API/docs routes are registered ABOVE
+# this block, so they are matched first — the catch-all only handles the rest.
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent / "static"
+if _FRONTEND_DIST.is_dir():
+    _ASSETS_DIR = _FRONTEND_DIST / "assets"
+    if _ASSETS_DIR.is_dir():
+        app.mount("/assets", StaticFiles(directory=_ASSETS_DIR), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa_fallback(full_path: str):
+        candidate = _FRONTEND_DIST / full_path
+        # A real file at the root (favicon, vite.svg, etc.) is served directly;
+        # everything else returns index.html for the SPA router to resolve.
+        if full_path and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_FRONTEND_DIST / "index.html")
+
+    logger.info("Serving frontend static build from %s", _FRONTEND_DIST)
+else:
+    logger.info("No frontend static build found at %s — running API-only", _FRONTEND_DIST)

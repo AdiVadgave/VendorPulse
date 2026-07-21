@@ -62,6 +62,7 @@ class MeetingRepository(BaseRepository):
     columns = (
         "meeting_id", "title", "description", "agenda", "organizer_id",
         "time_slot", "status", "created_at", "cycle_id", "meeting_type",
+        "time_zone", "duration_minutes", "alignment_index", "teams_meeting_url", "web_link",
     )
     json_columns = frozenset({"time_slot"})
 

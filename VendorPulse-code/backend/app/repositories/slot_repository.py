@@ -12,9 +12,9 @@ class SlotRepository(BaseRepository):
         "slot_id", "cycle_id", "proposed_time", "proposed_time_zone", "duration_minutes",
         "organiser_available", "exec_sponsor_available", "rank_score", "is_approved",
         "attendance_count", "total_attendees", "conflict_count", "attending", "conflicts",
-        "approved_by", "approved_at",
+        "approved_by", "approved_at", "tentative", "ranking_rationale",
     )
-    json_columns = frozenset({"attending", "conflicts"})
+    json_columns = frozenset({"attending", "conflicts", "tentative"})
 
     def get_by_slot_id(self, slot_id: str) -> Optional[dict]:
         return self.find_by_id("slot_id", slot_id)

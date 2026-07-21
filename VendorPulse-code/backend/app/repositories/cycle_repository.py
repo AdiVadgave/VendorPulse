@@ -21,6 +21,7 @@ class CycleRepository(BaseRepository):
         "workflow_state", "created_at", "updated_at", "meeting_plan", "scorecard_config",
         "teams_meeting_url", "teams_meeting_web_link", "teams_meeting_event_id",
         "teams_meeting_scheduled_at", "scorecard_dispatched_at", "scorecard_dispatched_to",
+        "meeting_time_zone", "meeting_duration_minutes",
     )
     json_columns = frozenset({"meeting_plan", "scorecard_config", "scorecard_dispatched_to"})
 

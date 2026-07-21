@@ -27,7 +27,7 @@ import asyncio
 import logging
 from typing import Optional, Protocol
 
-from app.config import Settings, settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -67,12 +67,18 @@ class GraphMailProvider:
         self, *, to_email: str, subject: str, html_body: str, text_body: Optional[str] = None
     ) -> dict:
         from app.services.graph_service import GraphService
+        from app.services.graph_auth import get_graph_app_token
 
-        token = _graph_token()
+        try:
+            token = get_graph_app_token()
+        except Exception as exc:  # noqa: BLE001 — surface auth failures as send errors
+            raise MailSendError(f"Graph token acquisition failed: {exc}") from exc
         if not token:
-            raise MailSendError("GRAPH_ACCESS_TOKEN is not set — cannot send mail via Graph")
+            raise MailSendError(
+                "No Graph credentials — set GRAPH_CERT_PATH (app-only) or GRAPH_ACCESS_TOKEN"
+            )
 
-        sender = (Settings().graph_mail_sender or settings.graph_mail_sender or "").strip() or None
+        sender = (settings.graph_mail_sender or "").strip() or None
         result = asyncio.run(
             GraphService(token).send_mail(
                 to_email=to_email, subject=subject, html_body=html_body,
@@ -84,16 +90,9 @@ class GraphMailProvider:
         return result
 
 
-def _graph_token() -> str:
-    token = (Settings().graph_access_token or settings.graph_access_token or "").strip()
-    if token.lower().startswith("bearer "):
-        token = token[7:].strip()
-    return token
-
-
 def get_mail_provider() -> MailProvider:
     """Return the active mail provider, chosen by `settings.mail_provider`."""
-    provider = (Settings().mail_provider or settings.mail_provider or "gmail").strip().lower()
+    provider = (settings.mail_provider or "gmail").strip().lower()
     if provider in ("graph", "outlook", "microsoft"):
         return GraphMailProvider()
     return GmailMailProvider()

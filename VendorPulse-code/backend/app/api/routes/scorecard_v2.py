@@ -36,7 +36,8 @@ from app.dependencies import (
     get_scorecard_submission_repo,
     get_user_repo,
 )
-from app.services.gmail_service import GmailSendError, build_scorecard_email, send_html_email
+from app.services.gmail_service import build_scorecard_email
+from app.services.mail_provider import get_mail_provider, MailSendError
 from app.models.scheduling import ScorecardConfigUpdate
 from app.services.google_auth_service import is_authenticated
 from app.utils.prompts import SCORECARD_COMMENT_SUMMARY_SYSTEM_PROMPT
@@ -1042,7 +1043,7 @@ def dispatch_inapp(payload: InAppDispatchRequest):
             form_url=link,
         )
         try:
-            res = send_html_email(
+            res = get_mail_provider().send_html_email(
                 to_email=email,
                 subject=email_data["subject"],
                 html_body=email_data["html_body"],
@@ -1050,7 +1051,7 @@ def dispatch_inapp(payload: InAppDispatchRequest):
             )
             results.append({"name": r.name, "email": email, "status": "sent", "message_id": res.get("id")})
             sent += 1
-        except GmailSendError as exc:
+        except MailSendError as exc:
             results.append({"name": r.name, "email": email, "status": "failed", "error": str(exc)})
 
     if sent > 0:

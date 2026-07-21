@@ -32,7 +32,6 @@ def list_users(search: Optional[str] = None, svc: UserService = Depends(get_user
             "user_id": u["user_id"],
             "name": u["name"],
             "email": u["email"],
-            "gmail": u.get("gmail", ""),
             "organisation": u.get("organisation", ""),
             "role": u.get("role", ""),
             "avatar": u.get("avatar", ""),

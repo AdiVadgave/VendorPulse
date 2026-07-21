@@ -117,13 +117,11 @@ class Settings(BaseSettings):
     # credentials. Override in production with the deployed frontend origin(s).
     cors_origins: str = "http://localhost:5173,http://localhost:5174"
 
-    # Mail provider — which channel sends scorecard links & meeting minutes (MOM).
-    # "gmail" (current) or "graph"/"outlook" (Microsoft Graph Mail.Send via a
-    # service account). Flip to "graph" once the tenant grants Mail.Send.
-    # See docs/MAIL_OUTLOOK_MIGRATION.md.
-    mail_provider: str = "gmail"
-    # Service-account mailbox (UPN) to send AS when mail_provider="graph" (app-only).
-    # Empty falls back to the token owner (/me) in dev.
+    # Mail — all outbound mail (scorecard links & meeting minutes) sends via
+    # Microsoft Graph using the service mailbox. Gmail has been removed.
+    # Kept for compatibility; Graph is the only channel. See docs/MAIL_OUTLOOK_MIGRATION.md.
+    mail_provider: str = "graph"
+    # Service-account mailbox (UPN) to send AS (app-only Mail.Send).
     graph_mail_sender: str = ""
 
     # ── Microsoft Graph app-only auth (certificate client-credentials) ───────
@@ -135,25 +133,6 @@ class Settings(BaseSettings):
     graph_cert_path: str = ""          # path to the .pfx / .p12 (private key)
     graph_cert_password: str = ""      # PFX password (empty if none)
     graph_cert_thumbprint: str = ""    # SHA-1 thumbprint (optional; derived from the cert if blank)
-
-    # Google OAuth2 (Gmail + Forms)
-    google_client_id: str = ""
-    google_client_secret: str = ""
-    google_project_id: str = ""
-    google_redirect_uri: str = "http://localhost:8000/auth/callback"
-    google_form_id: str = ""
-    google_form_url: str = "https://forms.gle/zeMdJ8uvFkryFDTr6"
-
-    # Google Forms prefill entry IDs (e.g. "entry.123456789").
-    # When set, the dispatch email links go to a prefilled form so reviewers
-    # don't have to re-type these fields. Get the IDs from the form's
-    # "Get pre-filled link" feature. Empty = no prefill (reviewer types it).
-    google_form_prefill_cycle_id_entry: str = ""
-    google_form_prefill_email_entry: str = ""
-    google_form_prefill_vendor_entry: str = ""
-
-    # Scorecard polling
-    scorecard_poll_interval_seconds: int = 90
 
     @property
     def effective_database_url(self) -> str:

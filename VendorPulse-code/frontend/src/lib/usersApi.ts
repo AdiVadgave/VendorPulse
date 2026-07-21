@@ -13,7 +13,6 @@ export interface UserInput {
   email: string
   role: string
   organisation?: string
-  gmail?: string
 }
 
 /** List the directory (optional server-side search on name/email/organisation). */
@@ -34,7 +33,6 @@ export async function createUser(input: UserInput): Promise<SystemUser> {
     user_id: u.userId ?? '',
     name: u.name ?? input.name,
     email: u.email ?? input.email,
-    gmail: u.gmail ?? input.gmail ?? '',
     organisation: u.organisation ?? input.organisation ?? '',
     role: u.role ?? input.role,
     avatar: u.avatar ?? '',

@@ -369,7 +369,6 @@ export interface SubmissionTrackerEntry {
   attendee_id: string
   name: string
   email: string
-  gmail: string
   type: 'Internal Stakeholder' | 'Vendor'
   role: string
   organisation: string

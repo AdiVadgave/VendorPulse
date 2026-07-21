@@ -203,7 +203,6 @@ class SchedulingService:
                 "stakeholder_id": a.stakeholder_id,
                 "name": a.name,
                 "email": a.email,
-                "gmail": getattr(a, "gmail", "") or "",
                 "role": a.role,
                 "organisation": a.organisation,
                 "type": getattr(a, "type", "Internal Stakeholder") or "Internal Stakeholder",

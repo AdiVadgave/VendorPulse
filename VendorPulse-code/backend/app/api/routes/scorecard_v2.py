@@ -1,7 +1,7 @@
 """
 Scorecard v2 — production weighted scorecard, collected via an in-app form
 (no Google Forms). Responses are submitted straight to the backend and stored
-as JSON. Emails (the form link) are still sent via Gmail.
+as JSON. Emails (the form link) are sent via the service mailbox (Microsoft Graph).
 
 Endpoints (prefix /api/scorecard):
   GET  /structure                     the weighted structure (themes/measures/weights)
@@ -9,7 +9,7 @@ Endpoints (prefix /api/scorecard):
   POST /submit                        store one team's scorecard submission
   GET  /team-submissions/{cycle_id}   who has submitted (key internal stakeholders)
   GET  /weighted/{cycle_id}           compiled weighted scorecard (team columns + weighted overall)
-  POST /dispatch-inapp                email the in-app form link (via Gmail)
+  POST /dispatch-inapp                email the in-app form link (via Outlook)
   GET  /final/{cycle_id}              the admin-adjusted (final) scorecard, if saved
   POST /final/{cycle_id}              save the admin-adjusted scorecard
   DELETE /final/{cycle_id}            reset (delete) the admin-adjusted scorecard
@@ -36,10 +36,9 @@ from app.dependencies import (
     get_scorecard_submission_repo,
     get_user_repo,
 )
-from app.services.gmail_service import build_scorecard_email
+from app.services.email_templates import build_scorecard_email
 from app.services.mail_provider import get_mail_provider, MailSendError
 from app.models.scheduling import ScorecardConfigUpdate
-from app.services.google_auth_service import is_authenticated
 from app.utils.prompts import SCORECARD_COMMENT_SUMMARY_SYSTEM_PROMPT
 from app.utils.scorecard_structure import (
     SCORECARD_CATALOG,
@@ -1004,22 +1003,17 @@ def weighted_as_compiled(cycle_id: str) -> dict:
     }
 
 
-# ── In-app dispatch (Gmail sends the form link) ──────────────────────────────
+# ── In-app dispatch (service mailbox sends the form link) ────────────────────
 
 
 @router.post("/dispatch-inapp")
 def dispatch_inapp(payload: InAppDispatchRequest):
-    """Email the in-app scorecard form link to each recipient via Gmail.
+    """Email the in-app scorecard form link to each recipient via the service
+    mailbox (Microsoft Graph).
 
     Recipient emails are used exactly as provided (editable), so a tester can
     send several links to their own inbox.
     """
-    if not is_authenticated():
-        raise HTTPException(
-            status_code=401,
-            detail="Google account not connected (Gmail send). Visit /auth/google to authenticate.",
-        )
-
     cycle_repo = get_cycle_repo()
     cycle = cycle_repo.get_by_cycle_id(payload.cycle_id)
     if cycle is None:

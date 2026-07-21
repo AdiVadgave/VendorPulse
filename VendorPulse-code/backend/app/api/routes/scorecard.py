@@ -88,13 +88,9 @@ def get_compiled_scorecard(cycle_id: str):
     email_type_map: dict[str, str] = {}
     email_name_map: dict[str, str] = {}
     for att in attendees:
-        gmail = (att.get("gmail") or "").lower().strip()
         corp = (att.get("email") or "").lower().strip()
         att_type = att.get("type", "Internal Stakeholder")
         att_name = att.get("name", "Unknown")
-        if gmail:
-            email_type_map[gmail] = att_type
-            email_name_map[gmail] = att_name
         if corp:
             email_type_map[corp] = att_type
             email_name_map[corp] = att_name

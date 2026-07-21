@@ -21,7 +21,6 @@ class UserCreate(BaseModel):
     email: str = Field(..., examples=["alex@zensar.com"])
     role: str = Field(default="Member", examples=["VMO_COORDINATOR"])
     organisation: Optional[str] = Field(default=None, examples=["Shell VMO"])
-    gmail: Optional[str] = Field(default=None, examples=["alex@gmail.com"])
 
 
 class UserUpdate(BaseModel):
@@ -29,7 +28,6 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     role: Optional[str] = None
     organisation: Optional[str] = None
-    gmail: Optional[str] = None
 
 
 class AvailabilityUpdate(BaseModel):

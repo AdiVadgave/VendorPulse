@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { ClipboardList, Send, Bell, Clock, AlertTriangle, CheckCircle2, ExternalLink, ChevronDown, ChevronRight, Link2, Check, Loader2 } from 'lucide-react'
+import { ClipboardList, Send, Bell, Clock, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Link2, Check, Loader2 } from 'lucide-react'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
 import { WEIGHTED_SCORECARD_STRUCTURE } from '@/types/scorecard.types'
 import type { WeightedCategoryDef } from '@/types/scorecard.types'
-import { checkGoogleAuth, dispatchInAppScorecard, buildScorecardLink } from '@/lib/scorecardApi'
+import { dispatchInAppScorecard, buildScorecardLink } from '@/lib/scorecardApi'
 import type { DispatchResponse } from '@/lib/scorecardApi'
 import type { CycleAttendee } from '@/types/scheduling.types'
 import { apiFetch } from '@/lib/api'
@@ -29,8 +29,6 @@ const REMINDER_SCHEDULE = [
   { label: 'T−2 days', tone: 'Deadline notice', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
   { label: 'T−0 days', tone: 'Escalation to organiser', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
 ]
-
-const GOOGLE_AUTH_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/google`
 
 function CategoriesDropdown({ structure }: { structure: WeightedCategoryDef[] }) {
   const [open, setOpen] = useState(false)
@@ -77,7 +75,6 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(alreadyDispatched ? 'complete' : 'idle')
   const [showApproval, setShowApproval] = useState(false)
   const [dispatched, setDispatched] = useState(alreadyDispatched)
-  const [googleConnected, setGoogleConnected] = useState<boolean | null>(null)
   const [dispatchResult, setDispatchResult] = useState<DispatchResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -115,13 +112,6 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
 
   async function handleGenerate() {
     setError(null)
-    setAgentStatus('running')
-    const authStatus = await checkGoogleAuth()
-    setGoogleConnected(authStatus.authenticated)
-    if (!authStatus.authenticated) {
-      setAgentStatus('idle')
-      return
-    }
     setAgentStatus('awaiting_approval')
     setShowApproval(true)
   }
@@ -140,7 +130,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
         recipients: recipients.map((a) => ({
           attendee_id: a.attendee_id,
           name: a.name,
-          email: a.gmail || a.email,
+          email: a.email,
           team: a.shell_department || a.name,
         })),
       })
@@ -204,7 +194,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
                 <div className="min-w-0 flex-1">
                   <span className="text-sm text-slate-700 dark:text-slate-300">{a.name}</span>
                   {(a.shell_department) && <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">{a.shell_department}</span>}
-                  <span className="ml-2 text-xs text-slate-400">{a.gmail || a.email}</span>
+                  <span className="ml-2 text-xs text-slate-400">{a.email}</span>
                 </div>
                 <button
                   onClick={() => copyLink(a.attendee_id)}
@@ -226,21 +216,6 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
             Each recipient gets a unique in-app form link tied to their identity. Use <strong>Copy link</strong> to test without sending email.
           </p>
         </div>
-
-        {googleConnected === false && (
-          <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-            <div className="flex items-start gap-2">
-              <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Google Account Not Connected</p>
-                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">Scorecard emails are sent via Gmail — connect your Google account, or use <strong>Copy link</strong> to test.</p>
-                <a href={GOOGLE_AUTH_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-lg transition-colors">
-                  <ExternalLink size={12} /> Connect Google Account
-                </a>
-              </div>
-            </div>
-          </div>
-        )}
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -275,7 +250,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
           </button>
         ) : (
           <div className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-700 dark:text-emerald-400 text-sm font-medium">
-            <Send size={14} /> Scorecard links dispatched via Gmail
+            <Send size={14} /> Scorecard links dispatched via Outlook
           </div>
         )}
       </div>
@@ -304,12 +279,12 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
 
       {showApproval && (
         <ApprovalPanel
-          title="Dispatch Scorecard Request via Gmail"
+          title="Dispatch Scorecard Request via Outlook"
           summary={`Email the in-app scorecard form link to ${recipients.length} key internal stakeholder(s) for ${vendorName} (${quarter} ${year}).`}
-          recipients={recipients.map((a) => `${a.name} (${a.gmail || a.email})`)}
+          recipients={recipients.map((a) => `${a.name} (${a.email})`)}
           warnings={[
-            'Emails are sent via your connected Gmail account',
-            'Each email links to the in-app scorecard form (not Google Forms)',
+            'Emails are sent from the VendorPulse service mailbox (Outlook)',
+            'Each email links to the in-app scorecard form',
             'Each link is tied to the reviewer; responses are stored directly',
           ]}
           previewContent={
@@ -324,7 +299,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
               </div>
             </div>
           }
-          approveLabel="Send via Gmail"
+          approveLabel="Send via Outlook"
           onApprove={handleApprove}
           onCancel={() => { setShowApproval(false); setAgentStatus('idle') }}
         />

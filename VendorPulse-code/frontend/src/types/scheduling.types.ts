@@ -34,7 +34,6 @@ export interface CycleAttendee {
   cycle_id?: string
   name: string
   email: string
-  gmail?: string
   role: StakeholderRole
   organisation: string
   type: AttendeeType

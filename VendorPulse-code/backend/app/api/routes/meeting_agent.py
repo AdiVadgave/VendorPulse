@@ -24,7 +24,7 @@ from app.dependencies import (
 )
 from app.models.common import AgentResponse
 from app.models.meeting_agent import GenerateMinutesRequest, ParseTranscriptRequest
-from app.services.gmail_service import build_minutes_email
+from app.services.email_templates import build_minutes_email
 from app.services.mail_provider import get_mail_provider, MailSendError
 
 logger = logging.getLogger(__name__)
@@ -206,24 +206,25 @@ class SendMinutesRequest(BaseModel):
 @router.post("/minutes/send")
 def send_minutes(cycleId: str, payload: SendMinutesRequest):
     """
-    Send approved meeting minutes to all internal stakeholders via Gmail API.
-    Requires Google OAuth to be completed at /auth/google first.
-    Uses the attendee's `gmail` field as the delivery address.
+    Send approved meeting minutes to all internal stakeholders via the service
+    mailbox (Microsoft Graph). Uses the attendee's `email` as the delivery address.
     """
     logger.info("MEETING-AGENT: send minutes — cycleId=%s, run_id=%s", cycleId, payload.run_id)
 
     attendee_repo = get_attendee_repo()
 
     all_attendees = attendee_repo.get_for_cycle(cycleId)
+    # Minutes go to internal stakeholders (everyone who is NOT a vendor). Treating
+    # null/missing type as internal is robust to legacy data where `type` is unset.
     internal = [
         a for a in all_attendees
-        if a.get("type", "").lower() == "internal stakeholder" and a.get("gmail", "").strip()
+        if (a.get("type") or "").lower() != "vendor" and (a.get("email") or "").strip()
     ]
 
     if not internal:
         raise HTTPException(
             status_code=404,
-            detail=f"No internal stakeholders with Gmail addresses found for cycle '{cycleId}'"
+            detail=f"No internal stakeholders with an email address found for cycle '{cycleId}'"
         )
 
     minutes = payload.minutes
@@ -232,8 +233,8 @@ def send_minutes(cycleId: str, payload: SendMinutesRequest):
     failed = []
 
     for attendee in internal:
-        gmail_addr = attendee["gmail"].strip()
-        name = attendee.get("name", gmail_addr)
+        email_addr = attendee["email"].strip()
+        name = attendee.get("name", email_addr)
 
         email_content = build_minutes_email(
             attendee_name=name,
@@ -245,23 +246,22 @@ def send_minutes(cycleId: str, payload: SendMinutesRequest):
 
         try:
             get_mail_provider().send_html_email(
-                to_email=gmail_addr,
+                to_email=email_addr,
                 subject=email_content["subject"],
                 html_body=email_content["html_body"],
                 text_body=email_content["text_body"],
             )
-            sent_to.append({"name": name, "email": gmail_addr})
-            logger.info("MEETING-AGENT: minutes sent to %s (%s)", name, gmail_addr)
+            sent_to.append({"name": name, "email": email_addr})
+            logger.info("MEETING-AGENT: minutes sent to %s (%s)", name, email_addr)
         except MailSendError as exc:
-            logger.warning("MEETING-AGENT: failed to send to %s — %s", gmail_addr, exc)
-            failed.append({"name": name, "email": gmail_addr, "error": str(exc)})
+            logger.warning("MEETING-AGENT: failed to send to %s — %s", email_addr, exc)
+            failed.append({"name": name, "email": email_addr, "error": str(exc)})
 
     if not sent_to and failed:
-        # All failed — likely not authenticated
         first_error = failed[0]["error"]
         raise HTTPException(
             status_code=503,
-            detail=f"Gmail send failed. Ensure Google OAuth is completed at /auth/google. Error: {first_error}"
+            detail=f"Mail send failed via the service mailbox. Error: {first_error}"
         )
 
     logger.info(

@@ -1,7 +1,7 @@
 /**
  * API functions for the Scorecard module (Module B).
- * Scorecard collection is in-app (see the weighted / v2 helpers below); the Gmail
- * dispatch of the form link still runs through the Google-auth-gated endpoints.
+ * Scorecard collection is in-app (see the weighted / v2 helpers below); the form
+ * link is emailed via the service mailbox (Microsoft Graph).
  */
 import { apiFetch, apiFetchBlob } from './api'
 
@@ -22,20 +22,7 @@ export interface DispatchResponse {
   results: DispatchResult[]
 }
 
-export interface GoogleAuthStatus {
-  authenticated: boolean
-}
-
 // ── API calls ───────────────────────────────────────────────────────────────
-
-/** Check if Google OAuth is connected */
-export async function checkGoogleAuth(): Promise<GoogleAuthStatus> {
-  try {
-    return await apiFetch<GoogleAuthStatus>('/auth/google/status')
-  } catch {
-    return { authenticated: false }
-  }
-}
 
 /** Get compiled scorecard (Internal vs Vendor 2-column) for a cycle */
 export async function getCompiledScorecard(
@@ -168,7 +155,7 @@ export interface InAppDispatchRecipient {
   team?: string
 }
 
-/** Email the in-app scorecard form link to recipients via Gmail */
+/** Email the in-app scorecard form link to recipients via the service mailbox (Outlook) */
 export async function dispatchInAppScorecard(payload: {
   cycle_id: string
   vendor_name: string

@@ -12,7 +12,7 @@ interface Props {
   vendorName: string
   quarter: string
   year: number
-  /** Full attendee list — used to resolve the delivery (gmail) address for a resend. */
+  /** Full attendee list — used to resolve the delivery email address for a resend. */
   attendees: CycleAttendee[]
   onSubmissionsUpdated?: ((data: TeamSubmissionsData) => void) | (() => void) | (() => Promise<void>)
 }
@@ -58,7 +58,7 @@ export default function SubmissionTracker({ cycleId, vendorName, quarter, year, 
     return () => clearInterval(id)
   }, [allCollected, doPoll])
 
-  // Ask one attendee to fill (email the form link via Gmail) — usable at any time.
+  // Ask one attendee to fill (email the form link via Outlook) — usable at any time.
   const requestFill = useCallback(async (entry: TeamSubmissionEntry) => {
     setBusyId(entry.attendee_id)
     setRowError(null)
@@ -73,14 +73,14 @@ export default function SubmissionTracker({ cycleId, vendorName, quarter, year, 
         recipients: [{
           attendee_id: entry.attendee_id,
           name: entry.name,
-          email: att?.gmail || att?.email || entry.email,
+          email: att?.email || entry.email,
           team: entry.team,
         }],
       })
       setSentId(entry.attendee_id)
       setTimeout(() => setSentId((s) => (s === entry.attendee_id ? null : s)), 2000)
     } catch (e) {
-      setRowError(e instanceof Error ? e.message : 'Failed to send — connect Gmail, or use Copy link.')
+      setRowError(e instanceof Error ? e.message : 'Failed to send — check the service mailbox config, or use Copy link.')
     } finally {
       setBusyId(null)
     }
@@ -227,7 +227,7 @@ export default function SubmissionTracker({ cycleId, vendorName, quarter, year, 
                   <button
                     onClick={() => requestFill(entry)}
                     disabled={busyId === entry.attendee_id}
-                    title="Email this attendee the scorecard form link (Gmail)"
+                    title="Email this attendee the scorecard form link (Outlook)"
                     className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 disabled:opacity-50"
                   >
                     {busyId === entry.attendee_id ? <Loader2 size={12} className="animate-spin" />

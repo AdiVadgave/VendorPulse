@@ -8,7 +8,7 @@ from app.repositories.base_repository import BaseRepository
 class UserRepository(BaseRepository):
     table = "users"
     pk = "user_id"
-    columns = ("user_id", "name", "email", "role", "organisation", "gmail", "avatar", "created_at")
+    columns = ("user_id", "name", "email", "role", "organisation", "avatar", "created_at")
 
     def get_by_user_id(self, user_id: str) -> Optional[dict]:
         return self.find_by_id("user_id", user_id)

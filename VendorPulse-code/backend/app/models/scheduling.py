@@ -35,7 +35,6 @@ class CycleAttendeeCreate(BaseModel):
     stakeholder_id: str
     name: str
     email: str
-    gmail: Optional[str] = Field(default="", description="Gmail address for scorecard dispatch")
     role: StakeholderRole
     organisation: str
     type: AttendeeType = Field(default="Internal Stakeholder", description="Internal Stakeholder or Vendor")
@@ -66,7 +65,6 @@ class CycleAttendeeUpdate(BaseModel):
     confirmation_note: Optional[str] = None
     is_key: Optional[bool] = None
     type: Optional[AttendeeType] = None
-    gmail: Optional[str] = None
     # Invitee classification
     attendance_requirement: Optional[AttendanceRequirement] = None
     lt_status: Optional[LTStatus] = None
@@ -81,7 +79,6 @@ class CycleAttendee(BaseModel):
     stakeholder_id: str
     name: str
     email: str
-    gmail: str = ""
     role: StakeholderRole
     organisation: str
     type: AttendeeType = "Internal Stakeholder"

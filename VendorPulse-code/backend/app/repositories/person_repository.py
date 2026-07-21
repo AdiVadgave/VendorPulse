@@ -15,7 +15,7 @@ from app.repositories.base_repository import BaseRepository
 class PersonRepository(BaseRepository):
     table = "persons"
     pk = "person_id"
-    columns = ("person_id", "email", "name", "gmail", "organisation")
+    columns = ("person_id", "email", "name", "organisation")
 
     def get_by_email(self, email: str) -> Optional[dict]:
         if not email:
@@ -30,17 +30,14 @@ class PersonRepository(BaseRepository):
         self,
         email: str,
         name: Optional[str] = None,
-        gmail: Optional[str] = None,
         organisation: Optional[str] = None,
     ) -> dict:
         """Return the person for this email, creating one if absent. On an
-        existing row, backfill a blank gmail/name/organisation if a value is now
+        existing row, backfill a blank name/organisation if a value is now
         available (never overwrite a non-empty value)."""
         existing = self.get_by_email(email)
         if existing:
             patch = {}
-            if gmail and not (existing.get("gmail") or ""):
-                patch["gmail"] = gmail
             if name and not (existing.get("name") or ""):
                 patch["name"] = name
             if organisation and not (existing.get("organisation") or ""):
@@ -53,7 +50,6 @@ class PersonRepository(BaseRepository):
             "person_id": f"per_{uuid.uuid4().hex}",
             "email": email.strip(),
             "name": name,
-            "gmail": gmail,
             "organisation": organisation,
         }
         self.insert(person)

@@ -65,7 +65,6 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
   const [newName, setNewName] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newOrg, setNewOrg] = useState('')
-  const [newGmail, setNewGmail] = useState('')
   const [creating, setCreating] = useState(false)
 
   function openCreateNew() {
@@ -74,7 +73,6 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
     if (q.includes('@')) { setNewEmail(q); setNewName('') }
     else { setNewName(q); setNewEmail('') }
     setNewOrg('')
-    setNewGmail('')
     setError(null)
     setShowDropdown(false)
     setCreatingNew(true)
@@ -88,7 +86,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
     setCreating(true)
     setError(null)
     try {
-      const created = await createUser({ name, email, role, organisation: newOrg.trim(), gmail: newGmail.trim() })
+      const created = await createUser({ name, email, role, organisation: newOrg.trim() })
       // Immediately select the freshly-created person so the normal add flow proceeds.
       setSelected(created)
       setQuery(created.name)
@@ -160,7 +158,6 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
               stakeholder_id: `s_${Date.now()}`,
               name: selected.name,
               email: selected.email,
-              gmail: selected.gmail || '',
               role,
               organisation: selected.organisation,
               type: attendeeType,
@@ -186,7 +183,6 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
         stakeholder_id: `s_${Date.now()}`,
         name: selected.name,
         email: selected.email,
-        gmail: selected.gmail || '',
         role,
         organisation: selected.organisation,
         type: attendeeType,
@@ -292,11 +288,6 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
             <input
               type="text" placeholder="Organisation" value={newOrg}
               onChange={(e) => setNewOrg(e.target.value)}
-              className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <input
-              type="email" placeholder="Gmail (optional)" value={newGmail}
-              onChange={(e) => setNewGmail(e.target.value)}
               className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>

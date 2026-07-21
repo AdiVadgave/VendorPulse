@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import actions, alignment, analytics, google_auth, meeting_agent, meetings, pushback, scheduling, scorecard, scorecard_v2, users, vendor_prep, vendors
+from app.api.routes import actions, alignment, analytics, meeting_agent, meetings, pushback, scheduling, scorecard, scorecard_v2, users, vendor_prep, vendors
 from app.config import settings
 from app.core.logging_config import setup_logging
 from app.db.pool import close_pool, get_pool
@@ -80,7 +80,6 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(users.router)
 app.include_router(meetings.router)
 app.include_router(scheduling.router)
-app.include_router(google_auth.router)
 app.include_router(scorecard.router)
 app.include_router(scorecard_v2.router)
 app.include_router(vendors.router)
@@ -115,8 +114,6 @@ def health():
             "users": "GET|POST /api/users",
             "userDetail": "GET|PUT /api/users/{userId}",
             "userAvailability": "GET|PUT /api/users/{userId}/availability",
-            "googleAuth": "GET /auth/google",
-            "googleAuthStatus": "GET /auth/google/status",
             "cycles": "GET|POST /api/cycles",
             "cycleDetail": "GET /api/cycles/{cycleId}",
             "attendees": "GET|POST /api/cycles/{cycleId}/attendees",

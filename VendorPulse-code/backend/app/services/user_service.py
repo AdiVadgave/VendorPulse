@@ -33,7 +33,6 @@ class UserService:
             "email": payload.email,
             "role": payload.role,
             "organisation": payload.organisation or "",
-            "gmail": payload.gmail or "",
             "avatar": initials,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }

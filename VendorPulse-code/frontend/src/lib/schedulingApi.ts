@@ -173,7 +173,6 @@ export interface SystemUser {
   user_id: string
   name: string
   email: string
-  gmail: string
   organisation: string
   role: string
   avatar: string

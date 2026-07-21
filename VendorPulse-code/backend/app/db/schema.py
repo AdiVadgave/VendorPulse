@@ -70,7 +70,6 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             person_id    TEXT PRIMARY KEY,
             email        TEXT NOT NULL,
             name         TEXT,
-            gmail        TEXT,
             organisation TEXT,
             seq          BIGSERIAL UNIQUE NOT NULL
         )
@@ -85,7 +84,6 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             email        TEXT,
             role         TEXT,
             organisation TEXT,
-            gmail        TEXT,
             avatar       TEXT,
             created_at   TEXT,
             seq          BIGSERIAL UNIQUE NOT NULL

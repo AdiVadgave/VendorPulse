@@ -67,8 +67,7 @@ def setup_logging(level: str = "INFO") -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("hpack").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("google").setLevel(logging.WARNING)
-    logging.getLogger("googleapiclient").setLevel(logging.WARNING)
+    logging.getLogger("msal").setLevel(logging.WARNING)
 
     logging.getLogger("app").info(
         "Logging initialized — file=%s, console=%s", LOG_FILE, level.upper()

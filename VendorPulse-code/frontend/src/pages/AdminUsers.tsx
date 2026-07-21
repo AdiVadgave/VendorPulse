@@ -16,7 +16,6 @@ const EMPTY_FORM: UserInput = {
   email: '',
   role: 'VMO_COORDINATOR',
   organisation: '',
-  gmail: '',
 }
 
 function roleLabel(role: string): string {
@@ -73,7 +72,6 @@ export default function AdminUsers() {
       email: u.email,
       role: ROLE_KEYS.includes(u.role as StakeholderRole) ? u.role : 'VMO_COORDINATOR',
       organisation: u.organisation ?? '',
-      gmail: u.gmail ?? '',
     })
     setEditingId(u.user_id)
     setFormError(null)
@@ -98,7 +96,6 @@ export default function AdminUsers() {
         email,
         role: form.role,
         organisation: form.organisation?.trim() || '',
-        gmail: form.gmail?.trim() || '',
       }
       if (editingId) await updateUser(editingId, payload)
       else await createUser(payload)
@@ -193,12 +190,6 @@ export default function AdminUsers() {
               <input className={cn(field, 'mt-1')} value={form.organisation}
                 onChange={(e) => setForm((f) => ({ ...f, organisation: e.target.value }))}
                 placeholder="Shell VMO / Zensar / Vendor name" />
-            </label>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 sm:col-span-2">
-              Gmail <span className="text-slate-400 font-normal">(optional — used for demo scorecard emails)</span>
-              <input className={cn(field, 'mt-1')} type="email" value={form.gmail}
-                onChange={(e) => setForm((f) => ({ ...f, gmail: e.target.value }))}
-                placeholder="alex@gmail.com" />
             </label>
           </div>
 

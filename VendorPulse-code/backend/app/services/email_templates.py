@@ -1,72 +1,12 @@
 """
-Gmail service — sends emails via the Gmail API using OAuth2 credentials.
+Email body templates (provider-agnostic).
 
-Uses the authenticated user's own Gmail account (personal, not organisational).
+Pure HTML/text builders for the two emails VendorPulse sends — scorecard
+requests and meeting minutes. No mail-transport or Google dependency: the
+result is handed to `mail_provider.get_mail_provider().send_html_email(...)`,
+which sends via Microsoft Graph (the service mailbox).
 """
 from __future__ import annotations
-
-import base64
-import logging
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
-
-from googleapiclient.discovery import build
-
-from app.config import settings
-from app.services.google_auth_service import get_credentials
-
-logger = logging.getLogger(__name__)
-
-
-class GmailSendError(RuntimeError):
-    pass
-
-
-def _get_gmail_service():
-    creds = get_credentials()
-    if creds is None:
-        raise GmailSendError(
-            "Google account not authenticated. "
-            "Visit /auth/google to sign in first."
-        )
-    return build("gmail", "v1", credentials=creds)
-
-
-def send_html_email(
-    *,
-    to_email: str,
-    subject: str,
-    html_body: str,
-    text_body: str | None = None,
-) -> dict:
-    """Send an email via the authenticated user's Gmail account.
-
-    Returns the Gmail API message resource (contains 'id', 'threadId', etc.).
-    """
-    service = _get_gmail_service()
-
-    msg = MIMEMultipart("alternative")
-    msg["To"] = to_email
-    msg["Subject"] = subject
-
-    if text_body:
-        msg.attach(MIMEText(text_body, "plain", "utf-8"))
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
-
-    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")
-
-    try:
-        result = (
-            service.users()
-            .messages()
-            .send(userId="me", body={"raw": raw})
-            .execute()
-        )
-        logger.info("Email sent to %s — message id: %s", to_email, result.get("id"))
-        return result
-    except Exception as exc:
-        raise GmailSendError(f"Failed to send email to '{to_email}': {exc}") from exc
 
 
 def build_minutes_email(
@@ -85,10 +25,8 @@ def build_minutes_email(
     key_decisions = minutes.get("key_decisions", [])
     action_items = minutes.get("action_items", [])
     agenda_summaries = minutes.get("agenda_summaries", [])
-    qa_log = minutes.get("qa_log", [])
     attendees_list = minutes.get("attendees", [])
 
-    # Build HTML sections
     decisions_html = "".join(
         f'<li style="margin-bottom:8px;">{d}</li>' for d in key_decisions
     )
@@ -137,7 +75,6 @@ def build_minutes_email(
 </div>
 """
 
-    # Plain-text fallback
     text_lines = [
         f"Meeting Minutes — {vendor_name} {quarter} {year} EGB/QBR",
         f"Date: {meeting_date}" if meeting_date else "",
@@ -159,45 +96,7 @@ def build_minutes_email(
     text_lines += ["---", "Sent via VendorPulse — Automated Governance Platform"]
 
     text_body = "\n".join(line for line in text_lines)
-
     return {"subject": subject, "html_body": html_body, "text_body": text_body}
-
-
-def build_prefilled_form_url(
-    form_url: str,
-    *,
-    cycle_id: str | None = None,
-    attendee_email: str | None = None,
-    vendor_name: str | None = None,
-) -> str:
-    """Append Google Forms prefill query params for whichever entry IDs are configured.
-
-    Returns the form_url unchanged if no prefill entry IDs are set, or if the URL
-    is a forms.gle short link (which strips query params on redirect — switch to
-    the full docs.google.com/forms/d/e/.../viewform URL to enable prefill).
-    """
-    pairs: list[tuple[str, str]] = []
-    if settings.google_form_prefill_cycle_id_entry and cycle_id:
-        pairs.append((settings.google_form_prefill_cycle_id_entry, cycle_id))
-    if settings.google_form_prefill_email_entry and attendee_email:
-        pairs.append((settings.google_form_prefill_email_entry, attendee_email))
-    if settings.google_form_prefill_vendor_entry and vendor_name:
-        pairs.append((settings.google_form_prefill_vendor_entry, vendor_name))
-
-    if not pairs:
-        return form_url
-
-    parsed = urlparse(form_url)
-    if "forms.gle" in parsed.netloc:
-        logger.warning(
-            "PREFILL: forms.gle short links drop query params; set GOOGLE_FORM_URL "
-            "to the full docs.google.com viewform URL to enable prefill."
-        )
-        return form_url
-
-    merged = dict(parse_qsl(parsed.query))
-    merged.update(dict(pairs))
-    return urlunparse(parsed._replace(query=urlencode(merged)))
 
 
 def build_scorecard_email(
@@ -210,25 +109,12 @@ def build_scorecard_email(
     year: int,
     form_url: str,
 ) -> dict[str, str]:
-    """Generate a professional scorecard request email (subject + HTML body + text body)."""
+    """Generate a professional scorecard request email (subject + HTML body + text body).
+
+    `form_url` is the in-app scorecard link (already carries the cycle id), so no
+    manual cycle-id entry notice is needed.
+    """
     subject = f"{vendor_name} — QBR Scorecard Input Request ({quarter} {year})"
-
-    prefilled_url = build_prefilled_form_url(
-        form_url,
-        cycle_id=cycle_id,
-        attendee_email=attendee_email,
-        vendor_name=vendor_name,
-    )
-    is_prefilled = prefilled_url != form_url
-
-    cycle_id_notice = "" if is_prefilled else f"""\
-    <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin: 20px 0;">
-      <p style="margin: 0; font-size: 13px; color: #92400e;">
-        <strong>Important:</strong> Please enter Cycle ID <code style="background: #fff; padding: 2px 6px; border-radius: 3px; font-weight: bold;">{cycle_id}</code>
-        in the form. Without the Cycle ID, your response cannot be mapped to this review cycle.
-      </p>
-    </div>
-"""
 
     html_body = f"""\
 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
@@ -260,12 +146,11 @@ def build_scorecard_email(
     </div>
 
     <div style="text-align: center; margin: 28px 0;">
-      <a href="{prefilled_url}" style="display: inline-block; background: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-size: 15px; font-weight: 600; letter-spacing: 0.3px;">
+      <a href="{form_url}" style="display: inline-block; background: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-size: 15px; font-weight: 600; letter-spacing: 0.3px;">
         Open Scorecard Form
       </a>
     </div>
 
-{cycle_id_notice}
     <p style="font-size: 13px; color: #94a3b8; margin-top: 24px; line-height: 1.5;">
       If you have questions, reply to this email or contact your VMO Coordinator.<br>
       Thank you for your timely input.
@@ -279,19 +164,13 @@ def build_scorecard_email(
 </div>
 """
 
-    cycle_id_text = "" if is_prefilled else (
-        f"IMPORTANT: Enter Cycle ID '{cycle_id}' in the form so your response "
-        f"can be mapped to this review cycle.\n\n"
-    )
     text_body = (
         f"Dear {attendee_name},\n\n"
         f"You have been selected as a key reviewer for the {vendor_name} "
         f"QBR governance cycle ({quarter} {year}).\n\n"
-        f"Please complete your scorecard at: {prefilled_url}\n\n"
-        f"{cycle_id_text}"
+        f"Please complete your scorecard at: {form_url}\n\n"
         f"Categories: Risk & Compliance, Performance, Commercial, Relationship\n"
         f"Scale: 1 (Poor) to 5 (Excellent)\n\n"
         f"Thank you,\nVendorPulse"
     )
-
     return {"subject": subject, "html_body": html_body, "text_body": text_body}

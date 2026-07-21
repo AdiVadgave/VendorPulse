@@ -1,7 +1,7 @@
 """
 Attendees — a cycle↔person junction.
 
-Person identity (name/email/gmail/organisation) is NOT stored here; it lives
+Person identity (name/email/organisation) is NOT stored here; it lives
 once in `persons` and is referenced by `person_id`. This repository keeps the
 dict-in/dict-out contract intact: on write it decomposes the incoming "fat"
 attendee dict (upserting the person by email), and on read it reconstructs the
@@ -16,7 +16,7 @@ from app.repositories.base_repository import BaseRepository
 from app.repositories.person_repository import PersonRepository
 
 # Fields that belong to the person, not the attendee row.
-_PERSON_FIELDS = ("name", "email", "gmail", "organisation")
+_PERSON_FIELDS = ("name", "email", "organisation")
 
 
 class AttendeeRepository(BaseRepository):
@@ -61,7 +61,7 @@ class AttendeeRepository(BaseRepository):
         email = record.get("email")
         if email:
             person = self._person_repo.upsert(
-                email, record.get("name"), record.get("gmail"), record.get("organisation")
+                email, record.get("name"), record.get("organisation")
             )
             person_id = person["person_id"]
         row = {c: record.get(c) for c in self.columns if c in record}

@@ -25,7 +25,7 @@ import type { StakeholderRole } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
 import type { SystemUser } from '@/lib/schedulingApi'
 import { createUser } from '@/lib/usersApi'
-import { searchPeople } from '@/lib/auth/graphPeople'
+import { searchPeople, type PeopleSearchResult } from '@/lib/auth/graphPeople'
 
 interface AttendeeRefreshPanelProps {
   cycleId: string
@@ -48,9 +48,9 @@ interface SearchAddAttendeeFormProps {
 
 export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel }: SearchAddAttendeeFormProps) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SystemUser[]>([])
+  const [results, setResults] = useState<PeopleSearchResult[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
-  const [selected, setSelected] = useState<SystemUser | null>(null)
+  const [selected, setSelected] = useState<PeopleSearchResult | null>(null)
   const [role, setRole] = useState<StakeholderRole>('VMO_COORDINATOR')
   const [attendeeType, setAttendeeType] = useState<'Internal Stakeholder' | 'Vendor'>('Internal Stakeholder')
   const [isKey, setIsKey] = useState(false)
@@ -120,7 +120,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
           if (cancelled) return
           // Local results first; append Shell people not already present (by email).
           const seen = new Set(local.map((u) => u.email.toLowerCase()))
-          const merged = [...local]
+          const merged: PeopleSearchResult[] = [...local]
           for (const u of shell) {
             const e = u.email.toLowerCase()
             if (seen.has(e)) continue
@@ -152,11 +152,13 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  function handleSelect(user: SystemUser) {
+  function handleSelect(user: PeopleSearchResult) {
     setSelected(user)
     setQuery(user.name)
     setShowDropdown(false)
     setError(null)
+    // Shell directory people are internal employees — default the type accordingly.
+    if (user.user_id.startsWith('graph:')) setAttendeeType('Internal Stakeholder')
   }
 
   function handleQueryChange(value: string) {
@@ -345,6 +347,11 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-slate-800 dark:text-slate-200">{selected.name}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{selected.email} · {selected.organisation}</p>
+            {(selected.jobTitle || selected.department) && (
+              <p className="text-xs text-slate-400 dark:text-slate-500 truncate">
+                {[selected.jobTitle, selected.department].filter(Boolean).join(' · ')}
+              </p>
+            )}
           </div>
         </div>
       )}

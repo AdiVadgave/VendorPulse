@@ -11,6 +11,12 @@
  */
 import type { SystemUser } from '@/lib/schedulingApi'
 
+/** A directory match, plus the extra Graph attributes we surface for context. */
+export interface PeopleSearchResult extends SystemUser {
+  jobTitle?: string
+  department?: string
+}
+
 type GraphTokenGetter = () => Promise<string | null>
 
 let graphTokenGetter: GraphTokenGetter | null = null
@@ -37,7 +43,7 @@ interface GraphUser {
  * Search Shell people by name or email. Returns [] silently on any failure so
  * the caller's local-directory results still show.
  */
-export async function searchPeople(query: string): Promise<SystemUser[]> {
+export async function searchPeople(query: string): Promise<PeopleSearchResult[]> {
   const q = query.trim()
   if (!q || !graphTokenGetter) return []
 
@@ -66,7 +72,7 @@ export async function searchPeople(query: string): Promise<SystemUser[]> {
     if (!res.ok) return []
     const data = (await res.json()) as { value?: GraphUser[] }
     return (data.value ?? [])
-      .map((u): SystemUser | null => {
+      .map((u): PeopleSearchResult | null => {
         const email = (u.mail || u.userPrincipalName || '').trim()
         if (!email) return null
         return {
@@ -76,9 +82,11 @@ export async function searchPeople(query: string): Promise<SystemUser[]> {
           organisation: u.department || 'Shell',
           role: '',
           avatar: '',
+          jobTitle: u.jobTitle || '',
+          department: u.department || '',
         }
       })
-      .filter((u): u is SystemUser => u !== null)
+      .filter((u): u is PeopleSearchResult => u !== null)
   } catch {
     return []
   }

@@ -11,8 +11,8 @@ const BASE_URLS = [
 // ── Auth token injection ──────────────────────────────────────────────────────
 // The auth layer (AuthProvider) registers a getter here once MSAL has a token.
 // While SSO is disabled the getter stays null and requests go out unauthenticated
-// — exactly the pre-SSO behaviour. Kept as a module-level hook so the plain
-// (non-hook) fetch helpers below can attach the bearer without prop-drilling.
+// — the pre-SSO behaviour. Module-level hook so the plain (non-hook) fetch helpers
+// below can attach the bearer without prop-drilling.
 type TokenGetter = () => Promise<string | null> | string | null
 let authTokenGetter: TokenGetter | null = null
 
@@ -26,8 +26,6 @@ async function authHeaders(): Promise<Record<string, string>> {
     const token = await authTokenGetter()
     return token ? { Authorization: `Bearer ${token}` } : {}
   } catch {
-    // Token acquisition failed (e.g. session expired) — send unauthenticated
-    // and let the backend return 401 so the UI can prompt re-login.
     return {}
   }
 }

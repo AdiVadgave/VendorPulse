@@ -1,16 +1,9 @@
 /**
- * SSO entry point for the app.
+ * SSO entry point. <AuthProvider> wraps the whole app.
  *
- * <AuthProvider> wraps the whole app. Its behaviour is entirely governed by
- * `ssoConfigured` (VITE_SSO_ENABLED + client/tenant ids):
- *
- *   • not configured → renders children directly. No MSAL, no login gate, no
- *     network calls. The app is byte-for-byte the pre-SSO experience.
+ *   • not configured → renders children directly (no MSAL, no login gate).
  *   • configured     → initialises MSAL, requires a Shell login, and registers
  *     a token getter so api.ts attaches the bearer to every request.
- *
- * Keeping the gate here (not in App.tsx) means routing and pages never need to
- * know whether SSO is on.
  */
 import { useEffect, useState, type ReactNode } from 'react'
 import {
@@ -18,20 +11,12 @@ import {
   InteractionRequiredAuthError,
   type AccountInfo,
 } from '@azure/msal-browser'
-import {
-  MsalProvider,
-  useMsal,
-  useIsAuthenticated,
-} from '@azure/msal-react'
+import { MsalProvider, useMsal, useIsAuthenticated } from '@azure/msal-react'
 import { setAuthTokenGetter } from '@/lib/api'
 import { msalConfig, loginRequest, ssoConfigured } from './msalConfig'
 
-// One MSAL instance for the app's lifetime — only created when SSO is configured.
 const msalInstance = ssoConfigured ? new PublicClientApplication(msalConfig) : null
 
-// ── Token bridge ──────────────────────────────────────────────────────────────
-// Registers a getter that silently acquires a fresh ID token for API calls,
-// falling back to an interactive popup only when the session truly needs it.
 function useRegisterTokenGetter(account: AccountInfo | null) {
   const { instance } = useMsal()
 
@@ -43,7 +28,6 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
     setAuthTokenGetter(async () => {
       try {
         const result = await instance.acquireTokenSilent({ ...loginRequest, account })
-        // The backend validates the ID token (audience = client id).
         return result.idToken ?? null
       } catch (err) {
         if (err instanceof InteractionRequiredAuthError) {
@@ -57,7 +41,6 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
   }, [instance, account])
 }
 
-// ── Login gate ────────────────────────────────────────────────────────────────
 function LoginGate({ children }: { children: ReactNode }) {
   const { instance, accounts } = useMsal()
   const isAuthenticated = useIsAuthenticated()
@@ -106,8 +89,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!msalInstance) return
-    // MSAL v3+ requires an explicit async initialise before any use, and we must
-    // process any redirect response that landed us back on the page.
     msalInstance
       .initialize()
       .then(() => msalInstance.handleRedirectPromise())
@@ -121,10 +102,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       })
   }, [])
 
-  // SSO off → passthrough, app unchanged.
   if (!msalInstance) return <>{children}</>
-
-  if (!ready) return null // brief blank while MSAL boots / resolves a redirect
+  if (!ready) return null
 
   return (
     <MsalProvider instance={msalInstance}>

@@ -1,23 +1,17 @@
 """
 Entra ID (Azure AD) SSO — token validation for the signed-in user.
 
-This is the *delegated* / user-login side of auth. It is deliberately kept
-separate from `services/graph_auth.py`, which is the *app-only* identity that
-sends mail as the service mailbox. The two never mix:
+This is the *delegated* / user-login side of auth, kept separate from
+`services/graph_auth.py` (the *app-only* identity that sends mail as the service
+mailbox):
 
     graph_auth.py  → the APP authenticates as itself (certificate) to send mail
     core/auth.py   → validates the USER who signed in via the SPA (this file)
 
-Dormant by default. When ``settings.sso_enabled`` is False, ``get_current_user``
-returns a fixed development principal and no route is blocked — the app behaves
-exactly as it did before SSO existed. Flip ``SSO_ENABLED=true`` in ``.env`` once
-the app registration's client id is available and the flow goes live.
-
-Validation performed (when enabled):
-  • signature  — against Entra's published JWKS for the tenant (auto-cached)
-  • issuer     — https://login.microsoftonline.com/{tenant}/v2.0
-  • audience   — the SPA's client id (+ any sso_extra_audiences)
-  • expiry     — standard exp/nbf checks (PyJWT)
+When ``settings.sso_enabled`` is False, ``get_current_user`` returns a fixed dev
+principal and no route is blocked — the app behaves exactly as before SSO. When
+True, it validates the Entra ID token: signature (against the tenant's JWKS),
+issuer, audience (the SPA client id), and expiry.
 """
 from __future__ import annotations
 
@@ -37,7 +31,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CurrentUser:
     """The authenticated principal for a request."""
-    sub: str                         # stable subject id (oid/sub)
+    sub: str
     email: str
     name: str
     roles: list[str] = field(default_factory=list)
@@ -47,21 +41,20 @@ class CurrentUser:
         return role in self.roles
 
 
-# The principal used while SSO is switched off — keeps every route callable in
-# dev without a login. Clearly marked so it can never be mistaken for a real user.
+# Principal used while SSO is off — keeps every route callable in dev without a
+# login. Clearly marked so it can never be mistaken for a real user.
 _DEV_USER = CurrentUser(
     sub="dev-local",
     email="dev@localhost",
     name="Local Dev (SSO disabled)",
-    roles=["VMO"],            # broad role so nothing is gated in dev
+    roles=["VMO"],
     is_authenticated=False,
 )
 
 
 @lru_cache(maxsize=4)
 def _jwks_client(tenant_id: str) -> PyJWKClient:
-    """One cached JWKS client per tenant. PyJWKClient caches signing keys
-    internally and refreshes on rotation, so this is created once per process."""
+    """One cached JWKS client per tenant (caches + refreshes signing keys)."""
     url = f"https://login.microsoftonline.com/{tenant_id}/discovery/v2.0/keys"
     return PyJWKClient(url)
 
@@ -106,8 +99,6 @@ def get_current_user(request: Request) -> CurrentUser:
         return _DEV_USER
 
     if not settings.sso_client_id or not settings.sso_tenant_id:
-        # Misconfiguration: SSO turned on without ids. Fail loud rather than
-        # silently letting requests through unauthenticated.
         logger.error("SSO_ENABLED=true but SSO_CLIENT_ID / SSO_TENANT_ID is not set")
         raise HTTPException(status_code=500, detail="SSO is enabled but not configured")
 
@@ -139,7 +130,7 @@ def require_roles(*allowed: str):
         @router.post(..., dependencies=[Depends(require_roles("VMO"))])
 
     While SSO is off the dev principal carries "VMO", so gated routes stay open
-    in local dev. No-op unless roles are actually assigned in Entra.
+    in local dev.
     """
     def _guard(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
         if allowed and not any(user.has_role(r) for r in allowed):

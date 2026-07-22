@@ -137,13 +137,12 @@ class Settings(BaseSettings):
     # ── SSO (Entra ID user sign-in — delegated) ──────────────────────────────
     # Separate identity from Graph Mail.Send: this authenticates the *user* who
     # logs in (SPA + OIDC), whereas graph_* authenticates the *app* that sends
-    # mail. Dormant until sso_enabled=true — while off, get_current_user() below
-    # returns a dev principal and no route is gated, so the app runs unchanged.
+    # mail. While sso_enabled is False, get_current_user() returns a dev principal
+    # and no route is gated, so the app runs unchanged.
     sso_enabled: bool = False
     sso_client_id: str = ""            # Application (client) ID of the SPA registration
     sso_tenant_id: str = ""            # Directory (tenant) ID (Shell: db1e96a8-...)
-    # Extra accepted audiences (comma-separated) beyond sso_client_id — e.g. the
-    # api://<client-id> App ID URI if you later switch from ID-token to access-token.
+    # Extra accepted audiences (comma-separated) beyond sso_client_id.
     sso_extra_audiences: str = ""
 
     @property

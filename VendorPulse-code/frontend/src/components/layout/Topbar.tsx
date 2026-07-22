@@ -1,7 +1,7 @@
-import { Bell, Sun, Moon, Menu } from 'lucide-react'
+import { Bell, Sun, Moon, Menu, LogOut } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useUIStore } from '@/store/useUIStore'
-import { useCurrentUser } from '@/lib/auth/currentUser'
+import { useCurrentUser, logout } from '@/lib/auth/currentUser'
 import { getCycleById } from '@/mock/cycles.mock'
 
 function PageTitle() {
@@ -127,6 +127,18 @@ export default function Topbar() {
             </p>
           </div>
         </button>
+
+        {/* Logout — only for a real SSO session (hidden in SSO-off dev). */}
+        {user.authenticated && (
+          <button
+            onClick={() => logout()}
+            title="Sign out"
+            aria-label="Sign out"
+            className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+          >
+            <LogOut size={18} />
+          </button>
+        )}
       </div>
     </header>
   )

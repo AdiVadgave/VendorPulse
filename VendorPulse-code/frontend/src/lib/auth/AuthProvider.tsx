@@ -13,7 +13,7 @@ import {
 } from '@azure/msal-browser'
 import { MsalProvider, useMsal, useIsAuthenticated } from '@azure/msal-react'
 import { setAuthTokenGetter } from '@/lib/api'
-import { setCurrentUser } from './currentUser'
+import { setCurrentUser, setLogoutHandler } from './currentUser'
 import { setGraphTokenGetter } from './graphPeople'
 import { msalConfig, loginRequest, ssoConfigured } from './msalConfig'
 
@@ -31,11 +31,13 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
       setAuthTokenGetter(null)
       setGraphTokenGetter(null)
       setCurrentUser(null)
+      setLogoutHandler(null)
       return
     }
     // Identity comes straight from the ID token claims (name + UPN/email) —
     // no Graph call needed.
     setCurrentUser({ name: account.name, email: account.username })
+    setLogoutHandler(() => instance.logoutRedirect({ account }))
 
     // Graph access token for people-search (directory lookups). Separate from the
     // ID token: it targets Graph and carries the User.ReadBasic.All scope.
@@ -67,6 +69,7 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
     return () => {
       setAuthTokenGetter(null)
       setGraphTokenGetter(null)
+      setLogoutHandler(null)
     }
   }, [instance, account])
 }

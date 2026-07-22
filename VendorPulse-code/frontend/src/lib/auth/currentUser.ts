@@ -11,8 +11,9 @@ import { useSyncExternalStore } from 'react'
 
 export interface CurrentUser {
   name: string
-  subtitle: string   // email when signed in; a role label in dev
+  subtitle: string      // email when signed in; a role label in dev
   initials: string
+  authenticated: boolean // true only for a real SSO session (drives the logout button)
 }
 
 // Dev default (SSO off) — keeps the existing demo identity in local dev.
@@ -20,10 +21,23 @@ const DEV_USER: CurrentUser = {
   name: 'Alex Thompson',
   subtitle: 'VMO Coordinator',
   initials: 'AT',
+  authenticated: false,
 }
 
 let current: CurrentUser = DEV_USER
 const listeners = new Set<() => void>()
+
+// Logout handler registered by AuthProvider (MSAL). Null when SSO is off.
+let logoutHandler: (() => void) | null = null
+
+export function setLogoutHandler(handler: (() => void) | null): void {
+  logoutHandler = handler
+}
+
+/** End the SSO session. No-op when SSO is off. */
+export function logout(): void {
+  logoutHandler?.()
+}
 
 function computeInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -39,7 +53,7 @@ export function setCurrentUser(user: { name?: string | null; email?: string | nu
   } else {
     const email = (user.email ?? '').trim()
     const name = (user.name ?? '').trim() || email || 'Signed in'
-    current = { name, subtitle: email, initials: computeInitials(name) }
+    current = { name, subtitle: email, initials: computeInitials(name), authenticated: true }
   }
   listeners.forEach((l) => l())
 }

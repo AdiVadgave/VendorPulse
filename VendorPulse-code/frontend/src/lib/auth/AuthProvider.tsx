@@ -13,6 +13,7 @@ import {
 } from '@azure/msal-browser'
 import { MsalProvider, useMsal, useIsAuthenticated } from '@azure/msal-react'
 import { setAuthTokenGetter } from '@/lib/api'
+import { setCurrentUser } from './currentUser'
 import { msalConfig, loginRequest, ssoConfigured } from './msalConfig'
 
 const msalInstance = ssoConfigured ? new PublicClientApplication(msalConfig) : null
@@ -23,8 +24,12 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
   useEffect(() => {
     if (!account) {
       setAuthTokenGetter(null)
+      setCurrentUser(null)
       return
     }
+    // Identity comes straight from the ID token claims (name + UPN/email) —
+    // no Graph call needed.
+    setCurrentUser({ name: account.name, email: account.username })
     setAuthTokenGetter(async () => {
       try {
         const result = await instance.acquireTokenSilent({ ...loginRequest, account })

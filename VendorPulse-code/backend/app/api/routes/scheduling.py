@@ -1,15 +1,12 @@
 """
 Scheduling routes for cycle and attendee management.
 
-Graph-only scheduling hard cutover is active:
-    - Real slot discovery must use /api/cycles/{cycleId}/scheduling/graph/find-times
-    - Real invite sending must use /api/cycles/{cycleId}/scheduling/graph/send-invite
-    - Legacy simulate/rank/agent/send-invites endpoints are intentionally disabled (HTTP 410)
+Slot discovery and ranking are deterministic (see slot_ranking_service). Meeting
+records are created locally; calendar/Teams event creation is best-effort via the
+delegated Graph token when one is configured, and skipped when it is not.
 """
 from __future__ import annotations
 
-import base64
-import json
 import logging
 from datetime import datetime, timezone
 
@@ -40,45 +37,11 @@ from app.models.scheduling import (
 )
 from app.utils.scorecard_structure import default_scorecard_config
 from app.services.scheduling_service import SchedulingService
-from app.services.graph_service import GraphService
-from app.config import Settings, settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["scheduling"])
-
-
-def _decode_jwt_payload_without_verification(token: str) -> dict | None:
-    """Decode JWT payload without verifying signature (diagnostics only)."""
-    if not token:
-        return None
-    parts = token.split(".")
-    if len(parts) < 2:
-        return None
-
-    payload_b64 = parts[1]
-    padding = "=" * (-len(payload_b64) % 4)
-    try:
-        payload_bytes = base64.urlsafe_b64decode(payload_b64 + padding)
-        return json.loads(payload_bytes.decode("utf-8"))
-    except Exception:
-        return None
-
-
-def _get_delegated_scopes_from_token(token: str) -> list[str]:
-    claims = _decode_jwt_payload_without_verification(token) or {}
-    scp = claims.get("scp") or ""
-    return [s for s in str(scp).split(" ") if s]
-
-
-def _get_graph_access_token() -> str:
-    """Read Graph token from .env at request time to avoid stale in-memory tokens."""
-    fresh_settings = Settings()
-    token = fresh_settings.graph_access_token or settings.graph_access_token
-    token = token.strip() if token else ""
-    if token.lower().startswith("bearer "):
-        token = token[7:].strip()
-    return token
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -408,68 +371,6 @@ def remove_attendee(
 # ──────────────────────────────────────────────────────────────────────────────
 # Scheduling workflow
 # ──────────────────────────────────────────────────────────────────────────────
-
-
-@router.post("/api/cycles/{cycleId}/scheduling/attendance-outreach")
-def send_attendance_outreach(
-    cycleId: str,
-    svc: SchedulingService = Depends(get_scheduling_service),
-    cycle_repo=Depends(get_cycle_repo),
-):
-    """
-    Trigger outreach to all attendees from the last cycle to confirm attendance.
-    In production this would send emails/forms; here it marks outreach as sent.
-    """
-    logger.info("send_attendance_outreach called — cycleId=%s", cycleId)
-    _get_cycle_or_404(cycleId, cycle_repo)
-
-    # Ensure attendees are loaded (may auto-seed from previous cycle)
-    svc.get_attendees(cycleId, seed_from_previous=True)
-
-    graph_access_token = _get_graph_access_token()
-    if not graph_access_token:
-        raise HTTPException(
-            status_code=500,
-            detail="GRAPH_ACCESS_TOKEN is not set in backend/.env (required for sending outreach emails via Microsoft Graph)",
-        )
-
-    scopes = _get_delegated_scopes_from_token(graph_access_token)
-    if scopes and "Mail.Send" not in scopes:
-        raise HTTPException(
-            status_code=403,
-            detail=(
-                "GRAPH_ACCESS_TOKEN is missing the delegated scope 'Mail.Send'. "
-                "Re-authenticate and request 'Mail.Send' (keep 'Mail.ReadWrite' as well)."
-            ),
-        )
-
-    graph_service = GraphService(graph_access_token)
-    return svc.send_attendance_outreach(cycleId, graph_service=graph_service)
-
-
-@router.get("/api/cycles/{cycleId}/scheduling/attendance-outreach/messages")
-def get_attendance_outreach_messages(
-    cycleId: str,
-    svc: SchedulingService = Depends(get_scheduling_service),
-    cycle_repo=Depends(get_cycle_repo),
-):
-    """Query messages (original + replies) for each attendee conversationId."""
-    _get_cycle_or_404(cycleId, cycle_repo)
-
-    graph_access_token = _get_graph_access_token()
-    if not graph_access_token:
-        raise HTTPException(
-            status_code=500,
-            detail="GRAPH_ACCESS_TOKEN is not set in .env",
-        )
-
-    graph_service = GraphService(graph_access_token)
-    try:
-        import asyncio
-
-        return asyncio.run(svc.get_attendance_outreach_messages(cycleId, graph_service=graph_service))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to query outreach messages: {str(exc)}")
 
 
 @router.get("/api/cycles/{cycleId}/scheduling/slots")

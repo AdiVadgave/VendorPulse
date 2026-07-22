@@ -8,12 +8,37 @@ const BASE_URLS = [
   'http://localhost:8010',
 ].filter((value): value is string => Boolean(value))
 
+// ── Auth token injection ──────────────────────────────────────────────────────
+// The auth layer (AuthProvider) registers a getter here once MSAL has a token.
+// While SSO is disabled the getter stays null and requests go out unauthenticated
+// — exactly the pre-SSO behaviour. Kept as a module-level hook so the plain
+// (non-hook) fetch helpers below can attach the bearer without prop-drilling.
+type TokenGetter = () => Promise<string | null> | string | null
+let authTokenGetter: TokenGetter | null = null
+
+export function setAuthTokenGetter(getter: TokenGetter | null): void {
+  authTokenGetter = getter
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  if (!authTokenGetter) return {}
+  try {
+    const token = await authTokenGetter()
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch {
+    // Token acquisition failed (e.g. session expired) — send unauthenticated
+    // and let the backend return 401 so the UI can prompt re-login.
+    return {}
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit & { params?: Record<string, string> } = {}
 ): Promise<T> {
   const { params, ...init } = options
   let lastError: unknown
+  const auth = await authHeaders()
 
   for (const baseUrl of BASE_URLS) {
     let url = `${baseUrl}${path}`
@@ -24,7 +49,7 @@ export async function apiFetch<T>(
 
     try {
       const res = await fetch(url, {
-        headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+        headers: { 'Content-Type': 'application/json', ...auth, ...(init.headers ?? {}) },
         ...init,
       })
 
@@ -58,10 +83,14 @@ export async function apiFetchBlob(
   options: RequestInit = {}
 ): Promise<{ blob: Blob; filename: string | null }> {
   let lastError: unknown
+  const auth = await authHeaders()
 
   for (const baseUrl of BASE_URLS) {
     try {
-      const res = await fetch(`${baseUrl}${path}`, options)
+      const res = await fetch(`${baseUrl}${path}`, {
+        ...options,
+        headers: { ...auth, ...(options.headers ?? {}) },
+      })
       if (!res.ok) {
         const body = await res.json().catch(() => null)
         const detail = body?.detail ?? res.statusText

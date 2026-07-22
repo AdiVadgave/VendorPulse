@@ -25,6 +25,7 @@ import type { StakeholderRole } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
 import type { SystemUser } from '@/lib/schedulingApi'
 import { createUser } from '@/lib/usersApi'
+import { searchPeople } from '@/lib/auth/graphPeople'
 
 interface AttendeeRefreshPanelProps {
   cycleId: string
@@ -99,21 +100,46 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
   }
 
   useEffect(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) {
+    const raw = query.trim()
+    if (!raw) {
       setResults([])
       setShowDropdown(false)
       return
     }
-    apiFetch<SystemUser[]>(`/api/users`, { params: { search: q } })
-      .then((data) => {
-        setResults(data.filter((u) => !existingAttendeeIds.includes(u.user_id)))
-        setShowDropdown(true)
-      })
-      .catch(() => {
-        setResults([])
-        setShowDropdown(false)
-      })
+    const q = raw.toLowerCase()
+    let cancelled = false
+    // Debounce so we don't hit the local directory + Graph on every keystroke.
+    const timer = setTimeout(() => {
+      Promise.all([
+        // Local directory (people already saved in VendorPulse).
+        apiFetch<SystemUser[]>(`/api/users`, { params: { search: q } }).catch(() => [] as SystemUser[]),
+        // Shell directory via Microsoft Graph — [] when SSO is off or unavailable.
+        searchPeople(raw).catch(() => [] as SystemUser[]),
+      ])
+        .then(([local, shell]) => {
+          if (cancelled) return
+          // Local results first; append Shell people not already present (by email).
+          const seen = new Set(local.map((u) => u.email.toLowerCase()))
+          const merged = [...local]
+          for (const u of shell) {
+            const e = u.email.toLowerCase()
+            if (seen.has(e)) continue
+            seen.add(e)
+            merged.push(u)
+          }
+          setResults(merged.filter((u) => !existingAttendeeIds.includes(u.user_id)))
+          setShowDropdown(true)
+        })
+        .catch(() => {
+          if (cancelled) return
+          setResults([])
+          setShowDropdown(false)
+        })
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [query, existingAttendeeIds])
 
   useEffect(() => {
@@ -238,7 +264,14 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
                   </span>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">{u.name}</p>
+                  <p className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate flex items-center gap-1.5">
+                    {u.name}
+                    {u.user_id.startsWith('graph:') && (
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 shrink-0">
+                        Shell directory
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{u.email}</p>
                   <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{u.organisation}</p>
                 </div>

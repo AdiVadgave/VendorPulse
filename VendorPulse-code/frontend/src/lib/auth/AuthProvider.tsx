@@ -14,7 +14,12 @@ import {
 import { MsalProvider, useMsal, useIsAuthenticated } from '@azure/msal-react'
 import { setAuthTokenGetter } from '@/lib/api'
 import { setCurrentUser } from './currentUser'
+import { setGraphTokenGetter } from './graphPeople'
 import { msalConfig, loginRequest, ssoConfigured } from './msalConfig'
+
+// Graph scope for the people-search (directory) feature. Admin-consented on the
+// app registration, so acquireTokenSilent succeeds without a prompt.
+const GRAPH_PEOPLE_SCOPES = ['User.ReadBasic.All']
 
 const msalInstance = ssoConfigured ? new PublicClientApplication(msalConfig) : null
 
@@ -24,12 +29,29 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
   useEffect(() => {
     if (!account) {
       setAuthTokenGetter(null)
+      setGraphTokenGetter(null)
       setCurrentUser(null)
       return
     }
     // Identity comes straight from the ID token claims (name + UPN/email) —
     // no Graph call needed.
     setCurrentUser({ name: account.name, email: account.username })
+
+    // Graph access token for people-search (directory lookups). Separate from the
+    // ID token: it targets Graph and carries the User.ReadBasic.All scope.
+    setGraphTokenGetter(async () => {
+      try {
+        const r = await instance.acquireTokenSilent({ scopes: GRAPH_PEOPLE_SCOPES, account })
+        return r.accessToken ?? null
+      } catch (err) {
+        if (err instanceof InteractionRequiredAuthError) {
+          const r = await instance.acquireTokenPopup({ scopes: GRAPH_PEOPLE_SCOPES, account })
+          return r.accessToken ?? null
+        }
+        return null
+      }
+    })
+
     setAuthTokenGetter(async () => {
       try {
         const result = await instance.acquireTokenSilent({ ...loginRequest, account })
@@ -42,7 +64,10 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
         throw err
       }
     })
-    return () => setAuthTokenGetter(null)
+    return () => {
+      setAuthTokenGetter(null)
+      setGraphTokenGetter(null)
+    }
   }, [instance, account])
 }
 

@@ -111,6 +111,31 @@ body,
 .theme-shell .focus\:ring-indigo-500:focus,
 .theme-shell .ring-indigo-500 { --tw-ring-color: var(--shell-red); }
 
+/* Accent: violet → Shell red (some components use violet instead of indigo —
+   e.g. the Analytics section toggle and the alignment scheduler). Mirror the
+   indigo remap so no purple survives in the Shell theme. */
+.theme-shell .bg-violet-600,
+.theme-shell .bg-violet-500 { background-color: var(--shell-red); }
+.theme-shell .bg-violet-700,
+.theme-shell .hover\:bg-violet-700:hover { background-color: var(--shell-red-dark); }
+.theme-shell .text-violet-700,
+.theme-shell .hover\:text-violet-700:hover { color: #a5161a; }
+.theme-shell .text-violet-600,
+.theme-shell .text-violet-500,
+.theme-shell .text-violet-400,
+.theme-shell .hover\:text-violet-600:hover,
+.theme-shell .hover\:text-violet-400:hover { color: var(--shell-red-text); }
+.theme-shell .border-violet-600,
+.theme-shell .border-violet-400,
+.theme-shell .hover\:border-violet-400:hover { border-color: var(--shell-red); }
+.theme-shell .border-violet-200,
+.theme-shell .border-violet-300 { border-color: #f0d9a0; }
+.theme-shell .bg-violet-50,
+.theme-shell .hover\:bg-violet-50:hover { background-color: #fdf1cc; }
+.theme-shell .bg-violet-100 { background-color: #fbe6a6; }
+.theme-shell .focus\:ring-violet-500:focus,
+.theme-shell .ring-violet-500 { --tw-ring-color: var(--shell-red); }
+
 /* Warm scrollbar to match the parchment surfaces */
 .theme-shell ::-webkit-scrollbar-thumb { background: #d8c8a4; }
 

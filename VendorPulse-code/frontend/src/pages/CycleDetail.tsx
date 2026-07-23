@@ -59,6 +59,9 @@ import AttendanceConfirmationPanel from '@/components/modules/scheduling/Attenda
 import AttendeeRefreshPanel from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import CycleAttendeesPanel from '@/components/modules/scheduling/CycleAttendeesPanel'
 import ManualMeetingPanel from '@/components/modules/scheduling/ManualMeetingPanel'
+import FindSlotsControl from '@/components/modules/scheduling/FindSlotsControl'
+import SlotRankingPanel from '@/components/modules/scheduling/SlotRankingPanel'
+import InviteApprovalPanel from '@/components/modules/scheduling/InviteApprovalPanel'
 import ConfirmationTracker from '@/components/modules/scheduling/ConfirmationTracker'
 
 import ScorecardDispatchPanel from '@/components/modules/scorecard/ScorecardDispatchPanel'
@@ -121,7 +124,7 @@ const TAB_ICONS: Record<TabKey, React.ReactNode> = {
 function getInitialSchedulingPhase(state: string): SchedulingPhase {
   const idx = WORKFLOW_STATES.indexOf(state as never)
   if (idx >= WORKFLOW_STATES.indexOf('MEETING_SCHEDULED')) return 'confirmation_tracking'
-  if (idx >= WORKFLOW_STATES.indexOf('AVAILABILITY_COLLECTED')) return 'schedule_meeting'
+  if (idx >= WORKFLOW_STATES.indexOf('AVAILABILITY_COLLECTED')) return 'slot_ranking'
   if (idx >= WORKFLOW_STATES.indexOf('ATTENDEE_REFRESH_SENT')) return 'attendee_refresh'
   return 'attendance_confirmation'
 }
@@ -129,11 +132,12 @@ function getInitialSchedulingPhase(state: string): SchedulingPhase {
 const SCHEDULING_STEPS: { key: SchedulingPhase; label: string }[] = [
   { key: 'attendance_confirmation', label: 'Attendance' },
   { key: 'attendee_refresh', label: 'Attendees' },
-  { key: 'schedule_meeting', label: 'Schedule Meeting' },
+  { key: 'slot_ranking', label: 'Slot Ranking' },
+  { key: 'invite_approval', label: 'Invite Approval' },
   { key: 'confirmation_tracking', label: 'Confirmation' },
 ]
 const PHASE_ORDER: SchedulingPhase[] = [
-  'attendance_confirmation', 'attendee_refresh', 'schedule_meeting', 'confirmation_tracking',
+  'attendance_confirmation', 'attendee_refresh', 'slot_ranking', 'invite_approval', 'confirmation_tracking',
 ]
 
 export default function CycleDetail() {
@@ -658,6 +662,7 @@ export default function CycleDetail() {
             cycle={cycle}
             schedulingPhase={schedulingPhase}
             attendees={schedulingAttendees}
+            slots={activeSlots}
             selectedSlot={selectedSlot}
             selectedSlotTimeZone={selectedSlotTimeZone}
             onPhaseChange={advanceScheduling}
@@ -932,7 +937,7 @@ function OverviewTab({
 
 /* ── Scheduling Tab ───────────────────────────────────────── */
 function SchedulingTab({
-  cycle, schedulingPhase, attendees, selectedSlot, onPhaseChange,
+  cycle, schedulingPhase, attendees, slots, selectedSlot, onPhaseChange,
   onAttendeesUpdated, onSlotsReceived, onSlotSelected,
   selectedSlotTimeZone, onSlotTimeZoneSelected,
   isMockCycle, onScorecardProceed, onTeamsMeetingUrlCaptured, onMeetingScheduled, meetingUrl,
@@ -940,6 +945,7 @@ function SchedulingTab({
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   schedulingPhase: SchedulingPhase
   attendees: CycleAttendee[]
+  slots: SlotProposal[]
   selectedSlot: SlotProposal | null
   selectedSlotTimeZone: 'IST' | 'UTC' | 'GMT'
   onPhaseChange: (p: SchedulingPhase) => void
@@ -1013,14 +1019,60 @@ function SchedulingTab({
         />
       )}
       {schedulingPhase === 'attendee_refresh' && (
-        <AttendeeRefreshPanel
-          cycleId={cycle.cycle_id}
-          attendees={attendees}
-          onAttendeesChanged={onAttendeesUpdated}
-          onDispatchComplete={() => {}}
-          onBackToAttendance={() => onPhaseChange('attendance_confirmation')}
-          onProceed={() => onPhaseChange('schedule_meeting')}
+        <div className="space-y-4">
+          <AttendeeRefreshPanel
+            cycleId={cycle.cycle_id}
+            attendees={attendees}
+            onAttendeesChanged={onAttendeesUpdated}
+            onDispatchComplete={() => {}}
+            onBackToAttendance={() => onPhaseChange('attendance_confirmation')}
+            onProceed={() => onPhaseChange('schedule_meeting')}
+          />
+          {/* Delegated Graph: find free slots across the attendees' calendars. */}
+          <FindSlotsControl
+            cycleId={cycle.cycle_id}
+            attendees={attendees}
+            onSlotsFound={(found) => {
+              onSlotsReceived(found)
+              onPhaseChange('slot_ranking')
+            }}
+          />
+        </div>
+      )}
+      {schedulingPhase === 'slot_ranking' && (
+        <SlotRankingPanel
+          slots={slots}
+          onSlotApproved={(slotId, tz) => {
+            onSlotSelected(slotId)
+            onSlotTimeZoneSelected(tz)
+            onPhaseChange('invite_approval')
+          }}
+          onBackToAttendees={() => onPhaseChange('attendee_refresh')}
         />
+      )}
+      {schedulingPhase === 'invite_approval' && (
+        selectedSlot ? (
+          <InviteApprovalPanel
+            cycleId={cycle.cycle_id}
+            slot={selectedSlot}
+            attendees={attendees}
+            vendorName={cycle.vendor_name}
+            quarter={cycle.quarter}
+            year={cycle.year}
+            timeZoneOverride={selectedSlotTimeZone}
+            onBack={() => onPhaseChange('slot_ranking')}
+            onInviteSent={(teamsUrl) => {
+              onTeamsMeetingUrlCaptured(teamsUrl)
+              onMeetingScheduled()
+              onPhaseChange('confirmation_tracking')
+            }}
+          />
+        ) : (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 text-sm text-slate-500 dark:text-slate-400">
+            No slot selected.{' '}
+            <button onClick={() => onPhaseChange('slot_ranking')} className="text-indigo-600 dark:text-indigo-400 underline">Back to slots</button>.
+          </div>
+        )
       )}
       {schedulingPhase === 'schedule_meeting' && (
         <ManualMeetingPanel

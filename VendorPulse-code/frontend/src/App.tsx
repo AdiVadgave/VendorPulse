@@ -6,8 +6,6 @@ import Analytics from './pages/Analytics'
 import AdminUsers from './pages/AdminUsers'
 import NotFound from './pages/NotFound'
 import ScorecardForm from './pages/ScorecardForm'
-import CalendarTest from './pages/CalendarTest'
-// ...
 
 export default function App() {
   return (
@@ -20,7 +18,6 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="/cycles/:cycleId" element={<CycleDetail />} />
         <Route path="/analytics" element={<Analytics />} />
-        <Route path="/calendar-test" element={<CalendarTest />} />
         <Route path="/directory" element={<AdminUsers />} />
         <Route path="*" element={<NotFound />} />
       </Route>

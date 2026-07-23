@@ -15,11 +15,14 @@ import { MsalProvider, useMsal, useIsAuthenticated } from '@azure/msal-react'
 import { setAuthTokenGetter } from '@/lib/api'
 import { setCurrentUser, setLogoutHandler } from './currentUser'
 import { setGraphTokenGetter } from './graphPeople'
+import { setCalendarTokenGetter } from '@/lib/graphScheduling'
 import { msalConfig, loginRequest, ssoConfigured } from './msalConfig'
 
 // Graph scope for the people-search (directory) feature. Admin-consented on the
 // app registration, so acquireTokenSilent succeeds without a prompt.
 const GRAPH_PEOPLE_SCOPES = ['User.ReadBasic.All']
+// Graph scope for delegated meeting scheduling (find times + create Teams event).
+const GRAPH_CALENDAR_SCOPES = ['Calendars.ReadWrite']
 
 const msalInstance = ssoConfigured ? new PublicClientApplication(msalConfig) : null
 
@@ -30,6 +33,7 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
     if (!account) {
       setAuthTokenGetter(null)
       setGraphTokenGetter(null)
+      setCalendarTokenGetter(null)
       setCurrentUser(null)
       setLogoutHandler(null)
       return
@@ -54,6 +58,20 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
       }
     })
 
+    // Calendar (scheduling) token — delegated Calendars.ReadWrite, as the coordinator.
+    setCalendarTokenGetter(async () => {
+      try {
+        const r = await instance.acquireTokenSilent({ scopes: GRAPH_CALENDAR_SCOPES, account })
+        return r.accessToken ?? null
+      } catch (err) {
+        if (err instanceof InteractionRequiredAuthError) {
+          const r = await instance.acquireTokenPopup({ scopes: GRAPH_CALENDAR_SCOPES, account })
+          return r.accessToken ?? null
+        }
+        return null
+      }
+    })
+
     setAuthTokenGetter(async () => {
       try {
         const result = await instance.acquireTokenSilent({ ...loginRequest, account })
@@ -69,6 +87,7 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
     return () => {
       setAuthTokenGetter(null)
       setGraphTokenGetter(null)
+      setCalendarTokenGetter(null)
       setLogoutHandler(null)
     }
   }, [instance, account])

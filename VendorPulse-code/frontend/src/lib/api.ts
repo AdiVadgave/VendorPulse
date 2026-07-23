@@ -1,5 +1,5 @@
 /**
- * Base API client for VendorPulse backend.
+ * Base API client for Mobility Vendor Pulse backend.
  * Prefers VITE_API_URL, then falls back to the local ports used in dev.
  */
 const BASE_URLS = [

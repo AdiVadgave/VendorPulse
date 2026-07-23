@@ -6,7 +6,6 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
-  Zap,
 } from 'lucide-react'
 import { useUIStore } from '@/store/useUIStore'
 import { useCycleStore } from '@/store/useCycleStore'
@@ -89,13 +88,13 @@ export default function Sidebar() {
             sidebarCollapsed && 'justify-center w-full'
           )}
         >
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-            <Zap size={16} className="text-white" />
+          <div className="w-8 h-8 flex items-center justify-center shrink-0">
+            <img src="/shell-logo.svg" alt="Shell" className="w-7 h-7" />
           </div>
           {!sidebarCollapsed && (
             <div className="min-w-0">
               <p className="font-semibold text-slate-900 dark:text-white text-sm leading-tight">
-                Zen-VendorPulse
+                Mobility Vendor Pulse
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                 Governance Platform

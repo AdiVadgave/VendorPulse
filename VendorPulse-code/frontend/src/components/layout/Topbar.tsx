@@ -1,4 +1,4 @@
-import { Bell, Sun, Moon, Menu, LogOut } from 'lucide-react'
+import { Bell, Moon, Menu, LogOut } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useUIStore } from '@/store/useUIStore'
 import { useCurrentUser, logout } from '@/lib/auth/currentUser'
@@ -15,7 +15,7 @@ function PageTitle() {
           Dashboard
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          VendorPulse — Governance Platform
+          Mobility Vendor Pulse — Governance Platform
         </p>
       </div>
     )
@@ -63,10 +63,16 @@ function PageTitle() {
 
   return (
     <h1 className="text-base font-semibold text-slate-900 dark:text-white">
-      VendorPulse
+      Mobility Vendor Pulse
     </h1>
   )
 }
+
+// Cycle order + presentation for the single theme toggle button (Shell ⇄ Dark).
+const THEME_META = {
+  dark: { label: 'Dark', next: 'Shell' },
+  shell: { label: 'Shell', next: 'Dark' },
+} as const
 
 export default function Topbar() {
   const { theme, toggleTheme, setMobileNavOpen } = useUIStore()
@@ -89,13 +95,17 @@ export default function Topbar() {
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        {/* Theme toggle */}
+        {/* Theme toggle — cycles Light → Dark → Shell */}
         <button
           onClick={toggleTheme}
           className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={`Theme: ${THEME_META[theme].label} — click for ${THEME_META[theme].next}`}
+          aria-label={`Theme: ${THEME_META[theme].label}. Click to switch to ${THEME_META[theme].next}.`}
         >
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          {theme === 'dark' && <Moon size={18} />}
+          {theme === 'shell' && (
+            <img src="/shell-logo.svg" alt="" aria-hidden className="w-[18px] h-[18px]" />
+          )}
         </button>
 
         {/* Notifications */}

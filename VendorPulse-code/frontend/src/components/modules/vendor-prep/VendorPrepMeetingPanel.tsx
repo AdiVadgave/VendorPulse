@@ -271,7 +271,7 @@ export default function VendorPrepMeetingPanel({
                 findAttendees={selectedInternal}
                 inviteAttendees={selectedAttendees}
                 defaultDuration={30}
-                subject="VendorPulse — Vendor Prep Meeting"
+                subject="Mobility Vendor Pulse — Vendor Prep Meeting"
                 bodyHtml={VENDOR_PREP_BODY_HTML}
                 onCancel={rescheduling ? () => setRescheduling(false) : undefined}
                 onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl }) => {

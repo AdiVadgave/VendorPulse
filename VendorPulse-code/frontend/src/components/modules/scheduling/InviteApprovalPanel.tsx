@@ -108,7 +108,7 @@ export default function InviteApprovalPanel({
         `<li>Key Issues, Concerns and Pushback Responses</li>` +
         `<li>Commitments and Action Items Review</li>` +
         `<li>Forward Planning &amp; AOB</li></ol>` +
-        `<p>Please accept or decline via Microsoft Teams.</p><p>— VendorPulse</p>`
+        `<p>Please accept or decline via Microsoft Teams.</p><p>— Mobility Vendor Pulse</p>`
 
       // 1. Create the Teams meeting + send invites AS the signed-in coordinator
       //    (delegated Graph — no backend token). 2. Persist to the backend.
@@ -296,7 +296,7 @@ export default function InviteApprovalPanel({
                 Please accept or decline this invitation via Microsoft Teams at your earliest convenience.
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                — VendorPulse Scheduling Agent
+                — Mobility Vendor Pulse Scheduling Agent
               </p>
             </div>
           </div>

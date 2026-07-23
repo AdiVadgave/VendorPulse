@@ -27,6 +27,7 @@ import type { CycleType, GovernanceCycle } from '@/types/cycle.types'
 import { CYCLE_TYPE_LABELS } from '@/types/cycle.types'
 import { fetchVendors } from '@/lib/schedulingApi'
 import type { VendorRecord } from '@/lib/schedulingApi'
+import { useCurrentUser, friendlyFirstName } from '@/lib/auth/currentUser'
 
 const STATE_BADGE: Record<string, { classes: string; progress: number }> = {
   CYCLE_CREATED:         { classes: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400', progress: 5 },
@@ -367,6 +368,7 @@ function NewCycleModal({
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const user = useCurrentUser()
   const today = new Date()
   const { cycles, addCycle, setCycles, removeCycle, getWorkflowState, lastTabs } = useCycleStore()
   const [showNewCycleModal, setShowNewCycleModal] = useState(false)
@@ -533,7 +535,7 @@ export default function Dashboard() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-            Welcome back, Alex
+            {friendlyFirstName(user.name) ? `Welcome back, ${friendlyFirstName(user.name)}` : 'Welcome back'}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             {format(today, 'EEEE, d MMMM yyyy')} · Zensar VMO — Governance Platform

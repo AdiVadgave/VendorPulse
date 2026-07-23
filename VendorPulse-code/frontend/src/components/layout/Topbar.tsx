@@ -2,11 +2,14 @@ import { Bell, Sun, Moon, Menu, LogOut } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useUIStore } from '@/store/useUIStore'
 import { useCurrentUser, logout } from '@/lib/auth/currentUser'
-import { getCycleById } from '@/mock/cycles.mock'
+import { useCycleStore } from '@/store/useCycleStore'
 
 function PageTitle() {
   const location = useLocation()
   const { cycleId } = useParams<{ cycleId: string }>()
+  // Resolve the cycle from the live store (backend-populated), not mock fixtures,
+  // so real cycles show their vendor/quarter in the breadcrumb.
+  const cycle = useCycleStore((s) => (cycleId ? s.getCycleById(cycleId) : undefined))
 
   if (location.pathname === '/') {
     return (
@@ -22,7 +25,6 @@ function PageTitle() {
   }
 
   if (cycleId) {
-    const cycle = getCycleById(cycleId)
     return (
       <div>
         <h1 className="text-base font-semibold text-slate-900 dark:text-white leading-tight">

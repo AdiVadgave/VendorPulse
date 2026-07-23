@@ -39,6 +39,18 @@ export function logout(): void {
   logoutHandler?.()
 }
 
+/**
+ * First name for a friendly greeting. Handles both the dev "First Last" form
+ * and the SSO ID-token claim "Last, First M ORG" (e.g. "Warrier, Jayadev D
+ * SBOBNG-ITV/ORB" → "Jayadev"). Falls back to the whole string if it can't tell.
+ */
+export function friendlyFirstName(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed) return ''
+  const afterComma = trimmed.includes(',') ? trimmed.split(',')[1] ?? '' : trimmed
+  return afterComma.trim().split(/\s+/)[0] || trimmed
+}
+
 function computeInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '?'

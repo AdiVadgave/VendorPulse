@@ -7,6 +7,7 @@ import type { GovernanceCycle } from '@/types/cycle.types'
 import { MOCK_CYCLES } from '@/mock/cycles.mock'
 import { getMockCycleById } from '@/mock/cycles.mock'
 import { setBackendWorkflowState } from '@/lib/schedulingApi'
+import { ssoConfigured } from '@/lib/auth/msalConfig'
 
 function workflowIndex(state: WorkflowState | undefined): number {
   if (!state) return -1
@@ -51,8 +52,14 @@ interface CycleStore {
   upsertCycle: (cycle: GovernanceCycle) => void
 }
 
+// In a real Shell deployment (SSO configured) cycles come from the backend, so
+// never seed demo fixtures — they would render as real data before the first
+// fetch and on any route that reads the store without fetching. Keep the demo
+// seed only for local dev / demo builds (SSO off).
+const SEED_CYCLES: GovernanceCycle[] = ssoConfigured ? [] : [...MOCK_CYCLES]
+
 const initialWorkflowStates: Record<string, WorkflowState> = Object.fromEntries(
-  MOCK_CYCLES.map((c) => [c.cycle_id, c.workflow_state])
+  SEED_CYCLES.map((c) => [c.cycle_id, c.workflow_state])
 )
 
 export const useCycleStore = create<CycleStore>()(
@@ -61,7 +68,7 @@ export const useCycleStore = create<CycleStore>()(
       activeCycleId: null,
       activeVendorId: null,
       activeTab: 'overview',
-      cycles: [...MOCK_CYCLES],
+      cycles: [...SEED_CYCLES],
       workflowStates: initialWorkflowStates,
       lastTabs: {},
 

@@ -24,7 +24,6 @@ import { getMockCycleById as getMockCycleById } from '@/mock/cycles.mock'
 import {
   MOCK_ATTENDEES_INITIAL,
   MOCK_SLOT_PROPOSALS,
-  MOCK_ATTENDEES_RSVP,
 } from '@/mock/scheduling.mock'
 import { completeAttendanceConfirmation, fetchAttendeesSeeded, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
 import { getCompiledScorecard, getWeightedScorecard, getScorecardConfig, getScorecardBriefing } from '@/lib/scorecardApi'
@@ -32,8 +31,6 @@ import type { ScorecardBriefing } from '@/lib/scorecardApi'
 import { compiledScorecardToLegacy } from '@/mock/scorecard.mock'
 import type { CompiledCategoryScore, CompiledScorecard, WeightedScorecard, TeamSubmissionsData, ScorecardConfig } from '@/types/scorecard.types'
 import {
-  MOCK_SCORE_DELTAS,
-  MOCK_ALIGNMENT_FLAGS,
   MOCK_FACE_OFF,
   buildCategoryComparisons,
   generateAlignmentInsights,
@@ -1124,7 +1121,7 @@ function SchedulingTab({
         selectedSlot ? (
           <ConfirmationTracker
             cycleId={cycle.cycle_id}
-            attendees={attendees.length > 0 ? attendees : MOCK_ATTENDEES_RSVP}
+            attendees={attendees}
             slot={selectedSlot}
             timeZoneOverride={selectedSlotTimeZone}
             meetingUrl={meetingUrl}
@@ -1383,7 +1380,7 @@ function AlignmentTab({
 
   const flags = hasWeighted
     ? buildFlagsFromWeighted(weighted!)
-    : legacyFlags.length > 0 ? legacyFlags : MOCK_ALIGNMENT_FLAGS
+    : legacyFlags
 
   // Prefer the backend insights (runtime from consolidated data, LLM-narrated when
   // enabled); fall back to the deterministic client builder, then legacy mock.
@@ -1391,7 +1388,7 @@ function AlignmentTab({
     ? serverInsights
     : hasWeighted
       ? buildInsightsFromWeighted(weighted!)
-      : generateAlignmentInsights(comparisons, MOCK_SCORE_DELTAS)
+      : generateAlignmentInsights(comparisons, [])
 
   const STATIC_BULLETS = [
     'Review the consolidated internal scorecard above and agree the position on any low-scoring or divergent measures before the vendor meeting.',
@@ -1405,7 +1402,7 @@ function AlignmentTab({
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <ChangeHighlightsPanel
-        deltas={MOCK_SCORE_DELTAS}
+        deltas={[]}
         whatChangedBullets={whatChangedBullets}
         insights={insights.length > 0 ? insights : undefined}
       />

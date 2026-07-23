@@ -108,7 +108,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
     // Debounce so we don't hit the local directory + Graph on every keystroke.
     const timer = setTimeout(() => {
       Promise.all([
-        // Local directory (people already saved in VendorPulse).
+        // Local directory (people already saved in Mobility Vendor Pulse).
         apiFetch<SystemUser[]>(`/api/users`, { params: { search: q } }).catch(() => [] as SystemUser[]),
         // Shell directory via Microsoft Graph — [] when SSO is off or unavailable.
         searchPeople(raw).catch(() => [] as SystemUser[]),

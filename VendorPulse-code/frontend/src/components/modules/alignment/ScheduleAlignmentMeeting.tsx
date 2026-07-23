@@ -250,7 +250,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
             findAttendees={internalAttendees}
             inviteAttendees={internalAttendees}
             defaultDuration={30}
-            subject="VendorPulse — Internal Alignment Meeting"
+            subject="Mobility Vendor Pulse — Internal Alignment Meeting"
             bodyHtml={ALIGNMENT_BODY_HTML}
             onCancel={rescheduling ? () => setRescheduling(false) : undefined}
             onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl, attendeeCount }) => {

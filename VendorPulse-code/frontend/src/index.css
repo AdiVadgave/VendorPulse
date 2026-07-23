@@ -53,3 +53,69 @@ body,
 .fade-in {
   animation: fade-in 0.25s ease-out;
 }
+
+/* ============================================================================
+   Shell theme  (third mode, alongside light + dark)
+   ----------------------------------------------------------------------------
+   Applied by adding `.theme-shell` on the app root (see AppLayout). It is a
+   LIGHT-family theme (no `.dark`), re-tinted to Shell's brand: warm parchment
+   surfaces + Shell red (#DD1D21) accent + restrained Shell yellow highlights —
+   deliberately easy on the eyes (no glaring yellow backgrounds).
+
+   These rules are intentionally unlayered so they win over Tailwind's layered
+   utilities without relying on selector specificity. We remap the neutral
+   (slate) surfaces and the indigo accent the app already uses everywhere, so
+   no per-component `shell:` classes are needed.
+   ============================================================================ */
+.theme-shell {
+  --shell-red: #dd1d21;
+  --shell-red-dark: #b3171a;
+  --shell-red-text: #c11b1e;
+  --shell-yellow: #fbce07;
+  color-scheme: light;
+}
+
+/* Neutral surfaces → warm parchment (page bg softened — less ochre) */
+.theme-shell .bg-slate-50 { background-color: #f8f4ea; }
+.theme-shell .bg-white { background-color: #fffdf7; }
+.theme-shell .bg-slate-100 { background-color: #ece1cb; }
+.theme-shell .bg-slate-200 { background-color: #e1d4b8; }
+
+/* Borders → warm neutrals */
+.theme-shell .border-slate-200 { border-color: #e7dcc4; }
+.theme-shell .border-slate-100 { border-color: #eee4d0; }
+.theme-shell .border-slate-300 { border-color: #dfd3b9; }
+
+/* Hover surfaces */
+.theme-shell .hover\:bg-slate-100:hover { background-color: #ece1cb; }
+.theme-shell .hover\:bg-slate-50:hover { background-color: #f0e8d5; }
+
+/* Accent: indigo → Shell red (fills, text, borders) */
+.theme-shell .bg-indigo-600,
+.theme-shell .bg-indigo-500 { background-color: var(--shell-red); }
+.theme-shell .bg-indigo-700,
+.theme-shell .hover\:bg-indigo-700:hover { background-color: var(--shell-red-dark); }
+.theme-shell .text-indigo-700 { color: #a5161a; }
+.theme-shell .text-indigo-600,
+.theme-shell .text-indigo-500,
+.theme-shell .text-indigo-400 { color: var(--shell-red-text); }
+.theme-shell .border-indigo-600,
+.theme-shell .border-indigo-400,
+.theme-shell .hover\:border-indigo-400:hover { border-color: var(--shell-red); }
+
+/* Soft accent chips / active-nav tints → Shell yellow (muted) */
+.theme-shell .bg-indigo-50 { background-color: #fdf1cc; }
+.theme-shell .bg-indigo-100 { background-color: #fbe6a6; }
+
+/* Focus rings → Shell red */
+.theme-shell .focus\:ring-indigo-500:focus,
+.theme-shell .ring-indigo-500 { --tw-ring-color: var(--shell-red); }
+
+/* Warm scrollbar to match the parchment surfaces */
+.theme-shell ::-webkit-scrollbar-thumb { background: #d8c8a4; }
+
+/* Subtle Shell-yellow accent under the brand row (sidebar + topbar header) */
+.theme-shell aside > .border-b,
+.theme-shell header.border-b {
+  box-shadow: inset 0 -2px 0 0 var(--shell-yellow);
+}

@@ -283,7 +283,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
           summary={`Email the in-app scorecard form link to ${recipients.length} key internal stakeholder(s) for ${vendorName} (${quarter} ${year}).`}
           recipients={recipients.map((a) => `${a.name} (${a.email})`)}
           warnings={[
-            'Emails are sent from the VendorPulse service mailbox (Outlook)',
+            'Emails are sent from the Mobility Vendor Pulse service mailbox (Outlook)',
             'Each email links to the in-app scorecard form',
             'Each link is tied to the reviewer; responses are stored directly',
           ]}

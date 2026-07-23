@@ -8,7 +8,7 @@ export default function AppLayout() {
   const { theme, mobileNavOpen, setMobileNavOpen } = useUIStore()
 
   return (
-    <div className={cn('h-full', theme === 'dark' && 'dark')}>
+    <div className={cn('h-full', theme === 'dark' && 'dark', theme === 'shell' && 'theme-shell')}>
       <div className="flex h-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
         {/* Backdrop behind the mobile nav drawer (small screens only). */}
         {mobileNavOpen && (

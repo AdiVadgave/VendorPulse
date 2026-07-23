@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ClipboardList, CheckCircle2, AlertCircle, AlertTriangle, Loader2, Send, User, Zap } from 'lucide-react'
+import { ClipboardList, CheckCircle2, AlertCircle, AlertTriangle, Loader2, Send, User } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { ScorecardFormMeta, WeightedScorecard } from '@/types/scorecard.types'
 import { WEIGHTED_SCORECARD_STRUCTURE } from '@/types/scorecard.types'
@@ -12,11 +12,11 @@ import { RAG_OPTIONS, RAG_META } from '@/components/modules/scorecard/rag'
 function BrandHeader() {
   return (
     <div className="flex items-center gap-3">
-      <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-        <Zap size={18} className="text-white" />
+      <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center shrink-0">
+        <img src="/shell-logo.svg" alt="Shell" className="w-7 h-7" />
       </div>
       <div className="min-w-0">
-        <p className="font-semibold text-white text-sm leading-tight">Zen-VendorPulse</p>
+        <p className="font-semibold text-white text-sm leading-tight">Mobility Vendor Pulse</p>
         <p className="text-xs text-slate-400">Governance Platform</p>
       </div>
     </div>

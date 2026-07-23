@@ -1,5 +1,5 @@
 /**
- * MSAL (Entra ID) configuration for VendorPulse SSO.
+ * MSAL (Entra ID) configuration for Mobility Vendor Pulse SSO.
  *
  * Driven entirely by Vite env vars:
  *   VITE_SSO_ENABLED=true

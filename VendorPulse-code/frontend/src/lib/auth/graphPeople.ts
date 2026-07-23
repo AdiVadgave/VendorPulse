@@ -56,14 +56,18 @@ export async function searchPeople(query: string): Promise<PeopleSearchResult[]>
   if (!token) return []
 
   // $search requires the ConsistencyLevel: eventual header. Strip embedded quotes
-  // so they can't break the search expression.
+  // so they can't break the search expression. Search across several fields so we
+  // match people regardless of how Shell stores them — display "Surname, Given",
+  // guests whose real address is in otherMails, contractors keyed by UPN, etc.
   const safe = q.replace(/"/g, '')
-  const searchExpr = `"displayName:${safe}" OR "mail:${safe}"`
+  const searchExpr =
+    `"displayName:${safe}" OR "givenName:${safe}" OR "surname:${safe}" ` +
+    `OR "mail:${safe}" OR "userPrincipalName:${safe}" OR "otherMails:${safe}"`
   const url =
     'https://graph.microsoft.com/v1.0/users' +
     `?$search=${encodeURIComponent(searchExpr)}` +
     '&$select=id,displayName,mail,userPrincipalName,department,jobTitle' +
-    '&$top=15'
+    '&$top=25'
 
   try {
     const res = await fetch(url, {

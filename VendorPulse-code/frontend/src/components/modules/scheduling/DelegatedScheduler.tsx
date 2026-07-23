@@ -51,9 +51,8 @@ export default function DelegatedScheduler({
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleApprove(slotId: string, tz: TZ) {
-    const slot = slots.find((s) => s.slot_id === slotId)
-    if (!slot) return
+  // Shared path — creates the Teams meeting via delegated Graph and persists.
+  async function scheduleSlot(slot: SlotProposal, tz: TZ) {
     setCreating(true)
     setError(null)
     try {
@@ -69,6 +68,36 @@ export default function DelegatedScheduler({
       setError(e instanceof Error ? e.message : 'Failed to create the meeting.')
       setCreating(false)
     }
+  }
+
+  function handleApprove(slotId: string, tz: TZ) {
+    const slot = slots.find((s) => s.slot_id === slotId)
+    if (slot) scheduleSlot(slot, tz)
+  }
+
+  // Manual override: build a synthetic slot at the chosen time and schedule it
+  // through the exact same delegated create-event path as a suggested slot.
+  function handleManual(startISO: string, tz: TZ, dur: number) {
+    scheduleSlot(
+      {
+        slot_id: 'manual-slot',
+        cycle_id: cycleId,
+        proposed_time: startISO,
+        proposed_time_zone: tz,
+        duration_minutes: dur,
+        organiser_available: true,
+        exec_sponsor_available: true,
+        rank_score: 100,
+        is_approved: false,
+        attendance_count: inviteAttendees.length,
+        total_attendees: inviteAttendees.length,
+        conflict_count: 0,
+        attending: inviteAttendees.map((a) => a.name),
+        tentative: [],
+        conflicts: [],
+      },
+      tz,
+    )
   }
 
   if (creating) {
@@ -110,6 +139,7 @@ export default function DelegatedScheduler({
           slots={slots}
           onSlotApproved={handleApprove}
           onBackToAttendees={() => setPhase('find')}
+          onScheduleManual={handleManual}
         />
       )}
 

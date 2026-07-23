@@ -251,18 +251,31 @@ function CompareVendorsChart({ vendors, themes }: { vendors: AnalyticsVendor[]; 
 
 function TrendChart({ vendor }: { vendor: AnalyticsVendor }) {
   const pal = usePalette()
+  const cat = pal.dark ? CAT_DARK : CAT_LIGHT
   const themeOptions = useMemo(() => {
     const set = new Set<string>()
     vendor.cycles.forEach((c) => Object.keys(c.themes).forEach((t) => set.add(t)))
     return Array.from(set)
   }, [vendor])
-  const [series, setSeries] = useState<string>('__overall__')
+  // '__all__' = every category as its own line; '__average__' = the single overall
+  // (averaged) line; otherwise a single line for the chosen category.
+  const [series, setSeries] = useState<string>('__all__')
 
-  const data = vendor.cycles.map((c) => ({
-    label: c.label,
-    value: series === '__overall__' ? c.overall_score : (c.themes[series] ?? null),
-  }))
-  const seriesLabel = series === '__overall__' ? 'Overall score' : series
+  // One row per cycle carrying every category score + the overall average.
+  const data = vendor.cycles.map((c) => {
+    const row: Record<string, string | number | null> = { label: c.label, Average: c.overall_score }
+    themeOptions.forEach((t) => { row[t] = c.themes[t] ?? null })
+    return row
+  })
+
+  const showAll = series === '__all__'
+  const lines = showAll
+    ? themeOptions.map((t, i) => ({ key: t, name: t, color: cat[i % cat.length] }))
+    : series === '__average__'
+      ? [{ key: 'Average', name: 'Average', color: pal.series }]
+      : [{ key: series, name: series, color: pal.series }]
+
+  const seriesLabel = showAll ? 'All categories' : series === '__average__' ? 'Average (overall)' : series
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
@@ -276,20 +289,36 @@ function TrendChart({ vendor }: { vendor: AnalyticsVendor }) {
           onChange={(e) => setSeries(e.target.value)}
           className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
-          <option value="__overall__">Overall</option>
+          <option value="__all__">Overall (all categories)</option>
+          <option value="__average__">Average</option>
           {themeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>
-      <div className="h-56">
+      <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 18, right: 16, left: -16, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: pal.axis }} tickLine={false} axisLine={false} />
             <YAxis domain={[0, 5]} ticks={[0, 1, 2, 3, 4, 5]} tick={{ fontSize: 11, fill: pal.axis }} tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={chartTooltipStyle(pal)} formatter={(v: unknown) => [num(v), seriesLabel]} />
-            <Line type="monotone" dataKey="value" stroke={pal.series} strokeWidth={2} dot={{ r: 4, fill: pal.series }} activeDot={{ r: 6 }} connectNulls>
-              <LabelList dataKey="value" position="top" formatter={(v: unknown) => num(v, 1)} style={{ fill: pal.textDim, fontSize: 11, fontWeight: 600 }} />
-            </Line>
+            <Tooltip contentStyle={chartTooltipStyle(pal)} formatter={(v: unknown, n: unknown) => [num(v), String(n)]} />
+            {showAll && <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />}
+            {lines.map((ln) => (
+              <Line
+                key={ln.key}
+                type="monotone"
+                dataKey={ln.key}
+                name={ln.name}
+                stroke={ln.color}
+                strokeWidth={2}
+                dot={{ r: showAll ? 3 : 4, fill: ln.color }}
+                activeDot={{ r: 6 }}
+                connectNulls
+              >
+                {!showAll && (
+                  <LabelList dataKey={ln.key} position="top" formatter={(v: unknown) => num(v, 1)} style={{ fill: pal.textDim, fontSize: 11, fontWeight: 600 }} />
+                )}
+              </Line>
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -408,24 +437,23 @@ export default function Analytics() {
 
           {view === 'vendor' && (
             <>
-              {/* Vendor selector */}
+              {/* Vendor selector — a dropdown so only the chosen vendor's name is
+                  visible (safe to show a vendor their own dashboard without exposing
+                  the other vendors on the portfolio). */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Vendor:</span>
-                {vendors.map((v) => (
-                  <button
-                    key={v.vendor_id}
-                    onClick={() => setSelectedVendorId(v.vendor_id)}
-                    className={cn(
-                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border',
-                      selected?.vendor_id === v.vendor_id
-                        ? 'bg-indigo-600 border-indigo-600 text-white'
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-700'
-                    )}
-                  >
-                    <Building2 size={13} />
-                    {v.vendor_name}
-                  </button>
-                ))}
+                <Building2 size={14} className="text-slate-400" />
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Vendor</span>
+                <select
+                  value={selected?.vendor_id ?? ''}
+                  onChange={(e) => setSelectedVendorId(e.target.value)}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {[...vendors]
+                    .sort((a, b) => a.vendor_name.localeCompare(b.vendor_name))
+                    .map((v) => (
+                      <option key={v.vendor_id} value={v.vendor_id}>{v.vendor_name}</option>
+                    ))}
+                </select>
               </div>
 
               {selected && <VendorDetail key={selected.vendor_id} vendor={selected} />}

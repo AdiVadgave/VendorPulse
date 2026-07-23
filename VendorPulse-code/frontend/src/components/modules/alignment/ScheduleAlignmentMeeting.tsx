@@ -49,7 +49,8 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
     setAttendeesLoading(true)
     try {
       const res = await getAlignmentAttendees(cycleId)
-      setInternalAttendees(res.attendees)
+      // Exclude anyone marked "Not attending" in attendance confirmation (DECLINED).
+      setInternalAttendees(res.attendees.filter((a) => a.confirmation_status !== 'DECLINED'))
     } catch {
       // Fallback: attendees endpoint may not be available
     } finally {

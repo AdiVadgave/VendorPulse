@@ -57,7 +57,6 @@ import WorkflowProgressBar from '@/components/shared/WorkflowProgressBar'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import AttendanceConfirmationPanel from '@/components/modules/scheduling/AttendanceConfirmationPanel'
 import AttendeeRefreshPanel from '@/components/modules/scheduling/AttendeeRefreshPanel'
-import CycleAttendeesPanel from '@/components/modules/scheduling/CycleAttendeesPanel'
 import ManualMeetingPanel from '@/components/modules/scheduling/ManualMeetingPanel'
 import FindSlotsControl from '@/components/modules/scheduling/FindSlotsControl'
 import SlotRankingPanel from '@/components/modules/scheduling/SlotRankingPanel'
@@ -990,16 +989,6 @@ function SchedulingTab({
         </div>
       </div>
 
-      {/* Manage cycle attendees at any time (the attendee-refresh phase has its own
-          fuller manager, so only show this persistent one outside that phase). */}
-      {schedulingPhase !== 'attendee_refresh' && (
-        <CycleAttendeesPanel
-          cycleId={cycle.cycle_id}
-          attendees={attendees}
-          onAttendeesChanged={onAttendeesUpdated}
-        />
-      )}
-
       {schedulingPhase === 'attendance_confirmation' && (
         <AttendanceConfirmationPanel
           cycleId={cycle.cycle_id}
@@ -1047,6 +1036,30 @@ function SchedulingTab({
             onPhaseChange('invite_approval')
           }}
           onBackToAttendees={() => onPhaseChange('attendee_refresh')}
+          onScheduleManual={(startISO, tz, dur) => {
+            const manual: SlotProposal = {
+              slot_id: 'manual-slot',
+              cycle_id: cycle.cycle_id,
+              proposed_time: startISO,
+              proposed_time_zone: tz,
+              duration_minutes: dur,
+              organiser_available: true,
+              exec_sponsor_available: true,
+              rank_score: 100,
+              is_approved: false,
+              attendance_count: attendees.length,
+              total_attendees: attendees.length,
+              conflict_count: 0,
+              attending: attendees.map((a) => a.name),
+              tentative: [],
+              conflicts: [],
+              ranking_rationale: 'Manually chosen time',
+            }
+            onSlotsReceived([...slots, manual])
+            onSlotSelected('manual-slot')
+            onSlotTimeZoneSelected(tz)
+            onPhaseChange('invite_approval')
+          }}
         />
       )}
       {schedulingPhase === 'invite_approval' && (

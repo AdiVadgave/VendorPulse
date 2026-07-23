@@ -64,8 +64,10 @@ export default function VendorPrepMeetingPanel({
     fetchAttendees(cycleId)
       .then((list) => {
         if (cancelled) return
-        setAttendees(list)
-        setSelected(new Set(list.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
+        // Exclude anyone marked "Not attending" in attendance confirmation (DECLINED).
+        const active = list.filter((a) => a.confirmation_status !== 'DECLINED')
+        setAttendees(active)
+        setSelected(new Set(active.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
       })
       .catch(() => { /* backend offline — leave empty */ })
     return () => { cancelled = true }

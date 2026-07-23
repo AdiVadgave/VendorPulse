@@ -56,13 +56,12 @@ export async function searchPeople(query: string): Promise<PeopleSearchResult[]>
   if (!token) return []
 
   // $search requires the ConsistencyLevel: eventual header. Strip embedded quotes
-  // so they can't break the search expression. Search across several fields so we
-  // match people regardless of how Shell stores them — display "Surname, Given",
-  // guests whose real address is in otherMails, contractors keyed by UPN, etc.
+  // so they can't break the search expression. NOTE: Graph $search on /users only
+  // supports displayName and mail — adding other fields (givenName, surname, UPN,
+  // otherMails) makes Graph return 400 and breaks the whole search. displayName
+  // already covers both first and last name (Shell stores it "Surname, Given").
   const safe = q.replace(/"/g, '')
-  const searchExpr =
-    `"displayName:${safe}" OR "givenName:${safe}" OR "surname:${safe}" ` +
-    `OR "mail:${safe}" OR "userPrincipalName:${safe}" OR "otherMails:${safe}"`
+  const searchExpr = `"displayName:${safe}" OR "mail:${safe}"`
   const url =
     'https://graph.microsoft.com/v1.0/users' +
     `?$search=${encodeURIComponent(searchExpr)}` +
@@ -73,7 +72,11 @@ export async function searchPeople(query: string): Promise<PeopleSearchResult[]>
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, ConsistencyLevel: 'eventual' },
     })
-    if (!res.ok) return []
+    if (!res.ok) {
+      // Surface the reason in the console instead of silently returning nothing.
+      console.warn('Graph people search failed:', res.status, await res.text().catch(() => ''))
+      return []
+    }
     const data = (await res.json()) as { value?: GraphUser[] }
     return (data.value ?? [])
       .map((u): PeopleSearchResult | null => {

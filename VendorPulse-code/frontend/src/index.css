@@ -136,6 +136,48 @@ body,
 .theme-shell .focus\:ring-violet-500:focus,
 .theme-shell .ring-violet-500 { --tw-ring-color: var(--shell-red); }
 
+/* ----------------------------------------------------------------------------
+   Remaining stray accents unified to Shell red (Shell theme only).
+
+   Blue, purple and the indigo shades the remaps above miss — plus the
+   indigo→violet gradients — all pulled into the Shell-red family. Soft chip
+   fills reuse the muted Shell-yellow tint (#fdf1cc), matching the indigo and
+   violet blocks above, with Shell red for text/accents.
+
+   Deliberately NOT overridden: the -400 / -500 BACKGROUND shades used by the
+   sidebar workflow-state dots and the RAG/score bars, so the state colour-
+   coding (and RAG) survives. Charts (hardcoded hex) are untouched.
+   ---------------------------------------------------------------------------- */
+/* Blue accents (info banners, badges, KPI tiles, misc icons) */
+.theme-shell .bg-blue-50 { background-color: #fdf1cc; }
+.theme-shell .bg-blue-100 { background-color: #fbe6a6; }
+.theme-shell .border-blue-200 { border-color: #f0d9a0; }
+.theme-shell .text-blue-500,
+.theme-shell .text-blue-600 { color: var(--shell-red-text); }
+.theme-shell .text-blue-700 { color: #a5161a; }
+.theme-shell .text-blue-800 { color: #8f1417; }
+
+/* Purple (scorecard-state badges) */
+.theme-shell .bg-purple-50 { background-color: #fdf1cc; }
+.theme-shell .text-purple-700 { color: #a5161a; }
+
+/* Indigo shades the primary remap above misses */
+.theme-shell .border-indigo-200 { border-color: #f0d9a0; }
+.theme-shell .border-indigo-300,
+.theme-shell .hover\:border-indigo-300:hover { border-color: #f0d9a0; }
+.theme-shell .text-indigo-800 { color: #8f1417; }
+.theme-shell .hover\:bg-indigo-50:hover,
+.theme-shell .bg-indigo-50\/60 { background-color: #fdf1cc; }
+.theme-shell .ring-indigo-200,
+.theme-shell .ring-indigo-200\/70 { --tw-ring-color: rgba(221, 29, 33, 0.45); }
+.theme-shell .shadow-indigo-200 { --tw-shadow-color: rgba(221, 29, 33, 0.35); }
+
+/* Indigo → violet gradients (progress bars, header cards) → Shell red */
+.theme-shell .from-indigo-500 { --tw-gradient-from: var(--shell-red); }
+.theme-shell .to-violet-500 { --tw-gradient-to: var(--shell-red-dark); }
+.theme-shell .from-indigo-50 { --tw-gradient-from: #fdf1cc; }
+.theme-shell .to-violet-50 { --tw-gradient-to: #fbe6a6; }
+
 /* Warm scrollbar to match the parchment surfaces */
 .theme-shell ::-webkit-scrollbar-thumb { background: #d8c8a4; }
 

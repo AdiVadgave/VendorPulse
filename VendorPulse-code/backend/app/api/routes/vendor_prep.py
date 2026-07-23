@@ -24,6 +24,7 @@ from app.dependencies import (
     get_cycle_repo,
     get_meeting_participant_repo,
     get_meeting_repo,
+    get_scorecard_submission_repo,
     get_vendor_prep_agent,
 )
 from app.models.common import AgentResponse
@@ -55,6 +56,19 @@ def generate_vendor_brief(
 
     if payload.cycle_id != cycleId:
         raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
+
+    # The brief is derived entirely from the compiled scorecard. With no submissions
+    # there is nothing to summarise — return a clear, non-fatal message the UI shows,
+    # rather than an empty/garbled brief.
+    if not get_scorecard_submission_repo().get_for_cycle(cycleId):
+        logger.info("VENDOR-PREP: brief blocked — no scorecard submissions for cycle %s", cycleId)
+        return AgentResponse(
+            status="failed",
+            agent="vendor_prep",
+            summary="No scorecard has been submitted for this cycle yet — collect and compile the scorecard before generating the vendor brief.",
+            data=None,
+            requires_approval=False,
+        )
 
     agent = get_vendor_prep_agent(cycle_id=cycleId)
     response = agent.run(

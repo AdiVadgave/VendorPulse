@@ -26,8 +26,12 @@ const GRAPH_CALENDAR_SCOPES = ['Calendars.ReadWrite']
 
 const msalInstance = ssoConfigured ? new PublicClientApplication(msalConfig) : null
 
-function useRegisterTokenGetter(account: AccountInfo | null) {
+function useRegisterTokenGetter(account: AccountInfo | null): boolean {
   const { instance } = useMsal()
+  // True only once the bearer-token getter is registered. The app must not render
+  // before this: its first API calls would fire without a token and the gated
+  // backend would reject them with 401 "Missing bearer token".
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     if (!account) {
@@ -36,6 +40,7 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
       setCalendarTokenGetter(null)
       setCurrentUser(null)
       setLogoutHandler(null)
+      setReady(false)
       return
     }
     // Identity comes straight from the ID token claims (name + UPN/email) —
@@ -84,13 +89,18 @@ function useRegisterTokenGetter(account: AccountInfo | null) {
         throw err
       }
     })
+    // Getters are live — safe to render the app now.
+    setReady(true)
     return () => {
       setAuthTokenGetter(null)
       setGraphTokenGetter(null)
       setCalendarTokenGetter(null)
       setLogoutHandler(null)
+      setReady(false)
     }
   }, [instance, account])
+
+  return ready
 }
 
 function LoginGate({ children }: { children: ReactNode }) {
@@ -98,9 +108,29 @@ function LoginGate({ children }: { children: ReactNode }) {
   const isAuthenticated = useIsAuthenticated()
   const account = accounts[0] ?? null
 
-  useRegisterTokenGetter(account)
+  const tokenReady = useRegisterTokenGetter(account)
 
-  if (isAuthenticated) return <>{children}</>
+  if (isAuthenticated && tokenReady) return <>{children}</>
+
+  // Signed in but the token getter is not registered yet — show a brief loader
+  // instead of the app, so no request goes out before the bearer token exists.
+  if (isAuthenticated) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'system-ui, sans-serif',
+          background: '#f8fafc',
+          color: '#475569',
+        }}
+      >
+        Signing you in…
+      </div>
+    )
+  }
 
   return (
     <div

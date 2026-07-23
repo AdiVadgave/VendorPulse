@@ -1,4 +1,4 @@
-import { Bell, Moon, Menu, LogOut } from 'lucide-react'
+import { Bell, Sun, Moon, Menu, LogOut } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useUIStore } from '@/store/useUIStore'
 import { useCurrentUser, logout } from '@/lib/auth/currentUser'
@@ -95,17 +95,15 @@ export default function Topbar() {
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        {/* Theme toggle — cycles Light → Dark → Shell */}
+        {/* Theme toggle — Shell ⇄ Dark. The icon shows the theme you'll switch TO. */}
         <button
           onClick={toggleTheme}
           className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           title={`Theme: ${THEME_META[theme].label} — click for ${THEME_META[theme].next}`}
           aria-label={`Theme: ${THEME_META[theme].label}. Click to switch to ${THEME_META[theme].next}.`}
         >
-          {theme === 'dark' && <Moon size={18} />}
-          {theme === 'shell' && (
-            <img src="/shell-logo.svg" alt="" aria-hidden className="w-[18px] h-[18px]" />
-          )}
+          {theme === 'shell' && <Moon size={18} />}
+          {theme === 'dark' && <Sun size={18} />}
         </button>
 
         {/* Notifications */}

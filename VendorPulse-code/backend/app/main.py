@@ -18,13 +18,14 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import actions, alignment, analytics, meeting_agent, meetings, pushback, scheduling, scorecard, scorecard_v2, users, vendor_prep, vendors
 from app.config import settings
+from app.core.auth import get_current_user
 from app.core.logging_config import setup_logging
 from app.db.pool import close_pool, get_pool
 from app.db.schema import ensure_schema
@@ -55,8 +56,11 @@ app = FastAPI(
         "Handles meeting scheduling, availability management, and the Module A "
         "scheduling agent workflow."
     ),
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # Public API docs expose the full endpoint map — disable them in production
+    # (whenever SSO is enforced). In local dev (SSO off) they stay available.
+    docs_url=None if settings.sso_enabled else "/docs",
+    redoc_url=None if settings.sso_enabled else "/redoc",
+    openapi_url=None if settings.sso_enabled else "/openapi.json",
     lifespan=lifespan,
 )
 
@@ -77,18 +81,24 @@ app.add_middleware(
 app.add_middleware(RequestLoggingMiddleware)
 
 # ── Register routers ──────────────────────────────────────────────────────────
-app.include_router(users.router)
-app.include_router(meetings.router)
-app.include_router(scheduling.router)
-app.include_router(scorecard.router)
-app.include_router(scorecard_v2.router)
-app.include_router(vendors.router)
-app.include_router(alignment.router)
-app.include_router(actions.router)
-app.include_router(vendor_prep.router)
-app.include_router(pushback.router)
-app.include_router(meeting_agent.router)
-app.include_router(analytics.router)
+# Every API router requires a valid signed-in user. get_current_user validates the
+# Entra ID token when SSO is on (401 on missing/invalid), and returns the dev
+# principal (never raising) when SSO is off, so local dev stays open. /api/health
+# and the SPA static fallback below are routes on `app` (not routers), so they
+# remain public — the health probe and the login screen must load without a token.
+_auth = [Depends(get_current_user)]
+app.include_router(users.router, dependencies=_auth)
+app.include_router(meetings.router, dependencies=_auth)
+app.include_router(scheduling.router, dependencies=_auth)
+app.include_router(scorecard.router, dependencies=_auth)
+app.include_router(scorecard_v2.router, dependencies=_auth)
+app.include_router(vendors.router, dependencies=_auth)
+app.include_router(alignment.router, dependencies=_auth)
+app.include_router(actions.router, dependencies=_auth)
+app.include_router(vendor_prep.router, dependencies=_auth)
+app.include_router(pushback.router, dependencies=_auth)
+app.include_router(meeting_agent.router, dependencies=_auth)
+app.include_router(analytics.router, dependencies=_auth)
 
 logger.info("VendorPulse backend initialized — routers registered, middleware active")
 

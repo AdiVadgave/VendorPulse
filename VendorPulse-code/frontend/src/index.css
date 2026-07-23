@@ -72,6 +72,14 @@ body,
   --shell-red-dark: #b3171a;
   --shell-red-text: #c11b1e;
   --shell-yellow: #fbce07;
+  /* Success green — warm sage/forest so "done/accepted" reads as green but
+     harmonises with the parchment palette (vs Tailwind's cool emerald). */
+  --shell-green: #2f8050;
+  --shell-green-dark: #276b43;
+  --shell-green-deep: #1f5836;
+  --shell-green-soft: #eaf1e3;
+  --shell-green-tint: #d7e6cc;
+  --shell-green-border: #bcd6ac;
   color-scheme: light;
 }
 
@@ -177,6 +185,23 @@ body,
 .theme-shell .to-violet-500 { --tw-gradient-to: var(--shell-red-dark); }
 .theme-shell .from-indigo-50 { --tw-gradient-from: #fdf1cc; }
 .theme-shell .to-violet-50 { --tw-gradient-to: #fbe6a6; }
+
+/* Success green: cool emerald → warm sage/forest (keeps the done/accepted
+   meaning). BG -400/-500 (status dots, RAG/score bars, step connectors) are
+   left alone, matching the principle used for the other accents above. */
+.theme-shell .bg-emerald-50 { background-color: var(--shell-green-soft); }
+.theme-shell .bg-emerald-100 { background-color: var(--shell-green-tint); }
+.theme-shell .bg-emerald-600 { background-color: var(--shell-green); }
+.theme-shell .bg-emerald-700,
+.theme-shell .hover\:bg-emerald-700:hover { background-color: var(--shell-green-dark); }
+.theme-shell .text-emerald-400,
+.theme-shell .text-emerald-500,
+.theme-shell .text-emerald-600 { color: var(--shell-green); }
+.theme-shell .text-emerald-700 { color: var(--shell-green-dark); }
+.theme-shell .text-emerald-800 { color: var(--shell-green-deep); }
+.theme-shell .border-emerald-200,
+.theme-shell .border-emerald-300 { border-color: var(--shell-green-border); }
+.theme-shell .ring-emerald-200 { --tw-ring-color: var(--shell-green-border); }
 
 /* Warm scrollbar to match the parchment surfaces */
 .theme-shell ::-webkit-scrollbar-thumb { background: #d8c8a4; }

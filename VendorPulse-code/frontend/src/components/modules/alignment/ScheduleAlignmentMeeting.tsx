@@ -1,8 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
-import { CalendarPlus, Users, Clock, CheckCircle2, ExternalLink, X, UserPlus, Trash2, Link2Off, CalendarClock } from 'lucide-react'
+import { CalendarPlus, Users, CheckCircle2, ExternalLink, X, UserPlus, Trash2, Link2Off, CalendarClock } from 'lucide-react'
 import { scheduleAlignmentMeetingManual, getAlignmentMeeting, getAlignmentAttendees, removeAlignmentAttendee } from '@/lib/alignmentApi'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
+import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
 import type { CycleAttendee } from '@/types/scheduling.types'
+
+const ALIGNMENT_BODY_HTML =
+  '<p>Internal alignment meeting to reconcile scores and agree our position before the vendor call.</p>' +
+  '<p><strong>Agenda</strong></p>' +
+  '<ol><li>Review the consolidated internal scores and low-scoring measures</li>' +
+  '<li>Reconcile cross-team divergence into one agreed internal position</li>' +
+  '<li>Confirm the points and evidence to raise with the vendor</li>' +
+  '<li>Capture action items and assign owners</li></ol>'
 
 export interface AlignmentMeetingResult {
   teamsUrl: string | null
@@ -20,8 +29,6 @@ interface Props {
 
 export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMeetingScheduled, meetingIndex = 1 }: Props) {
   const [error, setError] = useState<string | null>(null)
-  const [timeZone, setTimeZone] = useState<'IST' | 'UTC' | 'GMT'>('IST')
-  const [durationMinutes, setDurationMinutes] = useState(30)
 
   // Internal attendees state
   const [internalAttendees, setInternalAttendees] = useState<CycleAttendee[]>([])
@@ -31,11 +38,8 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
   const [showAddForm, setShowAddForm] = useState(false)
   const [removeLoading, setRemoveLoading] = useState<string | null>(null)
 
-  // Manual time + reschedule
+  // Reschedule toggle
   const [rescheduling, setRescheduling] = useState(false)
-  const [manualStart, setManualStart] = useState('')
-  const [meetingLink, setMeetingLink] = useState('')
-  const [scheduleLoading, setScheduleLoading] = useState(false)
 
   // State persistence check
   const [persistenceChecked, setPersistenceChecked] = useState(false)
@@ -85,32 +89,6 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
     fetchAttendees()
   }, [fetchAttendees])
 
-  async function handleManualSchedule() {
-    if (!manualStart) return
-    setScheduleLoading(true)
-    setError(null)
-    try {
-      const startTime = manualStart.length === 16 ? `${manualStart}:00` : manualStart
-      const response = await scheduleAlignmentMeetingManual(cycleId, {
-        startTime,
-        durationMinutes,
-        timeZone,
-        meetingUrl: meetingLink.trim() || null,
-        meetingIndex,
-      })
-      onMeetingScheduled({
-        teamsUrl: response.teams_meeting_url,
-        webLink: response.web_link,
-        attendeeCount: response.attendee_count,
-      })
-      setRescheduling(false)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to schedule meeting')
-    } finally {
-      setScheduleLoading(false)
-    }
-  }
-
   // A directory-searched attendee was added to the cycle. It's added as a cycle
   // attendee (Internal Stakeholder); refetch so the alignment list reflects the
   // authoritative internal-stakeholder set. Vendors are excluded server-side.
@@ -130,8 +108,6 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
       setRemoveLoading(null)
     }
   }
-
-  const showScheduler = !meetingResult || rescheduling
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -218,32 +194,6 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
           )}
         </div>
 
-        {/* Duration selector */}
-        <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
-          <div className="flex items-center gap-2 mb-1.5">
-            <Clock size={13} className="text-slate-400" />
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-              Duration
-            </span>
-          </div>
-          {meetingResult && !rescheduling ? (
-            <p className="text-sm text-slate-700 dark:text-slate-300">{durationMinutes} minutes</p>
-          ) : (
-            <select
-              value={durationMinutes}
-              onChange={(e) => setDurationMinutes(Number(e.target.value))}
-              className="w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
-            >
-              <option value={15}>15 minutes</option>
-              <option value={30}>30 minutes (recommended)</option>
-              <option value={45}>45 minutes</option>
-              <option value={60}>60 minutes</option>
-              <option value={90}>90 minutes</option>
-              <option value={120}>120 minutes</option>
-            </select>
-          )}
-        </div>
-
         {/* Agenda preview */}
         <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg px-4 py-3">
           <p className="text-xs font-semibold text-violet-600 dark:text-violet-400 mb-2">Suggested Agenda</p>
@@ -283,7 +233,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
                 </span>
               )}
               <button
-                onClick={() => { setRescheduling(true); setError(null); setManualStart(''); setMeetingLink(meetingResult.teamsUrl ?? '') }}
+                onClick={() => { setRescheduling(true); setError(null) }}
                 className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 font-medium"
               >
                 <CalendarClock size={11} />
@@ -292,71 +242,30 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
             </div>
           </div>
         ) : (
-          /* Manual date/time picker */
-          <div className="space-y-4">
-            {rescheduling && (
-              <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
-                <span className="text-xs text-amber-700 dark:text-amber-400">Rescheduling — pick a new date &amp; time.</span>
-                <button onClick={() => setRescheduling(false)} className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 font-medium">
-                  Cancel
-                </button>
-              </div>
-            )}
+          /* Delegated Graph scheduling: find free slots across internal calendars,
+             rank them, then create the Teams meeting + invites as the coordinator. */
+          <DelegatedScheduler
+            cycleId={cycleId}
+            findAttendees={internalAttendees}
+            inviteAttendees={internalAttendees}
+            defaultDuration={30}
+            subject="VendorPulse — Internal Alignment Meeting"
+            bodyHtml={ALIGNMENT_BODY_HTML}
+            onCancel={rescheduling ? () => setRescheduling(false) : undefined}
+            onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl, attendeeCount }) => {
+              await scheduleAlignmentMeetingManual(cycleId, {
+                startTime, durationMinutes, timeZone, meetingUrl: teamsUrl, meetingIndex,
+              })
+              onMeetingScheduled({ teamsUrl, webLink: null, attendeeCount })
+              setRescheduling(false)
+            }}
+          />
+        )}
 
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4 space-y-3">
-              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
-                When is the meeting scheduled?
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Date &amp; time</label>
-                  <input
-                    type="datetime-local"
-                    value={manualStart}
-                    onChange={(e) => setManualStart(e.target.value)}
-                    className="w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Timezone</label>
-                  <select
-                    value={timeZone}
-                    onChange={(e) => setTimeZone(e.target.value as 'IST' | 'UTC' | 'GMT')}
-                    className="w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  >
-                    <option value="IST">IST</option>
-                    <option value="UTC">UTC</option>
-                    <option value="GMT">GMT</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Meeting link (optional)</label>
-                <input
-                  type="url"
-                  placeholder="https://… (Teams, Meet, Zoom — paste if you have one)"
-                  value={meetingLink}
-                  onChange={(e) => setMeetingLink(e.target.value)}
-                  className="w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                />
-              </div>
-              <button
-                onClick={handleManualSchedule}
-                disabled={!manualStart || scheduleLoading}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <CalendarPlus size={14} />
-                {scheduleLoading ? 'Scheduling…' : 'Schedule at this time'}
-              </button>
-              <p className="text-[10px] text-slate-400">All internal stakeholders above are invited.</p>
-            </div>
-
-            {error && (
-              <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
-                {error}
-              </p>
-            )}
-          </div>
+        {error && (
+          <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+            {error}
+          </p>
         )}
       </div>
     </div>

@@ -14,16 +14,20 @@ interface Props {
   cycleId: string
   attendees: CycleAttendee[]
   onSlotsFound: (slots: SlotProposal[]) => void
+  defaultDuration?: number
 }
 
 function isoDate(offsetDays: number): string {
   return new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10)
 }
 
-export default function FindSlotsControl({ cycleId, attendees, onSlotsFound }: Props) {
+export default function FindSlotsControl({ cycleId, attendees, onSlotsFound, defaultDuration = 60 }: Props) {
   const [fromDate, setFromDate] = useState(isoDate(0))
   const [toDate, setToDate] = useState(isoDate(14))
-  const [duration, setDuration] = useState(60)
+  const [duration, setDuration] = useState<number>(defaultDuration)
+
+  const shellCount = attendees.filter((a) => (a.email || '').toLowerCase().endsWith('@shell.com')).length
+  const externalCount = attendees.length - shellCount
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,7 +59,10 @@ export default function FindSlotsControl({ cycleId, attendees, onSlotsFound }: P
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Find meeting slots</h3>
       </div>
       <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-        Compares all {attendees.length} attendees' calendars over the chosen window and returns ranked free slots.
+        Checks the <strong>{shellCount}</strong> Shell calendar{shellCount === 1 ? '' : 's'} over the chosen window and returns ranked free slots.
+        {externalCount > 0 && (
+          <> {externalCount} external invitee{externalCount === 1 ? '' : 's'} (non-Shell) will be invited at the time you pick — their calendars aren't checked.</>
+        )}
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

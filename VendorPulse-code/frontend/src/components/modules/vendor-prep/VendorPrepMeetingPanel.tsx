@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react'
 import {
-  CalendarPlus, Users, ExternalLink, CheckCircle2, Loader2, RotateCcw, Building2, Link2Off, UserPlus, X,
+  CalendarPlus, Users, ExternalLink, CheckCircle2, RotateCcw, Building2, Link2Off, UserPlus, X,
 } from 'lucide-react'
 import {
   scheduleVendorPrepMeetingManual, getVendorPrepMeeting,
 } from '@/lib/vendorPrepApi'
 import { fetchAttendees } from '@/lib/schedulingApi'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
+import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
+
+const VENDOR_PREP_BODY_HTML =
+  '<p>Vendor prep call — align the internal team with the vendor ahead of the governance meeting.</p>' +
+  '<p><strong>Agenda</strong></p>' +
+  '<ol><li>Walk through the agreed internal position and key issues</li>' +
+  '<li>Confirm the points, data and pushback responses to raise</li>' +
+  '<li>Agree logistics and owners for the governance meeting</li></ol>'
 import TranscriptInput from '@/components/modules/meeting/TranscriptInput'
 import type { CycleAttendee } from '@/types/scheduling.types'
 import type { MeetingNote } from '@/types/meeting.types'
@@ -29,8 +37,6 @@ interface MeetingResult {
   attendeeCount: number
 }
 
-type TZ = 'IST' | 'UTC' | 'GMT'
-
 /**
  * The single Vendor Prep meeting for a cycle: pick when the prep call is scheduled
  * and who is invited (internal team + vendor), then attach its transcript and
@@ -47,12 +53,6 @@ export default function VendorPrepMeetingPanel({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [meetingResult, setMeetingResult] = useState<MeetingResult | null>(null)
 
-  const [timeZone, setTimeZone] = useState<TZ>('IST')
-  const [durationMinutes, setDurationMinutes] = useState(30)
-  const [manualStart, setManualStart] = useState('')
-  const [meetingLink, setMeetingLink] = useState('')
-
-  const [scheduleLoading, setScheduleLoading] = useState(false)
   const [rescheduling, setRescheduling] = useState(false)
   const [addingInvitee, setAddingInvitee] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -124,28 +124,12 @@ export default function VendorPrepMeetingPanel({
     />
   )
 
-  async function handleManualSchedule() {
-    if (!manualStart) return
-    if (selectedEmails.length === 0) { setError('Select at least one attendee to invite.'); return }
-    setScheduleLoading(true)
-    setError(null)
-    try {
-      const startTime = manualStart.length === 16 ? `${manualStart}:00` : manualStart
-      const res = await scheduleVendorPrepMeetingManual(cycleId, {
-        startTime,
-        durationMinutes,
-        timeZone,
-        attendeeEmails: selectedEmails,
-        meetingUrl: meetingLink.trim() || null,
-      })
-      setMeetingResult({ teamsUrl: res.teams_meeting_url, webLink: res.web_link, attendeeCount: res.attendee_count })
-      setRescheduling(false)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to schedule meeting')
-    } finally {
-      setScheduleLoading(false)
-    }
-  }
+  const selectedInternal = attendees.filter(
+    (a) => a.type !== 'Vendor' && !!a.email && selected.has(a.email.toLowerCase())
+  )
+  const selectedAttendees = attendees.filter(
+    (a) => !!a.email && selected.has(a.email.toLowerCase())
+  )
 
   function handleParsed(parsed: MeetingNote[]) {
     const actions: ExtractedAction[] = parsed
@@ -194,7 +178,7 @@ export default function VendorPrepMeetingPanel({
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => { setRescheduling(true); setManualStart(''); setMeetingLink(meetingResult.teamsUrl ?? '') }}
+                  onClick={() => setRescheduling(true)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <RotateCcw size={13} /> Reschedule
@@ -276,63 +260,27 @@ export default function VendorPrepMeetingPanel({
                 )}
               </div>
 
-              {/* Manual date/time + timezone + duration */}
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4 space-y-3">
-                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
-                  When is the meeting scheduled?
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    Date &amp; time
-                    <input type="datetime-local" value={manualStart} onChange={(e) => setManualStart(e.target.value)}
-                      className="mt-1 w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                  </label>
-                  <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    Timezone
-                    <select value={timeZone} onChange={(e) => setTimeZone(e.target.value as TZ)}
-                      className="mt-1 w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                      <option value="IST">IST</option>
-                      <option value="UTC">UTC</option>
-                      <option value="GMT">GMT</option>
-                    </select>
-                  </label>
-                  <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    Duration
-                    <select value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                      className="mt-1 w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                      <option value={30}>30 min</option>
-                      <option value={60}>1 hour</option>
-                      <option value={90}>1.5 hours</option>
-                      <option value={120}>2 hours</option>
-                    </select>
-                  </label>
-                </div>
-                <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  Meeting link (optional)
-                  <input type="url" placeholder="https://… (Teams, Meet, Zoom — paste if you have one)"
-                    value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)}
-                    className="mt-1 w-full text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                </label>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={handleManualSchedule}
-                    disabled={scheduleLoading || !manualStart}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                  >
-                    {scheduleLoading ? <Loader2 size={14} className="animate-spin" /> : <CalendarPlus size={14} />}
-                    {scheduleLoading ? 'Scheduling…' : 'Schedule at this time'}
-                  </button>
-                  {rescheduling && (
-                    <button
-                      onClick={() => setRescheduling(false)}
-                      className="px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                </div>
-              </div>
+              {/* Delegated Graph scheduling: find slots across the internal invitees'
+                  calendars, rank them, then create the Teams meeting inviting everyone
+                  selected (internal + vendor). Vendors have no readable free/busy, so
+                  they're invited but not part of the availability search. */}
+              <DelegatedScheduler
+                cycleId={cycleId}
+                findAttendees={selectedInternal}
+                inviteAttendees={selectedAttendees}
+                defaultDuration={30}
+                subject="VendorPulse — Vendor Prep Meeting"
+                bodyHtml={VENDOR_PREP_BODY_HTML}
+                onCancel={rescheduling ? () => setRescheduling(false) : undefined}
+                onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl }) => {
+                  if (selectedEmails.length === 0) { setError('Select at least one attendee to invite.'); return }
+                  const res = await scheduleVendorPrepMeetingManual(cycleId, {
+                    startTime, durationMinutes, timeZone, attendeeEmails: selectedEmails, meetingUrl: teamsUrl,
+                  })
+                  setMeetingResult({ teamsUrl: res.teams_meeting_url, webLink: res.web_link, attendeeCount: res.attendee_count })
+                  setRescheduling(false)
+                }}
+              />
             </>
           )}
 

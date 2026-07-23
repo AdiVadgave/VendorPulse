@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Key,
-  ArrowRight,
   UserPlus,
   X,
   Loader2,
@@ -32,8 +31,6 @@ interface AttendeeRefreshPanelProps {
   attendees: CycleAttendee[]
   onAttendeesChanged: (updated: CycleAttendee[]) => void
   onDispatchComplete: () => void
-  /** Move on to the (manual) meeting-scheduling step. */
-  onProceed: () => void
   onBackToAttendance?: () => void
 }
 
@@ -473,7 +470,6 @@ export default function AttendeeRefreshPanel({
   cycleId,
   attendees,
   onAttendeesChanged,
-  onProceed,
   onBackToAttendance,
 }: AttendeeRefreshPanelProps) {
   const [showAddForm, setShowAddForm] = useState(false)
@@ -555,26 +551,9 @@ export default function AttendeeRefreshPanel({
         <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-400 flex items-start gap-2">
           <CalendarClock size={14} className="shrink-0 mt-0.5" />
           <span>
-            Add or remove attendees for this cycle. When the list is ready, continue to set the
-            meeting date &amp; time.
+            Add or remove attendees for this cycle. When the list is ready, use
+            <strong> Find Slots</strong> below to compare calendars and pick a meeting time.
           </span>
-        </div>
-
-        <div className="mt-4 flex items-center gap-2 flex-wrap">
-          <button
-            onClick={onProceed}
-            disabled={attendees.length === 0}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors',
-              attendees.length === 0 && 'opacity-60 cursor-not-allowed'
-            )}
-          >
-            <ArrowRight size={14} />
-            Proceed to Schedule Meeting
-          </button>
-          {attendees.length === 0 && (
-            <span className="text-xs text-slate-400 dark:text-slate-500">Add at least one attendee to proceed.</span>
-          )}
         </div>
       </div>
 

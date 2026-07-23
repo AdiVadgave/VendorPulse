@@ -1026,7 +1026,6 @@ function SchedulingTab({
             onAttendeesChanged={onAttendeesUpdated}
             onDispatchComplete={() => {}}
             onBackToAttendance={() => onPhaseChange('attendance_confirmation')}
-            onProceed={() => onPhaseChange('schedule_meeting')}
           />
           {/* Delegated Graph: find free slots across the attendees' calendars. */}
           <FindSlotsControl

@@ -32,6 +32,8 @@ interface AttendeeRefreshPanelProps {
   onAttendeesChanged: (updated: CycleAttendee[]) => void
   onDispatchComplete: () => void
   onBackToAttendance?: () => void
+  /** Hide the "use Find Slots below" scheduling hint (e.g. when reused post-scheduling). */
+  hideScheduleHint?: boolean
 }
 
 // ── Search & Add Attendee Form ───────────────────────────────────────────────
@@ -471,6 +473,7 @@ export default function AttendeeRefreshPanel({
   attendees,
   onAttendeesChanged,
   onBackToAttendance,
+  hideScheduleHint,
 }: AttendeeRefreshPanelProps) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -533,7 +536,7 @@ export default function AttendeeRefreshPanel({
                 Meeting Attendees
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Add all attendees for this governance cycle
+                {hideScheduleHint ? 'Add or remove attendees for this meeting' : 'Add all attendees for this governance cycle'}
               </p>
             </div>
           </div>
@@ -548,13 +551,15 @@ export default function AttendeeRefreshPanel({
           )}
         </div>
 
-        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-400 flex items-start gap-2">
-          <CalendarClock size={14} className="shrink-0 mt-0.5" />
-          <span>
-            Add or remove attendees for this cycle. When the list is ready, use
-            <strong> Find Slots</strong> below to compare calendars and pick a meeting time.
-          </span>
-        </div>
+        {!hideScheduleHint && (
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-400 flex items-start gap-2">
+            <CalendarClock size={14} className="shrink-0 mt-0.5" />
+            <span>
+              Add or remove attendees for this cycle. When the list is ready, use
+              <strong> Find Slots</strong> below to compare calendars and pick a meeting time.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Attendee table */}

@@ -983,6 +983,10 @@ function SchedulingTab({
 }) {
   const currentPhaseIndex = PHASE_ORDER.indexOf(schedulingPhase)
 
+  // Inline "add attendee" panel on the Confirmation page — lets the coordinator add
+  // (and invite) attendees to an already-scheduled meeting without navigating back.
+  const [showAddAttendee, setShowAddAttendee] = useState(false)
+
   // Schedule at a coordinator-chosen time (shared by the Attendees page and the
   // Slot Ranking panel). Builds a synthetic slot and jumps to Invite Approval,
   // where the Teams meeting is actually created via delegated Graph.
@@ -1171,15 +1175,42 @@ function SchedulingTab({
       )}
       {schedulingPhase === 'confirmation_tracking' && (
         selectedSlot ? (
-          <ConfirmationTracker
-            cycleId={cycle.cycle_id}
-            attendees={attendees}
-            slot={selectedSlot}
-            timeZoneOverride={selectedSlotTimeZone}
-            meetingUrl={meetingUrl}
-            onProceed={onScorecardProceed}
-            onReschedule={() => onPhaseChange('schedule_meeting')}
-          />
+          <div className="space-y-4">
+            <ConfirmationTracker
+              cycleId={cycle.cycle_id}
+              attendees={attendees}
+              slot={selectedSlot}
+              timeZoneOverride={selectedSlotTimeZone}
+              meetingUrl={meetingUrl}
+              onProceed={onScorecardProceed}
+              onReschedule={() => onPhaseChange('schedule_meeting')}
+              onAddAttendee={() => setShowAddAttendee((v) => !v)}
+              addAttendeeOpen={showAddAttendee}
+            />
+            {showAddAttendee && (
+              <>
+                {/* Add people to the existing meeting without leaving Confirmation. */}
+                <AttendeeRefreshPanel
+                  cycleId={cycle.cycle_id}
+                  attendees={attendees}
+                  onAttendeesChanged={onAttendeesUpdated}
+                  onDispatchComplete={() => {}}
+                  hideScheduleHint
+                />
+                <AddAttendeesToMeetingPanel
+                  cycleId={cycle.cycle_id}
+                  attendees={attendees}
+                  slot={selectedSlot}
+                  eventId={scheduledEventId}
+                  vendorName={cycle.vendor_name}
+                  quarter={cycle.quarter}
+                  year={cycle.year}
+                  timeZone={selectedSlotTimeZone}
+                  onUpdated={onEventUpdated}
+                />
+              </>
+            )}
+          </div>
         ) : (
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 text-sm text-slate-500 dark:text-slate-400">
             No meeting scheduled yet.{' '}

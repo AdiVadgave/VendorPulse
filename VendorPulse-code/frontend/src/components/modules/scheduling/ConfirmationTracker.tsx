@@ -10,6 +10,7 @@ import {
   CalendarClock,
   ExternalLink,
   Link2Off,
+  UserPlus,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
@@ -26,6 +27,10 @@ interface ConfirmationTrackerProps {
   onReschedule?: () => void
   /** The meeting join link the coordinator pasted (if any). */
   meetingUrl?: string | null
+  /** Toggle the inline "add attendee" panel (rendered by the parent below this). */
+  onAddAttendee?: () => void
+  /** Whether the inline add-attendee panel is currently open. */
+  addAttendeeOpen?: boolean
 }
 
 const STATUS_CONFIG: Record<
@@ -56,6 +61,8 @@ export default function ConfirmationTracker({
   onProceed,
   onReschedule,
   meetingUrl,
+  onAddAttendee,
+  addAttendeeOpen,
 }: ConfirmationTrackerProps) {
   const [nudgeSent, setNudgeSent] = useState<Set<string>>(new Set())
   const [nudgingId, setNudgingId] = useState<string | null>(null)
@@ -166,13 +173,25 @@ export default function ConfirmationTracker({
 
       {/* RSVP table */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
             RSVP Status
           </span>
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            {accepted.length} accepted · {declined.length} declined · {pending.length} pending
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline">
+              {accepted.length} accepted · {declined.length} declined · {pending.length} pending
+            </span>
+            {onAddAttendee && (
+              <button
+                type="button"
+                onClick={onAddAttendee}
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+              >
+                <UserPlus size={12} />
+                {addAttendeeOpen ? 'Close' : 'Add attendee'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto">

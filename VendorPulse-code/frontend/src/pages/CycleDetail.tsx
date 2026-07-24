@@ -9,7 +9,6 @@ import {
   ListChecks,
   LayoutDashboard,
   Lock,
-  UserPlus,
   CheckCircle2,
   Building2,
   Clock,
@@ -1084,20 +1083,6 @@ function SchedulingTab({
       )}
       {schedulingPhase === 'attendee_refresh' && (
         <div className="space-y-4">
-          {/* If a meeting is already scheduled, adding people here can invite them to it. */}
-          {meetingScheduled && selectedSlot && (
-            <AddAttendeesToMeetingPanel
-              cycleId={cycle.cycle_id}
-              attendees={attendees}
-              slot={selectedSlot}
-              eventId={scheduledEventId}
-              vendorName={cycle.vendor_name}
-              quarter={cycle.quarter}
-              year={cycle.year}
-              timeZone={selectedSlotTimeZone}
-              onUpdated={onEventUpdated}
-            />
-          )}
           <AttendeeRefreshPanel
             cycleId={cycle.cycle_id}
             attendees={attendees}
@@ -1191,50 +1176,36 @@ function SchedulingTab({
       )}
       {schedulingPhase === 'confirmation_tracking' && (
         selectedSlot ? (
-          <div className="space-y-4">
-            <ConfirmationTracker
-              cycleId={cycle.cycle_id}
-              attendees={attendees}
-              slot={selectedSlot}
-              timeZoneOverride={selectedSlotTimeZone}
-              meetingUrl={meetingUrl}
-              onProceed={onScorecardProceed}
-              onReschedule={() => onPhaseChange('schedule_meeting')}
-              onAddAttendee={() => setShowAddAttendee((v) => !v)}
-              addAttendeeOpen={showAddAttendee}
-            />
-            {showAddAttendee && (
-              <div ref={addAttendeeRef} className="space-y-4 scroll-mt-4 fade-in">
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl px-5 py-3 flex items-center gap-2 text-sm text-indigo-800 dark:text-indigo-300">
-                  <UserPlus size={15} className="shrink-0" />
-                  <span>
-                    <strong>Add attendees below</strong>, then use <strong>Send invite to added attendees</strong> to
-                    invite them to this meeting.
-                  </span>
+          <ConfirmationTracker
+            cycleId={cycle.cycle_id}
+            attendees={attendees}
+            slot={selectedSlot}
+            timeZoneOverride={selectedSlotTimeZone}
+            meetingUrl={meetingUrl}
+            onProceed={onScorecardProceed}
+            onReschedule={() => onPhaseChange('schedule_meeting')}
+            onAddAttendee={() => setShowAddAttendee((v) => !v)}
+            addAttendeeOpen={showAddAttendee}
+            addAttendeeSlot={
+              showAddAttendee ? (
+                <div ref={addAttendeeRef} className="scroll-mt-4">
+                  <AddAttendeesToMeetingPanel
+                    cycleId={cycle.cycle_id}
+                    attendees={attendees}
+                    onAttendeesChanged={onAttendeesUpdated}
+                    slot={selectedSlot}
+                    eventId={scheduledEventId}
+                    vendorName={cycle.vendor_name}
+                    quarter={cycle.quarter}
+                    year={cycle.year}
+                    timeZone={selectedSlotTimeZone}
+                    onUpdated={onEventUpdated}
+                    onClose={() => setShowAddAttendee(false)}
+                  />
                 </div>
-                {/* Add people to the existing meeting without leaving Confirmation. */}
-                <AttendeeRefreshPanel
-                  cycleId={cycle.cycle_id}
-                  attendees={attendees}
-                  onAttendeesChanged={onAttendeesUpdated}
-                  onDispatchComplete={() => {}}
-                  hideScheduleHint
-                  defaultShowAddForm
-                />
-                <AddAttendeesToMeetingPanel
-                  cycleId={cycle.cycle_id}
-                  attendees={attendees}
-                  slot={selectedSlot}
-                  eventId={scheduledEventId}
-                  vendorName={cycle.vendor_name}
-                  quarter={cycle.quarter}
-                  year={cycle.year}
-                  timeZone={selectedSlotTimeZone}
-                  onUpdated={onEventUpdated}
-                />
-              </div>
-            )}
-          </div>
+              ) : null
+            }
+          />
         ) : (
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 text-sm text-slate-500 dark:text-slate-400">
             No meeting scheduled yet.{' '}

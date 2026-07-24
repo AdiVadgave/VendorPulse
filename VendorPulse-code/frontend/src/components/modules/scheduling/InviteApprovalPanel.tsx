@@ -12,7 +12,7 @@ import {
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import { apiFetch } from '@/lib/api'
-import { createMeetingEvent } from '@/lib/graphScheduling'
+import { createMeetingEvent, isSchedulingAvailable } from '@/lib/graphScheduling'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
 
@@ -89,6 +89,11 @@ export default function InviteApprovalPanel({
 
   async function handleSend() {
     if (Boolean(isLocked) || hasSentInvite || isProcessing) return
+    if (!isSchedulingAvailable()) {
+      setGraphError("You can't schedule — you're not signed in with Shell (SSO). Sign in with your Shell account to send the invite.")
+      setAgentStatus('failed')
+      return
+    }
     setIsProcessing(true)
     setAgentStatus('running')
     setGraphError(null)

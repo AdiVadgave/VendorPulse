@@ -24,7 +24,7 @@ import type { StakeholderRole } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
 import type { SystemUser } from '@/lib/schedulingApi'
 import { createUser } from '@/lib/usersApi'
-import { searchPeople, type PeopleSearchResult } from '@/lib/auth/graphPeople'
+import { searchPeople, isGraphPeopleSearchAvailable, type PeopleSearchResult } from '@/lib/auth/graphPeople'
 
 interface AttendeeRefreshPanelProps {
   cycleId: string
@@ -51,6 +51,8 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<PeopleSearchResult[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const shellSearchAvailable = isGraphPeopleSearchAvailable()
   const [selected, setSelected] = useState<PeopleSearchResult | null>(null)
   const [role, setRole] = useState<StakeholderRole>('VMO_COORDINATOR')
   const [attendeeType, setAttendeeType] = useState<'Internal Stakeholder' | 'Vendor'>('Internal Stakeholder')
@@ -109,6 +111,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
     }
     const q = raw.toLowerCase()
     let cancelled = false
+    setSearching(true)
     // Debounce so we don't hit the local directory + Graph on every keystroke.
     const timer = setTimeout(() => {
       Promise.all([
@@ -119,6 +122,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
       ])
         .then(([local, shell]) => {
           if (cancelled) return
+          setSearching(false)
           // Local results first; append Shell people not already present (by email).
           const seen = new Set(local.map((u) => u.email.toLowerCase()))
           const merged: PeopleSearchResult[] = [...local]
@@ -133,6 +137,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
         })
         .catch(() => {
           if (cancelled) return
+          setSearching(false)
           setResults([])
           setShowDropdown(false)
         })
@@ -285,16 +290,24 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
 
         {showDropdown && results.length === 0 && query.trim() && !creatingNew && (
           <div className="absolute z-20 top-full mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden">
-            <div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
-              No users found matching "{query}"
+            <div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              {searching ? (
+                <><Loader2 size={12} className="animate-spin" /> Searching{shellSearchAvailable ? ' app + Shell directory' : ''}…</>
+              ) : shellSearchAvailable ? (
+                `No one in the app or Shell directory matches "${query}"`
+              ) : (
+                `No app users match "${query}" — sign in with Shell to search the Shell directory`
+              )}
             </div>
-            <button
-              type="button"
-              onMouseDown={(e) => { e.preventDefault(); openCreateNew() }}
-              className="w-full text-left px-3 py-2 border-t border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors flex items-center gap-2 text-xs font-medium text-indigo-600 dark:text-indigo-400"
-            >
-              <UserPlus size={13} /> Add "{query.trim()}" as a new person
-            </button>
+            {!searching && (
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); openCreateNew() }}
+                className="w-full text-left px-3 py-2 border-t border-slate-100 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors flex items-center gap-2 text-xs font-medium text-indigo-600 dark:text-indigo-400"
+              >
+                <UserPlus size={13} /> Add "{query.trim()}" as a new person
+              </button>
+            )}
           </div>
         )}
       </div>

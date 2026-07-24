@@ -7,7 +7,7 @@
  */
 import { useState } from 'react'
 import { CalendarSearch, Loader2, AlertCircle } from 'lucide-react'
-import { findMeetingSlots } from '@/lib/graphScheduling'
+import { findMeetingSlots, isSchedulingAvailable } from '@/lib/graphScheduling'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 
 interface Props {
@@ -33,6 +33,10 @@ export default function FindSlotsControl({ cycleId, attendees, onSlotsFound, def
 
   async function handleFind() {
     setError(null)
+    if (!isSchedulingAvailable()) {
+      setError("You can't schedule — you're not signed in with Shell (SSO). Sign in with your Shell account to check calendars and send invites.")
+      return
+    }
     if (attendees.length === 0) {
       setError('Add at least one attendee before finding slots.')
       return

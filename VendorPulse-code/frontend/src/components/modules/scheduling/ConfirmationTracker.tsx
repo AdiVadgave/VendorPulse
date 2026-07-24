@@ -31,6 +31,8 @@ interface ConfirmationTrackerProps {
   onAddAttendee?: () => void
   /** Whether the inline add-attendee panel is currently open. */
   addAttendeeOpen?: boolean
+  /** Rendered between the summary stats and the RSVP table (the add-attendee block). */
+  addAttendeeSlot?: React.ReactNode
 }
 
 const STATUS_CONFIG: Record<
@@ -63,6 +65,7 @@ export default function ConfirmationTracker({
   meetingUrl,
   onAddAttendee,
   addAttendeeOpen,
+  addAttendeeSlot,
 }: ConfirmationTrackerProps) {
   const [nudgeSent, setNudgeSent] = useState<Set<string>>(new Set())
   const [nudgingId, setNudgingId] = useState<string | null>(null)
@@ -170,6 +173,9 @@ export default function ConfirmationTracker({
           </div>
         ))}
       </div>
+
+      {/* Add-attendee block — sits below the stats, above the RSVP table. */}
+      {addAttendeeSlot}
 
       {/* RSVP table */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">

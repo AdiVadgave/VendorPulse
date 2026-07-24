@@ -29,6 +29,8 @@ interface Props {
   /** Bubble action items parsed from this meeting's transcript to the shared log. */
   onActionsExtracted?: (actions: ExtractedAction[]) => void
   alreadyExtracted?: boolean
+  /** Final QBR date — vendor-prep slots end the day before it. */
+  qbrMeetingDate?: string | null
 }
 
 interface MeetingResult {
@@ -47,7 +49,7 @@ interface MeetingResult {
  * is manual (no Microsoft Graph / calendar access required).
  */
 export default function VendorPrepMeetingPanel({
-  cycleId, onActionsExtracted, alreadyExtracted,
+  cycleId, onActionsExtracted, alreadyExtracted, qbrMeetingDate,
 }: Props) {
   const [attendees, setAttendees] = useState<CycleAttendee[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -271,6 +273,8 @@ export default function VendorPrepMeetingPanel({
                 findAttendees={selectedInternal}
                 inviteAttendees={selectedAttendees}
                 defaultDuration={30}
+                qbrMeetingDate={qbrMeetingDate}
+                existingMeetingUrl={rescheduling ? (meetingResult?.teamsUrl ?? null) : null}
                 subject="Mobility Vendor Pulse — Vendor Prep Meeting"
                 bodyHtml={VENDOR_PREP_BODY_HTML}
                 onCancel={rescheduling ? () => setRescheduling(false) : undefined}

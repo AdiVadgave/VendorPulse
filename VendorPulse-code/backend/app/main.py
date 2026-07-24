@@ -44,7 +44,11 @@ async def lifespan(_app: FastAPI):
     pool.wait()
     ensure_schema(pool)
     logger.info("VendorPulse backend ready — PostgreSQL connected, schema ensured")
+    # Start the daily scorecard-reminder scheduler (no-op if APScheduler absent).
+    from app.services.reminder_scheduler import start_reminder_scheduler, stop_reminder_scheduler
+    start_reminder_scheduler()
     yield
+    stop_reminder_scheduler()
     close_pool()
 
 

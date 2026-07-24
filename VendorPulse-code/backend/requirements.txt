@@ -10,5 +10,6 @@ psycopg-pool>=3.2.0
 msal>=1.31.0
 cryptography>=43.0.0
 pyjwt>=2.9.0
+apscheduler>=3.10.0
 openai>=1.50.0
 truststore>=0.10.0

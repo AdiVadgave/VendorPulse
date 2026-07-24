@@ -12,6 +12,8 @@ interface Props {
   vendorName: string
   quarter: string
   year: number
+  /** Final QBR date — alignment slots end the day before it. */
+  qbrMeetingDate?: string | null
   /** Bubble action items parsed from this meeting's transcript to the shared log. */
   onActionsExtracted?: (actions: ExtractedAction[]) => void
   /** True when this meeting already contributed action items (persisted queue) — so
@@ -25,7 +27,7 @@ interface Props {
  * section — not here. Each instance is scoped by its 1-based index so a cycle can
  * run several independent alignment meetings.
  */
-export default function AlignmentMeetingPanel({ cycleId, index, onActionsExtracted, alreadyExtracted }: Props) {
+export default function AlignmentMeetingPanel({ cycleId, index, onActionsExtracted, alreadyExtracted, qbrMeetingDate }: Props) {
   const [meetingResult, setMeetingResult] = useState<AlignmentMeetingResult | null>(null)
 
   function handleParsed(parsed: MeetingNote[]) {
@@ -49,6 +51,7 @@ export default function AlignmentMeetingPanel({ cycleId, index, onActionsExtract
         meetingIndex={index}
         meetingResult={meetingResult}
         onMeetingScheduled={setMeetingResult}
+        qbrMeetingDate={qbrMeetingDate}
       />
       <TranscriptInput
         cycleId={cycleId}

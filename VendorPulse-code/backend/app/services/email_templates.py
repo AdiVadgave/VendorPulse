@@ -174,3 +174,113 @@ def build_scorecard_email(
         f"Thank you,\nVendorPulse"
     )
     return {"subject": subject, "html_body": html_body, "text_body": text_body}
+
+
+def build_reminder_email(
+    *,
+    attendee_name: str,
+    vendor_name: str,
+    quarter: str,
+    year: int,
+    form_url: str,
+    deadline: str,
+    days_left: int,
+    tone_label: str,
+) -> dict[str, str]:
+    """A scorecard reminder email. `days_left` drives the urgency copy/colour."""
+    urgent = days_left <= 0
+    accent = "#dc2626" if urgent else ("#d97706" if days_left <= 2 else "#6366f1")
+    when = (
+        "is due <strong>today</strong>" if days_left <= 0
+        else f"is due in <strong>{days_left} day{'s' if days_left != 1 else ''}</strong> (by {deadline})"
+    )
+    subject = (
+        f"{'FINAL REMINDER' if urgent else 'Reminder'} — {vendor_name} QBR Scorecard "
+        f"{'due today' if urgent else f'due {deadline}'} ({quarter} {year})"
+    )
+    html_body = f"""\
+<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
+  <div style="background:{accent};padding:22px 32px;border-radius:12px 12px 0 0;">
+    <h1 style="color:#fff;margin:0;font-size:19px;">VendorPulse — Scorecard {tone_label}</h1>
+    <p style="color:#ffffffcc;margin:6px 0 0 0;font-size:13px;">{vendor_name} · {quarter} {year}</p>
+  </div>
+  <div style="background:#fff;border:1px solid #e2e8f0;border-top:none;padding:30px 32px;border-radius:0 0 12px 12px;">
+    <p style="font-size:15px;line-height:1.6;">Dear <strong>{attendee_name}</strong>,</p>
+    <p style="font-size:15px;line-height:1.6;">
+      Our records show your scorecard input for the <strong>{vendor_name} {quarter} {year}</strong>
+      governance cycle {when}. Please submit it at your earliest convenience.
+    </p>
+    <div style="text-align:center;margin:26px 0;">
+      <a href="{form_url}" style="display:inline-block;background:{accent};color:#fff;text-decoration:none;padding:13px 34px;border-radius:8px;font-size:15px;font-weight:600;">
+        Complete Scorecard
+      </a>
+    </div>
+    <p style="font-size:13px;color:#94a3b8;">If you have already submitted, please disregard this reminder.</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:22px 0;" />
+    <p style="font-size:11px;color:#94a3b8;text-align:center;">Sent via VendorPulse — Automated Governance Platform</p>
+  </div>
+</div>
+"""
+    text_body = (
+        f"Dear {attendee_name},\n\n"
+        f"Reminder: your scorecard for {vendor_name} {quarter} {year} "
+        f"{'is due today' if urgent else f'is due in {days_left} day(s) (by {deadline})'}.\n\n"
+        f"Complete it here: {form_url}\n\n"
+        f"If already submitted, please disregard.\n\nVendorPulse"
+    )
+    return {"subject": subject, "html_body": html_body, "text_body": text_body}
+
+
+def build_escalation_email(
+    *,
+    coordinator_name: str,
+    vendor_name: str,
+    quarter: str,
+    year: int,
+    deadline: str,
+    pending: list[dict],
+) -> dict[str, str]:
+    """Deadline-day escalation to the VMO Coordinator listing who is still outstanding."""
+    subject = f"[Escalation] {vendor_name} QBR scorecards outstanding — deadline {deadline}"
+    rows = "".join(
+        f'<tr><td style="padding:6px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;">{p.get("name","")}</td>'
+        f'<td style="padding:6px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#64748b;">{p.get("email","")}</td></tr>'
+        for p in pending
+    )
+    html_body = f"""\
+<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:620px;margin:0 auto;color:#1e293b;">
+  <div style="background:#dc2626;padding:22px 32px;border-radius:12px 12px 0 0;">
+    <h1 style="color:#fff;margin:0;font-size:19px;">VendorPulse — Scorecard Escalation</h1>
+    <p style="color:#ffffffcc;margin:6px 0 0 0;font-size:13px;">{vendor_name} · {quarter} {year}</p>
+  </div>
+  <div style="background:#fff;border:1px solid #e2e8f0;border-top:none;padding:30px 32px;border-radius:0 0 12px 12px;">
+    <p style="font-size:15px;line-height:1.6;">Dear <strong>{coordinator_name or 'VMO Coordinator'}</strong>,</p>
+    <p style="font-size:15px;line-height:1.6;">
+      Today is the scorecard deadline (<strong>{deadline}</strong>) for <strong>{vendor_name} {quarter} {year}</strong>,
+      and <strong>{len(pending)}</strong> reviewer{'s' if len(pending) != 1 else ''} {'have' if len(pending) != 1 else 'has'} not yet submitted:
+    </p>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+      <thead><tr>
+        <th style="text-align:left;padding:6px 12px;background:#f8fafc;font-size:11px;color:#64748b;text-transform:uppercase;">Name</th>
+        <th style="text-align:left;padding:6px 12px;background:#f8fafc;font-size:11px;color:#64748b;text-transform:uppercase;">Email</th>
+      </tr></thead>
+      <tbody>{rows}</tbody>
+    </table>
+    <p style="font-size:13px;color:#475569;">Please follow up directly to keep the governance cycle on track.</p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:22px 0;" />
+    <p style="font-size:11px;color:#94a3b8;text-align:center;">Sent via VendorPulse — Automated Governance Platform</p>
+  </div>
+</div>
+"""
+    text_lines = [
+        f"Dear {coordinator_name or 'VMO Coordinator'},",
+        "",
+        f"Today is the scorecard deadline ({deadline}) for {vendor_name} {quarter} {year}.",
+        f"{len(pending)} reviewer(s) have not submitted:",
+        *[f"  - {p.get('name','')} <{p.get('email','')}>" for p in pending],
+        "",
+        "Please follow up directly.",
+        "",
+        "VendorPulse",
+    ]
+    return {"subject": subject, "html_body": html_body, "text_body": "\n".join(text_lines)}

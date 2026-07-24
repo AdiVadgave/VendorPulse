@@ -14,7 +14,7 @@ import { useState } from 'react'
 import { Loader2, AlertCircle } from 'lucide-react'
 import FindSlotsControl from './FindSlotsControl'
 import SlotRankingPanel from './SlotRankingPanel'
-import { createMeetingEvent } from '@/lib/graphScheduling'
+import { createMeetingEvent, updateMeetingTime, findEventIdByJoinUrl } from '@/lib/graphScheduling'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 
 type TZ = 'IST' | 'UTC' | 'GMT'
@@ -26,6 +26,13 @@ interface Props {
   subject: string
   bodyHtml: string
   defaultDuration?: number
+  /** The final QBR meeting date — this meeting must be held before it, so the slot
+   *  search window ends the day before the QBR (From defaults to today). */
+  qbrMeetingDate?: string | null
+  /** Rescheduling an existing meeting: MOVE that event instead of creating a new one.
+   *  Provide its join link (and/or Graph event id) so we can locate + patch it. */
+  existingEventId?: string | null
+  existingMeetingUrl?: string | null
   onScheduled: (r: {
     startTime: string
     timeZone: TZ
@@ -43,29 +50,61 @@ export default function DelegatedScheduler({
   subject,
   bodyHtml,
   defaultDuration = 30,
+  qbrMeetingDate,
+  existingEventId,
+  existingMeetingUrl,
   onScheduled,
   onCancel,
 }: Props) {
   const [phase, setPhase] = useState<'find' | 'rank'>('find')
+
+  function localISODate(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  // From = today (when the coordinator opens this); To = day before the QBR.
+  const todayStr = localISODate(new Date())
+  let dayBeforeQbr: string | undefined
+  if (qbrMeetingDate) {
+    const q = new Date(qbrMeetingDate)
+    if (!Number.isNaN(q.getTime())) {
+      q.setDate(q.getDate() - 1)
+      dayBeforeQbr = localISODate(q)
+    }
+  }
   const [slots, setSlots] = useState<SlotProposal[]>([])
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Shared path — creates the Teams meeting via delegated Graph and persists.
+  // Shared path — creates the Teams meeting via delegated Graph and persists. When
+  // rescheduling an existing meeting, MOVE that event (patch its time) instead of
+  // creating a duplicate — same behaviour as the main QBR reschedule.
   async function scheduleSlot(slot: SlotProposal, tz: TZ) {
     setCreating(true)
     setError(null)
+    const durationMinutes = slot.duration_minutes ?? defaultDuration
     try {
-      const created = await createMeetingEvent({ slot, attendees: inviteAttendees, subject, bodyText: bodyHtml })
+      let teamsUrl: string | null = existingMeetingUrl ?? null
+      // Resolve the existing event (stored id, else look it up by join link).
+      let eventId: string | null = existingEventId ?? null
+      if (!eventId && existingMeetingUrl) {
+        eventId = await findEventIdByJoinUrl(existingMeetingUrl)
+      }
+      if (eventId) {
+        const updated = await updateMeetingTime({ eventId, startISO: slot.proposed_time, durationMinutes })
+        if (updated.teams_meeting_url) teamsUrl = updated.teams_meeting_url
+      } else {
+        const created = await createMeetingEvent({ slot, attendees: inviteAttendees, subject, bodyText: bodyHtml })
+        teamsUrl = created.teams_meeting_url
+      }
       await onScheduled({
         startTime: slot.proposed_time,
         timeZone: tz,
-        durationMinutes: slot.duration_minutes ?? defaultDuration,
-        teamsUrl: created.teams_meeting_url,
+        durationMinutes,
+        teamsUrl,
         attendeeCount: inviteAttendees.length,
       })
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create the meeting.')
+      setError(e instanceof Error ? e.message : 'Failed to schedule the meeting.')
       setCreating(false)
     }
   }
@@ -127,6 +166,10 @@ export default function DelegatedScheduler({
           cycleId={cycleId}
           attendees={findAttendees}
           defaultDuration={defaultDuration}
+          defaultFromDate={todayStr}
+          minFromDate={todayStr}
+          defaultToDate={dayBeforeQbr}
+          maxToDate={dayBeforeQbr}
           onSlotsFound={(found) => {
             setSlots(found)
             setPhase('rank')

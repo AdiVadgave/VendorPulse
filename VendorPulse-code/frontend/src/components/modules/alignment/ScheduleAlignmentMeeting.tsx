@@ -25,9 +25,11 @@ interface Props {
   onMeetingScheduled: (result: AlignmentMeetingResult) => void
   /** Which alignment meeting (1-based) — a cycle may have several. */
   meetingIndex?: number
+  /** Final QBR date — alignment must be before it, so slots end the day before. */
+  qbrMeetingDate?: string | null
 }
 
-export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMeetingScheduled, meetingIndex = 1 }: Props) {
+export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMeetingScheduled, meetingIndex = 1, qbrMeetingDate }: Props) {
   const [error, setError] = useState<string | null>(null)
 
   // Internal attendees state
@@ -250,6 +252,8 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
             findAttendees={internalAttendees}
             inviteAttendees={internalAttendees}
             defaultDuration={30}
+            qbrMeetingDate={qbrMeetingDate}
+            existingMeetingUrl={rescheduling ? (meetingResult?.teamsUrl ?? null) : null}
             subject="Mobility Vendor Pulse — Internal Alignment Meeting"
             bodyHtml={ALIGNMENT_BODY_HTML}
             onCancel={rescheduling ? () => setRescheduling(false) : undefined}

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ClipboardList, Send, Bell, Clock, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Link2, Check, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ClipboardList, Send, Bell, Clock, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Link2, Check, Loader2, Trash2, Plus, CalendarClock } from 'lucide-react'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
@@ -24,11 +24,209 @@ interface Props {
   structure?: WeightedCategoryDef[]
 }
 
-const REMINDER_SCHEDULE = [
-  { label: 'T−5 days', tone: 'Informational', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-  { label: 'T−2 days', tone: 'Deadline notice', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-  { label: 'T−0 days', tone: 'Escalation to organiser', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
-]
+interface ReminderTier {
+  offset: number
+  fire_date: string | null
+  status: 'sent' | 'due' | 'scheduled'
+}
+interface ReminderStatus {
+  cycle_id: string
+  deadline: string | null
+  offsets: number[]
+  pending: number
+  pending_names: string[]
+  tiers: ReminderTier[]
+}
+
+function toneFor(offset: number) {
+  if (offset <= 0) return { label: 'Escalation to organiser', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' }
+  if (offset <= 2) return { label: 'Deadline notice', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' }
+  return { label: 'Informational', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' }
+}
+
+/**
+ * Live automated-reminder controls: a coordinator-chosen deadline, editable
+ * T-minus offsets, per-tier status, and a manual "send now". Reminders fire
+ * automatically via the backend daily scheduler (Mail.Send); escalation to the
+ * VMO Coordinator goes out on the deadline day (offset 0).
+ */
+function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
+  const [deadline, setDeadline] = useState('')
+  const [offsets, setOffsets] = useState<number[]>([5, 2, 0])
+  const [status, setStatus] = useState<ReminderStatus | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function load() {
+    try {
+      const s = await apiFetch<ReminderStatus>(`/api/scorecard/reminders/${cycleId}`)
+      setStatus(s)
+      setDeadline(s.deadline ?? '')
+      setOffsets(s.offsets?.length ? s.offsets : [5, 2, 0])
+    } catch {
+      /* leave defaults */
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => { load() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [cycleId])
+
+  async function save() {
+    if (!deadline) { setError('Pick a deadline date first.'); return }
+    setSaving(true); setError(null); setMsg(null)
+    try {
+      const s = await apiFetch<ReminderStatus>(`/api/scorecard/reminders/${cycleId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ deadline: deadline || null, offsets, form_base_url: window.location.origin }),
+      })
+      setStatus(s)
+      setMsg('Reminder schedule saved.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save the schedule.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function sendNow() {
+    setSending(true); setError(null); setMsg(null)
+    try {
+      const r = await apiFetch<{ pending: number; sent: number; failed: number; escalated: number }>(
+        `/api/scorecard/reminders/send-now/${cycleId}`,
+        { method: 'POST', body: JSON.stringify({ form_base_url: window.location.origin }) },
+      )
+      setMsg(
+        r.pending === 0
+          ? 'Everyone has already submitted — no reminders sent.'
+          : `Reminder sent to ${r.sent} pending reviewer${r.sent === 1 ? '' : 's'}${r.failed ? `, ${r.failed} failed` : ''}.`,
+      )
+      load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to send reminders.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const STATUS_BADGE = {
+    sent: { label: 'Sent', cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' },
+    due: { label: 'Due now', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400' },
+    scheduled: { label: 'Scheduled', cls: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
+  } as const
+
+  return (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <Bell size={15} className="text-slate-400" />
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Automated Reminder Schedule</h3>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-slate-400 py-2"><Loader2 size={13} className="animate-spin" /> Loading…</div>
+      ) : (
+        <>
+          {/* Deadline */}
+          <div className="flex flex-wrap items-end gap-3 mb-4">
+            <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
+              <span className="flex items-center gap-1"><CalendarClock size={12} /> Submission deadline</span>
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="px-2.5 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </label>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white transition-colors"
+            >
+              {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+              Save schedule
+            </button>
+          </div>
+
+          {/* Editable offsets */}
+          <div className="space-y-2">
+            {offsets.map((o, i) => {
+              const tone = toneFor(o)
+              const tier = status?.tiers.find((t) => t.offset === o)
+              return (
+                <div key={i} className={`flex items-center justify-between gap-2 p-2.5 rounded-lg ${tone.bg}`}>
+                  <div className="flex items-center gap-2">
+                    <Clock size={13} className={tone.color} />
+                    <span className="text-xs text-slate-500 dark:text-slate-400">T−</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={o}
+                      onChange={(e) => setOffsets((prev) => prev.map((x, j) => (j === i ? Math.max(0, Number(e.target.value)) : x)))}
+                      className="w-14 px-1.5 py-1 text-xs text-center border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                    <span className="text-xs text-slate-500 dark:text-slate-400">days</span>
+                    <span className={`text-xs font-medium ${tone.color}`}>· {tone.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {tier && (
+                      <span className={cn('px-2 py-0.5 rounded-full text-[11px] font-medium', STATUS_BADGE[tier.status].cls)}>
+                        {STATUS_BADGE[tier.status].label}
+                        {tier.fire_date ? ` · ${tier.fire_date}` : ''}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setOffsets((prev) => prev.filter((_, j) => j !== i))}
+                      className="p-1 text-slate-400 hover:text-red-500"
+                      title="Remove reminder"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+            <button
+              onClick={() => setOffsets((prev) => [...prev, 1])}
+              className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+            >
+              <Plus size={12} /> Add reminder
+            </button>
+          </div>
+
+          {/* Pending + send now */}
+          <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {status ? (
+                status.pending === 0
+                  ? 'All key reviewers have submitted.'
+                  : `${status.pending} reviewer${status.pending === 1 ? '' : 's'} still pending.`
+              ) : ''}
+            </p>
+            <button
+              onClick={sendNow}
+              disabled={sending}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 disabled:opacity-60 transition-colors"
+            >
+              {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+              Send reminder now
+            </button>
+          </div>
+
+          {(msg || error) && (
+            <p className={cn('text-xs mt-2', error ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400')}>
+              {error ?? msg}
+            </p>
+          )}
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+            Reminders run automatically each day via the service mailbox. Escalation on the deadline day (T−0) alerts the VMO Coordinator.
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
 
 function CategoriesDropdown({ structure }: { structure: WeightedCategoryDef[] }) {
   const [open, setOpen] = useState(false)
@@ -255,27 +453,8 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
         )}
       </div>
 
-      {/* Reminder schedule */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Bell size={15} className="text-slate-400" />
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Automated Reminder Schedule</h3>
-        </div>
-        <div className="space-y-2">
-          {REMINDER_SCHEDULE.map((r) => (
-            <div key={r.label} className={`flex items-center justify-between p-3 rounded-lg ${r.bg}`}>
-              <div className="flex items-center gap-2">
-                <Clock size={13} className={r.color} />
-                <span className={`text-sm font-medium ${r.color}`}>{r.label}</span>
-              </div>
-              <span className={`text-xs ${r.color}`}>{r.tone}</span>
-            </div>
-          ))}
-        </div>
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
-          Reminders run automatically. Escalation on deadline day alerts the VMO Coordinator.
-        </p>
-      </div>
+      {/* Reminder schedule — live, configurable, sent via the service mailbox */}
+      <ReminderScheduleCard cycleId={cycleId} />
 
       {showApproval && (
         <ApprovalPanel

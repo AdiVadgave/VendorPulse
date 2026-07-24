@@ -18,7 +18,7 @@ const STATE_DOT_COLORS: Record<string, string> = {
   MEETING_SCHEDULED: 'bg-indigo-500',
   SCORECARD_REQUEST_SENT: 'bg-violet-500',
   SCORECARD_COLLECTION: 'bg-violet-500',
-  SCORECARD_COMPILED: 'bg-purple-500',
+  SCORECARD_COMPILED: 'bg-violet-500',
   INTERNAL_ALIGNMENT: 'bg-amber-500',
   VENDOR_PREP: 'bg-orange-500',
   MEETING_IN_PROGRESS: 'bg-rose-500',

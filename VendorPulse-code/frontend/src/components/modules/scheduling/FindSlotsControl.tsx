@@ -15,15 +15,31 @@ interface Props {
   attendees: CycleAttendee[]
   onSlotsFound: (slots: SlotProposal[]) => void
   defaultDuration?: number
+  /** Override the initial From/To dates (YYYY-MM-DD). */
+  defaultFromDate?: string
+  defaultToDate?: string
+  /** Constrain the pickers (YYYY-MM-DD) — e.g. To ≤ day before the QBR. */
+  minFromDate?: string
+  maxToDate?: string
 }
 
 function isoDate(offsetDays: number): string {
   return new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10)
 }
 
-export default function FindSlotsControl({ cycleId, attendees, onSlotsFound, defaultDuration = 60 }: Props) {
-  const [fromDate, setFromDate] = useState(isoDate(0))
-  const [toDate, setToDate] = useState(isoDate(14))
+export default function FindSlotsControl({
+  cycleId,
+  attendees,
+  onSlotsFound,
+  defaultDuration = 60,
+  defaultFromDate,
+  defaultToDate,
+  minFromDate,
+  maxToDate,
+}: Props) {
+  const [fromDate, setFromDate] = useState(defaultFromDate ?? isoDate(0))
+  // Default To: the constraint (day before QBR) if given, else the explicit default, else +14d.
+  const [toDate, setToDate] = useState(defaultToDate ?? maxToDate ?? isoDate(14))
   const [duration, setDuration] = useState<number>(defaultDuration)
 
   const shellCount = attendees.filter((a) => (a.email || '').toLowerCase().endsWith('@shell.com')).length
@@ -43,6 +59,14 @@ export default function FindSlotsControl({ cycleId, attendees, onSlotsFound, def
     }
     if (toDate < fromDate) {
       setError('The "to" date must be on or after the "from" date.')
+      return
+    }
+    if (minFromDate && fromDate < minFromDate) {
+      setError(`The "from" date can't be earlier than ${minFromDate}.`)
+      return
+    }
+    if (maxToDate && toDate > maxToDate) {
+      setError(`This meeting must be held before the QBR — pick a "to" date on or before ${maxToDate}.`)
       return
     }
     setLoading(true)
@@ -75,6 +99,8 @@ export default function FindSlotsControl({ cycleId, attendees, onSlotsFound, def
           <input
             type="date"
             value={fromDate}
+            min={minFromDate}
+            max={maxToDate}
             onChange={(e) => setFromDate(e.target.value)}
             className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
@@ -84,6 +110,8 @@ export default function FindSlotsControl({ cycleId, attendees, onSlotsFound, def
           <input
             type="date"
             value={toDate}
+            min={minFromDate ?? fromDate}
+            max={maxToDate}
             onChange={(e) => setToDate(e.target.value)}
             className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />

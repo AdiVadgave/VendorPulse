@@ -20,7 +20,7 @@ import io
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Body, HTTPException, Response
@@ -38,6 +38,7 @@ from app.dependencies import (
 )
 from app.services.email_templates import build_scorecard_email
 from app.services.mail_provider import get_mail_provider, MailSendError
+from app.services import reminder_service
 from app.models.scheduling import ScorecardConfigUpdate
 from app.utils.prompts import SCORECARD_COMMENT_SUMMARY_SYSTEM_PROMPT
 from app.utils.scorecard_structure import (
@@ -165,6 +166,10 @@ def save_scorecard_config(cycle_id: str, payload: ScorecardConfigUpdate):
     if any(c["weight"] <= 0 for c in cfg["categories"]):
         raise HTTPException(status_code=400, detail="Each included theme must have a weight greater than 0.")
 
+    # Preserve any configured reminder schedule (stored alongside the measures config).
+    existing = cycle.get("scorecard_config") or {}
+    if existing.get("reminders"):
+        cfg["reminders"] = existing["reminders"]
     now = datetime.now(timezone.utc).isoformat()
     updated = cycle_repo.update_by_id("cycle_id", cycle_id, {"scorecard_config": cfg, "updated_at": now})
     logger.info("save_scorecard_config — cycle=%s themes=%d measures=%d",
@@ -1059,6 +1064,92 @@ def dispatch_inapp(payload: InAppDispatchRequest):
             logger.warning("dispatch-inapp: workflow advance failed: %s", exc)
 
     return {"total": len(payload.recipients), "sent": sent, "failed": len(payload.recipients) - sent, "results": results}
+
+
+# ── Automated scorecard reminders ────────────────────────────────────────────
+
+
+class ReminderSettingsUpdate(BaseModel):
+    deadline: Optional[str] = Field(default=None, description="ISO date (YYYY-MM-DD) reviewers must submit by")
+    offsets: list[int] = Field(default_factory=lambda: [5, 2, 0], description="Days before the deadline to remind")
+    form_base_url: Optional[str] = Field(default=None, description="Frontend origin used to build the form link")
+
+
+class ReminderSendNowRequest(BaseModel):
+    form_base_url: Optional[str] = None
+
+
+def _reminder_status(cycle: dict) -> dict:
+    s = reminder_service.get_settings(cycle)
+    pending = reminder_service.pending_respondents(cycle.get("cycle_id"))
+    today = datetime.now(timezone.utc).date()
+    dl = None
+    if s.get("deadline"):
+        try:
+            dl = datetime.fromisoformat(str(s["deadline"])[:10]).date()
+        except ValueError:
+            dl = None
+    sent = {str(o) for o in (s.get("sent") or [])}
+    tiers = []
+    for off in s.get("offsets") or []:
+        off = int(off)
+        fire = (dl - timedelta(days=off)) if dl else None
+        if str(off) in sent:
+            status = "sent"
+        elif fire is not None and fire <= today:
+            status = "due"
+        else:
+            status = "scheduled"
+        tiers.append({"offset": off, "fire_date": fire.isoformat() if fire else None, "status": status})
+    return {
+        "cycle_id": cycle.get("cycle_id"),
+        "deadline": s.get("deadline"),
+        "offsets": s.get("offsets"),
+        "form_base_url": s.get("form_base_url"),
+        "pending": len(pending),
+        "pending_names": [p["name"] for p in pending],
+        "tiers": tiers,
+    }
+
+
+@router.get("/reminders/{cycle_id}")
+def get_reminders(cycle_id: str):
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+    return _reminder_status(cycle)
+
+
+@router.put("/reminders/{cycle_id}")
+def put_reminders(cycle_id: str, payload: ReminderSettingsUpdate):
+    if not payload.offsets:
+        raise HTTPException(status_code=400, detail="Add at least one reminder offset (days before the deadline).")
+    if any(o < 0 for o in payload.offsets):
+        raise HTTPException(status_code=400, detail="Reminder offsets must be 0 or more days before the deadline.")
+    try:
+        reminder_service.save_settings(
+            cycle_id, deadline=payload.deadline, offsets=payload.offsets, form_base_url=payload.form_base_url,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    return _reminder_status(cycle)
+
+
+@router.post("/reminders/send-now/{cycle_id}")
+def send_reminders_now(cycle_id: str, payload: ReminderSendNowRequest = Body(default=ReminderSendNowRequest())):
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+    # Persist the form base URL so the automated scheduler can build links too.
+    if payload and payload.form_base_url:
+        s = reminder_service.get_settings(cycle)
+        reminder_service.save_settings(
+            cycle_id, deadline=s.get("deadline"), offsets=s.get("offsets"), form_base_url=payload.form_base_url,
+        )
+        cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    result = reminder_service.send_now(cycle, base_url=payload.form_base_url if payload else None)
+    return result
 
 
 # ── Final (admin-adjusted) scorecard ─────────────────────────────────────────

@@ -71,28 +71,49 @@ def clamp(n: int) -> int:
     return max(1, min(5, n))
 
 
-# vendor -> (category, four target overalls Q1..Q4, per-theme bias by category index)
+# vendor -> (category, list of (quarter, year) cycles, one target overall per cycle,
+# per-theme bias by category index). len(targets) MUST equal len(quarters); bias is
+# per-category (4 entries) and independent of the number of cycles.
 VENDORS = [
     {
         "name": "TechnoServe", "category": "IT Infrastructure",
         "people": ["Kanishk", "Anup", "Aditya", "Abhishek"],
-        "targets": [2.8, 3.2, 3.6, 4.1],  # improving
+        "quarters": [("Q1", 2025), ("Q2", 2025), ("Q3", 2025)],
+        "targets": [2.8, 3.4, 4.1],       # improving
         "bias": [-0.4, 0.1, 0.0, 0.3],    # Risk&Compliance weak (recurring), Relationship strong
         "desc": "Core infrastructure & managed services. Focus: closing risk & compliance gaps.",
     },
     {
         "name": "DataBridge", "category": "IT Infrastructure",
         "people": ["Kanishk", "Aditya", "Richa"],
-        "targets": [3.9, 3.5, 3.1, 2.7],  # declining
+        "quarters": [("Q2", 2025), ("Q3", 2025), ("Q4", 2025)],
+        "targets": [3.9, 3.3, 2.7],       # declining
         "bias": [0.2, -0.5, 0.1, -0.2],   # Performance slipping
         "desc": "Data platform & integration vendor. Watch: delivery performance decline.",
     },
     {
         "name": "CloudCore", "category": "Managed Services",
         "people": ["Anup", "Abhishek", "Richa", "Aditya"],
-        "targets": [3.35, 3.4, 3.35, 3.4],  # stable
+        "quarters": [("Q3", 2025), ("Q4", 2025)],
+        "targets": [3.35, 3.45],          # stable
         "bias": [0.0, 0.1, -0.3, 0.1],    # Commercial slightly weak
         "desc": "Cloud operations partner. Stable performer under commercial pressure.",
+    },
+    {
+        "name": "NexaSoft", "category": "Application Development",
+        "people": ["Kanishk", "Anup", "Richa"],
+        "quarters": [("Q1", 2025), ("Q2", 2025), ("Q3", 2025)],
+        "targets": [3.0, 3.5, 3.9],       # improving
+        "bias": [0.1, 0.2, -0.2, 0.0],    # Performance strong, Commercial soft
+        "desc": "Custom application delivery partner. Improving after early onboarding gaps.",
+    },
+    {
+        "name": "OrbitLogic", "category": "Managed Services",
+        "people": ["Abhishek", "Aditya", "Richa"],
+        "quarters": [("Q2", 2025), ("Q3", 2025)],
+        "targets": [3.6, 3.1],            # slight decline
+        "bias": [-0.2, 0.0, 0.2, -0.1],   # Risk weak, Commercial strong
+        "desc": "Logistics & operations managed-services vendor. Monitoring compliance posture.",
     },
 ]
 DEMO_NAMES = {v["name"] for v in VENDORS}
@@ -116,7 +137,7 @@ def seed() -> None:
     for v in VENDORS:
         vendor_id = f"v_{uuid.uuid4().hex}"
         vrepo.insert({"vendor_id": vendor_id, "name": v["name"], "category": v["category"], "status": "active"})
-        quarters = [("Q1", 2025), ("Q2", 2025), ("Q3", 2025), ("Q4", 2025)]
+        quarters = v["quarters"]
         for idx, ((q, year), target) in enumerate(zip(quarters, v["targets"])):
             is_latest = idx == len(quarters) - 1
             state = "SCORECARD_COMPILED" if is_latest else "ARCHIVED"

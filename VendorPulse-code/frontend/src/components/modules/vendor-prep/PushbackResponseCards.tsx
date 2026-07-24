@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Sparkles, Check, Lock } from 'lucide-react'
-import type { PushbackItem, PushbackResponse } from '@/types/vendor-prep.types'
+import { Sparkles, Check, Lock, ChevronDown, ChevronRight } from 'lucide-react'
+import type { PushbackItem, PushbackResponse, PushbackCategory } from '@/types/vendor-prep.types'
 import { PUSHBACK_CATEGORY_LABELS } from '@/types/vendor-prep.types'
 import { generatePushbackResponses } from '@/lib/vendorPrepApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { AgentStatus } from '@/types/agent.types'
+import { cn } from '@/utils/cn'
 
 interface Props {
   cycleId: string
@@ -26,6 +27,9 @@ function PushbackCard({
 }) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(responses.length > 0 ? 'complete' : 'idle')
   const [error, setError] = useState<string | null>(null)
+  // Collapsed by default once handled (drafts ready or legal-locked); open when the
+  // coordinator still needs to generate drafts — so a long list stays tidy.
+  const [open, setOpen] = useState(responses.length === 0 && !item.needs_legal_review)
 
   async function handleGenerate() {
     setAgentStatus('running')
@@ -54,13 +58,29 @@ function PushbackCard({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-      {/* Pushback header */}
-      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <span className="text-xs bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400 px-2 py-0.5 rounded font-medium">
-            {PUSHBACK_CATEGORY_LABELS[item.category]}
-          </span>
-          <div className="flex items-center gap-2">
+      {/* Pushback header — click to expand/collapse */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((v) => !v) } }}
+        className={cn(
+          'px-5 py-4 cursor-pointer select-none hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors',
+          open && 'border-b border-slate-100 dark:border-slate-800'
+        )}
+      >
+        <div className={cn('flex items-center justify-between gap-3', open && 'mb-2')}>
+          <div className="flex items-center gap-2 min-w-0">
+            {open ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
+            <span className="text-xs bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400 px-2 py-0.5 rounded font-medium shrink-0">
+              {PUSHBACK_CATEGORY_LABELS[item.category]}
+            </span>
+            {/* Collapsed: show a one-line preview inline so the card is a single row. */}
+            {!open && (
+              <span className="text-sm text-slate-600 dark:text-slate-400 truncate">{item.description}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             {item.needs_legal_review && (
               <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded font-medium">
                 <Lock size={11} />
@@ -70,12 +90,17 @@ function PushbackCard({
             <AgentStatusBadge status={agentStatus} />
           </div>
         </div>
-        <p className="text-sm text-slate-700 dark:text-slate-300 mb-1">{item.description}</p>
-        <p className="text-xs text-slate-400 dark:text-slate-500">Raised by: {item.raised_by}</p>
+        {/* Expanded: full description + who raised it. */}
+        {open && (
+          <>
+            <p className="text-sm text-slate-700 dark:text-slate-300 mb-1 pl-6">{item.description}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 pl-6">Raised by: {item.raised_by}</p>
+          </>
+        )}
       </div>
 
-      {/* Response options */}
-      {item.needs_legal_review ? (
+      {/* Response options — only when expanded */}
+      {!open ? null : item.needs_legal_review ? (
         <div className="px-5 py-4 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           <Lock size={14} />
           AI response drafts excluded — requires legal/commercial review before Shell can respond.
@@ -109,6 +134,15 @@ function PushbackCard({
 }
 
 export default function PushbackResponseCards({ cycleId, items, responses, onGenerate }: Props) {
+  // Track which category groups are collapsed (all expanded by default).
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set())
+  const toggleCat = (cat: string) =>
+    setCollapsedCats((prev) => {
+      const next = new Set(prev)
+      next.has(cat) ? next.delete(cat) : next.add(cat)
+      return next
+    })
+
   if (items.length === 0) {
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center">
@@ -119,20 +153,58 @@ export default function PushbackResponseCards({ cycleId, items, responses, onGen
     )
   }
 
+  // Group by category (in the standard category order) so all "Data Dispute" items
+  // sit together, then "Process Concern", etc.
+  const order = Object.keys(PUSHBACK_CATEGORY_LABELS) as PushbackCategory[]
+  const groups = order
+    .map((cat) => ({ cat, list: items.filter((i) => i.category === cat) }))
+    .filter((g) => g.list.length > 0)
+
   return (
-    <div className="space-y-4">
-      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-        Pushback Items &amp; Response Drafts ({items.length})
-      </p>
-      {items.map((item) => (
-        <PushbackCard
-          key={item.pushback_id}
-          cycleId={cycleId}
-          item={item}
-          responses={responses[item.pushback_id] ?? []}
-          onGenerate={(generated) => onGenerate(item.pushback_id, generated)}
-        />
-      ))}
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+      {/* Panel header */}
+      <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+          Pushback Items &amp; Response Drafts ({items.length})
+        </h3>
+      </div>
+
+      {/* One collapsible section per category */}
+      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+        {groups.map((g) => {
+          const catOpen = !collapsedCats.has(g.cat)
+          return (
+            <div key={g.cat}>
+              <button
+                type="button"
+                onClick={() => toggleCat(g.cat)}
+                className="w-full flex items-center gap-2 px-5 py-3 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                {catOpen ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
+                <span className="text-xs font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wide">
+                  {PUSHBACK_CATEGORY_LABELS[g.cat]}
+                </span>
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full px-1.5 min-w-[18px] text-center">
+                  {g.list.length}
+                </span>
+              </button>
+              {catOpen && (
+                <div className="p-4 space-y-2 bg-slate-50/30 dark:bg-slate-800/20">
+                  {g.list.map((item) => (
+                    <PushbackCard
+                      key={item.pushback_id}
+                      cycleId={cycleId}
+                      item={item}
+                      responses={responses[item.pushback_id] ?? []}
+                      onGenerate={(generated) => onGenerate(item.pushback_id, generated)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

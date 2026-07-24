@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import {
   CalendarClock,
@@ -9,6 +9,7 @@ import {
   ListChecks,
   LayoutDashboard,
   Lock,
+  UserPlus,
   CheckCircle2,
   Building2,
   Clock,
@@ -986,6 +987,13 @@ function SchedulingTab({
   // Inline "add attendee" panel on the Confirmation page — lets the coordinator add
   // (and invite) attendees to an already-scheduled meeting without navigating back.
   const [showAddAttendee, setShowAddAttendee] = useState(false)
+  const addAttendeeRef = useRef<HTMLDivElement>(null)
+  // When opened, scroll the add-attendee section into view so it's obvious where to go.
+  useEffect(() => {
+    if (showAddAttendee) {
+      addAttendeeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [showAddAttendee])
 
   // Schedule at a coordinator-chosen time (shared by the Attendees page and the
   // Slot Ranking panel). Builds a synthetic slot and jumps to Invite Approval,
@@ -1196,7 +1204,14 @@ function SchedulingTab({
               addAttendeeOpen={showAddAttendee}
             />
             {showAddAttendee && (
-              <>
+              <div ref={addAttendeeRef} className="space-y-4 scroll-mt-4 fade-in">
+                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl px-5 py-3 flex items-center gap-2 text-sm text-indigo-800 dark:text-indigo-300">
+                  <UserPlus size={15} className="shrink-0" />
+                  <span>
+                    <strong>Add attendees below</strong>, then use <strong>Send invite to added attendees</strong> to
+                    invite them to this meeting.
+                  </span>
+                </div>
                 {/* Add people to the existing meeting without leaving Confirmation. */}
                 <AttendeeRefreshPanel
                   cycleId={cycle.cycle_id}
@@ -1204,6 +1219,7 @@ function SchedulingTab({
                   onAttendeesChanged={onAttendeesUpdated}
                   onDispatchComplete={() => {}}
                   hideScheduleHint
+                  defaultShowAddForm
                 />
                 <AddAttendeesToMeetingPanel
                   cycleId={cycle.cycle_id}
@@ -1216,7 +1232,7 @@ function SchedulingTab({
                   timeZone={selectedSlotTimeZone}
                   onUpdated={onEventUpdated}
                 />
-              </>
+              </div>
             )}
           </div>
         ) : (

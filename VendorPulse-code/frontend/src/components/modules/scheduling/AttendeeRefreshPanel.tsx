@@ -34,6 +34,8 @@ interface AttendeeRefreshPanelProps {
   onBackToAttendance?: () => void
   /** Hide the "use Find Slots below" scheduling hint (e.g. when reused post-scheduling). */
   hideScheduleHint?: boolean
+  /** Open the "Add attendee" search form immediately on mount (skips the nested Add click). */
+  defaultShowAddForm?: boolean
 }
 
 // ── Search & Add Attendee Form ───────────────────────────────────────────────
@@ -474,8 +476,9 @@ export default function AttendeeRefreshPanel({
   onAttendeesChanged,
   onBackToAttendance,
   hideScheduleHint,
+  defaultShowAddForm,
 }: AttendeeRefreshPanelProps) {
-  const [showAddForm, setShowAddForm] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(Boolean(defaultShowAddForm))
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function handleUpdateAttendee(

@@ -338,3 +338,31 @@ export async function addAttendeesToEvent(params: {
     throw new Error(`Graph update event ${res.status}: ${t.slice(0, 300)}`)
   }
 }
+
+// ── Reschedule: change an existing meeting's start/end time ───────────────────
+// PATCHes the event's start/end. Graph sends the updated invite to all attendees
+// automatically. Delegated, as the signed-in coordinator (Calendars.ReadWrite).
+export async function updateMeetingTime(params: {
+  eventId: string
+  startISO: string
+  durationMinutes: number
+}): Promise<{ teams_meeting_url: string | null }> {
+  const { eventId, startISO, durationMinutes } = params
+  const start = new Date(startISO)
+  const end = new Date(start.getTime() + durationMinutes * 60 * 1000)
+  const body = {
+    start: { dateTime: start.toISOString().replace('Z', ''), timeZone: 'UTC' },
+    end: { dateTime: end.toISOString().replace('Z', ''), timeZone: 'UTC' },
+  }
+  const res = await fetch(`${GRAPH}/me/events/${encodeURIComponent(eventId)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const t = await res.text()
+    throw new Error(`Graph reschedule ${res.status}: ${t.slice(0, 300)}`)
+  }
+  const ev = (await res.json()) as { onlineMeeting?: { joinUrl?: string } }
+  return { teams_meeting_url: ev.onlineMeeting?.joinUrl ?? null }
+}

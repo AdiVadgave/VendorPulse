@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileText, Sparkles, Copy, CheckCircle2, Send, Users } from 'lucide-react'
+import { FileText, Sparkles, Copy, CheckCircle2, Send, Users, Pencil, Plus, Trash2, X, Check } from 'lucide-react'
 import type { MeetingMinutes } from '@/types/meeting.types'
 import type { MeetingNote } from '@/types/meeting.types'
 import { generateMeetingMinutes, approveMinutes, sendMeetingMinutes } from '@/lib/meetingApi'
@@ -22,6 +22,8 @@ interface Props {
 export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = null, vendorName, quarter, year, onApproved }: Props) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(initialMinutes ? 'complete' : 'idle')
   const [minutes, setMinutes] = useState<MeetingMinutes | null>(initialMinutes)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<MeetingMinutes | null>(null)
   const [showApproval, setShowApproval] = useState(false)
   const [approved, setApproved] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -100,6 +102,30 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
     setTimeout(() => setCopied(false), 2000)
   }
 
+  function startEdit() {
+    if (!minutes) return
+    // Deep-ish copy so edits don't mutate the live minutes until Save.
+    setDraft({
+      ...minutes,
+      key_decisions: [...minutes.key_decisions],
+      agenda_summaries: minutes.agenda_summaries.map((a) => ({ ...a })),
+      action_items: minutes.action_items.map((a) => ({ ...a })),
+    })
+    setEditing(true)
+  }
+
+  function saveEdit() {
+    if (!draft) return
+    setMinutes({
+      ...draft,
+      key_decisions: draft.key_decisions.map((d) => d.trim()).filter(Boolean),
+      agenda_summaries: draft.agenda_summaries.filter((a) => a.topic.trim() || a.summary.trim()),
+      action_items: draft.action_items.filter((a) => a.description.trim()),
+    })
+    setEditing(false)
+    setDraft(null)
+  }
+
   async function handleSend() {
     if (!minutes || !runId) return
     setSendStatus('sending')
@@ -150,8 +176,169 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
               </p>
             )}
           </div>
+        ) : editing && draft ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">Editing minutes</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setEditing(false); setDraft(null) }}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <X size={12} /> Cancel
+                </button>
+                <button
+                  onClick={saveEdit}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+                >
+                  <Check size={12} /> Save changes
+                </button>
+              </div>
+            </div>
+
+            {/* Executive summary */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Executive Summary</label>
+              <textarea
+                value={draft.executive_summary}
+                onChange={(e) => setDraft((d) => d && ({ ...d, executive_summary: e.target.value }))}
+                rows={4}
+                className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 resize-y focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Key decisions */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Key Decisions</label>
+                <button
+                  onClick={() => setDraft((d) => d && ({ ...d, key_decisions: [...d.key_decisions, ''] }))}
+                  className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  <Plus size={12} /> Add
+                </button>
+              </div>
+              <div className="space-y-1.5">
+                {draft.key_decisions.map((d, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      value={d}
+                      onChange={(e) => setDraft((prev) => prev && ({ ...prev, key_decisions: prev.key_decisions.map((x, j) => (j === i ? e.target.value : x)) }))}
+                      className="flex-1 text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button
+                      onClick={() => setDraft((prev) => prev && ({ ...prev, key_decisions: prev.key_decisions.filter((_, j) => j !== i) }))}
+                      className="p-1 text-slate-400 hover:text-red-500"
+                      title="Remove"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Agenda summaries */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Agenda Summaries</label>
+                <button
+                  onClick={() => setDraft((d) => d && ({ ...d, agenda_summaries: [...d.agenda_summaries, { topic: '', summary: '' }] }))}
+                  className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  <Plus size={12} /> Add
+                </button>
+              </div>
+              <div className="space-y-2">
+                {draft.agenda_summaries.map((a, i) => (
+                  <div key={i} className="space-y-1.5 p-2.5 border border-slate-200 dark:border-slate-700 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={a.topic}
+                        placeholder="Topic"
+                        onChange={(e) => setDraft((prev) => prev && ({ ...prev, agenda_summaries: prev.agenda_summaries.map((x, j) => (j === i ? { ...x, topic: e.target.value } : x)) }))}
+                        className="flex-1 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <button
+                        onClick={() => setDraft((prev) => prev && ({ ...prev, agenda_summaries: prev.agenda_summaries.filter((_, j) => j !== i) }))}
+                        className="p-1 text-slate-400 hover:text-red-500"
+                        title="Remove"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    <textarea
+                      value={a.summary}
+                      placeholder="Summary"
+                      rows={2}
+                      onChange={(e) => setDraft((prev) => prev && ({ ...prev, agenda_summaries: prev.agenda_summaries.map((x, j) => (j === i ? { ...x, summary: e.target.value } : x)) }))}
+                      className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Action items */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Action Items</label>
+                <button
+                  onClick={() => setDraft((d) => d && ({ ...d, action_items: [...d.action_items, { description: '', owner: '', due_date: '' }] }))}
+                  className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  <Plus size={12} /> Add
+                </button>
+              </div>
+              <div className="space-y-2">
+                {draft.action_items.map((a, i) => (
+                  <div key={i} className="flex items-start gap-2 p-2.5 border border-slate-200 dark:border-slate-700 rounded-lg">
+                    <div className="flex-1 space-y-1.5">
+                      <input
+                        value={a.description}
+                        placeholder="Description"
+                        onChange={(e) => setDraft((prev) => prev && ({ ...prev, action_items: prev.action_items.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)) }))}
+                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <div className="flex gap-2">
+                        <input
+                          value={a.owner}
+                          placeholder="Owner"
+                          onChange={(e) => setDraft((prev) => prev && ({ ...prev, action_items: prev.action_items.map((x, j) => (j === i ? { ...x, owner: e.target.value } : x)) }))}
+                          className="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        <input
+                          value={a.due_date}
+                          placeholder="Due date"
+                          onChange={(e) => setDraft((prev) => prev && ({ ...prev, action_items: prev.action_items.map((x, j) => (j === i ? { ...x, due_date: e.target.value } : x)) }))}
+                          className="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setDraft((prev) => prev && ({ ...prev, action_items: prev.action_items.filter((_, j) => j !== i) }))}
+                      className="p-1 text-slate-400 hover:text-red-500 mt-0.5"
+                      title="Remove"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="space-y-4">
+            {!approved && (
+              <div className="flex justify-end">
+                <button
+                  onClick={startEdit}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors"
+                >
+                  <Pencil size={12} /> Edit minutes
+                </button>
+              </div>
+            )}
             {approved && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">

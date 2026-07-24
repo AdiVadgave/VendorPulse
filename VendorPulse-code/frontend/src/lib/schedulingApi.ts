@@ -119,7 +119,7 @@ export interface ManualMeetingResult {
  *  advances the workflow to MEETING_SCHEDULED). No calendar.readwrite required. */
 export async function scheduleManualMeeting(
   cycleId: string,
-  input: { startTime: string; timeZone: string; durationMinutes?: number; meetingUrl?: string | null }
+  input: { startTime: string; timeZone: string; durationMinutes?: number; meetingUrl?: string | null; eventId?: string | null }
 ): Promise<ManualMeetingResult> {
   return apiFetch<ManualMeetingResult>(`/api/cycles/${cycleId}/scheduling/manual-meeting`, {
     method: 'POST',
@@ -128,6 +128,7 @@ export async function scheduleManualMeeting(
       time_zone: input.timeZone,
       duration_minutes: input.durationMinutes ?? 60,
       meeting_url: input.meetingUrl ?? null,
+      event_id: input.eventId ?? null,
     }),
   })
 }

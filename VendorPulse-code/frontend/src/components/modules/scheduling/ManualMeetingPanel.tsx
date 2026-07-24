@@ -1,17 +1,29 @@
 import { useState } from 'react'
-import { CalendarClock, Loader2, AlertCircle, Link2, Users, ArrowRight } from 'lucide-react'
+import { CalendarClock, Loader2, AlertCircle, Users, ArrowRight } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { CycleAttendee } from '@/types/scheduling.types'
 import { scheduleManualMeeting } from '@/lib/schedulingApi'
+import { updateMeetingTime, createMeetingEvent, isSchedulingAvailable } from '@/lib/graphScheduling'
 
 type TimeZoneView = 'IST' | 'UTC' | 'GMT'
 
 interface Props {
   cycleId: string
   attendees: CycleAttendee[]
+  /** Graph event id of the meeting being rescheduled (null → a fresh event is created). */
+  existingEventId: string | null
+  vendorName: string
+  quarter: string
+  year: number
   onBack?: () => void
-  /** Called after the meeting date/time is saved to the DB. */
-  onScheduled: (info: { startTime: string; timeZone: TimeZoneView; durationMinutes: number; meetingUrl: string | null }) => void
+  /** Called after the meeting has been rescheduled on the calendar + persisted. */
+  onScheduled: (info: {
+    startTime: string
+    timeZone: TimeZoneView
+    durationMinutes: number
+    meetingUrl: string | null
+    eventId: string | null
+  }) => void
 }
 
 const DURATIONS = [
@@ -22,34 +34,76 @@ const DURATIONS = [
 ]
 
 /**
- * Manual meeting scheduling — no Microsoft Graph / calendar access. The coordinator
- * picks the date/time (and optionally pastes a meeting link); it's persisted on the
- * cycle so the DB holds the scheduled date, and the workflow advances to
- * MEETING_SCHEDULED.
+ * Reschedule the governance meeting. Because the Teams meeting is managed via
+ * delegated Calendars.ReadWrite, this updates the ACTUAL calendar event time (Graph
+ * PATCH), which re-notifies attendees — there is no manual meeting-link to paste.
+ * Requires an SSO session (same as scheduling).
  */
-export default function ManualMeetingPanel({ cycleId, attendees, onBack, onScheduled }: Props) {
+export default function ManualMeetingPanel({
+  cycleId,
+  attendees,
+  existingEventId,
+  vendorName,
+  quarter,
+  year,
+  onBack,
+  onScheduled,
+}: Props) {
   const [startLocal, setStartLocal] = useState('')      // from <input type="datetime-local">
   const [durationMinutes, setDurationMinutes] = useState(60)
   const [timeZone, setTimeZone] = useState<TimeZoneView>('IST')
-  const [meetingUrl, setMeetingUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSave() {
     if (!startLocal) { setError('Pick a date and time first.'); return }
+    if (!isSchedulingAvailable()) {
+      setError("You can't reschedule — you're not signed in with Shell (SSO). Sign in with your Shell account and try again.")
+      return
+    }
     setSaving(true)
     setError(null)
     const startTime = startLocal.length === 16 ? `${startLocal}:00` : startLocal
     try {
-      await scheduleManualMeeting(cycleId, {
-        startTime, timeZone, durationMinutes, meetingUrl: meetingUrl.trim() || null,
-      })
+      let meetingUrl: string | null = null
+      let eventId: string | null = existingEventId
+
+      if (existingEventId) {
+        // Move the existing Teams event — Graph re-sends the updated invite.
+        const updated = await updateMeetingTime({ eventId: existingEventId, startISO: startTime, durationMinutes })
+        meetingUrl = updated.teams_meeting_url
+      } else {
+        // No event on record → create a fresh Teams meeting at the new time.
+        const subject = `EGB/QBR Meeting Invitation — ${vendorName} ${quarter} ${year}`
+        const bodyHtml =
+          `<p>Dear Team,</p>` +
+          `<p>You are invited to the <strong>EGB/QBR governance review</strong> for ` +
+          `<strong>${vendorName} — ${quarter} ${year}</strong>.</p>` +
+          `<p>Please accept or decline via Microsoft Teams.</p><p>— Mobility Vendor Pulse</p>`
+        const created = await createMeetingEvent({
+          slot: {
+            slot_id: 'reschedule',
+            cycle_id: cycleId,
+            proposed_time: startTime,
+            proposed_time_zone: timeZone,
+            duration_minutes: durationMinutes,
+          } as unknown as Parameters<typeof createMeetingEvent>[0]['slot'],
+          attendees,
+          subject,
+          bodyText: bodyHtml,
+        })
+        meetingUrl = created.teams_meeting_url
+        eventId = created.event_id
+      }
+
+      // Persist the new time (+ event id / link) on the cycle.
+      await scheduleManualMeeting(cycleId, { startTime, timeZone, durationMinutes, meetingUrl, eventId })
+      setSaving(false)
+      onScheduled({ startTime, timeZone, durationMinutes, meetingUrl, eventId })
     } catch (e) {
-      // Persisted best-effort; still advance the UI so the flow isn't blocked offline.
-      setError(e instanceof Error ? e.message : 'Could not save to the server — continuing locally.')
+      setError(e instanceof Error ? e.message : 'Could not reschedule the meeting.')
+      setSaving(false)
     }
-    setSaving(false)
-    onScheduled({ startTime, timeZone, durationMinutes, meetingUrl: meetingUrl.trim() || null })
   }
 
   return (
@@ -61,9 +115,9 @@ export default function ManualMeetingPanel({ cycleId, attendees, onBack, onSched
               <CalendarClock size={18} className="text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Schedule the Meeting</h3>
+              <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Reschedule the Meeting</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Set the governance meeting date &amp; time. This is saved on the cycle.
+                Pick a new time — the Teams meeting is updated and attendees are re-notified automatically.
               </p>
             </div>
           </div>
@@ -73,7 +127,7 @@ export default function ManualMeetingPanel({ cycleId, attendees, onBack, onSched
               onClick={onBack}
               className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
-              Back to Attendees
+              Back
             </button>
           )}
         </div>
@@ -112,23 +166,9 @@ export default function ManualMeetingPanel({ cycleId, attendees, onBack, onSched
           </label>
         </div>
 
-        <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400 mt-3">
-          Meeting link <span className="text-slate-400">(optional — paste a Teams/Zoom/Meet link)</span>
-          <div className="relative">
-            <Link2 size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              type="url"
-              value={meetingUrl}
-              onChange={(e) => setMeetingUrl(e.target.value)}
-              placeholder="https://teams.microsoft.com/l/meetup-join/…"
-              className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        </label>
-
         <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
           <Users size={13} className="text-slate-400" />
-          {attendees.length} attendee{attendees.length === 1 ? '' : 's'} on this cycle
+          {attendees.length} attendee{attendees.length === 1 ? '' : 's'} will be re-notified
         </div>
 
         {error && (
@@ -148,7 +188,7 @@ export default function ManualMeetingPanel({ cycleId, attendees, onBack, onSched
           )}
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
-          {saving ? 'Saving…' : 'Confirm Meeting Date'}
+          {saving ? 'Rescheduling…' : 'Reschedule Meeting'}
         </button>
       </div>
     </div>

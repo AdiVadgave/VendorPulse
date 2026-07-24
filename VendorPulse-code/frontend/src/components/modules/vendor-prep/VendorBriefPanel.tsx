@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Sparkles, TrendingUp, TrendingDown, Minus, CheckCircle2, AlertTriangle, Send } from 'lucide-react'
+import { Sparkles, TrendingUp, TrendingDown, Minus, CheckCircle2, AlertTriangle, Send, Pencil, Plus, Trash2, X, Check } from 'lucide-react'
 import type { VendorBrief } from '@/types/vendor-prep.types'
 import { generateVendorBrief, approveBrief } from '@/lib/vendorPrepApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
@@ -49,6 +49,30 @@ export default function VendorBriefPanel({ cycleId, vendorName, quarter, year, b
   const [error, setError] = useState<string | null>(null)
   const [runId, setRunId] = useState<string | null>(null)
   const [isApproving, setIsApproving] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<VendorBrief | null>(null)
+
+  function startEdit() {
+    if (!brief) return
+    setDraft({
+      ...brief,
+      category_ratings: brief.category_ratings.map((c) => ({ ...c })),
+      key_concerns: [...brief.key_concerns],
+      positive_areas: [...brief.positive_areas],
+    })
+    setEditing(true)
+  }
+
+  function saveEdit() {
+    if (!draft) return
+    onBriefGenerated({
+      ...draft,
+      key_concerns: draft.key_concerns.map((c) => c.trim()).filter(Boolean),
+      positive_areas: draft.positive_areas.map((p) => p.trim()).filter(Boolean),
+    })
+    setEditing(false)
+    setDraft(null)
+  }
 
   async function handleGenerate() {
     setAgentStatus('running')
@@ -127,8 +151,96 @@ export default function VendorBriefPanel({ cycleId, vendorName, quarter, year, b
               </p>
             )}
           </div>
+        ) : editing && draft ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wide">Editing brief</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setEditing(false); setDraft(null) }}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <X size={12} /> Cancel
+                </button>
+                <button
+                  onClick={saveEdit}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-medium"
+                >
+                  <Check size={12} /> Save changes
+                </button>
+              </div>
+            </div>
+
+            {/* Category rationales */}
+            <div>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Category Ratings — rationale</p>
+              <div className="space-y-2">
+                {draft.category_ratings.map((cat, i) => (
+                  <div key={cat.category} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{cat.category}</span>
+                    <textarea
+                      value={cat.rationale}
+                      rows={2}
+                      onChange={(e) => setDraft((d) => d && ({ ...d, category_ratings: d.category_ratings.map((x, j) => (j === i ? { ...x, rationale: e.target.value } : x)) }))}
+                      className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 resize-none focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Key concerns */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-wide flex items-center gap-1"><AlertTriangle size={12} /> Key Concerns</p>
+                <button onClick={() => setDraft((d) => d && ({ ...d, key_concerns: [...d.key_concerns, ''] }))} className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 hover:underline"><Plus size={12} /> Add</button>
+              </div>
+              <div className="space-y-1.5">
+                {draft.key_concerns.map((c, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      value={c}
+                      onChange={(e) => setDraft((d) => d && ({ ...d, key_concerns: d.key_concerns.map((x, j) => (j === i ? e.target.value : x)) }))}
+                      className="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    />
+                    <button onClick={() => setDraft((d) => d && ({ ...d, key_concerns: d.key_concerns.filter((_, j) => j !== i) }))} className="p-1 text-slate-400 hover:text-red-500" title="Remove"><Trash2 size={13} /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Positive areas */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide flex items-center gap-1"><CheckCircle2 size={12} /> Positive Areas</p>
+                <button onClick={() => setDraft((d) => d && ({ ...d, positive_areas: [...d.positive_areas, ''] }))} className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 hover:underline"><Plus size={12} /> Add</button>
+              </div>
+              <div className="space-y-1.5">
+                {draft.positive_areas.map((p, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      value={p}
+                      onChange={(e) => setDraft((d) => d && ({ ...d, positive_areas: d.positive_areas.map((x, j) => (j === i ? e.target.value : x)) }))}
+                      className="flex-1 text-xs border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                    <button onClick={() => setDraft((d) => d && ({ ...d, positive_areas: d.positive_areas.filter((_, j) => j !== i) }))} className="p-1 text-slate-400 hover:text-red-500" title="Remove"><Trash2 size={13} /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="space-y-4">
+            {!approved && (
+              <div className="flex justify-end">
+                <button
+                  onClick={startEdit}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors"
+                >
+                  <Pencil size={12} /> Edit brief
+                </button>
+              </div>
+            )}
             {/* Overall score */}
             <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
               <div className="text-center">

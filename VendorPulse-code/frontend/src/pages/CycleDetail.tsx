@@ -1144,9 +1144,13 @@ function SchedulingTab({
         <ManualMeetingPanel
           cycleId={cycle.cycle_id}
           attendees={attendees}
-          onBack={() => onPhaseChange('attendee_refresh')}
-          onScheduled={({ startTime, timeZone, durationMinutes, meetingUrl }) => {
-            // Build a synthetic approved slot from the manual date so the
+          existingEventId={scheduledEventId}
+          vendorName={cycle.vendor_name}
+          quarter={cycle.quarter}
+          year={cycle.year}
+          onBack={() => onPhaseChange('confirmation_tracking')}
+          onScheduled={({ startTime, timeZone, durationMinutes, meetingUrl, eventId }) => {
+            // Build a synthetic approved slot from the new date so the
             // Confirmation view can render the scheduled time + attendee list.
             const manualSlot: SlotProposal = {
               slot_id: `manual-${cycle.cycle_id}`,
@@ -1169,6 +1173,7 @@ function SchedulingTab({
             onSlotSelected(manualSlot.slot_id)
             onSlotTimeZoneSelected(timeZone)
             if (meetingUrl) onTeamsMeetingUrlCaptured(meetingUrl)
+            onEventIdCaptured(eventId)
             onMeetingScheduled()  // advance the workflow store to MEETING_SCHEDULED
             onPhaseChange('confirmation_tracking')
           }}

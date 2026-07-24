@@ -3,15 +3,17 @@ import { CalendarClock, Loader2, AlertCircle, Users, ArrowRight } from 'lucide-r
 import { cn } from '@/utils/cn'
 import type { CycleAttendee } from '@/types/scheduling.types'
 import { scheduleManualMeeting } from '@/lib/schedulingApi'
-import { updateMeetingTime, createMeetingEvent, isSchedulingAvailable } from '@/lib/graphScheduling'
+import { updateMeetingTime, createMeetingEvent, findEventIdByJoinUrl, isSchedulingAvailable } from '@/lib/graphScheduling'
 
 type TimeZoneView = 'IST' | 'UTC' | 'GMT'
 
 interface Props {
   cycleId: string
   attendees: CycleAttendee[]
-  /** Graph event id of the meeting being rescheduled (null → a fresh event is created). */
+  /** Graph event id of the meeting being rescheduled (null → looked up by join link). */
   existingEventId: string | null
+  /** Existing meeting join link — used to locate the event when its id isn't stored. */
+  existingMeetingUrl: string | null
   vendorName: string
   quarter: string
   year: number
@@ -43,6 +45,7 @@ export default function ManualMeetingPanel({
   cycleId,
   attendees,
   existingEventId,
+  existingMeetingUrl,
   vendorName,
   quarter,
   year,
@@ -65,15 +68,20 @@ export default function ManualMeetingPanel({
     setError(null)
     const startTime = startLocal.length === 16 ? `${startLocal}:00` : startLocal
     try {
-      let meetingUrl: string | null = null
+      // Resolve the existing event: prefer the stored id; otherwise locate it by its
+      // join link so we MOVE that meeting instead of creating a duplicate.
       let eventId: string | null = existingEventId
+      if (!eventId && existingMeetingUrl) {
+        eventId = await findEventIdByJoinUrl(existingMeetingUrl)
+      }
+      let meetingUrl: string | null = existingMeetingUrl
 
-      if (existingEventId) {
+      if (eventId) {
         // Move the existing Teams event — Graph re-sends the updated invite.
-        const updated = await updateMeetingTime({ eventId: existingEventId, startISO: startTime, durationMinutes })
-        meetingUrl = updated.teams_meeting_url
+        const updated = await updateMeetingTime({ eventId, startISO: startTime, durationMinutes })
+        if (updated.teams_meeting_url) meetingUrl = updated.teams_meeting_url
       } else {
-        // No event on record → create a fresh Teams meeting at the new time.
+        // Genuinely no existing event to move → create one at the new time.
         const subject = `EGB/QBR Meeting Invitation — ${vendorName} ${quarter} ${year}`
         const bodyHtml =
           `<p>Dear Team,</p>` +
@@ -96,7 +104,7 @@ export default function ManualMeetingPanel({
         eventId = created.event_id
       }
 
-      // Persist the new time (+ event id / link) on the cycle.
+      // Persist the new time (+ resolved event id / link) so future reschedules move it too.
       await scheduleManualMeeting(cycleId, { startTime, timeZone, durationMinutes, meetingUrl, eventId })
       setSaving(false)
       onScheduled({ startTime, timeZone, durationMinutes, meetingUrl, eventId })

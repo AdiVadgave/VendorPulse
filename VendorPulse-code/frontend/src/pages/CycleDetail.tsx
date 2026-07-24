@@ -1145,6 +1145,7 @@ function SchedulingTab({
           cycleId={cycle.cycle_id}
           attendees={attendees}
           existingEventId={scheduledEventId}
+          existingMeetingUrl={meetingUrl}
           vendorName={cycle.vendor_name}
           quarter={cycle.quarter}
           year={cycle.year}

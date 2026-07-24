@@ -339,6 +339,20 @@ export async function addAttendeesToEvent(params: {
   }
 }
 
+// ── Find an existing event by its Teams join link ────────────────────────────
+// Used when we don't have the stored event id (e.g. a meeting scheduled before ids
+// were persisted) so reschedule can MOVE that event instead of creating a duplicate.
+export async function findEventIdByJoinUrl(joinUrl: string): Promise<string | null> {
+  if (!joinUrl) return null
+  const res = await fetch(`${GRAPH}/me/events?$select=id,onlineMeeting&$top=250`, {
+    headers: { Authorization: `Bearer ${await token()}` },
+  })
+  if (!res.ok) return null
+  const data = (await res.json()) as { value?: Array<{ id: string; onlineMeeting?: { joinUrl?: string } }> }
+  const match = (data.value ?? []).find((e) => !!e.onlineMeeting?.joinUrl && e.onlineMeeting.joinUrl === joinUrl)
+  return match?.id ?? null
+}
+
 // ── Reschedule: change an existing meeting's start/end time ───────────────────
 // PATCHes the event's start/end. Graph sends the updated invite to all attendees
 // automatically. Delegated, as the signed-in coordinator (Calendars.ReadWrite).

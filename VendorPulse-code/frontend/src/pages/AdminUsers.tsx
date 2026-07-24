@@ -189,7 +189,7 @@ export default function AdminUsers() {
               Organisation
               <input className={cn(field, 'mt-1')} value={form.organisation}
                 onChange={(e) => setForm((f) => ({ ...f, organisation: e.target.value }))}
-                placeholder="Shell VMO / Zensar / Vendor name" />
+                placeholder="Shell VMO / Vendor name" />
             </label>
           </div>
 

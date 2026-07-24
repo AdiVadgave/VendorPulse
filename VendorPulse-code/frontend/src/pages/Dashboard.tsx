@@ -538,7 +538,7 @@ export default function Dashboard() {
             {friendlyFirstName(user.name) ? `Welcome back, ${friendlyFirstName(user.name)}` : 'Welcome back'}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            {format(today, 'EEEE, d MMMM yyyy')} · Zensar VMO — Governance Platform
+            {format(today, 'EEEE, d MMMM yyyy')} · Shell VMO — Governance Platform
           </p>
         </div>
         <button

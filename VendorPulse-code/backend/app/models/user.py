@@ -18,7 +18,7 @@ class AvailabilitySlot(BaseModel):
 
 class UserCreate(BaseModel):
     name: str = Field(..., examples=["Alex Johnson"])
-    email: str = Field(..., examples=["alex@zensar.com"])
+    email: str = Field(..., examples=["alex@shell.com"])
     role: str = Field(default="Member", examples=["VMO_COORDINATOR"])
     organisation: Optional[str] = Field(default=None, examples=["Shell VMO"])
 

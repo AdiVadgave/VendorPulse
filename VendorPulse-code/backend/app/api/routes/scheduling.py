@@ -195,6 +195,11 @@ class ManualMeetingRequest(BaseModel):
     time_zone: str = Field(default="IST")
     duration_minutes: int = Field(default=60)
     meeting_url: Optional[str] = Field(default=None, description="Optional meeting link the coordinator pastes")
+    event_id: Optional[str] = Field(
+        default=None,
+        description="Graph calendar event id (set when the Teams meeting was created via delegated Graph) "
+        "so newly-added attendees can later be invited to the same event.",
+    )
 
 
 @router.post("/api/cycles/{cycleId}/scheduling/manual-meeting")
@@ -213,7 +218,7 @@ def set_manual_meeting(
         cycleId,
         teams_meeting_url=(payload.meeting_url or None),
         web_link=None,
-        event_id=None,
+        event_id=(payload.event_id or None),
         scheduled_at=payload.start_time,
     )
     # Persist the chosen timezone + duration so the Confirmation view rehydrates
@@ -237,6 +242,7 @@ def set_manual_meeting(
         "time_zone": payload.time_zone,
         "duration_minutes": payload.duration_minutes,
         "meeting_url": payload.meeting_url or None,
+        "event_id": payload.event_id or None,
     }
 
 

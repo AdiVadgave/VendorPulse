@@ -116,7 +116,7 @@ export async function findMeetingSlots(
   maxCandidates = 12,
 ): Promise<SlotProposal[]> {
   // Free/busy is only readable for Shell mailboxes. Search ONLY Shell (@shell.com)
-  // attendees; non-Shell people (vendors, partners like @zensar.com) are invited
+  // attendees; non-Shell people (vendors, external partners) are invited
   // later at the chosen time but must NOT constrain the slot search — otherwise
   // their unreadable availability makes every slot "not free" and none are found.
   const SHELL_DOMAIN = '@shell.com'
@@ -128,7 +128,13 @@ export async function findMeetingSlots(
     )
   }
   // Window in UTC; activityDomain "work" restricts to each attendee's working hours.
-  const startIso = `${startDate}T00:00:00`
+  // Never search into the past: if the from-date is today (or earlier), start the
+  // window at the current moment so already-passed times (e.g. 9 AM when it's noon)
+  // are not suggested.
+  const windowStart = new Date(`${startDate}T00:00:00Z`)
+  const nowDate = new Date()
+  const effectiveStart = windowStart.getTime() < nowDate.getTime() ? nowDate : windowStart
+  const startIso = effectiveStart.toISOString().slice(0, 19)
   const endIso = `${endDate}T23:59:59`
 
   const body = {
@@ -235,9 +241,16 @@ export async function findMeetingSlots(
     }
   })
 
+  // Drop any slot that starts in the past (belt-and-braces with the window clamp
+  // above — guards against Graph anchoring a suggestion to the window start).
+  const future = scored.filter((s) => {
+    const t = new Date(s.proposed_time).getTime()
+    return Number.isFinite(t) && t >= now
+  })
+
   // Rank best-first, then assign stable rank ids (slot-1 = top).
-  scored.sort((a, b) => b.rank_score - a.rank_score)
-  return scored.map((slot, idx) => ({ ...slot, slot_id: `slot-${idx + 1}` }))
+  future.sort((a, b) => b.rank_score - a.rank_score)
+  return future.map((slot, idx) => ({ ...slot, slot_id: `slot-${idx + 1}` }))
 }
 
 // ── Create the Teams meeting + send invites (as the coordinator) ─────────────
@@ -293,5 +306,35 @@ export async function createMeetingEvent(params: {
     event_id: ev.id,
     web_link: ev.webLink ?? '',
     teams_meeting_url: ev.onlineMeeting?.joinUrl ?? null,
+  }
+}
+
+// ── Add attendees to an already-created meeting ──────────────────────────────
+// PATCHes the existing calendar event with the full attendee list. Graph sends a
+// meeting invite to any newly-added attendees while leaving the event (time, join
+// link) unchanged — so everyone shares the same Teams meeting. Delegated, as the
+// signed-in coordinator (Calendars.ReadWrite). Graph requires the COMPLETE
+// attendee collection on PATCH (it replaces, not appends), so pass every attendee.
+export async function addAttendeesToEvent(params: {
+  eventId: string
+  attendees: CycleAttendee[]
+}): Promise<void> {
+  const { eventId, attendees } = params
+  const body = {
+    attendees: attendees
+      .filter((a) => a.email)
+      .map((a) => ({
+        emailAddress: { address: a.email, name: a.name },
+        type: a.attendance_requirement === 'Optional' ? 'optional' : 'required',
+      })),
+  }
+  const res = await fetch(`${GRAPH}/me/events/${encodeURIComponent(eventId)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const t = await res.text()
+    throw new Error(`Graph update event ${res.status}: ${t.slice(0, 300)}`)
   }
 }

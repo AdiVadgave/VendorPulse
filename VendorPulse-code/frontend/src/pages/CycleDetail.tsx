@@ -58,6 +58,8 @@ import ManualMeetingPanel from '@/components/modules/scheduling/ManualMeetingPan
 import FindSlotsControl from '@/components/modules/scheduling/FindSlotsControl'
 import SlotRankingPanel from '@/components/modules/scheduling/SlotRankingPanel'
 import InviteApprovalPanel from '@/components/modules/scheduling/InviteApprovalPanel'
+import ManualTimeCard from '@/components/modules/scheduling/ManualTimeCard'
+import AddAttendeesToMeetingPanel from '@/components/modules/scheduling/AddAttendeesToMeetingPanel'
 import ConfirmationTracker from '@/components/modules/scheduling/ConfirmationTracker'
 
 import ScorecardDispatchPanel from '@/components/modules/scorecard/ScorecardDispatchPanel'
@@ -240,6 +242,11 @@ export default function CycleDetail() {
   const [vendorMeetingTeamsUrl, setVendorMeetingTeamsUrl] = useState<string | null>(
     cycle?.teams_meeting_url ?? null
   )
+  // Graph event id of the scheduled meeting — lets the coordinator invite newly-added
+  // attendees to the SAME event later (delegated Calendars.ReadWrite PATCH).
+  const [scheduledEventId, setScheduledEventId] = useState<string | null>(
+    cycle?.teams_meeting_event_id ?? null
+  )
   const [minutesApproved, setMinutesApproved] = useState(false)
 
   useEffect(() => {
@@ -266,6 +273,9 @@ export default function CycleDetail() {
         // survives page refresh once an invite has been sent.
         if (backendCycle.teams_meeting_url) {
           setVendorMeetingTeamsUrl(backendCycle.teams_meeting_url)
+        }
+        if (backendCycle.teams_meeting_event_id) {
+          setScheduledEventId(backendCycle.teams_meeting_event_id)
         }
         // Read the merged state *after* the upsert so we honor any locally-advanced progress.
         const localState = useCycleStore.getState().workflowStates[cycleId]
@@ -668,7 +678,14 @@ export default function CycleDetail() {
             onSlotTimeZoneSelected={setSelectedSlotTimeZone}
             isMockCycle={isMockCycle}
             meetingUrl={vendorMeetingTeamsUrl}
+            meetingScheduled={currentStateIndex >= WORKFLOW_STATES.indexOf('MEETING_SCHEDULED')}
+            scheduledEventId={scheduledEventId}
+            onEventUpdated={(eid, url) => {
+              if (eid) setScheduledEventId(eid)
+              if (url) setVendorMeetingTeamsUrl(url)
+            }}
             onTeamsMeetingUrlCaptured={setVendorMeetingTeamsUrl}
+            onEventIdCaptured={setScheduledEventId}
             onMeetingScheduled={() => advanceWorkflow(cycle!.cycle_id, 'MEETING_SCHEDULED')}
             onScorecardProceed={() => {
               advanceWorkflow(cycle!.cycle_id, 'SCORECARD_REQUEST_SENT')
@@ -937,6 +954,7 @@ function SchedulingTab({
   onAttendeesUpdated, onSlotsReceived, onSlotSelected,
   selectedSlotTimeZone, onSlotTimeZoneSelected,
   isMockCycle, onScorecardProceed, onTeamsMeetingUrlCaptured, onMeetingScheduled, meetingUrl,
+  meetingScheduled, scheduledEventId, onEventUpdated, onEventIdCaptured,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   schedulingPhase: SchedulingPhase
@@ -954,8 +972,44 @@ function SchedulingTab({
   onTeamsMeetingUrlCaptured: (url: string | null) => void
   onMeetingScheduled: () => void
   meetingUrl: string | null
+  /** True once the cycle has reached MEETING_SCHEDULED (a meeting exists). */
+  meetingScheduled: boolean
+  /** Graph event id of the scheduled meeting, for inviting late-added attendees. */
+  scheduledEventId: string | null
+  /** After a meeting update (add-attendees / re-create): refresh stored id + link. */
+  onEventUpdated: (eventId: string | null, meetingUrl: string | null) => void
+  /** Capture the Graph event id when the initial invite is sent. */
+  onEventIdCaptured: (eventId: string | null) => void
 }) {
   const currentPhaseIndex = PHASE_ORDER.indexOf(schedulingPhase)
+
+  // Schedule at a coordinator-chosen time (shared by the Attendees page and the
+  // Slot Ranking panel). Builds a synthetic slot and jumps to Invite Approval,
+  // where the Teams meeting is actually created via delegated Graph.
+  function scheduleManual(startISO: string, tz: 'IST' | 'UTC' | 'GMT', dur: number) {
+    const manual: SlotProposal = {
+      slot_id: 'manual-slot',
+      cycle_id: cycle.cycle_id,
+      proposed_time: startISO,
+      proposed_time_zone: tz,
+      duration_minutes: dur,
+      organiser_available: true,
+      exec_sponsor_available: true,
+      rank_score: 100,
+      is_approved: false,
+      attendance_count: attendees.length,
+      total_attendees: attendees.length,
+      conflict_count: 0,
+      attending: attendees.map((a) => a.name),
+      tentative: [],
+      conflicts: [],
+      ranking_rationale: 'Manually chosen time',
+    }
+    onSlotsReceived([...slots, manual])
+    onSlotSelected('manual-slot')
+    onSlotTimeZoneSelected(tz)
+    onPhaseChange('invite_approval')
+  }
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
@@ -967,16 +1021,20 @@ function SchedulingTab({
             const isUpcoming = phaseIdx > currentPhaseIndex
             return (
               <div key={step.key} className="flex items-center flex-1 min-w-0">
-                <div className={cn(
-                  'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium flex-1 justify-center transition-all',
+                <button
+                  type="button"
+                  onClick={() => onPhaseChange(step.key)}
+                  title={`Go to ${step.label}`}
+                  className={cn(
+                  'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium flex-1 justify-center transition-all cursor-pointer hover:opacity-90',
                   isComplete && 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200 ring-1 ring-emerald-200 dark:ring-emerald-500/30',
                   isActive && 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-200/70 dark:ring-indigo-500/30',
-                  isUpcoming && 'bg-slate-100 text-slate-500 dark:bg-slate-800/70 dark:text-slate-300'
+                  isUpcoming && 'bg-slate-100 text-slate-500 dark:bg-slate-800/70 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                 )}>
                   {isComplete && <CheckCircle2 size={11} />}
                   <span className="truncate hidden sm:inline">{step.label}</span>
                   <span className="sm:hidden">{idx + 1}</span>
-                </div>
+                </button>
                 {idx < SCHEDULING_STEPS.length - 1 && (
                   <div className={cn('h-px w-4 shrink-0 mx-0.5', isComplete ? 'bg-emerald-400 dark:bg-emerald-500/60' : 'bg-slate-300 dark:bg-slate-700')} />
                 )}
@@ -1006,6 +1064,20 @@ function SchedulingTab({
       )}
       {schedulingPhase === 'attendee_refresh' && (
         <div className="space-y-4">
+          {/* If a meeting is already scheduled, adding people here can invite them to it. */}
+          {meetingScheduled && selectedSlot && (
+            <AddAttendeesToMeetingPanel
+              cycleId={cycle.cycle_id}
+              attendees={attendees}
+              slot={selectedSlot}
+              eventId={scheduledEventId}
+              vendorName={cycle.vendor_name}
+              quarter={cycle.quarter}
+              year={cycle.year}
+              timeZone={selectedSlotTimeZone}
+              onUpdated={onEventUpdated}
+            />
+          )}
           <AttendeeRefreshPanel
             cycleId={cycle.cycle_id}
             attendees={attendees}
@@ -1022,6 +1094,8 @@ function SchedulingTab({
               onPhaseChange('slot_ranking')
             }}
           />
+          {/* Prefer a specific time — available right here, no need to Find Slots first. */}
+          <ManualTimeCard onSchedule={scheduleManual} defaultTimeZone={selectedSlotTimeZone} />
         </div>
       )}
       {schedulingPhase === 'slot_ranking' && (
@@ -1033,30 +1107,7 @@ function SchedulingTab({
             onPhaseChange('invite_approval')
           }}
           onBackToAttendees={() => onPhaseChange('attendee_refresh')}
-          onScheduleManual={(startISO, tz, dur) => {
-            const manual: SlotProposal = {
-              slot_id: 'manual-slot',
-              cycle_id: cycle.cycle_id,
-              proposed_time: startISO,
-              proposed_time_zone: tz,
-              duration_minutes: dur,
-              organiser_available: true,
-              exec_sponsor_available: true,
-              rank_score: 100,
-              is_approved: false,
-              attendance_count: attendees.length,
-              total_attendees: attendees.length,
-              conflict_count: 0,
-              attending: attendees.map((a) => a.name),
-              tentative: [],
-              conflicts: [],
-              ranking_rationale: 'Manually chosen time',
-            }
-            onSlotsReceived([...slots, manual])
-            onSlotSelected('manual-slot')
-            onSlotTimeZoneSelected(tz)
-            onPhaseChange('invite_approval')
-          }}
+          onScheduleManual={scheduleManual}
         />
       )}
       {schedulingPhase === 'invite_approval' && (
@@ -1070,8 +1121,9 @@ function SchedulingTab({
             year={cycle.year}
             timeZoneOverride={selectedSlotTimeZone}
             onBack={() => onPhaseChange('slot_ranking')}
-            onInviteSent={(teamsUrl) => {
+            onInviteSent={(teamsUrl, eventId) => {
               onTeamsMeetingUrlCaptured(teamsUrl)
+              onEventIdCaptured(eventId)
               onMeetingScheduled()
               onPhaseChange('confirmation_tracking')
             }}

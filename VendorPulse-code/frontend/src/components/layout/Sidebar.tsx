@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   BarChart3,
   Building2,
-  Users,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -117,12 +116,6 @@ export default function Sidebar() {
           to="/analytics"
           icon={<BarChart3 size={18} />}
           label="Analytics"
-          collapsed={sidebarCollapsed}
-        />
-        <NavItem
-          to="/directory"
-          icon={<Users size={18} />}
-          label="Directory"
           collapsed={sidebarCollapsed}
         />
 

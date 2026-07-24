@@ -24,7 +24,7 @@ interface InviteApprovalPanelProps {
   quarter: string
   year: number
   timeZoneOverride?: 'IST' | 'UTC' | 'GMT'
-  onInviteSent: (teamsMeetingId: string | null) => void
+  onInviteSent: (teamsMeetingUrl: string | null, eventId: string | null) => void
   onBack?: () => void
   isLocked?: boolean
 }
@@ -121,13 +121,14 @@ export default function InviteApprovalPanel({
           time_zone: displayZone,
           duration_minutes: durationMinutes,
           meeting_url: created.teams_meeting_url,
+          event_id: created.event_id,
         }),
       })
 
       setAgentStatus('complete')
       setHasSentInvite(true)
       setIsProcessing(false)
-      onInviteSent(created.teams_meeting_url)
+      onInviteSent(created.teams_meeting_url, created.event_id)
     } catch (err) {
       setGraphError(err instanceof Error ? err.message : 'Failed to create Teams meeting')
       setAgentStatus('failed')

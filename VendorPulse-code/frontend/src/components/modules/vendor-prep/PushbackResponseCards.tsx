@@ -78,7 +78,7 @@ function PushbackCard({
       {item.needs_legal_review ? (
         <div className="px-5 py-4 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           <Lock size={14} />
-          AI response drafts excluded — requires legal/commercial review before Zensar can respond.
+          AI response drafts excluded — requires legal/commercial review before Shell can respond.
         </div>
       ) : responses.length > 0 ? (
         // Once drafted, the select/edit UI lives in the Unresolved Item Tracker — keep this compact.

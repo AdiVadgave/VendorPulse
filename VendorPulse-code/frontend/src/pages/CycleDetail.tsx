@@ -1023,19 +1023,27 @@ function SchedulingTab({
             const isComplete = phaseIdx < currentPhaseIndex
             const isActive = phaseIdx === currentPhaseIndex
             const isUpcoming = phaseIdx > currentPhaseIndex
+            // Once the meeting is scheduled, lock every step except Confirmation —
+            // the coordinator adds attendees from the Confirmation tab, not by
+            // walking back through Attendees / Slot Ranking / Invite Approval.
+            const locked = meetingScheduled && step.key !== 'confirmation_tracking'
             return (
               <div key={step.key} className="flex items-center flex-1 min-w-0">
                 <button
                   type="button"
-                  onClick={() => onPhaseChange(step.key)}
-                  title={`Go to ${step.label}`}
+                  onClick={() => { if (!locked) onPhaseChange(step.key) }}
+                  disabled={locked}
+                  title={locked ? 'Meeting scheduled — only Confirmation is available' : `Go to ${step.label}`}
                   className={cn(
-                  'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium flex-1 justify-center transition-all cursor-pointer hover:opacity-90',
+                  'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium flex-1 justify-center transition-all',
+                  locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:opacity-90',
                   isComplete && 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200 ring-1 ring-emerald-200 dark:ring-emerald-500/30',
                   isActive && 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-200/70 dark:ring-indigo-500/30',
-                  isUpcoming && 'bg-slate-100 text-slate-500 dark:bg-slate-800/70 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  isUpcoming && 'bg-slate-100 text-slate-500 dark:bg-slate-800/70 dark:text-slate-300',
+                  isUpcoming && !locked && 'hover:bg-slate-200 dark:hover:bg-slate-700'
                 )}>
-                  {isComplete && <CheckCircle2 size={11} />}
+                  {isComplete && !locked && <CheckCircle2 size={11} />}
+                  {locked && <Lock size={11} />}
                   <span className="truncate hidden sm:inline">{step.label}</span>
                   <span className="sm:hidden">{idx + 1}</span>
                 </button>

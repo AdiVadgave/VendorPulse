@@ -1,4 +1,4 @@
-﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock } from 'lucide-react'
+﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock, Key, Star } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { SlotProposal } from '@/types/scheduling.types'
 import { SCHEDULING_CONFIG } from '@/config/scheduling.config'
@@ -190,7 +190,7 @@ export default function SlotCard({
       </div>
 
       {/* Key attendees */}
-      <div className="flex items-center gap-3 mb-4 text-xs">
+      <div className="flex items-center gap-3 mb-3 text-xs">
         <div className="flex items-center gap-1.5">
           {slot.organiser_available
             ? <CheckCircle2 size={13} className="text-emerald-500" />
@@ -204,6 +204,38 @@ export default function SlotCard({
           <span className="text-slate-600 dark:text-slate-400">Exec Sponsor available</span>
         </div>
       </div>
+
+      {/* Key-stakeholder & leadership coverage (what the ranking weights most) */}
+      {((slot.key_total ?? 0) > 0 || (slot.lt_total ?? 0) > 0) && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {(slot.key_total ?? 0) > 0 && (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+                (slot.key_free ?? 0) === slot.key_total
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                  : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400'
+              )}
+              title="Key stakeholders free at this time"
+            >
+              <Key size={11} /> Key {slot.key_free ?? 0}/{slot.key_total} free
+            </span>
+          )}
+          {(slot.lt_total ?? 0) > 0 && (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+                (slot.lt_free ?? 0) === slot.lt_total
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                  : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400'
+              )}
+              title="Leadership (LT) members free at this time"
+            >
+              <Star size={11} /> LT {slot.lt_free ?? 0}/{slot.lt_total} free
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Attending + conflicts */}
       <div className="space-y-2 mb-4">

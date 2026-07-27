@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   CheckCircle2,
   XCircle,
   Clock,
+  CircleDot,
   Bell,
   CalendarCheck,
   Key,
@@ -11,11 +12,14 @@ import {
   ExternalLink,
   Link2Off,
   UserPlus,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
-import type { CycleAttendee, InviteStatus, SlotProposal } from '@/types/scheduling.types'
+import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import { ROLE_LABELS } from '@/types/cycle.types'
+import { getEventAttendeeResponses, isSchedulingAvailable, type RsvpResponse } from '@/lib/graphScheduling'
 
 interface ConfirmationTrackerProps {
   cycleId: string
@@ -27,6 +31,8 @@ interface ConfirmationTrackerProps {
   onReschedule?: () => void
   /** The meeting join link the coordinator pasted (if any). */
   meetingUrl?: string | null
+  /** Graph event id — enables reading live RSVP responses from Outlook. */
+  eventId?: string | null
   /** Toggle the inline "add attendee" panel (rendered by the parent below this). */
   onAddAttendee?: () => void
   /** Whether the inline add-attendee panel is currently open. */
@@ -35,21 +41,29 @@ interface ConfirmationTrackerProps {
   addAttendeeSlot?: React.ReactNode
 }
 
+// The RSVP status we actually display (live from Outlook, falling back to stored).
+type DisplayStatus = 'accepted' | 'tentative' | 'declined' | 'pending'
+
 const STATUS_CONFIG: Record<
-  InviteStatus,
+  DisplayStatus,
   { icon: React.ReactNode; label: string; classes: string }
 > = {
-  ACCEPTED: {
+  accepted: {
     icon: <CheckCircle2 size={14} />,
     label: 'Accepted',
     classes: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400',
   },
-  DECLINED: {
+  tentative: {
+    icon: <CircleDot size={14} />,
+    label: 'Tentative',
+    classes: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
+  },
+  declined: {
     icon: <XCircle size={14} />,
     label: 'Declined',
     classes: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
   },
-  PENDING: {
+  pending: {
     icon: <Clock size={14} />,
     label: 'Pending',
     classes: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
@@ -63,12 +77,49 @@ export default function ConfirmationTracker({
   onProceed,
   onReschedule,
   meetingUrl,
+  eventId,
   onAddAttendee,
   addAttendeeOpen,
   addAttendeeSlot,
 }: ConfirmationTrackerProps) {
   const [nudgeSent, setNudgeSent] = useState<Set<string>>(new Set())
   const [nudgingId, setNudgingId] = useState<string | null>(null)
+
+  // Live RSVP responses from the Outlook event (email → response).
+  const [liveRsvp, setLiveRsvp] = useState<Record<string, RsvpResponse>>({})
+  const [rsvpLoading, setRsvpLoading] = useState(false)
+  const [rsvpError, setRsvpError] = useState<string | null>(null)
+  const [rsvpFetched, setRsvpFetched] = useState(false)
+  const canReadRsvp = Boolean(eventId) && isSchedulingAvailable()
+
+  const refreshRsvp = useCallback(async () => {
+    if (!eventId || !isSchedulingAvailable()) return
+    setRsvpLoading(true)
+    setRsvpError(null)
+    try {
+      setLiveRsvp(await getEventAttendeeResponses(eventId))
+      setRsvpFetched(true)
+    } catch (e) {
+      setRsvpError(e instanceof Error ? e.message : 'Could not read RSVP responses')
+    } finally {
+      setRsvpLoading(false)
+    }
+  }, [eventId])
+
+  // Pull live responses on mount / when the event becomes available.
+  useEffect(() => { void refreshRsvp() }, [refreshRsvp])
+
+  // Effective status = live Outlook response when known, else the stored invite status.
+  const statusOf = useCallback((a: CycleAttendee): DisplayStatus => {
+    const live = liveRsvp[(a.email || '').toLowerCase()]
+    if (live === 'accepted' || live === 'organizer') return 'accepted'
+    if (live === 'declined') return 'declined'
+    if (live === 'tentative') return 'tentative'
+    // live === 'none' (not responded) or no live data → fall back to stored status.
+    if (a.invite_status === 'ACCEPTED') return 'accepted'
+    if (a.invite_status === 'DECLINED') return 'declined'
+    return 'pending'
+  }, [liveRsvp])
   const dateObj = new Date(slot.proposed_time)
   const durationMin = slot.duration_minutes ?? 60
 
@@ -97,9 +148,10 @@ export default function ConfirmationTracker({
     hour12: true,
     timeZone: ianaZone,
   })
-  const accepted = attendees.filter((a) => a.invite_status === 'ACCEPTED')
-  const declined = attendees.filter((a) => a.invite_status === 'DECLINED')
-  const pending   = attendees.filter((a) => a.invite_status === 'PENDING')
+  const accepted  = attendees.filter((a) => statusOf(a) === 'accepted')
+  const tentative = attendees.filter((a) => statusOf(a) === 'tentative')
+  const declined  = attendees.filter((a) => statusOf(a) === 'declined')
+  const pending   = attendees.filter((a) => statusOf(a) === 'pending')
 
 
 
@@ -157,22 +209,25 @@ export default function ConfirmationTracker({
         </div>
       </div>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
+      {/* Summary stats (Tentative tile shown only when someone responded tentatively) */}
+      {(() => {
+        const tiles = [
           { count: accepted.length, label: 'Accepted', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' },
-          { count: pending.length,  label: 'Pending',  color: 'text-amber-600 dark:text-amber-400',   bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' },
-          { count: declined.length, label: 'Declined', color: 'text-red-600 dark:text-red-400',        bg: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className={cn('border rounded-xl p-4 text-center', stat.bg)}
-          >
-            <p className={cn('text-2xl font-bold', stat.color)}>{stat.count}</p>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{stat.label}</p>
+          ...(tentative.length > 0 ? [{ count: tentative.length, label: 'Tentative', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' }] : []),
+          { count: pending.length,  label: 'Pending',  color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' },
+          { count: declined.length, label: 'Declined', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' },
+        ]
+        return (
+          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
+            {tiles.map((stat) => (
+              <div key={stat.label} className={cn('border rounded-xl p-4 text-center', stat.bg)}>
+                <p className={cn('text-2xl font-bold', stat.color)}>{stat.count}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{stat.label}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )
+      })()}
 
       {/* Add-attendee block — sits below the stats, above the RSVP table. */}
       {addAttendeeSlot}
@@ -185,8 +240,20 @@ export default function ConfirmationTracker({
           </span>
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline">
-              {accepted.length} accepted · {declined.length} declined · {pending.length} pending
+              {accepted.length} accepted{tentative.length ? ` · ${tentative.length} tentative` : ''} · {declined.length} declined · {pending.length} pending
             </span>
+            {canReadRsvp && (
+              <button
+                type="button"
+                onClick={() => void refreshRsvp()}
+                disabled={rsvpLoading}
+                title="Refresh RSVP responses from Outlook"
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60 transition-colors"
+              >
+                {rsvpLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                Refresh
+              </button>
+            )}
             {onAddAttendee && (
               <button
                 type="button"
@@ -213,7 +280,8 @@ export default function ConfirmationTracker({
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {attendees.map((a) => {
-                const cfg    = STATUS_CONFIG[a.invite_status]
+                const status = statusOf(a)
+                const cfg    = STATUS_CONFIG[status]
                 const nudged = nudgeSent.has(a.attendee_id)
                 const isNudging = nudgingId === a.attendee_id
 
@@ -248,7 +316,7 @@ export default function ConfirmationTracker({
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {a.invite_status === 'PENDING' && (
+                      {status === 'pending' && (
                         <button
                           onClick={() => sendNudge(a)}
                           disabled={nudged || isNudging}
@@ -263,12 +331,12 @@ export default function ConfirmationTracker({
                           {isNudging ? 'Sending…' : nudged ? 'Nudge sent' : 'Send nudge'}
                         </button>
                       )}
-                      {a.invite_status === 'DECLINED' && (
+                      {status === 'declined' && (
                         <span className="text-xs text-slate-400 dark:text-slate-500 italic">
                           No action required
                         </span>
                       )}
-                      {a.invite_status === 'ACCEPTED' && (
+                      {(status === 'accepted' || status === 'tentative') && (
                         <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
                       )}
                     </td>
@@ -277,6 +345,24 @@ export default function ConfirmationTracker({
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Source of the statuses shown above. */}
+        <div className="px-5 py-2.5 border-t border-slate-100 dark:border-slate-800">
+          {rsvpError ? (
+            <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5">
+              <XCircle size={12} /> Couldn&rsquo;t read live RSVPs: {rsvpError}
+            </p>
+          ) : canReadRsvp ? (
+            <p className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+              <CheckCircle2 size={12} className="text-emerald-500" />
+              Live from Outlook — reflects each invitee&rsquo;s actual response.{rsvpFetched ? '' : ' Loading…'} Use <strong>Refresh</strong> to update.
+            </p>
+          ) : (
+            <p className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+              <Clock size={12} /> Sign in with Shell to read live RSVP responses — showing the last saved status.
+            </p>
+          )}
         </div>
 
         {pending.length > 0 && (

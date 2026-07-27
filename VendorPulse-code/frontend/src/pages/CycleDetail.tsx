@@ -1189,6 +1189,7 @@ function SchedulingTab({
             slot={selectedSlot}
             timeZoneOverride={selectedSlotTimeZone}
             meetingUrl={meetingUrl}
+            eventId={scheduledEventId}
             onProceed={onScorecardProceed}
             onReschedule={() => onPhaseChange('schedule_meeting')}
             onAddAttendee={() => setShowAddAttendee((v) => !v)}

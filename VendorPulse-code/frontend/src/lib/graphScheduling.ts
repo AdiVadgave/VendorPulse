@@ -36,34 +36,32 @@ async function token(): Promise<string> {
   return t
 }
 
-// ── Ranking (ported from the old backend graph_scheduling.py, §8 of the handover) ─
-const HIGH_SCORE = 100
-const MEDIUM_SCORE = 80
-const LOW_SCORE = 60
-const TENTATIVE_PENALTY = 8    // per tentative attendee
-const CONFLICT_PENALTY = 25    // per hard conflict (rare with a 100%-attendance search)
-const EXEC_BONUS = 4           // exec sponsor (EGB_CHAIR) is available
+// ── Ranking ───────────────────────────────────────────────────────────────────
+// The score is driven by WHO can attend, not just how many. Each searched
+// attendee carries an importance weight so a slot where the key stakeholders and
+// leadership (LT) are free ranks far above one where only optional/non-key people
+// are free — even if the raw head-count is the same.
+//
+//   weight = base(1)  + key(+3)  + LT(+2)  + exec/EGB chair(+3),  then ×0.4 if Optional
+//
+// Composite weights of the score components (sum ≈ 1.0):
+const W_WEIGHTED_COVERAGE = 0.58  // importance-weighted attendance (the main driver)
+const W_KEY_COVERAGE = 0.22       // how many KEY stakeholders are free
+const W_DAY = 0.12                // mid-week preference
+const W_RECENCY = 0.08            // sooner is better
+// Extra penalties that widen the spread when critical people can't make it:
+const KEY_CONFLICT_PENALTY = 6    // per key stakeholder who is busy
+const LT_CONFLICT_PENALTY = 3     // per (non-key) LT member who is busy
+const EXEC_BUSY_PENALTY = 10      // exec sponsor (EGB chair) is busy
 
-// Composite weights (positive components sum to 1.0).
-const W_COVERAGE = 0.35        // how many searched attendees are free
-const W_CONFIDENCE = 0.25      // Graph's own confidence
-const W_RECENCY = 0.25         // sooner is better
-const W_DAY = 0.15             // mid-week preference
-
-function baseScore(confidence: unknown): number {
-  if (typeof confidence === 'string') {
-    const c = confidence.toLowerCase()
-    if (c === 'high') return HIGH_SCORE
-    if (c === 'medium') return MEDIUM_SCORE
-    return LOW_SCORE
-  }
-  if (typeof confidence === 'number') {
-    const n = confidence <= 1 ? confidence * 100 : confidence
-    if (n >= 90) return HIGH_SCORE
-    if (n >= 70) return MEDIUM_SCORE
-    return LOW_SCORE
-  }
-  return LOW_SCORE
+/** Importance weight for a searched attendee (higher = matters more to the slot). */
+function attendeeWeight(a: CycleAttendee): number {
+  let w = 1
+  if (a.is_key) w += 3
+  if (a.lt_status === 'LT') w += 2
+  if (a.role === 'EGB_CHAIR') w += 3
+  if (a.attendance_requirement === 'Optional') w *= 0.4
+  return w
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, n))
@@ -172,9 +170,18 @@ export async function findMeetingSlots(
 
   // Which attendee is the exec sponsor (hard-constraint role)?
   const execEmail = attendees.find((a) => a.role === 'EGB_CHAIR')?.email?.toLowerCase() ?? null
-  const byEmailName = new Map(attendees.map((a) => [a.email.toLowerCase(), a.name]))
-  const nameFor = (email: string) => byEmailName.get(email.toLowerCase()) ?? email
+  // Per-searched-attendee importance metadata, keyed by lowercased email.
+  const META = new Map(
+    searchable.map((a) => [
+      a.email.toLowerCase(),
+      { w: attendeeWeight(a), key: !!a.is_key, lt: a.lt_status === 'LT', name: a.name },
+    ]),
+  )
+  const nameFor = (email: string) => META.get(email.toLowerCase())?.name ?? email
   const totalSearched = searchable.length
+  const totalWeight = [...META.values()].reduce((s, m) => s + m.w, 0) || 1
+  const keyTotal = [...META.values()].filter((m) => m.key).length
+  const ltTotal = [...META.values()].filter((m) => m.lt).length
   const now = Date.now()
 
   const scored = suggestions.map((s): SlotProposal => {
@@ -184,16 +191,21 @@ export async function findMeetingSlots(
     const conflicts: string[] = []
     let execAvailable = execEmail === null // no exec sponsor → treat as satisfied
 
+    // Importance-weighted tallies (drive the score) + key/LT breakdown (shown on the card).
+    let freeW = 0, tentW = 0
+    let keyFree = 0, keyTent = 0, keyConf = 0
+    let ltFree = 0, ltConf = 0
+
     for (const a of avail) {
-      const email = a.attendee?.emailAddress?.address ?? ''
+      const email = (a.attendee?.emailAddress?.address ?? '').toLowerCase()
       if (!email) continue
-      const name = nameFor(email)
-      if (isFree(a.availability)) attending.push(name)
-      else if (isTentative(a.availability)) tentative.push(name)
-      else conflicts.push(name)
-      if (execEmail && email.toLowerCase() === execEmail && (isFree(a.availability) || isTentative(a.availability))) {
-        execAvailable = true
-      }
+      const meta = META.get(email) ?? { w: 1, key: false, lt: false, name: nameFor(email) }
+      const free = isFree(a.availability)
+      const tent = isTentative(a.availability)
+      if (free) { attending.push(meta.name); freeW += meta.w; if (meta.key) keyFree++; if (meta.lt) ltFree++ }
+      else if (tent) { tentative.push(meta.name); tentW += meta.w; if (meta.key) keyTent++ }
+      else { conflicts.push(meta.name); if (meta.key) keyConf++; if (meta.lt) ltConf++ }
+      if (execEmail && email === execEmail && (free || tent)) execAvailable = true
     }
 
     // findMeetingTimes only returns slots where the organiser (us) is free.
@@ -201,22 +213,23 @@ export async function findMeetingSlots(
     const proposedUtc = startDt ? `${startDt.replace(/(\.\d+)?$/, '')}Z` : ''
     const startDate = proposedUtc ? new Date(proposedUtc) : new Date(now)
 
-    // Composite score: attendance coverage (tentative counts half), Graph
-    // confidence, how soon the slot is, and the day of week — minus penalties for
-    // tentative/conflicts, plus a small bonus when the exec sponsor is free.
-    const coverage = totalSearched > 0
-      ? ((attending.length + 0.5 * tentative.length) / totalSearched) * 100
-      : 100
+    // Importance-weighted coverage (tentative counts half) is the main driver, then
+    // how many KEY stakeholders are free, then day-of-week and recency nudges. Hard
+    // penalties for key/LT/exec conflicts widen the spread between otherwise-similar slots.
+    const weightedCoverage = ((freeW + 0.5 * tentW) / totalWeight) * 100
+    const keyCoverage = keyTotal > 0 ? ((keyFree + 0.5 * keyTent) / keyTotal) * 100 : 100
     let score =
-      W_COVERAGE * coverage +
-      W_CONFIDENCE * baseScore(s.confidenceLevel) +
-      W_RECENCY * recencyScore(startDate, now) +
-      W_DAY * dayOfWeekScore(startDate)
-    score -= TENTATIVE_PENALTY * tentative.length + CONFLICT_PENALTY * conflicts.length
-    if (execEmail && execAvailable) score += EXEC_BONUS
+      W_WEIGHTED_COVERAGE * weightedCoverage +
+      W_KEY_COVERAGE * keyCoverage +
+      W_DAY * dayOfWeekScore(startDate) +
+      W_RECENCY * recencyScore(startDate, now)
+    score -= KEY_CONFLICT_PENALTY * keyConf + LT_CONFLICT_PENALTY * ltConf
+    if (execEmail && !execAvailable) score -= EXEC_BUSY_PENALTY
     score = clamp(Math.round(score))
 
-    const bits: string[] = [`${attending.length}/${totalSearched} Shell free`]
+    const bits: string[] = [`${attending.length}/${totalSearched} free`]
+    if (keyTotal) bits.push(`key ${keyFree}/${keyTotal}`)
+    if (ltTotal) bits.push(`LT ${ltFree}/${ltTotal}`)
     if (tentative.length) bits.push(`${tentative.length} tentative`)
     if (conflicts.length) bits.push(`${conflicts.length} conflict`)
     if (execEmail) bits.push(execAvailable ? 'exec sponsor free' : 'exec sponsor busy')
@@ -237,6 +250,10 @@ export async function findMeetingSlots(
       attending,
       tentative,
       conflicts,
+      key_free: keyFree,
+      key_total: keyTotal,
+      lt_free: ltFree,
+      lt_total: ltTotal,
       ranking_rationale: bits.join(' · '),
     }
   })
@@ -356,6 +373,41 @@ export async function findEventIdByJoinUrl(joinUrl: string): Promise<string | nu
   const data = (await res.json()) as { value?: Array<{ id: string; onlineMeeting?: { joinUrl?: string } }> }
   const match = (data.value ?? []).find((e) => !!e.onlineMeeting?.joinUrl && e.onlineMeeting.joinUrl === joinUrl)
   return match?.id ?? null
+}
+
+// ── Read live RSVP responses from the meeting event ──────────────────────────
+// GET /me/events/{id}?$select=attendees → each attendee's status.response is one of
+// none | organizer | tentativelyAccepted | accepted | declined | notResponded.
+// Returned as a map of lowercased email → normalized status so the confirmation
+// tracker can show who actually accepted/declined in Outlook. Delegated, as the
+// signed-in coordinator (Calendars.ReadWrite / Read).
+export type RsvpResponse = 'accepted' | 'declined' | 'tentative' | 'organizer' | 'none'
+
+export async function getEventAttendeeResponses(eventId: string): Promise<Record<string, RsvpResponse>> {
+  if (!eventId) return {}
+  const res = await fetch(`${GRAPH}/me/events/${encodeURIComponent(eventId)}?$select=attendees`, {
+    headers: { Authorization: `Bearer ${await token()}` },
+  })
+  if (!res.ok) {
+    const t = await res.text()
+    throw new Error(`Graph read RSVPs ${res.status}: ${t.slice(0, 200)}`)
+  }
+  const data = (await res.json()) as {
+    attendees?: Array<{ emailAddress?: { address?: string }; status?: { response?: string } }>
+  }
+  const out: Record<string, RsvpResponse> = {}
+  for (const a of data.attendees ?? []) {
+    const email = (a.emailAddress?.address ?? '').toLowerCase()
+    if (!email) continue
+    const r = (a.status?.response ?? '').toLowerCase()
+    out[email] =
+      r === 'accepted' ? 'accepted'
+        : r === 'declined' ? 'declined'
+          : r === 'tentativelyaccepted' ? 'tentative'
+            : r === 'organizer' ? 'organizer'
+              : 'none'
+  }
+  return out
 }
 
 // ── Reschedule: change an existing meeting's start/end time ───────────────────

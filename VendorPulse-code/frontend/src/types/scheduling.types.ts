@@ -69,6 +69,11 @@ export interface SlotProposal {
   attending: string[]
   tentative?: string[]
   conflicts: string[]
+  /** Importance breakdown driving the rank score (from the weighted ranker). */
+  key_free?: number
+  key_total?: number
+  lt_free?: number
+  lt_total?: number
   ranking_rationale?: string
 }
 

@@ -138,31 +138,58 @@ function LoginGate({ children }: { children: ReactNode }) {
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '1.25rem',
         fontFamily: 'system-ui, sans-serif',
         background: '#f8fafc',
       }}
     >
-      <img src="/shell-logo.svg" alt="Shell" style={{ width: '56px', height: '56px' }} />
-      <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#0f172a' }}>Mobility Vendor Pulse</div>
-      <div style={{ color: '#475569' }}>Sign in with your Shell account to continue.</div>
-      <button
-        onClick={() => instance.loginRedirect(loginRequest)}
+      {/* Top navigation bar with the tool name */}
+      <nav
         style={{
-          padding: '0.6rem 1.4rem',
-          fontSize: '1rem',
-          fontWeight: 600,
-          color: '#fff',
-          background: '#dd1d21',
-          border: 'none',
-          borderRadius: '0.5rem',
-          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+          padding: '0.85rem 1.5rem',
+          background: '#ffffff',
+          borderBottom: '1px solid #e2e8f0',
+          boxShadow: 'inset 0 -2px 0 0 #fbce07',
         }}
       >
-        Sign in with Shell
-      </button>
+        <img src="/shell-logo.svg" alt="Shell" style={{ width: '28px', height: '28px' }} />
+        <span style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' }}>
+          Mobility Vendor Pulse
+        </span>
+      </nav>
+
+      {/* Centered sign-in content fills the remaining space */}
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '1.25rem',
+        }}
+      >
+        <img src="/shell-logo.svg" alt="Shell" style={{ width: '56px', height: '56px' }} />
+        <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#0f172a' }}>Mobility Vendor Pulse</div>
+        <div style={{ color: '#475569' }}>Sign in with your Shell account to continue.</div>
+        <button
+          onClick={() => instance.loginRedirect(loginRequest)}
+          style={{
+            padding: '0.6rem 1.4rem',
+            fontSize: '1rem',
+            fontWeight: 600,
+            color: '#fff',
+            background: '#dd1d21',
+            border: 'none',
+            borderRadius: '0.5rem',
+            cursor: 'pointer',
+          }}
+        >
+          Sign in with Shell
+        </button>
+      </div>
     </div>
   )
 }

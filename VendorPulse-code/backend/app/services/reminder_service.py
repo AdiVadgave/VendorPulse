@@ -133,8 +133,21 @@ def _parse_deadline(deadline: Optional[str]) -> Optional[date]:
         return None
 
 
-def send_tier(cycle: dict, offset: int, *, base_url: Optional[str], days_left: int) -> dict:
-    """Send the reminder for one offset to all pending reviewers; escalate at offset 0."""
+def send_tier(
+    cycle: dict,
+    offset: int,
+    *,
+    base_url: Optional[str],
+    days_left: int,
+    subject_override: Optional[str] = None,
+    html_override: Optional[str] = None,
+    text_override: Optional[str] = None,
+) -> dict:
+    """Send the reminder for one offset to all pending reviewers; escalate at offset 0.
+
+    When ``html_override`` is set (coordinator edited the draft) it is sent to the
+    reviewers verbatim, substituting {{name}}/{{link}} per recipient. The T-0
+    escalation to coordinators always uses its own template."""
     cycle_id = cycle.get("cycle_id")
     vendor = cycle.get("vendor_name", "")
     quarter = cycle.get("quarter", "")
@@ -145,14 +158,21 @@ def send_tier(cycle: dict, offset: int, *, base_url: Optional[str], days_left: i
     sent, failed = 0, 0
     for p in pending:
         link = _form_link(base_url or get_settings(cycle).get("form_base_url"), cycle_id, p["attendee_id"])
-        email = build_reminder_email(
-            attendee_name=p["name"], vendor_name=vendor, quarter=quarter, year=year,
-            form_url=link, deadline=deadline, days_left=days_left, tone_label=_tone_label(days_left),
-        )
+        if html_override:
+            default_subject = f"Reminder — {vendor} QBR Scorecard ({quarter} {year})"
+            subject = (subject_override or default_subject).replace("{{name}}", p["name"])
+            html_body = html_override.replace("{{name}}", p["name"]).replace("{{link}}", link)
+            text_body = (text_override or "").replace("{{name}}", p["name"]).replace("{{link}}", link) or None
+        else:
+            email = build_reminder_email(
+                attendee_name=p["name"], vendor_name=vendor, quarter=quarter, year=year,
+                form_url=link, deadline=deadline, days_left=days_left, tone_label=_tone_label(days_left),
+            )
+            subject, html_body, text_body = email["subject"], email["html_body"], email["text_body"]
         try:
             get_mail_provider().send_html_email(
-                to_email=p["email"], subject=email["subject"],
-                html_body=email["html_body"], text_body=email["text_body"],
+                to_email=p["email"], subject=subject,
+                html_body=html_body, text_body=text_body,
             )
             sent += 1
         except MailSendError as exc:
@@ -199,17 +219,27 @@ def run_due(cycle: dict, *, today: date, base_url: Optional[str] = None) -> list
     return results
 
 
-def send_now(cycle: dict, *, base_url: Optional[str] = None) -> dict:
+def send_now(
+    cycle: dict,
+    *,
+    base_url: Optional[str] = None,
+    subject_override: Optional[str] = None,
+    html_override: Optional[str] = None,
+    text_override: Optional[str] = None,
+) -> dict:
     """Manual 'send reminder now' — reminds all currently-pending reviewers immediately.
 
     Uses days-left from the deadline (if set) for the copy; does not consume a
-    scheduled offset, so the automated T-5/T-2/T-0 still fire independently.
-    """
+    scheduled offset, so the automated T-5/T-2/T-0 still fire independently. An
+    edited draft (html_override) is sent verbatim with per-recipient tokens."""
     settings_ = get_settings(cycle)
     deadline = _parse_deadline(settings_.get("deadline"))
     today = datetime.now(timezone.utc).date()
     days_left = (deadline - today).days if deadline else 5
-    return send_tier(cycle, days_left, base_url=base_url or settings_.get("form_base_url"), days_left=days_left)
+    return send_tier(
+        cycle, days_left, base_url=base_url or settings_.get("form_base_url"), days_left=days_left,
+        subject_override=subject_override, html_override=html_override, text_override=text_override,
+    )
 
 
 def run_all_due(today: Optional[date] = None) -> dict:

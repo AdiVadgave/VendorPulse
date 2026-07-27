@@ -192,6 +192,8 @@ export interface WeightedMeasureDef {
   label: string
   description: string
   measure_type?: ScorecardMeasureType
+  /** Teams asked to score this measure. Absent = everyone; [] = nobody. */
+  teams?: string[]
 }
 
 export interface WeightedCategoryDef {
@@ -270,6 +272,8 @@ export interface ScorecardConfigMeasure {
   label: string
   description: string
   measure_type: ScorecardMeasureType
+  /** Teams asked to score this measure. Absent = everyone; [] = nobody. */
+  teams?: string[]
 }
 
 export interface ScorecardConfigTheme {

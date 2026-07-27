@@ -318,9 +318,12 @@ export async function createMeetingEvent(params: {
 export async function addAttendeesToEvent(params: {
   eventId: string
   attendees: CycleAttendee[]
+  /** Optionally update the invite subject/body so Graph re-notifies with fresh text. */
+  subject?: string
+  bodyHtml?: string
 }): Promise<void> {
-  const { eventId, attendees } = params
-  const body = {
+  const { eventId, attendees, subject, bodyHtml } = params
+  const body: Record<string, unknown> = {
     attendees: attendees
       .filter((a) => a.email)
       .map((a) => ({
@@ -328,6 +331,8 @@ export async function addAttendeesToEvent(params: {
         type: a.attendance_requirement === 'Optional' ? 'optional' : 'required',
       })),
   }
+  if (subject) body.subject = subject
+  if (bodyHtml) body.body = { contentType: 'HTML', content: bodyHtml }
   const res = await fetch(`${GRAPH}/me/events/${encodeURIComponent(eventId)}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
@@ -360,14 +365,19 @@ export async function updateMeetingTime(params: {
   eventId: string
   startISO: string
   durationMinutes: number
+  /** Optionally update the invite subject/body alongside the new time. */
+  subject?: string
+  bodyHtml?: string
 }): Promise<{ teams_meeting_url: string | null }> {
-  const { eventId, startISO, durationMinutes } = params
+  const { eventId, startISO, durationMinutes, subject, bodyHtml } = params
   const start = new Date(startISO)
   const end = new Date(start.getTime() + durationMinutes * 60 * 1000)
-  const body = {
+  const body: Record<string, unknown> = {
     start: { dateTime: start.toISOString().replace('Z', ''), timeZone: 'UTC' },
     end: { dateTime: end.toISOString().replace('Z', ''), timeZone: 'UTC' },
   }
+  if (subject) body.subject = subject
+  if (bodyHtml) body.body = { contentType: 'HTML', content: bodyHtml }
   const res = await fetch(`${GRAPH}/me/events/${encodeURIComponent(eventId)}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },

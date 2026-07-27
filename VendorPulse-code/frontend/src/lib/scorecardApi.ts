@@ -59,7 +59,12 @@ export async function getScorecardConfig(cycleId: string): Promise<ScorecardConf
 /** Save the VMO's scorecard selection (measure keys + per-theme weights). */
 export async function saveScorecardConfig(
   cycleId: string,
-  payload: { selected_measure_keys: string[]; weights: Record<string, number> }
+  payload: {
+    selected_measure_keys: string[]
+    weights: Record<string, number>
+    /** measure_key -> team names asked to score it ([] = nobody). */
+    measure_teams?: Record<string, string[]>
+  }
 ): Promise<ScorecardConfig> {
   const res = await apiFetch<{ config: ScorecardConfig }>(`/api/scorecard/config/${cycleId}`, {
     method: 'PUT',
@@ -163,11 +168,34 @@ export async function dispatchInAppScorecard(payload: {
   year: number
   form_base_url: string
   recipients: InAppDispatchRecipient[]
+  /** True when re-sending after a mistake — reviewers get the correction notice. */
+  reissue?: boolean
+  /** Edited draft overrides ({{name}}/{{link}} substituted per recipient server-side). */
+  subject_override?: string
+  html_body_override?: string
+  text_body_override?: string
 }): Promise<DispatchResponse> {
   return apiFetch<DispatchResponse>('/api/scorecard/dispatch-inapp', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+/** The default scorecard dispatch email draft (subject + HTML) to seed an editable preview. */
+export async function getScorecardDispatchPreview(
+  cycleId: string,
+  reissue = false,
+): Promise<{ subject: string; html_body: string; text_body: string }> {
+  return apiFetch(`/api/scorecard/dispatch-preview/${cycleId}`, { params: { reissue: String(reissue) } })
+}
+
+/**
+ * Reopen scorecard collection after a mistake: discards all submissions and
+ * clears the dispatched marker so the config can be edited and re-sent. Only the
+ * newly-collected (latest) scorecard is then considered.
+ */
+export async function redoScorecard(cycleId: string): Promise<{ cycle_id: string; reopened: boolean }> {
+  return apiFetch(`/api/scorecard/redo/${cycleId}`, { method: 'POST' })
 }
 
 export interface ScorecardBriefing {

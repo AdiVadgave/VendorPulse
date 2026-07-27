@@ -699,6 +699,7 @@ export default function CycleDetail() {
             cycle={cycle}
             dispatched={scorecardDispatched}
             onDispatched={() => setScorecardDispatched(true)}
+            onScorecardRedo={() => setScorecardDispatched(false)}
             compiledScorecard={compiledScorecard}
             onCompiledFetched={handleCompiledFetched}
             cycleId={cycle.cycle_id}
@@ -1225,12 +1226,14 @@ function SchedulingTab({
 
 /* ── Scorecard Tab ────────────────────────────────────────── */
 function ScorecardTab({
-  cycle, dispatched, onDispatched, onCompiledFetched, cycleId, attendees, onAttendeesChanged,
+  cycle, dispatched, onDispatched, onScorecardRedo, onCompiledFetched, cycleId, attendees, onAttendeesChanged,
   onScorecardCompiled, onProceedToAlignment,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   dispatched: boolean
   onDispatched: () => void
+  /** Redo: reopen the scorecard config lock after discarding prior submissions. */
+  onScorecardRedo: () => void
   compiledScorecard: CompiledScorecard | null
   onCompiledFetched: (cs: CompiledScorecard) => void
   cycleId: string
@@ -1245,6 +1248,15 @@ function ScorecardTab({
   const [weighted, setWeighted] = useState<WeightedScorecard | null>(null)
   const [config, setConfig] = useState<ScorecardConfig | null>(null)
   const [autoFetched, setAutoFetched] = useState(false)
+  // Bumped on redo to force the submission tracker to refetch (submissions cleared).
+  const [redoNonce, setRedoNonce] = useState(0)
+
+  // Redo: unlock the config, reset the finalize view, and remount the tracker.
+  const handleRedo = useCallback(() => {
+    onScorecardRedo()
+    setWeighted(null)
+    setRedoNonce((n) => n + 1)
+  }, [onScorecardRedo])
 
   const refreshWeighted = useCallback(async () => {
     try {
@@ -1301,7 +1313,7 @@ function ScorecardTab({
 
       {subTab === 'collection' && (
         <>
-          <ScorecardConfigPanel cycleId={cycleId} dispatched={dispatched} onSaved={setConfig} />
+          <ScorecardConfigPanel cycleId={cycleId} dispatched={dispatched} onSaved={setConfig} attendees={attendees} />
           <ScorecardDispatchPanel
             vendorName={cycle.vendor_name}
             cycleId={cycleId}
@@ -1309,11 +1321,13 @@ function ScorecardTab({
             year={cycle.year}
             attendees={attendees}
             onDispatched={onDispatched}
+            onRedo={handleRedo}
             onAttendeesChanged={onAttendeesChanged}
             alreadyDispatched={dispatched}
             structure={config?.categories}
           />
           <SubmissionTracker
+            key={`tracker-${redoNonce}`}
             cycleId={cycleId}
             vendorName={cycle.vendor_name}
             quarter={cycle.quarter}

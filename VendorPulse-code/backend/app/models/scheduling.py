@@ -189,6 +189,9 @@ class ScorecardMeasureCfg(BaseModel):
     label: str
     description: str = ""
     measure_type: ScorecardMeasureType = "numeric"
+    # Teams (shell_department / identity) asked to score this measure. Absent =
+    # not team-restricted (everyone); empty list = nobody is asked this measure.
+    teams: Optional[list[str]] = None
 
 
 class ScorecardCategoryCfg(BaseModel):
@@ -214,6 +217,9 @@ class ScorecardConfigUpdate(BaseModel):
 
     selected_measure_keys: list[str] = Field(default_factory=list)
     weights: dict[str, int] = Field(default_factory=dict, description="theme_key -> weight (included themes must sum to 100)")
+    # measure_key -> team names asked to score it. Empty list for a selected
+    # measure means nobody is asked it. Omitted entirely => no team restriction.
+    measure_teams: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class CycleCreate(BaseModel):

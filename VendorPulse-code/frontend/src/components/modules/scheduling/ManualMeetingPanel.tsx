@@ -4,6 +4,7 @@ import { cn } from '@/utils/cn'
 import type { CycleAttendee } from '@/types/scheduling.types'
 import { scheduleManualMeeting } from '@/lib/schedulingApi'
 import { updateMeetingTime, createMeetingEvent, findEventIdByJoinUrl, isSchedulingAvailable } from '@/lib/graphScheduling'
+import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 
 type TimeZoneView = 'IST' | 'UTC' | 'GMT'
 
@@ -57,13 +58,31 @@ export default function ManualMeetingPanel({
   const [timeZone, setTimeZone] = useState<TimeZoneView>('IST')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [draftOpen, setDraftOpen] = useState(false)
 
-  async function handleSave() {
+  // Default subject/body for the updated invite (the coordinator can edit before sending).
+  const prettyTime = startLocal ? `${startLocal.replace('T', ' ')} ${timeZone}` : ''
+  const defaultSubject = `EGB/QBR Meeting — Updated Time — ${vendorName} ${quarter} ${year}`
+  const defaultBody =
+    `<p>Dear Team,</p>` +
+    `<p>The <strong>EGB/QBR governance review</strong> for <strong>${vendorName} — ${quarter} ${year}</strong> has been rescheduled.</p>` +
+    (prettyTime ? `<p>🕙 <strong>New time:</strong> ${prettyTime}</p>` : '') +
+    `<p>The updated invitation will appear in your calendar. Please accept or decline via Microsoft Teams.</p>` +
+    `<p>— Mobility Vendor Pulse</p>`
+
+  // "Reschedule" opens the draft editor first; the calendar event is only updated
+  // once the coordinator confirms (with any edits) in the dialog.
+  function openDraft() {
     if (!startLocal) { setError('Pick a date and time first.'); return }
     if (!isSchedulingAvailable()) {
       setError("You can't reschedule — you're not signed in with Shell (SSO). Sign in with your Shell account and try again.")
       return
     }
+    setError(null)
+    setDraftOpen(true)
+  }
+
+  async function doSave(draft: { subject: string; body: string }) {
     setSaving(true)
     setError(null)
     const startTime = startLocal.length === 16 ? `${startLocal}:00` : startLocal
@@ -77,17 +96,11 @@ export default function ManualMeetingPanel({
       let meetingUrl: string | null = existingMeetingUrl
 
       if (eventId) {
-        // Move the existing Teams event — Graph re-sends the updated invite.
-        const updated = await updateMeetingTime({ eventId, startISO: startTime, durationMinutes })
+        // Move the existing Teams event with the reviewed invite text — Graph re-notifies.
+        const updated = await updateMeetingTime({ eventId, startISO: startTime, durationMinutes, subject: draft.subject, bodyHtml: draft.body })
         if (updated.teams_meeting_url) meetingUrl = updated.teams_meeting_url
       } else {
         // Genuinely no existing event to move → create one at the new time.
-        const subject = `EGB/QBR Meeting Invitation — ${vendorName} ${quarter} ${year}`
-        const bodyHtml =
-          `<p>Dear Team,</p>` +
-          `<p>You are invited to the <strong>EGB/QBR governance review</strong> for ` +
-          `<strong>${vendorName} — ${quarter} ${year}</strong>.</p>` +
-          `<p>Please accept or decline via Microsoft Teams.</p><p>— Mobility Vendor Pulse</p>`
         const created = await createMeetingEvent({
           slot: {
             slot_id: 'reschedule',
@@ -97,8 +110,8 @@ export default function ManualMeetingPanel({
             duration_minutes: durationMinutes,
           } as unknown as Parameters<typeof createMeetingEvent>[0]['slot'],
           attendees,
-          subject,
-          bodyText: bodyHtml,
+          subject: draft.subject,
+          bodyText: draft.body,
         })
         meetingUrl = created.teams_meeting_url
         eventId = created.event_id
@@ -107,6 +120,7 @@ export default function ManualMeetingPanel({
       // Persist the new time (+ resolved event id / link) so future reschedules move it too.
       await scheduleManualMeeting(cycleId, { startTime, timeZone, durationMinutes, meetingUrl, eventId })
       setSaving(false)
+      setDraftOpen(false)
       onScheduled({ startTime, timeZone, durationMinutes, meetingUrl, eventId })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not reschedule the meeting.')
@@ -186,7 +200,7 @@ export default function ManualMeetingPanel({
         )}
 
         <button
-          onClick={handleSave}
+          onClick={openDraft}
           disabled={saving || !startLocal}
           className={cn(
             'mt-4 w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-colors',
@@ -199,6 +213,19 @@ export default function ManualMeetingPanel({
           {saving ? 'Rescheduling…' : 'Reschedule Meeting'}
         </button>
       </div>
+
+      <DraftReviewDialog
+        open={draftOpen}
+        kind="invite"
+        title="Review updated invite"
+        subject={defaultSubject}
+        body={defaultBody}
+        recipients={attendees.filter((a) => a.email).map((a) => `${a.name} (${a.email})`)}
+        sendLabel="Update & send"
+        busy={saving}
+        onSend={doSave}
+        onCancel={() => { if (!saving) setDraftOpen(false) }}
+      />
     </div>
   )
 }

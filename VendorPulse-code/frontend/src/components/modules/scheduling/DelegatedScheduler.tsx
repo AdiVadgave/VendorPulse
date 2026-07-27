@@ -14,6 +14,7 @@ import { useState } from 'react'
 import { Loader2, AlertCircle } from 'lucide-react'
 import FindSlotsControl from './FindSlotsControl'
 import SlotRankingPanel from './SlotRankingPanel'
+import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import { createMeetingEvent, updateMeetingTime, findEventIdByJoinUrl } from '@/lib/graphScheduling'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 
@@ -74,11 +75,14 @@ export default function DelegatedScheduler({
   const [slots, setSlots] = useState<SlotProposal[]>([])
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // A slot chosen and awaiting draft review before the invite is created/updated.
+  const [pending, setPending] = useState<{ slot: SlotProposal; tz: TZ } | null>(null)
 
   // Shared path — creates the Teams meeting via delegated Graph and persists. When
   // rescheduling an existing meeting, MOVE that event (patch its time) instead of
-  // creating a duplicate — same behaviour as the main QBR reschedule.
-  async function scheduleSlot(slot: SlotProposal, tz: TZ) {
+  // creating a duplicate — same behaviour as the main QBR reschedule. The reviewed
+  // subject/body come from the draft dialog.
+  async function scheduleSlot(slot: SlotProposal, tz: TZ, draftSubject: string, draftBody: string) {
     setCreating(true)
     setError(null)
     const durationMinutes = slot.duration_minutes ?? defaultDuration
@@ -90,12 +94,13 @@ export default function DelegatedScheduler({
         eventId = await findEventIdByJoinUrl(existingMeetingUrl)
       }
       if (eventId) {
-        const updated = await updateMeetingTime({ eventId, startISO: slot.proposed_time, durationMinutes })
+        const updated = await updateMeetingTime({ eventId, startISO: slot.proposed_time, durationMinutes, subject: draftSubject, bodyHtml: draftBody })
         if (updated.teams_meeting_url) teamsUrl = updated.teams_meeting_url
       } else {
-        const created = await createMeetingEvent({ slot, attendees: inviteAttendees, subject, bodyText: bodyHtml })
+        const created = await createMeetingEvent({ slot, attendees: inviteAttendees, subject: draftSubject, bodyText: draftBody })
         teamsUrl = created.teams_meeting_url
       }
+      setPending(null)
       await onScheduled({
         startTime: slot.proposed_time,
         timeZone: tz,
@@ -106,19 +111,23 @@ export default function DelegatedScheduler({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to schedule the meeting.')
       setCreating(false)
+      setPending(null)
     }
   }
 
+  // Selecting a slot opens the draft review dialog; the invite is only sent when
+  // the coordinator confirms (with any edits) in that dialog.
   function handleApprove(slotId: string, tz: TZ) {
     const slot = slots.find((s) => s.slot_id === slotId)
-    if (slot) scheduleSlot(slot, tz)
+    if (slot) setPending({ slot, tz })
   }
 
-  // Manual override: build a synthetic slot at the chosen time and schedule it
-  // through the exact same delegated create-event path as a suggested slot.
+  // Manual override: build a synthetic slot at the chosen time and route it
+  // through the same draft-review + delegated create-event path as a suggested slot.
   function handleManual(startISO: string, tz: TZ, dur: number) {
-    scheduleSlot(
-      {
+    setPending({
+      tz,
+      slot: {
         slot_id: 'manual-slot',
         cycle_id: cycleId,
         proposed_time: startISO,
@@ -135,8 +144,7 @@ export default function DelegatedScheduler({
         tentative: [],
         conflicts: [],
       },
-      tz,
-    )
+    })
   }
 
   if (creating) {
@@ -192,6 +200,19 @@ export default function DelegatedScheduler({
           {error}
         </p>
       )}
+
+      <DraftReviewDialog
+        open={pending !== null}
+        kind="invite"
+        title={existingMeetingUrl ? 'Review updated invite' : 'Review meeting invite'}
+        subject={subject}
+        body={bodyHtml}
+        recipients={inviteAttendees.filter((a) => a.email).map((a) => `${a.name} (${a.email})`)}
+        sendLabel={existingMeetingUrl ? 'Update & send' : 'Send invite'}
+        busy={creating}
+        onSend={(draft) => { if (pending) void scheduleSlot(pending.slot, pending.tz, draft.subject, draft.body) }}
+        onCancel={() => { if (!creating) setPending(null) }}
+      />
     </div>
   )
 }

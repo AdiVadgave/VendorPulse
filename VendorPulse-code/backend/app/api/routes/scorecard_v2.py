@@ -36,7 +36,7 @@ from app.dependencies import (
     get_scorecard_submission_repo,
     get_user_repo,
 )
-from app.services.email_templates import build_scorecard_email
+from app.services.email_templates import build_scorecard_email, build_reminder_email
 from app.services.mail_provider import get_mail_provider, MailSendError
 from app.services import reminder_service
 from app.models.scheduling import ScorecardConfigUpdate
@@ -113,6 +113,14 @@ class InAppDispatchRequest(BaseModel):
     year: int
     form_base_url: str = Field(..., description="Frontend origin, e.g. http://localhost:5173")
     recipients: list[InAppDispatchRecipient] = Field(..., min_length=1)
+    # True when re-sending after a mistake — uses the formal correction email.
+    reissue: bool = False
+    # Optional edited draft (from the review dialog). When html_body_override is set
+    # it is sent verbatim instead of the template; the tokens {{name}} and {{link}}
+    # are substituted per recipient.
+    subject_override: Optional[str] = None
+    html_body_override: Optional[str] = None
+    text_body_override: Optional[str] = None
 
 
 # ── Structure / form meta ────────────────────────────────────────────────────
@@ -153,7 +161,16 @@ def save_scorecard_config(cycle_id: str, payload: ScorecardConfigUpdate):
     if cycle is None:
         raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
 
-    cfg = build_config_from_selection(payload.selected_measure_keys, payload.weights)
+    # Once the scorecard has been dispatched the configuration is locked — reviewers
+    # are already filling forms against it, so changing measures/teams now would be
+    # inconsistent. The UI also disables editing, this is the server-side guard.
+    if cycle.get("scorecard_dispatched_at"):
+        raise HTTPException(
+            status_code=409,
+            detail="The scorecard has already been dispatched — its configuration is locked and can no longer be changed.",
+        )
+
+    cfg = build_config_from_selection(payload.selected_measure_keys, payload.weights, payload.measure_teams)
     if not cfg["categories"]:
         raise HTTPException(status_code=400, detail="Select at least one measure to include in the scorecard.")
 
@@ -177,6 +194,27 @@ def save_scorecard_config(cycle_id: str, payload: ScorecardConfigUpdate):
     return {"cycle_id": cycle_id, "config": cfg, "cycle": updated}
 
 
+def _filter_structure_for_team(categories: list[dict], team: str | None) -> list[dict]:
+    """Return only the measures a given team is asked to score. A measure with
+    no ``teams`` list is unrestricted (everyone). A measure with a ``teams`` list
+    is kept only when the respondent's team is in it. Themes left with no
+    measures are dropped. With no team (team is None) nothing is filtered."""
+    if team is None:
+        return categories
+    out: list[dict] = []
+    for cat in categories:
+        kept = []
+        for m in cat.get("measures", []):
+            teams = m.get("teams")
+            if not isinstance(teams, list):   # unrestricted → everyone
+                kept.append(m)
+            elif team in teams:
+                kept.append(m)
+        if kept:
+            out.append({**cat, "measures": kept})
+    return out
+
+
 @router.get("/form-meta/{cycle_id}")
 def get_form_meta(cycle_id: str, attendee: str = ""):
     cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
@@ -184,23 +222,27 @@ def get_form_meta(cycle_id: str, attendee: str = ""):
         raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
 
     respondent = None
+    respondent_team: str | None = None
     if attendee:
         att = get_attendee_repo().find_by_id("attendee_id", attendee)
         if att and att.get("cycle_id") == cycle_id:
+            respondent_team = att.get("shell_department") or att.get("name", "")
             respondent = {
                 "attendee_id": att.get("attendee_id"),
                 "name": att.get("name", ""),
                 "email": att.get("email", ""),
-                "team": att.get("shell_department") or att.get("name", ""),
+                "team": respondent_team,
             }
 
+    # Show each respondent only the measures assigned to their team.
+    structure = _filter_structure_for_team(_effective_config(cycle)["categories"], respondent_team)
     return {
         "cycle_id": cycle_id,
         "vendor_name": cycle.get("vendor_name", ""),
         "cycle_type": cycle.get("cycle_type", "SPR"),
         "quarter": cycle.get("quarter", ""),
         "year": cycle.get("year"),
-        "structure": _effective_config(cycle)["categories"],
+        "structure": structure,
         "respondent": respondent,
     }
 
@@ -359,12 +401,15 @@ def _compile_weighted(cycle_id: str) -> dict:
     # Columns = key internal attendees who have submitted (stable attendee_id).
     # Order follows the attendee list for a consistent, predictable layout.
     submitting = [a for a in key_internal if a.get("attendee_id") in subs_by_attendee]
+    # Column label is the TEAM (Shell department). When an attendee has no
+    # department set we show "Unassigned" rather than leaking their personal name
+    # as if it were a team (set the Dept in the Attendees step to show the real team).
     teams = [
         {
             "attendee_id": a.get("attendee_id"),
             "email": (a.get("email") or "").lower(),
             "name": a.get("name", ""),
-            "team": a.get("shell_department") or a.get("name", ""),
+            "team": a.get("shell_department") or "Unassigned",
         }
         for a in submitting
     ]
@@ -1032,21 +1077,33 @@ def dispatch_inapp(payload: InAppDispatchRequest):
         if not email or not r.attendee_id:
             continue
         link = f"{base}/scorecard?cycle={payload.cycle_id}&attendee={r.attendee_id}"
-        email_data = build_scorecard_email(
-            attendee_name=r.name,
-            attendee_email=email,
-            vendor_name=payload.vendor_name,
-            cycle_id=payload.cycle_id,
-            quarter=payload.quarter,
-            year=payload.year,
-            form_url=link,
-        )
+        if payload.html_body_override:
+            # Coordinator edited the draft — send it verbatim, substituting the
+            # per-recipient tokens {{name}} and {{link}}.
+            default_subject = f"{payload.vendor_name} — QBR Scorecard Input Request ({payload.quarter} {payload.year})"
+            subject = (payload.subject_override or default_subject).replace("{{name}}", r.name)
+            html_body = payload.html_body_override.replace("{{name}}", r.name).replace("{{link}}", link)
+            text_body = (payload.text_body_override or "").replace("{{name}}", r.name).replace("{{link}}", link) or None
+        else:
+            email_data = build_scorecard_email(
+                attendee_name=r.name,
+                attendee_email=email,
+                vendor_name=payload.vendor_name,
+                cycle_id=payload.cycle_id,
+                quarter=payload.quarter,
+                year=payload.year,
+                form_url=link,
+                reissue=payload.reissue,
+            )
+            subject = email_data["subject"]
+            html_body = email_data["html_body"]
+            text_body = email_data["text_body"]
         try:
             res = get_mail_provider().send_html_email(
                 to_email=email,
-                subject=email_data["subject"],
-                html_body=email_data["html_body"],
-                text_body=email_data["text_body"],
+                subject=subject,
+                html_body=html_body,
+                text_body=text_body,
             )
             results.append({"name": r.name, "email": email, "status": "sent", "message_id": res.get("id")})
             sent += 1
@@ -1066,6 +1123,51 @@ def dispatch_inapp(payload: InAppDispatchRequest):
     return {"total": len(payload.recipients), "sent": sent, "failed": len(payload.recipients) - sent, "results": results}
 
 
+@router.get("/dispatch-preview/{cycle_id}")
+def dispatch_preview(cycle_id: str, reissue: bool = False):
+    """The default scorecard email draft (subject + HTML + text) so the UI can seed
+    an editable preview. Uses {{name}} and {{link}} tokens where the per-recipient
+    name and form link are substituted at send time."""
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+    email_data = build_scorecard_email(
+        attendee_name="{{name}}",
+        attendee_email="",
+        vendor_name=cycle.get("vendor_name", ""),
+        cycle_id=cycle_id,
+        quarter=cycle.get("quarter", ""),
+        year=cycle.get("year") or 0,
+        form_url="{{link}}",
+        reissue=reissue,
+    )
+    return {
+        "subject": email_data["subject"],
+        "html_body": email_data["html_body"],
+        "text_body": email_data["text_body"],
+    }
+
+
+@router.post("/redo/{cycle_id}")
+def redo_scorecard(cycle_id: str):
+    """Reopen scorecard collection after a mistake.
+
+    Discards every submission collected so far and clears the dispatched marker,
+    so the VMO can reconfigure the scorecard and send it again. Because the old
+    submissions are removed, only the freshly-collected (latest) scorecard is
+    considered. The next dispatch should be sent with ``reissue=true`` so
+    reviewers receive the formal correction notice."""
+    cycle_repo = get_cycle_repo()
+    cycle = cycle_repo.get_by_cycle_id(cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+
+    _submissions_repo().delete_by_field("cycle_id", cycle_id)
+    updated = cycle_repo.clear_scorecard_dispatch(cycle_id)
+    logger.info("redo_scorecard — cycle=%s submissions discarded, dispatch reopened", cycle_id)
+    return {"cycle_id": cycle_id, "reopened": True, "cycle": updated}
+
+
 # ── Automated scorecard reminders ────────────────────────────────────────────
 
 
@@ -1077,6 +1179,10 @@ class ReminderSettingsUpdate(BaseModel):
 
 class ReminderSendNowRequest(BaseModel):
     form_base_url: Optional[str] = None
+    # Optional edited draft (from the review dialog); {{name}}/{{link}} substituted per recipient.
+    subject_override: Optional[str] = None
+    html_body_override: Optional[str] = None
+    text_body_override: Optional[str] = None
 
 
 def _reminder_status(cycle: dict) -> dict:
@@ -1148,8 +1254,47 @@ def send_reminders_now(cycle_id: str, payload: ReminderSendNowRequest = Body(def
             cycle_id, deadline=s.get("deadline"), offsets=s.get("offsets"), form_base_url=payload.form_base_url,
         )
         cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
-    result = reminder_service.send_now(cycle, base_url=payload.form_base_url if payload else None)
+    result = reminder_service.send_now(
+        cycle,
+        base_url=payload.form_base_url if payload else None,
+        subject_override=payload.subject_override if payload else None,
+        html_override=payload.html_body_override if payload else None,
+        text_override=payload.text_body_override if payload else None,
+    )
     return result
+
+
+@router.get("/reminders/preview/{cycle_id}")
+def reminder_preview(cycle_id: str):
+    """The default reminder email draft (subject + HTML + text) for an editable
+    preview. {{name}}/{{link}} tokens are substituted per recipient at send time."""
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+    s = reminder_service.get_settings(cycle)
+    deadline = s.get("deadline") or ""
+    today = datetime.now(timezone.utc).date()
+    days_left = 5
+    if deadline:
+        try:
+            days_left = (datetime.fromisoformat(str(deadline)[:10]).date() - today).days
+        except ValueError:
+            pass
+    email_data = build_reminder_email(
+        attendee_name="{{name}}",
+        vendor_name=cycle.get("vendor_name", ""),
+        quarter=cycle.get("quarter", ""),
+        year=cycle.get("year") or 0,
+        form_url="{{link}}",
+        deadline=deadline,
+        days_left=days_left,
+        tone_label=reminder_service._tone_label(days_left),
+    )
+    return {
+        "subject": email_data["subject"],
+        "html_body": email_data["html_body"],
+        "text_body": email_data["text_body"],
+    }
 
 
 # ── Final (admin-adjusted) scorecard ─────────────────────────────────────────

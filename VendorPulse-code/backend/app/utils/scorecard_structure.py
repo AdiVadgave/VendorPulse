@@ -184,20 +184,30 @@ _DEFAULT_MEASURE_KEYS: set[str] = {
 }
 
 
-def _theme_measures(theme_key: str, keys: set[str]) -> list[dict]:
+def _theme_measures(
+    theme_key: str,
+    keys: set[str],
+    measure_teams: dict[str, list[str]] | None = None,
+) -> list[dict]:
     theme = next((t for t in SCORECARD_CATALOG if t["key"] == theme_key), None)
     if theme is None:
         return []
-    return [
-        {
+    out: list[dict] = []
+    for m in theme["measures"]:
+        if m["key"] not in keys:
+            continue
+        entry = {
             "key": m["key"],
             "label": m["label"],
             "description": m["description"],
             "measure_type": m["measure_type"],
         }
-        for m in theme["measures"]
-        if m["key"] in keys
-    ]
+        # Only stamp a `teams` list when the caller opts into team assignment.
+        # Absent => not team-restricted (everyone answers it).
+        if measure_teams is not None:
+            entry["teams"] = list(measure_teams.get(m["key"], []))
+        out.append(entry)
+    return out
 
 
 def default_scorecard_config() -> dict:
@@ -219,14 +229,23 @@ def default_scorecard_config() -> dict:
     return {"categories": categories, "configured": False}
 
 
-def build_config_from_selection(selected_measure_keys: list[str], weights: dict[str, int]) -> dict:
+def build_config_from_selection(
+    selected_measure_keys: list[str],
+    weights: dict[str, int],
+    measure_teams: dict[str, list[str]] | None = None,
+) -> dict:
     """Resolve a VMO selection (measure keys + per-theme weights) against the
     catalog into an authoritative config. Labels/descriptions/types always come
-    from the catalog — never trusted from the client."""
+    from the catalog — never trusted from the client.
+
+    ``measure_teams`` (measure_key -> team names) optionally restricts which
+    teams are asked each measure; pass it to stamp a ``teams`` list on every
+    included measure (empty list = nobody). Omit it to leave measures
+    unrestricted (everyone answers, the legacy behaviour)."""
     selected = set(selected_measure_keys)
     categories = []
     for theme in SCORECARD_CATALOG:
-        measures = _theme_measures(theme["key"], selected)
+        measures = _theme_measures(theme["key"], selected, measure_teams)
         if not measures:
             continue
         raw = weights.get(theme["key"], theme["default_weight"])

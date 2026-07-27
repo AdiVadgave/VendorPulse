@@ -69,6 +69,15 @@ class CycleRepository(BaseRepository):
             {"scorecard_dispatched_at": dispatched_at, "scorecard_dispatched_to": emails},
         )
 
+    def clear_scorecard_dispatch(self, cycle_id: str) -> Optional[dict]:
+        """Undo the dispatched marker so the scorecard config reopens and it can be
+        re-sent (used by the 'redo scorecard' flow after a mistake)."""
+        return self.update_by_id(
+            "cycle_id",
+            cycle_id,
+            {"scorecard_dispatched_at": None, "scorecard_dispatched_to": None},
+        )
+
     def mark_teams_meeting_scheduled(
         self,
         cycle_id: str,

@@ -108,23 +108,47 @@ def build_scorecard_email(
     quarter: str,
     year: int,
     form_url: str,
+    reissue: bool = False,
 ) -> dict[str, str]:
     """Generate a professional scorecard request email (subject + HTML body + text body).
 
     `form_url` is the in-app scorecard link (already carries the cycle id), so no
     manual cycle-id entry notice is needed.
+
+    When ``reissue`` is true the email formally notifies the reviewer that the
+    previously issued scorecard has been withdrawn and a corrected one must be
+    completed (used by the 'redo scorecard' flow).
     """
-    subject = f"{vendor_name} — QBR Scorecard Input Request ({quarter} {year})"
+    subject = (
+        f"{vendor_name} — Corrected QBR Scorecard, Action Required ({quarter} {year})"
+        if reissue
+        else f"{vendor_name} — QBR Scorecard Input Request ({quarter} {year})"
+    )
+
+    # Formal correction notice shown at the top when re-issuing.
+    reissue_notice = (
+        """
+    <div style="background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid #dc2626; border-radius: 8px; padding: 16px 20px; margin: 0 0 24px 0;">
+      <p style="font-size: 14px; line-height: 1.6; margin: 0; color: #7f1d1d;">
+        <strong>Please disregard the scorecard previously issued for this cycle.</strong>
+        An error was identified in the earlier request, and that version has been withdrawn.
+        Kindly complete this corrected scorecard using the link below. We apologise for the
+        inconvenience and appreciate your cooperation.
+      </p>
+    </div>"""
+        if reissue
+        else ""
+    )
 
     html_body = f"""\
 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
   <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 24px 32px; border-radius: 12px 12px 0 0;">
-    <h1 style="color: #fff; margin: 0; font-size: 20px;">VendorPulse — Scorecard Request</h1>
+    <h1 style="color: #fff; margin: 0; font-size: 20px;">VendorPulse — {'Corrected Scorecard' if reissue else 'Scorecard Request'}</h1>
   </div>
 
   <div style="background: #ffffff; border: 1px solid #e2e8f0; border-top: none; padding: 32px; border-radius: 0 0 12px 12px;">
     <p style="font-size: 15px; line-height: 1.6;">Dear <strong>{attendee_name}</strong>,</p>
-
+{reissue_notice}
     <p style="font-size: 15px; line-height: 1.6;">
       You have been identified as a key reviewer for the <strong>{vendor_name}</strong>
       QBR governance cycle (<strong>{quarter} {year}</strong>).
@@ -166,7 +190,14 @@ def build_scorecard_email(
 
     text_body = (
         f"Dear {attendee_name},\n\n"
-        f"You have been selected as a key reviewer for the {vendor_name} "
+        + (
+            "Please disregard the scorecard previously issued for this cycle. An error was "
+            "identified in the earlier request and that version has been withdrawn. Kindly "
+            "complete this corrected scorecard using the link below.\n\n"
+            if reissue
+            else ""
+        )
+        + f"You have been selected as a key reviewer for the {vendor_name} "
         f"QBR governance cycle ({quarter} {year}).\n\n"
         f"Please complete your scorecard at: {form_url}\n\n"
         f"Categories: Risk & Compliance, Performance, Commercial, Relationship\n"

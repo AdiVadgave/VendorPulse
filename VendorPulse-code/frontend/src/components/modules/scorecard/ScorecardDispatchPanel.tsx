@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { ClipboardList, Send, Bell, Clock, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Link2, Check, Loader2, Trash2, Plus, CalendarClock } from 'lucide-react'
+import { ClipboardList, Send, Bell, Clock, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Link2, Check, Loader2, Trash2, Plus, CalendarClock, RotateCcw } from 'lucide-react'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
-import ApprovalPanel from '@/components/shared/ApprovalPanel'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import type { AgentStatus } from '@/types/agent.types'
 import { WEIGHTED_SCORECARD_STRUCTURE } from '@/types/scorecard.types'
 import type { WeightedCategoryDef } from '@/types/scorecard.types'
-import { dispatchInAppScorecard, buildScorecardLink } from '@/lib/scorecardApi'
+import { dispatchInAppScorecard, buildScorecardLink, redoScorecard, getScorecardDispatchPreview } from '@/lib/scorecardApi'
 import type { DispatchResponse } from '@/lib/scorecardApi'
 import type { CycleAttendee } from '@/types/scheduling.types'
 import { apiFetch } from '@/lib/api'
@@ -22,6 +23,8 @@ interface Props {
   alreadyDispatched?: boolean
   /** The configured scorecard structure for this cycle (falls back to default). */
   structure?: WeightedCategoryDef[]
+  /** Reopen the scorecard config (unlock) after a redo so it can be reconfigured. */
+  onRedo?: () => void
 }
 
 interface ReminderTier {
@@ -59,6 +62,8 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
   const [sending, setSending] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [draftOpen, setDraftOpen] = useState(false)
+  const [draft, setDraft] = useState<{ subject: string; body: string }>({ subject: '', body: '' })
 
   async function load() {
     try {
@@ -91,18 +96,37 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
     }
   }
 
+  // Open the draft editor seeded with the default reminder email.
   async function sendNow() {
+    setError(null); setMsg(null)
+    try {
+      const p = await apiFetch<{ subject: string; html_body: string; text_body: string }>(
+        `/api/scorecard/reminders/preview/${cycleId}`,
+      )
+      setDraft({ subject: p.subject, body: p.html_body })
+      setDraftOpen(true)
+    } catch {
+      setError('Could not load the reminder draft.')
+    }
+  }
+
+  async function doSendNow(edited: { subject: string; body: string }) {
     setSending(true); setError(null); setMsg(null)
     try {
       const r = await apiFetch<{ pending: number; sent: number; failed: number; escalated: number }>(
         `/api/scorecard/reminders/send-now/${cycleId}`,
-        { method: 'POST', body: JSON.stringify({ form_base_url: window.location.origin }) },
+        { method: 'POST', body: JSON.stringify({
+          form_base_url: window.location.origin,
+          subject_override: edited.subject,
+          html_body_override: edited.body,
+        }) },
       )
       setMsg(
         r.pending === 0
           ? 'Everyone has already submitted — no reminders sent.'
           : `Reminder sent to ${r.sent} pending reviewer${r.sent === 1 ? '' : 's'}${r.failed ? `, ${r.failed} failed` : ''}.`,
       )
+      setDraftOpen(false)
       load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to send reminders.')
@@ -224,6 +248,20 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
           </p>
         </>
       )}
+
+      <DraftReviewDialog
+        open={draftOpen}
+        kind="email"
+        title="Review reminder email"
+        subject={draft.subject}
+        body={draft.body}
+        recipients={status?.pending_names ?? []}
+        note="{{name}} and {{link}} are replaced with each pending reviewer's name and personal form link."
+        sendLabel="Send reminder"
+        busy={sending}
+        onSend={doSendNow}
+        onCancel={() => { if (!sending) setDraftOpen(false) }}
+      />
     </div>
   )
 }
@@ -267,7 +305,7 @@ function CategoriesDropdown({ structure }: { structure: WeightedCategoryDef[] })
   )
 }
 
-export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false, structure }: Props) {
+export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false, structure, onRedo }: Props) {
   const effectiveStructure = structure && structure.length > 0 ? structure : WEIGHTED_SCORECARD_STRUCTURE
   const totalMeasures = effectiveStructure.reduce((sum, c) => sum + c.measures.length, 0)
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(alreadyDispatched ? 'complete' : 'idle')
@@ -277,11 +315,38 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [addingId, setAddingId] = useState<string | null>(null)
+  // Set after a redo — the next send uses the formal "corrected scorecard" email.
+  const [reissue, setReissue] = useState(false)
+  const [redoing, setRedoing] = useState(false)
+  const [confirmRedo, setConfirmRedo] = useState(false)
+  const [dispatchDraft, setDispatchDraft] = useState<{ subject: string; body: string }>({ subject: '', body: '' })
 
-  // Recipients ARE the key internal stakeholders (one scorecard per team).
+  // Teams the config assigns to ≥1 measure. A measure with a `teams` list is
+  // team-restricted; if ANY measure is restricted we only invite people whose
+  // team is assigned somewhere. If no measure carries a `teams` list (legacy /
+  // unrestricted config) everyone key + internal is invited, as before.
+  const teamOf = (a: CycleAttendee) => a.shell_department || a.name
+  const assignedTeams = new Set<string>()
+  let hasTeamConfig = false
+  for (const cat of effectiveStructure) {
+    for (const m of cat.measures) {
+      if (Array.isArray(m.teams)) {
+        hasTeamConfig = true
+        m.teams.forEach((t) => assignedTeams.add(t))
+      }
+    }
+  }
+
+  // Recipients ARE the key internal stakeholders (one scorecard per team), further
+  // narrowed to teams the config actually asks something of.
   // Anything not explicitly a Vendor counts as internal — robust to legacy/missing
   // `type` values so a key stakeholder never silently drops from the recipient list.
-  const recipients = attendees.filter((a) => a.is_key && a.type !== 'Vendor')
+  const keyInternal = attendees.filter((a) => a.is_key && a.type !== 'Vendor')
+  const recipients = hasTeamConfig
+    ? keyInternal.filter((a) => assignedTeams.has(teamOf(a)))
+    : keyInternal
+  // Key internal stakeholders excluded because their team isn't assigned any measure.
+  const excludedByTeam = hasTeamConfig ? keyInternal.filter((a) => !assignedTeams.has(teamOf(a))) : []
   // Internal stakeholders that could be added as recipients (not yet key).
   const addable = attendees.filter((a) => a.type !== 'Vendor' && !a.is_key)
 
@@ -308,13 +373,20 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
     } catch { /* clipboard blocked */ }
   }
 
+  // Open the editable draft, seeded with the real server-side template.
   async function handleGenerate() {
     setError(null)
-    setAgentStatus('awaiting_approval')
-    setShowApproval(true)
+    try {
+      const p = await getScorecardDispatchPreview(cycleId, reissue)
+      setDispatchDraft({ subject: p.subject, body: p.html_body })
+      setAgentStatus('awaiting_approval')
+      setShowApproval(true)
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : 'Could not load the email draft')
+    }
   }
 
-  async function handleApprove() {
+  async function handleApprove(edited: { subject: string; body: string }) {
     setAgentStatus('running')
     setShowApproval(false)
     setError(null)
@@ -331,6 +403,9 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
           email: a.email,
           team: a.shell_department || a.name,
         })),
+        reissue,
+        subject_override: edited.subject,
+        html_body_override: edited.body,
       })
       setDispatchResult(result)
       setAgentStatus('complete')
@@ -339,6 +414,28 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : 'Failed to send emails')
       setAgentStatus('idle')
+    }
+  }
+
+  // Redo: discard collected submissions + reopen the config so the scorecard can
+  // be corrected and re-sent. Only the freshly-collected scorecard then counts.
+  // Confirmed via the in-app ConfirmDialog (see `confirmRedo`).
+  async function runRedo() {
+    setRedoing(true)
+    setError(null)
+    try {
+      await redoScorecard(cycleId)
+      // Reopen the panel + config for a fresh send, flagged as a re-issue.
+      setDispatched(false)
+      setDispatchResult(null)
+      setReissue(true)
+      setAgentStatus('idle')
+      onRedo?.()
+      setConfirmRedo(false)
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : 'Failed to reopen the scorecard')
+    } finally {
+      setRedoing(false)
     }
   }
 
@@ -406,12 +503,19 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
             ))}
             {recipients.length === 0 && (
               <p className="text-xs text-amber-600 dark:text-amber-400 py-2">
-                No key internal stakeholders yet. Mark attendees as &quot;Key&quot; in the attendee step, or add one above.
+                {hasTeamConfig && keyInternal.length > 0
+                  ? 'No recipients — none of the key stakeholders’ teams are assigned to any measure. Assign teams in the scorecard config above.'
+                  : 'No key internal stakeholders yet. Mark attendees as “Key” in the attendee step, or add one above.'}
               </p>
             )}
           </div>
+          {excludedByTeam.length > 0 && (
+            <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+              {excludedByTeam.length} key stakeholder{excludedByTeam.length !== 1 ? 's' : ''} not shown — their team isn&apos;t assigned to any measure in the config.
+            </p>
+          )}
           <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
-            Each recipient gets a unique in-app form link tied to their identity. Use <strong>Copy link</strong> to test without sending email.
+            Each recipient gets a unique in-app form link tied to their identity — with only the measures assigned to their team. Use <strong>Copy link</strong> to test without sending email.
           </p>
         </div>
 
@@ -437,6 +541,12 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
           </div>
         )}
 
+        {reissue && !dispatched && (
+          <div className="mb-3 flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
+            <RotateCcw size={14} className="mt-0.5 shrink-0" />
+            <span>Previous scorecard reopened. Correct the configuration above if needed, then re-send — reviewers will get a formal notice to disregard the earlier scorecard and complete the corrected one.</span>
+          </div>
+        )}
         {!dispatched ? (
           <button
             onClick={handleGenerate}
@@ -444,11 +554,29 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
             className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
           >
             {agentStatus === 'running' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            {agentStatus === 'running' ? 'Preparing dispatch…' : `Send Scorecard Link to ${recipients.length} Recipient${recipients.length !== 1 ? 's' : ''}`}
+            {agentStatus === 'running'
+              ? 'Preparing dispatch…'
+              : `${reissue ? 'Re-send Corrected Scorecard' : 'Send Scorecard Link'} to ${recipients.length} Recipient${recipients.length !== 1 ? 's' : ''}`}
           </button>
         ) : (
-          <div className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-700 dark:text-emerald-400 text-sm font-medium">
-            <Send size={14} /> Scorecard links dispatched via Outlook
+          <div className="space-y-2">
+            <div className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-700 dark:text-emerald-400 text-sm font-medium">
+              <Send size={14} /> Scorecard links dispatched via Outlook
+            </div>
+            {/* Redo — mistake on the scorecard? Reopen config + re-send. */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between px-1">
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                Something wrong with the scorecard? Reopen the configuration and send a corrected one.
+              </p>
+              <button
+                onClick={() => { setError(null); setConfirmRedo(true) }}
+                disabled={redoing}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-60 shrink-0"
+              >
+                {redoing ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+                Redo scorecard
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -456,33 +584,37 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
       {/* Reminder schedule — live, configurable, sent via the service mailbox */}
       <ReminderScheduleCard cycleId={cycleId} />
 
-      {showApproval && (
-        <ApprovalPanel
-          title="Dispatch Scorecard Request via Outlook"
-          summary={`Email the in-app scorecard form link to ${recipients.length} key internal stakeholder(s) for ${vendorName} (${quarter} ${year}).`}
-          recipients={recipients.map((a) => `${a.name} (${a.email})`)}
-          warnings={[
-            'Emails are sent from the Mobility Vendor Pulse service mailbox (Outlook)',
-            'Each email links to the in-app scorecard form',
-            'Each link is tied to the reviewer; responses are stored directly',
-          ]}
-          previewContent={
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                Subject: {vendorName} &mdash; Scorecard Input Request ({quarter} {year})
-              </p>
-              <div className="text-sm text-slate-600 dark:text-slate-400 space-y-2">
-                <p>Dear [Reviewer],</p>
-                <p>You have been identified as a key reviewer for the {vendorName} governance cycle ({quarter} {year}).</p>
-                <p>Please open the secure link and complete your scorecard (1–5 per measure, with comments).</p>
-              </div>
-            </div>
-          }
-          approveLabel="Send via Outlook"
-          onApprove={handleApprove}
-          onCancel={() => { setShowApproval(false); setAgentStatus('idle') }}
-        />
-      )}
+      <ConfirmDialog
+        open={confirmRedo}
+        tone="danger"
+        title="Redo the scorecard?"
+        confirmLabel="Yes, redo scorecard"
+        cancelLabel="Cancel"
+        busy={redoing}
+        onConfirm={runRedo}
+        onCancel={() => setConfirmRedo(false)}
+        message={
+          <>
+            This will discard <strong>all scorecard submissions</strong> collected so far and reopen the
+            configuration so you can correct it and send again. Reviewers will receive a formal notice to
+            disregard the previous scorecard and complete the corrected one.
+          </>
+        }
+      />
+
+      <DraftReviewDialog
+        open={showApproval}
+        kind="email"
+        title={reissue ? 'Review corrected scorecard email' : 'Review scorecard request email'}
+        subject={dispatchDraft.subject}
+        body={dispatchDraft.body}
+        recipients={recipients.map((a) => `${a.name} (${a.email})`)}
+        note="{{name}} and {{link}} are replaced with each recipient's name and personal scorecard link. Sent from the Mobility Vendor Pulse service mailbox (Outlook)."
+        sendLabel={reissue ? 'Re-send via Outlook' : 'Send via Outlook'}
+        busy={agentStatus === 'running'}
+        onSend={handleApprove}
+        onCancel={() => { setShowApproval(false); setAgentStatus('idle') }}
+      />
     </div>
   )
 }

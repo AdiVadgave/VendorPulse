@@ -3,6 +3,7 @@ import { UserPlus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { addAttendeesToEvent, createMeetingEvent, isSchedulingAvailable } from '@/lib/graphScheduling'
 import { SearchAddAttendeeForm } from './AttendeeRefreshPanel'
+import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 
 interface Props {
@@ -47,6 +48,15 @@ export default function AddAttendeesToMeetingPanel({
 }: Props) {
   const [status, setStatus] = useState<'idle' | 'working' | 'done' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [draftOpen, setDraftOpen] = useState(false)
+
+  // Default invite text (editable in the draft dialog before sending).
+  const defaultSubject = `EGB/QBR Meeting Invitation — ${vendorName} ${quarter} ${year}`
+  const defaultBody =
+    `<p>Dear Team,</p>` +
+    `<p>You have been added to the <strong>EGB/QBR governance review</strong> for ` +
+    `<strong>${vendorName} — ${quarter} ${year}</strong>.</p>` +
+    `<p>Please accept or decline via Microsoft Teams.</p><p>— Mobility Vendor Pulse</p>`
 
   function handleAdded(added: CycleAttendee) {
     onAttendeesChanged([...attendees, added])
@@ -54,32 +64,38 @@ export default function AddAttendeesToMeetingPanel({
     setStatus('idle')
   }
 
-  async function handleInvite() {
+  function openDraft() {
     if (!isSchedulingAvailable()) {
       setError("You can't send invites — you're not signed in with Shell (SSO). Sign in with your Shell account and try again.")
       setStatus('error')
       return
     }
+    setError(null)
+    setDraftOpen(true)
+  }
+
+  async function doInvite(draft: { subject: string; body: string }) {
     setStatus('working')
     setError(null)
+    // Only push the invite text onto the existing event when the coordinator actually
+    // edited it — otherwise leave it untouched so Graph notifies just the new people.
+    const edited = draft.subject !== defaultSubject || draft.body !== defaultBody
     try {
       if (eventId) {
-        // Existing event → PATCH the attendee list. Graph invites the new ones and
-        // leaves the time/join link untouched.
-        await addAttendeesToEvent({ eventId, attendees })
+        // Existing event → PATCH the attendee list (+ optionally the edited text).
+        await addAttendeesToEvent({
+          eventId,
+          attendees,
+          ...(edited ? { subject: draft.subject, bodyHtml: draft.body } : {}),
+        })
         setStatus('done')
+        setDraftOpen(false)
         onUpdated(eventId, null)
         return
       }
 
       // No stored event id → re-create the meeting for everyone at the same time.
-      const subject = `EGB/QBR Meeting Invitation — ${vendorName} ${quarter} ${year}`
-      const bodyHtml =
-        `<p>Dear Team,</p>` +
-        `<p>You are invited to the <strong>EGB/QBR governance review</strong> for ` +
-        `<strong>${vendorName} — ${quarter} ${year}</strong>.</p>` +
-        `<p>Please accept or decline via Microsoft Teams.</p><p>— Mobility Vendor Pulse</p>`
-      const created = await createMeetingEvent({ slot, attendees, subject, bodyText: bodyHtml })
+      const created = await createMeetingEvent({ slot, attendees, subject: draft.subject, bodyText: draft.body })
       await apiFetch(`/api/cycles/${cycleId}/scheduling/manual-meeting`, {
         method: 'POST',
         body: JSON.stringify({
@@ -91,6 +107,7 @@ export default function AddAttendeesToMeetingPanel({
         }),
       })
       setStatus('done')
+      setDraftOpen(false)
       onUpdated(created.event_id, created.teams_meeting_url)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to invite the added attendees.')
@@ -122,7 +139,7 @@ export default function AddAttendeesToMeetingPanel({
           </p>
           <button
             type="button"
-            onClick={handleInvite}
+            onClick={openDraft}
             disabled={status === 'working' || attendees.length === 0}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shrink-0"
           >
@@ -141,6 +158,20 @@ export default function AddAttendeesToMeetingPanel({
           </p>
         )}
       </div>
+
+      <DraftReviewDialog
+        open={draftOpen}
+        kind="invite"
+        title="Review invite for added attendees"
+        subject={defaultSubject}
+        body={defaultBody}
+        recipients={attendees.filter((a) => a.email).map((a) => `${a.name} (${a.email})`)}
+        note="Leave the message unchanged to notify only the newly-added people; editing it re-notifies all attendees with the updated text."
+        sendLabel="Send invite"
+        busy={status === 'working'}
+        onSend={doInvite}
+        onCancel={() => { if (status !== 'working') setDraftOpen(false) }}
+      />
     </div>
   )
 }

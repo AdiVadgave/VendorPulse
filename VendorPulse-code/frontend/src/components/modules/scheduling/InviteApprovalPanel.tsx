@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
+import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import { apiFetch } from '@/lib/api'
 import { createMeetingEvent, isSchedulingAvailable } from '@/lib/graphScheduling'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
@@ -45,6 +46,7 @@ export default function InviteApprovalPanel({
   const [isProcessing, setIsProcessing] = useState(false)
   const [graphError, setGraphError] = useState<string | null>(null)
   const [hasSentInvite, setHasSentInvite] = useState(false)
+  const [draftOpen, setDraftOpen] = useState(false)
 
   const dateObj = new Date(slot.proposed_time)
   const durationMinutes = Number((slot as unknown as { duration_minutes?: number }).duration_minutes ?? 60)
@@ -87,37 +89,45 @@ export default function InviteApprovalPanel({
     })
   }
 
-  async function handleSend() {
+  // The default invite subject + HTML body (the coordinator can edit before sending).
+  const defaultSubject = `EGB/QBR Meeting Invitation — ${vendorName} ${quarter} ${year}`
+  const defaultBody =
+    `<p>Dear Team,</p>` +
+    `<p>You are invited to the <strong>EGB/QBR governance review</strong> for ` +
+    `<strong>${vendorName} — ${quarter} ${year}</strong>.</p>` +
+    `<p>📅 <strong>Date:</strong> ${formatDateInZone(dateObj)}<br/>` +
+    `🕙 <strong>Time:</strong> ${formatTimeInZone(dateObj)} – ${formatTimeInZone(endTime)} ${displayZone}<br/>` +
+    `📍 <strong>Location:</strong> Microsoft Teams</p>` +
+    `<p><strong>Agenda</strong></p>` +
+    `<ol><li>${quarter} Performance Review &amp; Scorecard Discussion</li>` +
+    `<li>Key Issues, Concerns and Pushback Responses</li>` +
+    `<li>Commitments and Action Items Review</li>` +
+    `<li>Forward Planning &amp; AOB</li></ol>` +
+    `<p>Please accept or decline via Microsoft Teams.</p><p>— Mobility Vendor Pulse</p>`
+
+  // "Approve & Send" opens the draft editor first; the invite is only created
+  // when the coordinator confirms in the dialog (with any edits they made).
+  function openDraft() {
     if (Boolean(isLocked) || hasSentInvite || isProcessing) return
     if (!isSchedulingAvailable()) {
       setGraphError("You can't schedule — you're not signed in with Shell (SSO). Sign in with your Shell account to send the invite.")
       setAgentStatus('failed')
       return
     }
+    setGraphError(null)
+    setDraftOpen(true)
+  }
+
+  async function doSend(draft: { subject: string; body: string }) {
     setIsProcessing(true)
     setAgentStatus('running')
     setGraphError(null)
 
     try {
-      // Build the invite subject + HTML body from the approved details.
-      const subject = `EGB/QBR Meeting Invitation — ${vendorName} ${quarter} ${year}`
-      const bodyHtml =
-        `<p>Dear Team,</p>` +
-        `<p>You are invited to the <strong>EGB/QBR governance review</strong> for ` +
-        `<strong>${vendorName} — ${quarter} ${year}</strong>.</p>` +
-        `<p>📅 <strong>Date:</strong> ${formatDateInZone(dateObj)}<br/>` +
-        `🕙 <strong>Time:</strong> ${formatTimeInZone(dateObj)} – ${formatTimeInZone(endTime)} ${displayZone}<br/>` +
-        `📍 <strong>Location:</strong> Microsoft Teams</p>` +
-        `<p><strong>Agenda</strong></p>` +
-        `<ol><li>${quarter} Performance Review &amp; Scorecard Discussion</li>` +
-        `<li>Key Issues, Concerns and Pushback Responses</li>` +
-        `<li>Commitments and Action Items Review</li>` +
-        `<li>Forward Planning &amp; AOB</li></ol>` +
-        `<p>Please accept or decline via Microsoft Teams.</p><p>— Mobility Vendor Pulse</p>`
-
       // 1. Create the Teams meeting + send invites AS the signed-in coordinator
-      //    (delegated Graph — no backend token). 2. Persist to the backend.
-      const created = await createMeetingEvent({ slot, attendees, subject, bodyText: bodyHtml })
+      //    (delegated Graph — no backend token) with the reviewed subject/body.
+      //    2. Persist to the backend.
+      const created = await createMeetingEvent({ slot, attendees, subject: draft.subject, bodyText: draft.body })
 
       await apiFetch(`/api/cycles/${cycleId}/scheduling/manual-meeting`, {
         method: 'POST',
@@ -133,6 +143,7 @@ export default function InviteApprovalPanel({
       setAgentStatus('complete')
       setHasSentInvite(true)
       setIsProcessing(false)
+      setDraftOpen(false)
       onInviteSent(created.teams_meeting_url, created.event_id)
     } catch (err) {
       setGraphError(err instanceof Error ? err.message : 'Failed to create Teams meeting')
@@ -343,7 +354,7 @@ export default function InviteApprovalPanel({
             </button>
           )}
           <button
-            onClick={handleSend}
+            onClick={openDraft}
             disabled={Boolean(isLocked) || isProcessing || hasSentInvite}
             className={cn(
               'flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors',
@@ -369,6 +380,19 @@ export default function InviteApprovalPanel({
           </button>
         </div>
       </div>
+
+      <DraftReviewDialog
+        open={draftOpen}
+        kind="invite"
+        title="Review meeting invite"
+        subject={defaultSubject}
+        body={defaultBody}
+        recipients={attendees.filter((a) => a.email).map((a) => `${a.name} (${a.email})`)}
+        sendLabel="Send invite"
+        busy={isProcessing}
+        onSend={doSend}
+        onCancel={() => { if (!isProcessing) setDraftOpen(false) }}
+      />
     </div>
   )
 }

@@ -376,6 +376,7 @@ export default function Dashboard() {
   const [loadingError, setLoadingError] = useState<string | null>(null)
   const [deletingCycleId, setDeletingCycleId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [selectedVendor, setSelectedVendor] = useState('')  // '' = all vendors
   const [expandedVendors, setExpandedVendors] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -408,10 +409,15 @@ export default function Dashboard() {
   const archivedCycles = cycles.filter((c) => getWorkflowState(c.cycle_id) === 'ARCHIVED')
   const vendorCount = new Set(cycles.map((c) => c.vendor_name)).size
 
+  // Distinct vendor names for the filter dropdown (alphabetical).
+  const vendorNames = [...new Set(cycles.map((c) => c.vendor_name))].sort((a, b) => a.localeCompare(b))
+
   const q = query.trim().toLowerCase()
-  const matchesQuery = (c: GovernanceCycle) => !q || c.vendor_name.toLowerCase().includes(q)
-  const activeShown = activeCycles.filter(matchesQuery)
-  const archivedShown = archivedCycles.filter(matchesQuery)
+  const matchesFilters = (c: GovernanceCycle) =>
+    (!q || c.vendor_name.toLowerCase().includes(q)) &&
+    (!selectedVendor || c.vendor_name === selectedVendor)
+  const activeShown = activeCycles.filter(matchesFilters)
+  const archivedShown = archivedCycles.filter(matchesFilters)
 
   // Group closed cycles vendor-wise (most cycles first), each group sorted recent→old.
   const archivedByVendor = Object.entries(
@@ -579,16 +585,42 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search cycles by vendor…"
-          className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
+      {/* Search + vendor filter */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <div className="relative flex-1 max-w-md">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search cycles by vendor…"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+        <div className="relative sm:w-64">
+          <Building2 size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <select
+            value={selectedVendor}
+            onChange={(e) => setSelectedVendor(e.target.value)}
+            className="w-full appearance-none pl-9 pr-8 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+          >
+            <option value="">All vendors</option>
+            {vendorNames.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+          <ChevronDown size={15} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          {selectedVendor && (
+            <button
+              type="button"
+              onClick={() => setSelectedVendor('')}
+              title="Clear vendor filter"
+              className="absolute right-7 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Active governance cycles */}
@@ -627,7 +659,7 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-3">
               {archivedByVendor.map(([vendor, list]) => {
-                const open = expandedVendors.has(vendor) || !!q
+                const open = expandedVendors.has(vendor) || !!q || !!selectedVendor
                 return (
                   <div key={vendor} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
                     <button

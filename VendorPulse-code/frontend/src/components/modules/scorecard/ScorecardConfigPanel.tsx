@@ -1,33 +1,56 @@
-import { useEffect, useMemo, useState } from 'react'
-import { SlidersHorizontal, ChevronDown, ChevronRight, Save, RotateCcw, Loader2, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { SlidersHorizontal, ChevronDown, ChevronRight, Save, RotateCcw, Loader2, CheckCircle2, AlertTriangle, Info, Lock, Users } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { ScorecardCatalogTheme, ScorecardConfig } from '@/types/scorecard.types'
+import type { CycleAttendee } from '@/types/scheduling.types'
 import { getScorecardCatalog, getScorecardConfig, saveScorecardConfig } from '@/lib/scorecardApi'
 
 interface Props {
   cycleId: string
   /** Called after a successful save with the new effective config. */
   onSaved?: (config: ScorecardConfig) => void
-  /** Warn (non-blocking) that the scorecard has already been dispatched. */
+  /** Once dispatched the config is locked (read-only) — reviewers are filling it. */
   dispatched?: boolean
+  /** Cycle attendees — internal stakeholders define the teams a measure can target. */
+  attendees?: CycleAttendee[]
 }
+
+/** A team is identified the same way the backend derives a submission's team. */
+function teamOf(a: CycleAttendee): string {
+  return a.shell_department || a.name
+}
+
+// Shell-red accented checkboxes (accent-color paints the tick/fill red).
+const CB = 'w-4 h-4 rounded border-slate-300 accent-[#dd1d21] focus:ring-2 focus:ring-red-400/50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer'
+const CB_LG = 'w-5 h-5 rounded border-slate-300 accent-[#dd1d21] focus:ring-2 focus:ring-red-400/50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
 
 /**
  * VMO configuration step (before dispatch): choose which measures to include in
  * this SPR's scorecard and set the per-theme weightage. Fully catalog-driven —
  * no hardcoded structure. RAG measures are tagged and carry no weight.
  */
-export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = false }: Props) {
+export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = false, attendees = [] }: Props) {
   const [open, setOpen] = useState(false)
   const [catalog, setCatalog] = useState<ScorecardCatalogTheme[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [weights, setWeights] = useState<Record<string, number>>({})
+  // measure_key -> teams asked to score it. No entry = all teams (everyone);
+  // an explicit (possibly empty) Set = exactly those teams ([] = nobody).
+  const [measureTeams, setMeasureTeams] = useState<Record<string, Set<string>>>({})
   const [configured, setConfigured] = useState(false)
 
+  const locked = dispatched  // config is read-only once the scorecard is sent
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Teams available to assign = distinct teams among internal (non-vendor) attendees.
+  const teams = useMemo(() => {
+    const set = new Set<string>()
+    for (const a of attendees) if (a.type !== 'Vendor') set.add(teamOf(a))
+    return [...set].sort((x, y) => x.localeCompare(y))
+  }, [attendees])
 
   // Load the catalog + the cycle's current effective config.
   useEffect(() => {
@@ -38,14 +61,21 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
         setCatalog(cat)
         const sel = new Set<string>()
         const w: Record<string, number> = {}
+        const mt: Record<string, Set<string>> = {}
         for (const theme of cfg.categories) {
           w[theme.key] = theme.weight
-          for (const m of theme.measures) sel.add(m.key)
+          for (const m of theme.measures) {
+            sel.add(m.key)
+            // Only hydrate explicit assignments; measures without a `teams` list
+            // stay unrestricted (default all teams) until the VMO edits them.
+            if (Array.isArray(m.teams)) mt[m.key] = new Set(m.teams)
+          }
         }
         // Pre-fill weights for themes not in the config with catalog defaults.
         for (const theme of cat) if (!(theme.key in w)) w[theme.key] = theme.default_weight
         setSelected(sel)
         setWeights(w)
+        setMeasureTeams(mt)
         setConfigured(cfg.configured)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load the scorecard catalog'))
@@ -61,6 +91,13 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
       else next.add(key)
       return next
     })
+    // Drop stale team assignment when a measure is removed.
+    setMeasureTeams((prev) => {
+      if (!(key in prev) || selected.has(key) === false) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
   }
 
   function toggleTheme(theme: ScorecardCatalogTheme, include: boolean) {
@@ -68,6 +105,46 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
     setSelected((prev) => {
       const next = new Set(prev)
       theme.measures.forEach((m) => (include ? next.add(m.key) : next.delete(m.key)))
+      return next
+    })
+    if (!include) {
+      setMeasureTeams((prev) => {
+        const next = { ...prev }
+        theme.measures.forEach((m) => delete next[m.key])
+        return next
+      })
+    }
+  }
+
+  // Teams currently asked a measure: an explicit set, else all teams (default).
+  function teamsForMeasure(key: string): Set<string> {
+    return measureTeams[key] ?? new Set(teams)
+  }
+
+  function toggleMeasureTeam(measureKey: string, team: string) {
+    setSavedAt(null)
+    setMeasureTeams((prev) => {
+      // First edit of an unrestricted measure starts from "all teams", then toggles.
+      const current = prev[measureKey] ? new Set(prev[measureKey]) : new Set(teams)
+      if (current.has(team)) current.delete(team)
+      else current.add(team)
+      return { ...prev, [measureKey]: current }
+    })
+  }
+
+  // Column header toggle: add/remove one team across ALL selected measures at once.
+  function toggleTeamColumn(team: string) {
+    setSavedAt(null)
+    const sel = [...selected]
+    const allOn = sel.length > 0 && sel.every((k) => teamsForMeasure(k).has(team))
+    setMeasureTeams((prev) => {
+      const next = { ...prev }
+      for (const k of sel) {
+        const cur = new Set(prev[k] ?? teams)
+        if (allOn) cur.delete(team)
+        else cur.add(team)
+        next[k] = cur
+      }
       return next
     })
   }
@@ -92,7 +169,13 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
 
   const weightOk = totalWeight === 100 && included.every((t) => (weights[t.key] ?? 0) > 0)
   const hasSelection = selected.size > 0
-  const canSave = hasSelection && weightOk && !saving && !loading
+  // Selected numeric/RAG measures that currently target no team → nobody is asked them.
+  const emptyTeamMeasures = useMemo(
+    () => [...selected].filter((k) => teamsForMeasure(k).size === 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selected, measureTeams, teams]
+  )
+  const canSave = hasSelection && weightOk && !saving && !loading && !locked
 
   async function handleSave() {
     setSaving(true)
@@ -100,13 +183,18 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
     try {
       const w: Record<string, number> = {}
       for (const t of included) w[t.key] = weights[t.key] ?? 0
+      // Persist an explicit team list for every selected measure ([] = nobody).
+      const mt: Record<string, string[]> = {}
+      for (const key of selected) mt[key] = Array.from(teamsForMeasure(key))
       const cfg = await saveScorecardConfig(cycleId, {
         selected_measure_keys: Array.from(selected),
         weights: w,
+        measure_teams: mt,
       })
       setConfigured(true)
       setSavedAt(new Date().toISOString())
       onSaved?.(cfg)
+      setOpen(false)  // collapse the config panel once saved
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save the scorecard configuration')
     } finally {
@@ -123,12 +211,17 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
       .then((cfg) => {
         const sel = new Set<string>()
         const w: Record<string, number> = { ...weights }
+        const mt: Record<string, Set<string>> = {}
         for (const theme of cfg.categories) {
           w[theme.key] = theme.weight
-          for (const m of theme.measures) sel.add(m.key)
+          for (const m of theme.measures) {
+            sel.add(m.key)
+            if (Array.isArray(m.teams)) mt[m.key] = new Set(m.teams)
+          }
         }
         setSelected(sel)
         setWeights(w)
+        setMeasureTeams(mt)
       })
       .finally(() => setLoading(false))
   }
@@ -166,64 +259,140 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
             <div className="flex justify-center py-6"><Loader2 className="animate-spin text-indigo-500" size={20} /></div>
           ) : (
             <>
-              {dispatched && (
-                <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
-                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                  Scorecards have already been dispatched. Changing the configuration now affects reviewers who haven&apos;t submitted yet — avoid changes unless necessary.
+              {locked && (
+                <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300">
+                  <Lock size={14} className="mt-0.5 shrink-0" />
+                  <span><strong>Configuration locked.</strong> The scorecard has been dispatched, so measures, weights and team assignments can no longer be changed.</span>
                 </div>
               )}
 
-              <div className="space-y-3">
-                {catalog.map((theme) => {
-                  const themeMeasures = theme.measures
-                  const themeSelected = themeMeasures.filter((m) => selected.has(m.key))
-                  const isIncluded = themeSelected.length > 0
-                  const allOn = themeSelected.length === themeMeasures.length
-                  return (
-                    <div key={theme.key} className={cn('rounded-lg border p-3', isIncluded ? 'border-indigo-200 dark:border-indigo-900 bg-indigo-50/40 dark:bg-indigo-900/10' : 'border-slate-200 dark:border-slate-800')}>
-                      <div className="flex items-center justify-between gap-3 mb-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={allOn}
-                            ref={(el) => { if (el) el.indeterminate = isIncluded && !allOn }}
-                            onChange={(e) => toggleTheme(theme, e.target.checked)}
-                            className="rounded border-slate-300"
-                          />
-                          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{theme.label}</span>
-                        </label>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-slate-400">Weight</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={isIncluded ? (weights[theme.key] ?? 0) : ''}
-                            disabled={!isIncluded}
-                            onChange={(e) => setWeight(theme.key, e.target.value)}
-                            placeholder="—"
-                            className="w-16 px-2 py-1 text-center text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                          <span className="text-[11px] text-slate-400">%</span>
-                        </div>
-                      </div>
-                      <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 pl-6">
-                        {themeMeasures.map((m) => (
-                          <label key={m.key} className="flex items-center gap-2 py-0.5 cursor-pointer">
-                            <input type="checkbox" checked={selected.has(m.key)} onChange={() => toggleMeasure(m.key)} className="rounded border-slate-300" />
-                            <span className="text-xs text-slate-600 dark:text-slate-400">{m.label}</span>
-                            {m.measure_type === 'rag' && (
-                              <span className="text-[10px] px-1 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400" title="Colour-coded Red/Amber/Green — not included in the score">
-                                RAG
-                              </span>
-                            )}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
+              {teams.length === 0 && (
+                <div className="mb-3 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                  <Users size={13} className="shrink-0" />
+                  Add internal stakeholders in the Attendees step to assign measures to teams.
+                </div>
+              )}
+
+              {/* Matrix: measures (rows, grouped by theme) × teams (columns). Each cell
+                  is a red checkbox — is this team asked to score this measure? */}
+              <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
+                      <th className="text-left px-4 py-3 text-sm font-semibold sticky left-0 z-10 bg-slate-100 dark:bg-slate-800 min-w-[16rem]">
+                        Theme / Measure
+                      </th>
+                      {teams.map((t) => {
+                        const sel = [...selected]
+                        const on = sel.length > 0 && sel.every((k) => teamsForMeasure(k).has(t))
+                        const some = sel.some((k) => teamsForMeasure(k).has(t))
+                        return (
+                          <th key={t} className="px-4 py-3 text-center whitespace-nowrap border-l border-slate-200 dark:border-slate-700">
+                            <label className={cn('flex flex-col items-center gap-1.5', locked || sel.length === 0 ? 'cursor-not-allowed' : 'cursor-pointer')} title={`Toggle ${t} for every selected measure`}>
+                              <span className="text-sm font-semibold">{t}</span>
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                ref={(el) => { if (el) el.indeterminate = some && !on }}
+                                disabled={locked || sel.length === 0}
+                                onChange={() => toggleTeamColumn(t)}
+                                className={CB}
+                              />
+                            </label>
+                          </th>
+                        )
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {catalog.map((theme) => {
+                      const themeMeasures = theme.measures
+                      const themeSelected = themeMeasures.filter((m) => selected.has(m.key))
+                      const isIncluded = themeSelected.length > 0
+                      const allOn = themeSelected.length === themeMeasures.length
+                      return (
+                        <Fragment key={theme.key}>
+                          {/* Theme band: include-all toggle + per-theme weight */}
+                          <tr className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
+                            <td colSpan={1 + teams.length} className="px-4 py-2.5">
+                              <div className="flex items-center justify-between gap-3">
+                                <label className={cn('flex items-center gap-2.5', locked ? 'cursor-not-allowed' : 'cursor-pointer')}>
+                                  <input
+                                    type="checkbox"
+                                    checked={allOn}
+                                    disabled={locked}
+                                    ref={(el) => { if (el) el.indeterminate = isIncluded && !allOn }}
+                                    onChange={(e) => toggleTheme(theme, e.target.checked)}
+                                    className={CB}
+                                  />
+                                  <span className="text-sm font-bold text-slate-800 dark:text-slate-100 tracking-tight">{theme.label}</span>
+                                </label>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="text-xs text-slate-500 dark:text-slate-400">Weight</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={isIncluded ? (weights[theme.key] ?? 0) : ''}
+                                    disabled={!isIncluded || locked}
+                                    onChange={(e) => setWeight(theme.key, e.target.value)}
+                                    placeholder="—"
+                                    className="w-16 px-2 py-1 text-center text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-red-400"
+                                  />
+                                  <span className="text-xs text-slate-500 dark:text-slate-400">%</span>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                          {/* Measure rows */}
+                          {themeMeasures.map((m) => {
+                            const isSel = selected.has(m.key)
+                            const mTeams = teamsForMeasure(m.key)
+                            const noneAssigned = isSel && teams.length > 0 && mTeams.size === 0
+                            return (
+                              <tr key={m.key} className={cn('border-t border-slate-100 dark:border-slate-800 transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/20', !isSel && 'opacity-50')}>
+                                {/* Measure name + include checkbox (sticky first column) */}
+                                <td className="px-4 py-2.5 sticky left-0 z-10 bg-white dark:bg-slate-900">
+                                  <label className={cn('flex items-center gap-2.5 pl-6', locked ? 'cursor-not-allowed' : 'cursor-pointer')}>
+                                    <input type="checkbox" checked={isSel} disabled={locked} onChange={() => toggleMeasure(m.key)} className={CB} />
+                                    <span className="text-sm text-slate-700 dark:text-slate-300">{m.label}</span>
+                                    {m.measure_type === 'rag' && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400" title="Colour-coded Red/Amber/Green — not included in the score">
+                                        RAG
+                                      </span>
+                                    )}
+                                    {noneAssigned && (
+                                      <span title="No team selected — no one will be asked this measure">
+                                        <AlertTriangle size={13} className="text-amber-500 shrink-0" />
+                                      </span>
+                                    )}
+                                  </label>
+                                </td>
+                                {/* One checkbox per team */}
+                                {teams.map((t) => (
+                                  <td key={t} className="px-4 py-2.5 text-center border-l border-slate-100 dark:border-slate-800">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSel && mTeams.has(t)}
+                                      disabled={!isSel || locked}
+                                      onChange={() => toggleMeasureTeam(m.key, t)}
+                                      title={isSel ? `${t}: ${mTeams.has(t) ? 'asked' : 'not asked'} this measure` : 'Include the measure first'}
+                                      className={CB_LG}
+                                    />
+                                  </td>
+                                ))}
+                              </tr>
+                            )
+                          })}
+                        </Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
+              <p className="mt-2.5 text-xs text-slate-400 dark:text-slate-500">
+                Tick a measure to include it — every team is asked by default. Untick a team's cell to exclude it, or use a column header to toggle that team across all measures. A selected measure with no team ticked is asked to no one.
+              </p>
 
               {/* Weight summary */}
               <div className="mt-3 flex items-center gap-2 text-xs">
@@ -239,11 +408,17 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
 
               {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1"><AlertTriangle size={12} />{error}</p>}
               {!hasSelection && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Select at least one measure.</p>}
+              {emptyTeamMeasures.length > 0 && !locked && (
+                <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <AlertTriangle size={12} />
+                  {emptyTeamMeasures.length} selected measure{emptyTeamMeasures.length !== 1 ? 's have' : ' has'} no team assigned — no one will be asked to score {emptyTeamMeasures.length !== 1 ? 'them' : 'it'}.
+                </p>
+              )}
 
               <div className="mt-4 flex items-center gap-2">
                 <button
                   onClick={resetToCurrent}
-                  disabled={saving}
+                  disabled={saving || locked}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
                 >
                   <RotateCcw size={13} /> Discard changes

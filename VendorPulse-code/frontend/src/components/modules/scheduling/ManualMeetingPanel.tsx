@@ -3,7 +3,7 @@ import { CalendarClock, Loader2, AlertCircle, Users, ArrowRight } from 'lucide-r
 import { cn } from '@/utils/cn'
 import type { CycleAttendee } from '@/types/scheduling.types'
 import { scheduleManualMeeting } from '@/lib/schedulingApi'
-import { updateMeetingTime, createMeetingEvent, findEventIdByJoinUrl, isSchedulingAvailable } from '@/lib/graphScheduling'
+import { updateMeetingTime, createMeetingEvent, findEventIdByJoinUrl, isSchedulingAvailable, wallClockToUtcIso } from '@/lib/graphScheduling'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 
 type TimeZoneView = 'IST' | 'UTC' | 'GMT'
@@ -85,7 +85,9 @@ export default function ManualMeetingPanel({
   async function doSave(draft: { subject: string; body: string }) {
     setSaving(true)
     setError(null)
-    const startTime = startLocal.length === 16 ? `${startLocal}:00` : startLocal
+    // Convert the wall-clock entry in the chosen zone to a real UTC instant so the
+    // event lands at the intended time regardless of the coordinator's browser zone.
+    const startTime = wallClockToUtcIso(startLocal, timeZone)
     try {
       // Resolve the existing event: prefer the stored id; otherwise locate it by its
       // join link so we MOVE that meeting instead of creating a duplicate.

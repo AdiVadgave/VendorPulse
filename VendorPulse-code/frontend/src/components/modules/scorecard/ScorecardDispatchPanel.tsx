@@ -256,6 +256,7 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
         subject={draft.subject}
         body={draft.body}
         recipients={status?.pending_names ?? []}
+        requiredTokens={['{{link}}']}
         note="{{name}} and {{link}} are replaced with each pending reviewer's name and personal form link."
         sendLabel="Send reminder"
         busy={sending}
@@ -352,14 +353,16 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
 
   async function markKey(attendeeId: string) {
     setAddingId(attendeeId)
+    setError(null)
     try {
       await apiFetch(`/api/cycles/${cycleId}/attendees/${attendeeId}`, {
         method: 'PUT',
         body: JSON.stringify({ is_key: true }),
       })
+      // Only reflect the change locally once the backend has persisted it.
       onAttendeesChanged?.(attendees.map((a) => (a.attendee_id === attendeeId ? { ...a, is_key: true } : a)))
-    } catch {
-      onAttendeesChanged?.(attendees.map((a) => (a.attendee_id === attendeeId ? { ...a, is_key: true } : a)))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not add that stakeholder as a recipient — please try again.')
     } finally {
       setAddingId(null)
     }
@@ -609,6 +612,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
         subject={dispatchDraft.subject}
         body={dispatchDraft.body}
         recipients={recipients.map((a) => `${a.name} (${a.email})`)}
+        requiredTokens={['{{link}}']}
         note="{{name}} and {{link}} are replaced with each recipient's name and personal scorecard link. Sent from the Mobility Vendor Pulse service mailbox (Outlook)."
         sendLabel={reissue ? 'Re-send via Outlook' : 'Send via Outlook'}
         busy={agentStatus === 'running'}

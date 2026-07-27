@@ -27,6 +27,19 @@ export function isSchedulingAvailable(): boolean {
   return calendarTokenGetter !== null
 }
 
+// The scheduler only offers three fixed-offset display zones (no DST): IST +05:30,
+// UTC/GMT +00:00. A datetime-local input yields a bare wall-clock with NO offset, so
+// `new Date(wallClock)` would parse it in the BROWSER's zone (wrong when the chosen
+// zone differs). Convert the wall-clock + chosen zone to a real UTC instant.
+const ZONE_OFFSET: Record<'IST' | 'UTC' | 'GMT', string> = { IST: '+05:30', UTC: '+00:00', GMT: '+00:00' }
+
+export function wallClockToUtcIso(wallClock: string, tz: 'IST' | 'UTC' | 'GMT'): string {
+  if (!wallClock) return wallClock
+  const withSeconds = wallClock.length === 16 ? `${wallClock}:00` : wallClock // add :SS if datetime-local omitted it
+  const d = new Date(`${withSeconds}${ZONE_OFFSET[tz]}`)
+  return Number.isNaN(d.getTime()) ? wallClock : d.toISOString()
+}
+
 async function token(): Promise<string> {
   if (!calendarTokenGetter) {
     throw new Error('Scheduling needs an active Shell sign-in (SSO). Please sign in and retry.')
@@ -44,15 +57,23 @@ async function token(): Promise<string> {
 //
 //   weight = base(1)  + key(+3)  + LT(+2)  + exec/EGB chair(+3),  then ×0.4 if Optional
 //
-// Composite weights of the score components (sum ≈ 1.0):
-const W_WEIGHTED_COVERAGE = 0.58  // importance-weighted attendance (the main driver)
-const W_KEY_COVERAGE = 0.22       // how many KEY stakeholders are free
-const W_DAY = 0.12                // mid-week preference
-const W_RECENCY = 0.08            // sooner is better
-// Extra penalties that widen the spread when critical people can't make it:
-const KEY_CONFLICT_PENALTY = 6    // per key stakeholder who is busy
-const LT_CONFLICT_PENALTY = 3     // per (non-key) LT member who is busy
-const EXEC_BUSY_PENALTY = 10      // exec sponsor (EGB chair) is busy
+// Scoring model: an AVAILABILITY CORE dominates, so a slot where everyone (weighted
+// by importance) is free scores in the 90s–100. A light PREFERENCE top-up (time of
+// day, weekday, recency) nudges and separates otherwise-equal slots but can never
+// pull a fully-available slot below ~90.
+const W_CORE = 0.85               // importance-weighted availability (the headline)
+const W_PREF = 0.15               // day/time/recency top-up (also breaks same-day ties)
+// Within the availability core (both are 100 when every weighted attendee is free):
+const CORE_COVERAGE = 0.65        // share of importance-weight that is free
+const CORE_KEY = 0.35             // share of KEY stakeholders that are free
+// Within the preference top-up:
+const PREF_TIME = 0.50            // time-of-day
+const PREF_DAY = 0.30             // weekday
+const PREF_REC = 0.20             // sooner is better
+// Exec sponsor is a hard constraint — a real penalty when their calendar shows busy.
+// (Key/LT availability is already captured by the core, so no separate head-count
+// penalty is applied — that keeps fully-available slots at the top of the range.)
+const EXEC_BUSY_PENALTY = 8
 
 /** Importance weight for a searched attendee (higher = matters more to the slot). */
 function attendeeWeight(a: CycleAttendee): number {
@@ -78,6 +99,21 @@ function dayOfWeekScore(d: Date): number {
 function recencyScore(d: Date, now: number): number {
   const days = Math.max(0, (d.getTime() - now) / 86_400_000)
   return Math.max(40, 100 - days * 4)
+}
+
+// Time-of-day preference in IST (the team's primary zone). This also breaks ties
+// between slots that are otherwise identical (same people free, same day) — e.g.
+// a 10:00 slot outranks a 12:30 lunch slot — so the ranking never collapses to one
+// flat score. Slots are UTC instants; convert to an IST wall-clock hour first.
+function timeOfDayScore(d: Date): number {
+  const istMinutes = (d.getUTCHours() * 60 + d.getUTCMinutes() + 330) % 1440
+  const h = istMinutes / 60
+  if (h >= 9 && h < 12) return 100    // prime late-morning
+  if (h >= 14 && h < 16) return 90    // mid-afternoon
+  if (h >= 16 && h < 17.5) return 78  // late afternoon
+  if (h >= 8 && h < 9) return 74      // early
+  if (h >= 12 && h < 14) return 62    // lunch dip
+  return 48                            // very early / evening
 }
 
 // ── Graph payload types (trimmed to what we use) ─────────────────────────────
@@ -168,8 +204,11 @@ export async function findMeetingSlots(
   const data = (await res.json()) as { meetingTimeSuggestions?: GraphSuggestion[] }
   const suggestions = data.meetingTimeSuggestions ?? []
 
-  // Which attendee is the exec sponsor (hard-constraint role)?
-  const execEmail = attendees.find((a) => a.role === 'EGB_CHAIR')?.email?.toLowerCase() ?? null
+  // Which attendee is the exec sponsor (hard-constraint role)? Only treat them as a
+  // constraint when their calendar is actually searchable (a Shell mailbox) — an
+  // external EGB chair has unreadable free/busy, so we must NOT mark every slot
+  // "exec busy" or penalise it for availability we can't see.
+  const execEmail = searchable.find((a) => a.role === 'EGB_CHAIR')?.email?.toLowerCase() ?? null
   // Per-searched-attendee importance metadata, keyed by lowercased email.
   const META = new Map(
     searchable.map((a) => [
@@ -193,8 +232,8 @@ export async function findMeetingSlots(
 
     // Importance-weighted tallies (drive the score) + key/LT breakdown (shown on the card).
     let freeW = 0, tentW = 0
-    let keyFree = 0, keyTent = 0, keyConf = 0
-    let ltFree = 0, ltConf = 0
+    let keyFree = 0, keyTent = 0
+    let ltFree = 0
 
     for (const a of avail) {
       const email = (a.attendee?.emailAddress?.address ?? '').toLowerCase()
@@ -204,7 +243,7 @@ export async function findMeetingSlots(
       const tent = isTentative(a.availability)
       if (free) { attending.push(meta.name); freeW += meta.w; if (meta.key) keyFree++; if (meta.lt) ltFree++ }
       else if (tent) { tentative.push(meta.name); tentW += meta.w; if (meta.key) keyTent++ }
-      else { conflicts.push(meta.name); if (meta.key) keyConf++; if (meta.lt) ltConf++ }
+      else { conflicts.push(meta.name) }
       if (execEmail && email === execEmail && (free || tent)) execAvailable = true
     }
 
@@ -218,12 +257,14 @@ export async function findMeetingSlots(
     // penalties for key/LT/exec conflicts widen the spread between otherwise-similar slots.
     const weightedCoverage = ((freeW + 0.5 * tentW) / totalWeight) * 100
     const keyCoverage = keyTotal > 0 ? ((keyFree + 0.5 * keyTent) / keyTotal) * 100 : 100
-    let score =
-      W_WEIGHTED_COVERAGE * weightedCoverage +
-      W_KEY_COVERAGE * keyCoverage +
-      W_DAY * dayOfWeekScore(startDate) +
-      W_RECENCY * recencyScore(startDate, now)
-    score -= KEY_CONFLICT_PENALTY * keyConf + LT_CONFLICT_PENALTY * ltConf
+    // Availability core (100 = everyone important is free) dominates; a light
+    // day/time/recency top-up separates otherwise-equal slots into a clean gradient.
+    const core = CORE_COVERAGE * weightedCoverage + CORE_KEY * keyCoverage
+    const pref =
+      PREF_TIME * timeOfDayScore(startDate) +
+      PREF_DAY * dayOfWeekScore(startDate) +
+      PREF_REC * recencyScore(startDate, now)
+    let score = W_CORE * core + W_PREF * pref
     if (execEmail && !execAvailable) score -= EXEC_BUSY_PENALTY
     score = clamp(Math.round(score))
 

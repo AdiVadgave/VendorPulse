@@ -83,7 +83,6 @@ export default function ConfirmationTracker({
   addAttendeeSlot,
 }: ConfirmationTrackerProps) {
   const [nudgeSent, setNudgeSent] = useState<Set<string>>(new Set())
-  const [nudgingId, setNudgingId] = useState<string | null>(null)
 
   // Live RSVP responses from the Outlook event (email → response).
   const [liveRsvp, setLiveRsvp] = useState<Record<string, RsvpResponse>>({})
@@ -155,14 +154,11 @@ export default function ConfirmationTracker({
 
 
 
-  async function sendNudge(attendee: CycleAttendee) {
-    setNudgingId(attendee.attendee_id)
-
-    // Simulate network delay for UI
-    await new Promise(resolve => setTimeout(resolve, 800))
-
+  // Mark a local follow-up reminder for a pending attendee. This does NOT send an
+  // email (meeting RSVPs are driven by the Outlook invite itself) — it's a tracking
+  // marker for the coordinator, so the copy is deliberately "log", not "send".
+  function logReminder(attendee: CycleAttendee) {
     setNudgeSent((prev) => new Set([...prev, attendee.attendee_id]))
-    setNudgingId(null)
   }
 
   return (
@@ -283,7 +279,6 @@ export default function ConfirmationTracker({
                 const status = statusOf(a)
                 const cfg    = STATUS_CONFIG[status]
                 const nudged = nudgeSent.has(a.attendee_id)
-                const isNudging = nudgingId === a.attendee_id
 
                 return (
                   <tr
@@ -318,17 +313,18 @@ export default function ConfirmationTracker({
                     <td className="px-4 py-3">
                       {status === 'pending' && (
                         <button
-                          onClick={() => sendNudge(a)}
-                          disabled={nudged || isNudging}
+                          onClick={() => logReminder(a)}
+                          disabled={nudged}
+                          title="Log a follow-up reminder for this attendee (does not send an email — RSVPs come from the Outlook invite)"
                           className={cn(
                             'flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors',
-                            nudged || isNudging
+                            nudged
                               ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-default'
                               : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 border border-amber-200 dark:border-amber-800'
                           )}
                         >
                           <Bell size={11} />
-                          {isNudging ? 'Sending…' : nudged ? 'Nudge sent' : 'Send nudge'}
+                          {nudged ? 'Reminder logged' : 'Log reminder'}
                         </button>
                       )}
                       {status === 'declined' && (
@@ -371,7 +367,7 @@ export default function ConfirmationTracker({
               <Bell size={12} />
               <span>
                 {pending.length} attendee{pending.length > 1 ? 's have' : ' has'} not
-                responded yet. Use <strong>Send nudge</strong> to log a reminder for them.
+                responded yet. Use <strong>Log reminder</strong> to note a follow-up for them.
               </span>
             </p>
           </div>

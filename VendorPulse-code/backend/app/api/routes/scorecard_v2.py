@@ -21,7 +21,14 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta
+from html import escape as html_escape
 from typing import Optional
+
+
+def _clean_subject(s: str) -> str:
+    """Collapse CR/LF in a subject line (defensive — Graph sendMail is JSON, but keep
+    subjects single-line regardless of edited/token-substituted input)."""
+    return s.replace("\r", " ").replace("\n", " ").strip()
 
 from fastapi import APIRouter, Body, HTTPException, Response
 from pydantic import BaseModel, Field
@@ -1069,6 +1076,14 @@ def dispatch_inapp(payload: InAppDispatchRequest):
     if cycle is None:
         raise HTTPException(status_code=404, detail=f"Cycle '{payload.cycle_id}' not found")
 
+    # An edited body MUST keep the {{link}} token, otherwise recipients get an email
+    # with no way to reach their scorecard (and the cycle would still lock as dispatched).
+    if payload.html_body_override and "{{link}}" not in payload.html_body_override:
+        raise HTTPException(
+            status_code=400,
+            detail="The edited email must keep the {{link}} placeholder so each recipient can open their scorecard form.",
+        )
+
     base = payload.form_base_url.rstrip("/")
     results = []
     sent = 0
@@ -1079,10 +1094,11 @@ def dispatch_inapp(payload: InAppDispatchRequest):
         link = f"{base}/scorecard?cycle={payload.cycle_id}&attendee={r.attendee_id}"
         if payload.html_body_override:
             # Coordinator edited the draft — send it verbatim, substituting the
-            # per-recipient tokens {{name}} and {{link}}.
+            # per-recipient tokens {{name}} (HTML-escaped) and {{link}}.
             default_subject = f"{payload.vendor_name} — QBR Scorecard Input Request ({payload.quarter} {payload.year})"
-            subject = (payload.subject_override or default_subject).replace("{{name}}", r.name)
-            html_body = payload.html_body_override.replace("{{name}}", r.name).replace("{{link}}", link)
+            safe_name = html_escape(r.name)
+            subject = _clean_subject((payload.subject_override or default_subject).replace("{{name}}", r.name))
+            html_body = payload.html_body_override.replace("{{name}}", safe_name).replace("{{link}}", link)
             text_body = (payload.text_body_override or "").replace("{{name}}", r.name).replace("{{link}}", link) or None
         else:
             email_data = build_scorecard_email(
@@ -1162,10 +1178,26 @@ def redo_scorecard(cycle_id: str):
     if cycle is None:
         raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
 
-    _submissions_repo().delete_by_field("cycle_id", cycle_id)
+    # Redo is only meaningful while the scorecard is still being collected. Once the
+    # cycle has moved on to Alignment / Vendor-Prep / Meeting, purging submissions
+    # would leave those downstream stages operating on an empty scorecard — refuse.
+    ws = cycle.get("workflow_state", "")
+    ws_idx = WORKFLOW_STATES.index(ws) if ws in WORKFLOW_STATES else -1
+    if ws_idx > WORKFLOW_STATES.index("SCORECARD_COMPILED"):
+        raise HTTPException(
+            status_code=409,
+            detail="The cycle has already progressed past scorecard collection — it can no longer be redone.",
+        )
+
+    cleared = _submissions_repo().delete_by_field("cycle_id", cycle_id)
+    # Drop the frozen (admin-adjusted) snapshot too — it is stale once submissions reset.
+    try:
+        _final_repo().delete_for_cycle(cycle_id)
+    except Exception:  # noqa: BLE001 — snapshot may not exist; never block the redo
+        pass
     updated = cycle_repo.clear_scorecard_dispatch(cycle_id)
-    logger.info("redo_scorecard — cycle=%s submissions discarded, dispatch reopened", cycle_id)
-    return {"cycle_id": cycle_id, "reopened": True, "cycle": updated}
+    logger.info("redo_scorecard — cycle=%s discarded %d submissions, dispatch reopened", cycle_id, cleared)
+    return {"cycle_id": cycle_id, "reopened": True, "submissions_cleared": cleared, "cycle": updated}
 
 
 # ── Automated scorecard reminders ────────────────────────────────────────────
@@ -1247,6 +1279,11 @@ def send_reminders_now(cycle_id: str, payload: ReminderSendNowRequest = Body(def
     cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
     if cycle is None:
         raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+    if payload and payload.html_body_override and "{{link}}" not in payload.html_body_override:
+        raise HTTPException(
+            status_code=400,
+            detail="The edited reminder must keep the {{link}} placeholder so each reviewer can open their scorecard form.",
+        )
     # Persist the form base URL so the automated scheduler can build links too.
     if payload and payload.form_base_url:
         s = reminder_service.get_settings(cycle)

@@ -14,10 +14,18 @@ interface Props {
   recipients?: string[]
   /** Small hint under the body (e.g. token substitution note). */
   note?: ReactNode
+  /** Placeholders that MUST remain in the body (e.g. ['{{link}}']) — send is blocked if removed. */
+  requiredTokens?: string[]
   sendLabel?: string
   busy?: boolean
-  onSend: (draft: { subject: string; body: string }) => void
+  /** `edited` is true only when the coordinator actually changed the subject or body. */
+  onSend: (draft: { subject: string; body: string }, edited: boolean) => void
   onCancel: () => void
+}
+
+/** Visible text of an HTML fragment (tags/entities stripped) — used to detect an empty body. */
+function plainText(html: string): string {
+  return html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim()
 }
 
 /**
@@ -34,6 +42,7 @@ export default function DraftReviewDialog({
   body,
   recipients = [],
   note,
+  requiredTokens = [],
   sendLabel = 'Send',
   busy = false,
   onSend,
@@ -42,6 +51,8 @@ export default function DraftReviewDialog({
   const [subj, setSubj] = useState(subject)
   const [html, setHtml] = useState(body)
   const [mode, setMode] = useState<'preview' | 'edit'>('preview')
+  const [dirty, setDirty] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
   const editorRef = useRef<HTMLDivElement>(null)
 
   // Re-seed the editor whenever it (re)opens or the source draft changes.
@@ -50,8 +61,23 @@ export default function DraftReviewDialog({
       setSubj(subject)
       setHtml(body)
       setMode('preview')
+      setDirty(false)
+      setSendError(null)
     }
   }, [open, subject, body])
+
+  const missingTokens = requiredTokens.filter((t) => !html.includes(t))
+  const bodyEmpty = plainText(html).length === 0
+  const canSend = !busy && subj.trim().length > 0 && !bodyEmpty && missingTokens.length === 0
+
+  function handleSend() {
+    if (missingTokens.length > 0) {
+      setSendError(`Please keep ${missingTokens.join(', ')} in the message — ${missingTokens.length > 1 ? 'they are' : 'it is'} replaced with each recipient's details.`)
+      return
+    }
+    if (bodyEmpty) { setSendError('The message body is empty.'); return }
+    onSend({ subject: subj, body: html }, dirty)
+  }
 
   // Populate the rich-text editor's DOM once when entering Edit mode (an
   // uncontrolled contentEditable — we read innerHTML back on input, so we must
@@ -70,6 +96,10 @@ export default function DraftReviewDialog({
     return () => document.removeEventListener('keydown', onKey)
   }, [open, busy, onCancel])
 
+  // Move focus into the dialog when it opens (basic a11y).
+  const cardRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (open) cardRef.current?.focus() }, [open])
+
   if (!open) return null
 
   const Icon = kind === 'invite' ? CalendarPlus : Mail
@@ -80,9 +110,12 @@ export default function DraftReviewDialog({
       onMouseDown={() => { if (!busy) onCancel() }}
       role="dialog"
       aria-modal="true"
+      aria-labelledby="draft-dialog-title"
     >
       <div
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+        ref={cardRef}
+        tabIndex={-1}
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col focus:outline-none"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -91,7 +124,7 @@ export default function DraftReviewDialog({
             <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
               <Icon size={16} className="text-indigo-600 dark:text-indigo-400" />
             </div>
-            <h3 className="font-semibold text-slate-900 dark:text-white text-sm truncate">{title}</h3>
+            <h3 id="draft-dialog-title" className="font-semibold text-slate-900 dark:text-white text-sm truncate">{title}</h3>
           </div>
           <button
             type="button"
@@ -123,7 +156,7 @@ export default function DraftReviewDialog({
               type="text"
               value={subj}
               disabled={busy}
-              onChange={(e) => setSubj(e.target.value)}
+              onChange={(e) => { setSubj(e.target.value); setDirty(true); setSendError(null) }}
               className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -163,7 +196,10 @@ export default function DraftReviewDialog({
                   ref={editorRef}
                   contentEditable={!busy}
                   suppressContentEditableWarning
-                  onInput={(e) => setHtml((e.target as HTMLDivElement).innerHTML)}
+                  role="textbox"
+                  aria-multiline="true"
+                  aria-label="Message body"
+                  onInput={(e) => { setHtml((e.target as HTMLDivElement).innerHTML); setDirty(true); setSendError(null) }}
                   className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-white dark:bg-slate-900 max-h-80 overflow-y-auto text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <p className="text-[11px] text-slate-400 dark:text-slate-500">
@@ -176,7 +212,10 @@ export default function DraftReviewDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-800">
+          {sendError && (
+            <p className="mr-auto text-xs text-red-600 dark:text-red-400 text-left">{sendError}</p>
+          )}
           <button
             type="button"
             onClick={onCancel}
@@ -187,8 +226,9 @@ export default function DraftReviewDialog({
           </button>
           <button
             type="button"
-            onClick={() => onSend({ subject: subj, body: html })}
-            disabled={busy || !subj.trim()}
+            onClick={handleSend}
+            disabled={!canSend}
+            title={missingTokens.length ? `Keep ${missingTokens.join(', ')} in the message` : bodyEmpty ? 'The message is empty' : undefined}
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-60 transition-colors"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { getMockCycleById as getMockCycleById } from '@/mock/cycles.mock'
+import { wallClockToUtcIso } from '@/lib/graphScheduling'
 import {
   MOCK_ATTENDEES_INITIAL,
   MOCK_SLOT_PROPOSALS,
@@ -1002,7 +1003,8 @@ function SchedulingTab({
     const manual: SlotProposal = {
       slot_id: 'manual-slot',
       cycle_id: cycle.cycle_id,
-      proposed_time: startISO,
+      // Convert the wall-clock entry in the chosen zone to a real UTC instant.
+      proposed_time: wallClockToUtcIso(startISO, tz),
       proposed_time_zone: tz,
       duration_minutes: dur,
       organiser_available: true,
@@ -1203,6 +1205,7 @@ function SchedulingTab({
                     onAttendeesChanged={onAttendeesUpdated}
                     slot={selectedSlot}
                     eventId={scheduledEventId}
+                    meetingUrl={meetingUrl}
                     vendorName={cycle.vendor_name}
                     quarter={cycle.quarter}
                     year={cycle.year}

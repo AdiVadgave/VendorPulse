@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timezone
+from html import escape as _html_escape
 from typing import Optional
 
 from app.dependencies import (
@@ -160,8 +161,9 @@ def send_tier(
         link = _form_link(base_url or get_settings(cycle).get("form_base_url"), cycle_id, p["attendee_id"])
         if html_override:
             default_subject = f"Reminder — {vendor} QBR Scorecard ({quarter} {year})"
-            subject = (subject_override or default_subject).replace("{{name}}", p["name"])
-            html_body = html_override.replace("{{name}}", p["name"]).replace("{{link}}", link)
+            safe_name = _html_escape(p["name"])
+            subject = (subject_override or default_subject).replace("{{name}}", p["name"]).replace("\r", " ").replace("\n", " ").strip()
+            html_body = html_override.replace("{{name}}", safe_name).replace("{{link}}", link)
             text_body = (text_override or "").replace("{{name}}", p["name"]).replace("{{link}}", link) or None
         else:
             email = build_reminder_email(

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { UserPlus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
-import { addAttendeesToEvent, createMeetingEvent, isSchedulingAvailable } from '@/lib/graphScheduling'
+import { addAttendeesToEvent, createMeetingEvent, findEventIdByJoinUrl, isSchedulingAvailable } from '@/lib/graphScheduling'
 import { SearchAddAttendeeForm } from './AttendeeRefreshPanel'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
@@ -14,6 +14,8 @@ interface Props {
   slot: SlotProposal
   /** Graph event id of the already-scheduled meeting (null for meetings created before it was persisted). */
   eventId: string | null
+  /** Existing meeting join link — used to locate the event when its id isn't stored (avoids duplicate meetings). */
+  meetingUrl?: string | null
   vendorName: string
   quarter: string
   year: number
@@ -39,6 +41,7 @@ export default function AddAttendeesToMeetingPanel({
   onAttendeesChanged,
   slot,
   eventId,
+  meetingUrl,
   vendorName,
   quarter,
   year,
@@ -74,27 +77,33 @@ export default function AddAttendeesToMeetingPanel({
     setDraftOpen(true)
   }
 
-  async function doInvite(draft: { subject: string; body: string }) {
+  // `edited` (from the draft dialog) is true only when the coordinator actually
+  // changed the text — so an untouched draft leaves the invite body alone and Graph
+  // notifies just the newly-added people.
+  async function doInvite(draft: { subject: string; body: string }, edited: boolean) {
     setStatus('working')
     setError(null)
-    // Only push the invite text onto the existing event when the coordinator actually
-    // edited it — otherwise leave it untouched so Graph notifies just the new people.
-    const edited = draft.subject !== defaultSubject || draft.body !== defaultBody
     try {
-      if (eventId) {
-        // Existing event → PATCH the attendee list (+ optionally the edited text).
+      // Resolve the existing event: stored id, else look it up by join link — so we
+      // PATCH the SAME meeting rather than creating a duplicate with a new link.
+      let targetEventId = eventId
+      if (!targetEventId && meetingUrl) {
+        try { targetEventId = await findEventIdByJoinUrl(meetingUrl) } catch { /* fall through to create */ }
+      }
+      if (targetEventId) {
+        // Existing event → PATCH the attendee list (+ the edited text only if changed).
         await addAttendeesToEvent({
-          eventId,
+          eventId: targetEventId,
           attendees,
           ...(edited ? { subject: draft.subject, bodyHtml: draft.body } : {}),
         })
         setStatus('done')
         setDraftOpen(false)
-        onUpdated(eventId, null)
+        onUpdated(targetEventId, null)
         return
       }
 
-      // No stored event id → re-create the meeting for everyone at the same time.
+      // Genuinely no existing event to patch → re-create for everyone at the same time.
       const created = await createMeetingEvent({ slot, attendees, subject: draft.subject, bodyText: draft.body })
       await apiFetch(`/api/cycles/${cycleId}/scheduling/manual-meeting`, {
         method: 'POST',

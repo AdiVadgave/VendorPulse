@@ -15,7 +15,7 @@ import { Loader2, AlertCircle } from 'lucide-react'
 import FindSlotsControl from './FindSlotsControl'
 import SlotRankingPanel from './SlotRankingPanel'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
-import { createMeetingEvent, updateMeetingTime, findEventIdByJoinUrl } from '@/lib/graphScheduling'
+import { createMeetingEvent, updateMeetingTime, findEventIdByJoinUrl, wallClockToUtcIso } from '@/lib/graphScheduling'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 
 type TZ = 'IST' | 'UTC' | 'GMT'
@@ -130,7 +130,8 @@ export default function DelegatedScheduler({
       slot: {
         slot_id: 'manual-slot',
         cycle_id: cycleId,
-        proposed_time: startISO,
+        // Wall-clock entry in the chosen zone → real UTC instant.
+        proposed_time: wallClockToUtcIso(startISO, tz),
         proposed_time_zone: tz,
         duration_minutes: dur,
         organiser_available: true,

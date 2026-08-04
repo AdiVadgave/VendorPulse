@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  CalendarPlus, Users, ExternalLink, CheckCircle2, RotateCcw, Building2, Link2Off, UserPlus, X,
+  CalendarPlus, Users, ExternalLink, CheckCircle2, RotateCcw, Building2, Link2Off, UserPlus, X, CalendarCheck,
 } from 'lucide-react'
 import {
   scheduleVendorPrepMeetingManual, getVendorPrepMeeting,
@@ -8,6 +8,7 @@ import {
 import { fetchAttendees } from '@/lib/schedulingApi'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
+import { formatMeetingTime } from '@/utils/formatMeetingTime'
 
 const VENDOR_PREP_BODY_HTML =
   '<p>Vendor prep call — align the internal team with the vendor ahead of the governance meeting.</p>' +
@@ -16,8 +17,10 @@ const VENDOR_PREP_BODY_HTML =
   '<li>Confirm the points, data and pushback responses to raise</li>' +
   '<li>Agree logistics and owners for the governance meeting</li></ol>'
 import TranscriptInput from '@/components/modules/meeting/TranscriptInput'
+import MeetingMinutesViewer from '@/components/modules/meeting/MeetingMinutesViewer'
+import { getMeetingArtifact } from '@/lib/meetingApi'
 import type { CycleAttendee } from '@/types/scheduling.types'
-import type { MeetingNote } from '@/types/meeting.types'
+import type { MeetingNote, MeetingMinutes } from '@/types/meeting.types'
 import type { ExtractedAction } from '@/types/alignment.types'
 import { cn } from '@/utils/cn'
 
@@ -37,6 +40,10 @@ interface MeetingResult {
   teamsUrl: string | null
   webLink: string | null
   attendeeCount: number
+  /** UTC ISO instant of the scheduled start — used to display date/time. */
+  startISO?: string | null
+  timeZone?: string | null
+  durationMinutes?: number | null
 }
 
 /**
@@ -49,11 +56,15 @@ interface MeetingResult {
  * is manual (no Microsoft Graph / calendar access required).
  */
 export default function VendorPrepMeetingPanel({
-  cycleId, onActionsExtracted, alreadyExtracted, qbrMeetingDate,
+  cycleId, vendorName, quarter, year, onActionsExtracted, alreadyExtracted, qbrMeetingDate,
 }: Props) {
   const [attendees, setAttendees] = useState<CycleAttendee[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [meetingResult, setMeetingResult] = useState<MeetingResult | null>(null)
+  // Parsed transcript notes + any previously-generated MoM for this prep meeting.
+  const meetingId = `vprep-${cycleId}`
+  const [parsedNotes, setParsedNotes] = useState<MeetingNote[]>([])
+  const [savedMinutes, setSavedMinutes] = useState<MeetingMinutes | null>(null)
 
   const [rescheduling, setRescheduling] = useState(false)
   const [addingInvitee, setAddingInvitee] = useState(false)
@@ -86,6 +97,9 @@ export default function VendorPrepMeetingPanel({
             teamsUrl: res.meeting.teams_meeting_url,
             webLink: res.meeting.web_link,
             attendeeCount: res.meeting.attendee_count,
+            startISO: res.meeting.start_time,
+            timeZone: res.meeting.time_zone,
+            durationMinutes: res.meeting.duration_minutes,
           })
         }
       })
@@ -93,6 +107,19 @@ export default function VendorPrepMeetingPanel({
       .finally(() => { if (!cancelled) setPersistenceChecked(true) })
     return () => { cancelled = true }
   }, [cycleId, persistenceChecked])
+
+  // Restore parsed notes + generated MoM for this prep meeting so it survives a refresh.
+  useEffect(() => {
+    let cancelled = false
+    getMeetingArtifact(cycleId, meetingId)
+      .then((a) => {
+        if (cancelled) return
+        if (a.notes?.length) setParsedNotes(a.notes)
+        if (a.minutes) setSavedMinutes(a.minutes)
+      })
+      .catch(() => { /* backend offline / never parsed */ })
+    return () => { cancelled = true }
+  }, [cycleId, meetingId])
 
   const selectedEmails = attendees
     .map((a) => (a.email || '').toLowerCase())
@@ -136,6 +163,7 @@ export default function VendorPrepMeetingPanel({
   )
 
   function handleParsed(parsed: MeetingNote[]) {
+    setParsedNotes(parsed)
     const actions: ExtractedAction[] = parsed
       .filter((n) => n.note_type === 'ACTION')
       .map((n, i) => ({
@@ -166,6 +194,12 @@ export default function VendorPrepMeetingPanel({
               <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 font-medium">
                 <CheckCircle2 size={16} /> Vendor prep meeting scheduled — {meetingResult.attendeeCount} attendee{meetingResult.attendeeCount === 1 ? '' : 's'} invited.
               </div>
+              {formatMeetingTime(meetingResult.startISO, meetingResult.timeZone ?? 'IST', meetingResult.durationMinutes) && (
+                <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                  <CalendarCheck size={13} className="shrink-0" />
+                  {formatMeetingTime(meetingResult.startISO, meetingResult.timeZone ?? 'IST', meetingResult.durationMinutes)}
+                </p>
+              )}
               {meetingResult.teamsUrl ? (
                 <a
                   href={meetingResult.teamsUrl}
@@ -283,7 +317,10 @@ export default function VendorPrepMeetingPanel({
                   const res = await scheduleVendorPrepMeetingManual(cycleId, {
                     startTime, durationMinutes, timeZone, attendeeEmails: selectedEmails, meetingUrl: teamsUrl,
                   })
-                  setMeetingResult({ teamsUrl: res.teams_meeting_url, webLink: res.web_link, attendeeCount: res.attendee_count })
+                  setMeetingResult({
+                    teamsUrl: res.teams_meeting_url, webLink: res.web_link, attendeeCount: res.attendee_count,
+                    startISO: startTime, timeZone, durationMinutes,
+                  })
                   setRescheduling(false)
                 }}
               />
@@ -296,14 +333,26 @@ export default function VendorPrepMeetingPanel({
         </div>
       </div>
 
-      {/* Transcript → action items only. Meeting minutes are generated in the
-          final Meeting section, not here. */}
+      {/* Transcript → action items, and (once parsed) the meeting minutes for this prep call. */}
       <TranscriptInput
         cycleId={cycleId}
-        meetingId={`vprep-${cycleId}`}
+        meetingId={meetingId}
         onParsed={handleParsed}
         alreadyExtracted={alreadyExtracted}
       />
+      {(parsedNotes.length > 0 || savedMinutes) && (
+        <MeetingMinutesViewer
+          cycleId={cycleId}
+          meetingId={meetingId}
+          heading="Vendor Prep Meeting Minutes"
+          notes={parsedNotes}
+          initialMinutes={savedMinutes}
+          vendorName={vendorName}
+          quarter={quarter}
+          year={year}
+          onApproved={() => { /* per-meeting MoM — no workflow gate */ }}
+        />
+      )}
     </div>
   )
 }

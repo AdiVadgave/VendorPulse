@@ -9,9 +9,15 @@ POST /api/cycles/{cycleId}/meeting/minutes/send       Send approved minutes to i
 """
 from __future__ import annotations
 
+import base64
+import binascii
+import io
 import logging
+import re
+import zipfile
 from datetime import datetime, timezone
 from typing import Any
+from xml.sax.saxutils import unescape
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -158,6 +164,115 @@ def parse_transcript(
         })
     logger.info("MEETING-AGENT: transcript parsed — status=%s", response.status)
     return response
+
+
+# ── Transcript file upload (.docx / .vtt) → plain text ───────────────────────
+# Extracts the transcript text from an uploaded Word document or a WebVTT caption
+# file (e.g. a Teams meeting transcript export) using the Python standard library
+# only — no third-party dependency. The coordinator reviews/edits the extracted
+# text in the transcript box before parsing, so extraction just needs to be clean,
+# not perfect.
+
+# Hard cap so a stray large upload can't exhaust memory.
+_MAX_TRANSCRIPT_FILE_BYTES = 15 * 1024 * 1024  # 15 MB
+
+
+def _extract_docx(data: bytes) -> str:
+    """Pull readable text out of a .docx (a zip of OOXML). Paragraphs become lines."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            xml = z.read("word/document.xml").decode("utf-8", "ignore")
+    except (zipfile.BadZipFile, KeyError) as exc:
+        raise HTTPException(status_code=400, detail="Couldn't read the .docx file — it may be corrupt or not a Word document.") from exc
+    # Paragraph and line breaks become newlines; tabs are preserved.
+    xml = xml.replace("</w:p>", "\n")
+    xml = re.sub(r"<w:tab\b[^>]*/?>", "\t", xml)
+    xml = re.sub(r"<w:br\b[^>]*/?>", "\n", xml)
+    # Drop every remaining tag, then decode XML entities.
+    text = unescape(re.sub(r"<[^>]+>", "", xml))
+    lines = [ln.rstrip() for ln in text.split("\n")]
+    # Collapse runs of 3+ blank lines down to a single blank line.
+    out: list[str] = []
+    blank = 0
+    for ln in lines:
+        if ln.strip():
+            blank = 0
+            out.append(ln)
+        else:
+            blank += 1
+            if blank == 1:
+                out.append("")
+    return "\n".join(out).strip()
+
+
+def _extract_vtt(data: bytes) -> str:
+    """Pull spoken text out of a WebVTT file, keeping speaker labels where present.
+
+    Teams exports tag each cue as <v Speaker Name>text</v>; we render those as
+    "Speaker Name: text". Cue numbers, timestamps, NOTE blocks and the WEBVTT
+    header are dropped, and consecutive duplicate lines (rolling captions) collapsed."""
+    raw = data.decode("utf-8-sig", "ignore")
+    out: list[str] = []
+    last: str | None = None
+    for line in raw.splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        if s.upper().startswith("WEBVTT") or s.startswith("NOTE"):
+            continue
+        if "-->" in s:            # timestamp cue line
+            continue
+        if re.fullmatch(r"\d+", s):  # numeric cue identifier
+            continue
+        m = re.search(r"<v\s+([^>]+)>(.*?)</v>", s)
+        if m:
+            speaker = m.group(1).strip()
+            spoken = re.sub(r"<[^>]+>", "", m.group(2)).strip()
+            formatted = f"{speaker}: {spoken}" if spoken else ""
+        else:
+            formatted = re.sub(r"<[^>]+>", "", s).strip()
+        formatted = unescape(formatted)
+        if formatted and formatted != last:
+            out.append(formatted)
+            last = formatted
+    return "\n".join(out).strip()
+
+
+class TranscriptFileRequest(BaseModel):
+    """A transcript file uploaded as base64 (keeps the JSON API — no multipart dep)."""
+    filename: str
+    content_b64: str
+
+
+@router.post("/extract-transcript-file")
+def extract_transcript_file(cycleId: str, payload: TranscriptFileRequest):
+    """Extract transcript text from an uploaded .docx or .vtt file (sent base64-encoded).
+
+    Returns the plain text so the frontend can drop it into the transcript box for
+    the coordinator to review and edit before parsing."""
+    name = (payload.filename or "").strip()
+    lower = name.lower()
+    if not (lower.endswith(".docx") or lower.endswith(".vtt")):
+        raise HTTPException(status_code=400, detail="Unsupported file type. Attach a .docx or .vtt transcript.")
+
+    # Base64 can carry a data: URI prefix (e.g. "data:...;base64,") — strip it.
+    b64 = payload.content_b64.split(",", 1)[-1] if "," in payload.content_b64 else payload.content_b64
+    try:
+        data = base64.b64decode(b64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Couldn't decode the uploaded file.") from exc
+
+    if not data:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty.")
+    if len(data) > _MAX_TRANSCRIPT_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="File is too large (max 15 MB).")
+
+    text = _extract_docx(data) if lower.endswith(".docx") else _extract_vtt(data)
+    if not text:
+        raise HTTPException(status_code=422, detail="No readable text found in the file.")
+
+    logger.info("MEETING-AGENT: transcript file extracted — cycleId=%s file=%s chars=%d", cycleId, name, len(text))
+    return {"text": text, "filename": name, "chars": len(text)}
 
 
 # ── Approval endpoint ───────────────────────────────────────────────────────

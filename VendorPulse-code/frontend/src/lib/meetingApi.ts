@@ -42,6 +42,47 @@ export async function parseTranscript(
   )
 }
 
+// ── Extract transcript text from an uploaded file (.docx / .vtt) ─────────────
+
+export interface ExtractedTranscript {
+  text: string
+  filename: string
+  chars: number
+}
+
+/** Read a File as base64 (without the data: URI prefix). */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result
+      if (typeof result !== 'string') return reject(new Error('Failed to read file'))
+      // result is a data: URI — keep only the base64 payload after the comma.
+      resolve(result.slice(result.indexOf(',') + 1))
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
+}
+
+/**
+ * Upload a .docx or .vtt transcript file; the backend returns the extracted plain
+ * text. Sent as base64 JSON so it rides the standard apiFetch client (no multipart).
+ */
+export async function extractTranscriptFile(
+  cycleId: string,
+  file: File
+): Promise<ExtractedTranscript> {
+  const contentB64 = await fileToBase64(file)
+  return apiFetch<ExtractedTranscript>(
+    `/api/cycles/${cycleId}/meeting/extract-transcript-file`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ filename: file.name, content_b64: contentB64 }),
+    }
+  )
+}
+
 // ── Persisted meeting artifact (parsed notes + generated minutes) ────────────
 
 export interface MeetingArtifact {

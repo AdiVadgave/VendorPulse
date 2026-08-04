@@ -17,9 +17,14 @@ interface Props {
   quarter: string
   year: number
   onApproved: () => void
+  /** Persistence key for this meeting's MoM. Defaults to the first note's meeting_id.
+   *  Pass explicitly for alignment / vendor-prep meetings so each MoM stores separately. */
+  meetingId?: string
+  /** Card heading — defaults to "Meeting Minutes". */
+  heading?: string
 }
 
-export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = null, vendorName, quarter, year, onApproved }: Props) {
+export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = null, vendorName, quarter, year, onApproved, meetingId: meetingIdProp, heading = 'Meeting Minutes' }: Props) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(initialMinutes ? 'complete' : 'idle')
   const [minutes, setMinutes] = useState<MeetingMinutes | null>(initialMinutes)
   const [editing, setEditing] = useState(false)
@@ -47,7 +52,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
     setAgentStatus('running')
     setError(null)
     try {
-      const meetingId = notes[0]?.meeting_id ?? `mtg-${cycleId}`
+      const meetingId = meetingIdProp ?? notes[0]?.meeting_id ?? `mtg-${cycleId}`
       const attendees = [...new Set(notes.map((n) => n.raised_by))]
       const response = await generateMeetingMinutes(cycleId, meetingId, notes, attendees)
       if (response.status === 'success' && response.data) {
@@ -84,7 +89,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
   function handleCopy() {
     if (!minutes) return
     const text = [
-      `Meeting Minutes — ${vendorName} ${quarter} ${year} EGB/QBR`,
+      `${heading} — ${vendorName} ${quarter} ${year}`,
       `Date: ${minutes.meeting_date}`,
       `Attendees: ${minutes.attendees.join(', ')}`,
       '',
@@ -149,7 +154,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
               <FileText size={18} className="text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Meeting Minutes</h3>
+              <h3 className="font-semibold text-slate-900 dark:text-white text-sm">{heading}</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">{vendorName} {quarter} {year}</p>
             </div>
           </div>

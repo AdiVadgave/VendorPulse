@@ -673,7 +673,11 @@ def _strip_markdown_json(text: str) -> str:
 def _collect_comments(weighted: dict) -> tuple[list[dict], int]:
     """Per-measure comments (only measures that have any). Returns (measures, total).
 
-    Each item: {measure_key, theme, measure, entries:[{team, comment}]}."""
+    Each item: {measure_key, theme, measure, consolidated_score, entries:[{team, score, comment}]}.
+    Each entry carries the team's own score (numeric 1-5 or RAG label) next to its
+    comment so the summary can compare what a team SAID against what it SCORED. Teams
+    that submitted no comment for the measure are surfaced separately (`teams_no_feedback`)
+    so the summary can note "No feedback from <team>" instead of inventing a view."""
     team_name = {
         t["attendee_id"]: (t.get("team") or t.get("name") or t.get("email") or "Team")
         for t in weighted.get("teams", [])
@@ -682,25 +686,50 @@ def _collect_comments(weighted: dict) -> tuple[list[dict], int]:
     total = 0
     for cat in weighted.get("categories", []):
         for m in cat.get("measures", []):
+            comments = m.get("comments") or {}
+            team_scores = m.get("team_scores") or {}
+            team_rag = m.get("team_rag") or {}
+
+            def _score_of(aid: str):
+                """This team's own rating for the measure: numeric score, else RAG label."""
+                if isinstance(team_scores.get(aid), int):
+                    return team_scores[aid]
+                return team_rag.get(aid)
+
             entries = [
-                {"team": team_name.get(aid, aid), "comment": txt.strip()}
-                for aid, txt in (m.get("comments") or {}).items()
+                {"team": team_name.get(aid, aid), "score": _score_of(aid), "comment": txt.strip()}
+                for aid, txt in comments.items()
                 if (txt or "").strip()
             ]
             if entries:
+                commented_aids = {aid for aid, txt in comments.items() if (txt or "").strip()}
+                teams_no_feedback = [
+                    team_name.get(aid, aid)
+                    for aid in team_name
+                    if aid not in commented_aids and _score_of(aid) is not None
+                ]
                 measures.append({
                     "measure_key": m["key"],
                     "theme": cat["label"],
                     "measure": m["label"],
+                    "consolidated_score": m.get("average"),
                     "entries": entries,
+                    "teams_no_feedback": teams_no_feedback,
                 })
                 total += len(entries)
     return measures, total
 
 
 def _fallback_measure_summary(entries: list[dict]) -> str:
-    """Deterministic per-measure bullets (the raw comments) when the LLM is off."""
-    return "\n".join(f"- {e['team']}: {e['comment']}" for e in entries)
+    """Deterministic per-measure bullets (the raw comments) when the LLM is off.
+
+    Prefixes each team's own score (numeric or RAG) so the baseline still pairs what a
+    team said with how it scored."""
+    def _line(e: dict) -> str:
+        score = e.get("score")
+        tag = f" [{score}]" if score not in (None, "") else ""
+        return f"- {e['team']}{tag}: {e['comment']}"
+    return "\n".join(_line(e) for e in entries)
 
 
 def _compute_summaries(weighted: dict) -> tuple[dict[str, str], bool, list[dict], int]:
@@ -716,7 +745,14 @@ def _compute_summaries(weighted: dict) -> tuple[dict[str, str], bool, list[dict]
         llm = get_llm_service() if settings.enable_llm else None
         if llm and llm.is_enabled:
             payload = [
-                {"measure_key": c["measure_key"], "measure": c["measure"], "theme": c["theme"], "comments": c["entries"]}
+                {
+                    "measure_key": c["measure_key"],
+                    "measure": c["measure"],
+                    "theme": c["theme"],
+                    "consolidated_score": c["consolidated_score"],
+                    "teams_no_feedback": c["teams_no_feedback"],
+                    "comments": c["entries"],
+                }
                 for c in collected
             ]
             prompt = (

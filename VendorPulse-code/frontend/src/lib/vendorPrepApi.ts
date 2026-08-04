@@ -126,7 +126,11 @@ export interface VendorPrepMeeting {
   web_link: string | null
   attendee_count: number
   status: string
-  time_slot: { date: string; startTime: string; endTime: string } | null
+  time_slot: { date: string; start_time: string; end_time: string } | null
+  /** UTC ISO instant of the scheduled start (for display). */
+  start_time: string | null
+  time_zone: string | null
+  duration_minutes: number | null
   title: string
   attendee_emails: string[]
 }

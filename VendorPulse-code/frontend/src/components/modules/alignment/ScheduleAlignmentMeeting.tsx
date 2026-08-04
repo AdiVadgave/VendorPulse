@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { CalendarPlus, Users, CheckCircle2, ExternalLink, X, UserPlus, Trash2, Link2Off, CalendarClock } from 'lucide-react'
+import { CalendarPlus, Users, CheckCircle2, ExternalLink, X, UserPlus, Trash2, Link2Off, CalendarClock, CalendarCheck } from 'lucide-react'
 import { scheduleAlignmentMeetingManual, getAlignmentMeeting, getAlignmentAttendees, removeAlignmentAttendee } from '@/lib/alignmentApi'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
+import { formatMeetingTime } from '@/utils/formatMeetingTime'
 import type { CycleAttendee } from '@/types/scheduling.types'
 
 const ALIGNMENT_BODY_HTML =
@@ -17,6 +18,10 @@ export interface AlignmentMeetingResult {
   teamsUrl: string | null
   webLink: string | null
   attendeeCount: number
+  /** UTC ISO instant of the scheduled start — used to display date/time. */
+  startISO?: string | null
+  timeZone?: string | null
+  durationMinutes?: number | null
 }
 
 interface Props {
@@ -76,6 +81,9 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
             teamsUrl: res.meeting.teams_meeting_url,
             webLink: res.meeting.web_link,
             attendeeCount: res.meeting.attendee_count,
+            startISO: res.meeting.start_time,
+            timeZone: res.meeting.time_zone,
+            durationMinutes: res.meeting.duration_minutes,
           })
         }
       } catch {
@@ -215,6 +223,12 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
               <CheckCircle2 size={15} className="text-emerald-600 dark:text-emerald-400" />
               <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Meeting scheduled</p>
             </div>
+            {formatMeetingTime(meetingResult.startISO, meetingResult.timeZone ?? 'IST', meetingResult.durationMinutes) && (
+              <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                <CalendarCheck size={13} className="shrink-0" />
+                {formatMeetingTime(meetingResult.startISO, meetingResult.timeZone ?? 'IST', meetingResult.durationMinutes)}
+              </p>
+            )}
             <p className="text-xs text-emerald-600 dark:text-emerald-400">
               {meetingResult.attendeeCount} internal stakeholders invited
             </p>
@@ -261,7 +275,10 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
               await scheduleAlignmentMeetingManual(cycleId, {
                 startTime, durationMinutes, timeZone, meetingUrl: teamsUrl, meetingIndex,
               })
-              onMeetingScheduled({ teamsUrl, webLink: null, attendeeCount })
+              onMeetingScheduled({
+                teamsUrl, webLink: null, attendeeCount,
+                startISO: startTime, timeZone, durationMinutes,
+              })
               setRescheduling(false)
             }}
           />

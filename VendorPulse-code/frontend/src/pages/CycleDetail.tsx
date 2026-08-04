@@ -736,7 +736,7 @@ export default function CycleDetail() {
             cycle={cycle}
             vendorBrief={vendorBrief}
             onBriefGenerated={setVendorBrief}
-            onBriefApproved={() => {
+            onBriefReady={() => {
               setBriefApproved(true)
               advanceWorkflow(cycle!.cycle_id, 'VENDOR_PREP')
             }}
@@ -1622,7 +1622,7 @@ function AlignmentTab({
 
 /* ── Vendor Prep Tab ──────────────────────────────────────── */
 function VendorPrepTab({
-  cycleId, cycle, vendorBrief, onBriefGenerated, onBriefApproved,
+  cycleId, cycle, vendorBrief, onBriefGenerated, onBriefReady,
   pushbackItems, pushbackResponses, onPushbackAdd, onGenerateResponses, onEditResponses, onPushbackStatusChange,
   onPushbackEdit, onPushbackDelete, onActionsExtracted, alreadyExtracted,
 }: {
@@ -1630,7 +1630,7 @@ function VendorPrepTab({
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   vendorBrief: VendorBrief | null
   onBriefGenerated: (b: VendorBrief) => void
-  onBriefApproved: () => void
+  onBriefReady: () => void
   pushbackItems: PushbackItem[]
   pushbackResponses: Record<string, PushbackResponse[]>
   onPushbackAdd: (item: Omit<PushbackItem, 'pushback_id' | 'cycle_id' | 'created_at'>) => void
@@ -1651,7 +1651,7 @@ function VendorPrepTab({
         year={cycle.year}
         brief={vendorBrief}
         onBriefGenerated={onBriefGenerated}
-        onBriefApproved={onBriefApproved}
+        onBriefReady={onBriefReady}
       />
       <PushbackInput onAdd={onPushbackAdd} />
       <PushbackResponseCards

@@ -227,6 +227,19 @@ class VPManualScheduleRequest(BaseModel):
     meeting_url: Optional[str] = None
 
 
+def _iso_start_from_slot(ts: Optional[dict]) -> Optional[str]:
+    """Rebuild the UTC ISO instant from the persisted time_slot (date + start_time are
+    stored as UTC wall-clock components) so the UI can show the scheduled date/time
+    after a refresh, the same way the QBR meeting banner does."""
+    if not ts:
+        return None
+    date = ts.get("date")
+    start = ts.get("start_time")
+    if not date or not start:
+        return None
+    return f"{date}T{start}:00Z"
+
+
 def _vp_meeting_dto(m: dict, participant_repo) -> dict:
     participants = participant_repo.get_for_meeting(m.get("meeting_id", ""))
     return {
@@ -237,6 +250,10 @@ def _vp_meeting_dto(m: dict, participant_repo) -> dict:
         "attendee_count": len(participants) + 1,
         "status": m.get("status"),
         "time_slot": m.get("time_slot"),
+        # Scheduled date/time so the UI can render it after a refresh.
+        "start_time": _iso_start_from_slot(m.get("time_slot")),
+        "time_zone": m.get("time_zone"),
+        "duration_minutes": m.get("duration_minutes"),
         "title": m.get("title"),
         "attendee_emails": [p.get("user_id") for p in participants],
     }

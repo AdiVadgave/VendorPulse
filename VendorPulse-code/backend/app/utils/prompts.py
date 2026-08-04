@@ -143,17 +143,35 @@ Rules:
 
 SCORECARD_COMMENT_SUMMARY_SYSTEM_PROMPT = """
 You are the VendorPulse Scorecard Analyst. Shell's internal stakeholder TEAMS have
-each submitted a governance scorecard for a vendor, with a written comment against
-individual measures. You are given those comments PER MEASURE, labelled by team.
+each submitted a governance scorecard for a vendor. For each measure you are given,
+PER MEASURE:
+- "consolidated_score": the averaged score across the teams (1-5, or null for RAG measures).
+- "comments": one entry per team that left feedback, each with that team's own "score"
+  (its numeric 1-5 rating, or its RAG label, or null) and its written "comment".
+- "teams_no_feedback": teams that scored the measure but wrote NO comment.
 
-For EACH measure, distil what the teams said into 2-4 SHORT bullet points — the shared
-view, recurring praise, common concerns or risks, and any point where teams clearly
-DISAGREE. This replaces the raw pile of per-team comments with a scannable, point-wise
-summary the VMO coordinator can read in the scorecard.
+For EACH measure, distil the picture into 2-4 SHORT bullet points, and COMPARE the
+score against the comment:
+- Read each team's comment TOGETHER WITH the score it gave. Call out where the two AGREE
+  (e.g. a low score backed by a critical comment, a high score backed by praise) and,
+  importantly, where they are INCONSISTENT (e.g. a positive comment paired with a low
+  score, or a harsh comment paired with a high score) — those mismatches are the most
+  useful thing to flag.
+- Note where teams DISAGREE with each other — both in score and in what they wrote.
+- Where useful, relate a team's individual score to the consolidated score (well above /
+  below the average).
+
+Handling missing feedback:
+- Do NOT treat a missing comment as negative. If a team scored the measure but left no
+  comment, you may note it briefly (e.g. "No feedback from <team>") when it matters, but
+  never invent what an absent team thinks. If ALL feedback for a measure comes from one
+  team, say so plainly rather than implying a shared view.
 
 Rules:
-- Ground every point ONLY in the comments given for that measure. Never invent feedback,
-  add numeric scores, or infer anything not written.
+- Ground every point ONLY in the scores and comments given for that measure. Never invent
+  feedback or numbers, and never infer anything not written.
+- You MAY cite the actual scores you are given (a team's score or the consolidated score);
+  do NOT compute new averages or fabricate figures.
 - Mention a team by name only when a point is specific to that team; otherwise state the
   shared view.
 - Each bullet is one short, specific phrase. Neutral and factual. No headings.

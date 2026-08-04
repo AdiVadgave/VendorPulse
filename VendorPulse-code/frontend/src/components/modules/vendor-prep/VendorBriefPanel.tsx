@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { Sparkles, TrendingUp, TrendingDown, Minus, CheckCircle2, AlertTriangle, Send, Pencil, Plus, Trash2, X, Check } from 'lucide-react'
+import { Sparkles, TrendingUp, TrendingDown, Minus, CheckCircle2, AlertTriangle, Pencil, Plus, Trash2, X, Check } from 'lucide-react'
 import type { VendorBrief } from '@/types/vendor-prep.types'
-import { generateVendorBrief, approveBrief } from '@/lib/vendorPrepApi'
+import { generateVendorBrief } from '@/lib/vendorPrepApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
-import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
 import { cn } from '@/utils/cn'
 
@@ -14,7 +13,9 @@ interface Props {
   year: number
   brief: VendorBrief | null
   onBriefGenerated: (brief: VendorBrief) => void
-  onBriefApproved: () => void
+  /** Fired once the brief exists (generation is the terminal step — no approval gate).
+   *  Lets the parent advance the workflow to VENDOR_PREP. */
+  onBriefReady: () => void
 }
 
 const TREND_ICON = {
@@ -42,13 +43,9 @@ function ScoreDots({ score }: { score: number }) {
   )
 }
 
-export default function VendorBriefPanel({ cycleId, vendorName, quarter, year, brief, onBriefGenerated, onBriefApproved }: Props) {
-  const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
-  const [showApproval, setShowApproval] = useState(false)
-  const [approved, setApproved] = useState(false)
+export default function VendorBriefPanel({ cycleId, vendorName, brief, onBriefGenerated, onBriefReady }: Props) {
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>(brief ? 'complete' : 'idle')
   const [error, setError] = useState<string | null>(null)
-  const [runId, setRunId] = useState<string | null>(null)
-  const [isApproving, setIsApproving] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<VendorBrief | null>(null)
 
@@ -81,9 +78,9 @@ export default function VendorBriefPanel({ cycleId, vendorName, quarter, year, b
       const response = await generateVendorBrief(cycleId, vendorName)
       if (response.status === 'success' && response.data) {
         onBriefGenerated(response.data.brief)
-        setRunId(response.run_id ?? null)
-        setAgentStatus('awaiting_approval')
-        setShowApproval(true)
+        setAgentStatus('complete')
+        // No approval gate — the generated brief is the finished internal prep doc.
+        onBriefReady()
       } else {
         setError(response.summary || 'Failed to generate vendor brief')
         setAgentStatus('idle')
@@ -92,22 +89,6 @@ export default function VendorBriefPanel({ cycleId, vendorName, quarter, year, b
       setError(e instanceof Error ? e.message : 'Failed to reach backend')
       setAgentStatus('idle')
     }
-  }
-
-  async function handleApprove() {
-    setIsApproving(true)
-    try {
-      if (runId) {
-        await approveBrief(cycleId, runId)
-      }
-    } catch {
-      // Approval persisting failed — still approve locally so UI isn't stuck
-    }
-    setShowApproval(false)
-    setAgentStatus('complete')
-    setApproved(true)
-    setIsApproving(false)
-    onBriefApproved()
   }
 
   const trendLabel = brief?.overall_trend === 'improving' ? 'Improving'
@@ -231,16 +212,21 @@ export default function VendorBriefPanel({ cycleId, vendorName, quarter, year, b
           </div>
         ) : (
           <div className="space-y-4">
-            {!approved && (
-              <div className="flex justify-end">
-                <button
-                  onClick={startEdit}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors"
-                >
-                  <Pencil size={12} /> Edit brief
-                </button>
-              </div>
-            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={handleGenerate}
+                disabled={agentStatus === 'running'}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-60 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors"
+              >
+                <Sparkles size={12} /> {agentStatus === 'running' ? 'Regenerating…' : 'Regenerate'}
+              </button>
+              <button
+                onClick={startEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors"
+              >
+                <Pencil size={12} /> Edit brief
+              </button>
+            </div>
             {/* Overall score */}
             <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
               <div className="text-center">
@@ -253,12 +239,6 @@ export default function VendorBriefPanel({ cycleId, vendorName, quarter, year, b
                     {brief.overall_trend === 'improving' ? <TrendingUp size={11} /> : brief.overall_trend === 'declining' ? <TrendingDown size={11} /> : <Minus size={11} />}
                     {trendLabel}
                   </span>
-                  {approved && (
-                    <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                      <CheckCircle2 size={12} />
-                      Approved
-                    </span>
-                  )}
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   {brief.open_actions} open action items from prior cycles
@@ -317,43 +297,9 @@ export default function VendorBriefPanel({ cycleId, vendorName, quarter, year, b
               </div>
             </div>
 
-            {!approved && (
-              <button
-                onClick={() => setShowApproval(true)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <Send size={14} />
-                Review & Approve Brief
-              </button>
-            )}
           </div>
         )}
       </div>
-
-      {showApproval && brief && (
-        <ApprovalPanel
-          title="Approve Vendor Brief"
-          summary={`Review the AI-generated vendor brief for ${vendorName} before the prep call.`}
-          warnings={['This brief will be used to prepare the Shell team — vendor does not see it directly.']}
-          previewContent={
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                {vendorName} — {quarter} {year} Vendor Prep Brief
-              </p>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Overall Score: <strong>{brief.overall_score}/5</strong> · Trend: {trendLabel}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Key concern: {brief.key_concerns[0]}
-              </p>
-            </div>
-          }
-          approveLabel="Approve Brief"
-          isProcessing={isApproving}
-          onApprove={handleApprove}
-          onCancel={() => { setShowApproval(false); if (agentStatus === 'awaiting_approval') setAgentStatus('idle') }}
-        />
-      )}
     </div>
   )
 }

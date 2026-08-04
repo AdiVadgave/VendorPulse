@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import ScheduleAlignmentMeeting from './ScheduleAlignmentMeeting'
 import type { AlignmentMeetingResult } from './ScheduleAlignmentMeeting'
 import TranscriptInput from '@/components/modules/meeting/TranscriptInput'
-import type { MeetingNote } from '@/types/meeting.types'
+import MeetingMinutesViewer from '@/components/modules/meeting/MeetingMinutesViewer'
+import { getMeetingArtifact } from '@/lib/meetingApi'
+import type { MeetingNote, MeetingMinutes } from '@/types/meeting.types'
 import type { ExtractedAction } from '@/types/alignment.types'
 
 interface Props {
@@ -27,10 +29,28 @@ interface Props {
  * section — not here. Each instance is scoped by its 1-based index so a cycle can
  * run several independent alignment meetings.
  */
-export default function AlignmentMeetingPanel({ cycleId, index, onActionsExtracted, alreadyExtracted, qbrMeetingDate }: Props) {
+export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quarter, year, onActionsExtracted, alreadyExtracted, qbrMeetingDate }: Props) {
   const [meetingResult, setMeetingResult] = useState<AlignmentMeetingResult | null>(null)
+  // Parsed transcript notes + any previously-generated MoM for THIS alignment meeting.
+  const meetingId = `align-${cycleId}-${index}`
+  const [parsedNotes, setParsedNotes] = useState<MeetingNote[]>([])
+  const [savedMinutes, setSavedMinutes] = useState<MeetingMinutes | null>(null)
+
+  // Restore the parsed notes + minutes for this meeting on mount so the MoM survives a refresh.
+  useEffect(() => {
+    let cancelled = false
+    getMeetingArtifact(cycleId, meetingId)
+      .then((a) => {
+        if (cancelled) return
+        if (a.notes?.length) setParsedNotes(a.notes)
+        if (a.minutes) setSavedMinutes(a.minutes)
+      })
+      .catch(() => { /* backend offline / never parsed */ })
+    return () => { cancelled = true }
+  }, [cycleId, meetingId])
 
   function handleParsed(parsed: MeetingNote[]) {
+    setParsedNotes(parsed)
     const actions: ExtractedAction[] = parsed
       .filter((n) => n.note_type === 'ACTION')
       .map((n, i) => ({
@@ -55,10 +75,24 @@ export default function AlignmentMeetingPanel({ cycleId, index, onActionsExtract
       />
       <TranscriptInput
         cycleId={cycleId}
-        meetingId={`align-${cycleId}-${index}`}
+        meetingId={meetingId}
         onParsed={handleParsed}
         alreadyExtracted={alreadyExtracted}
       />
+      {/* Generate the minutes (MoM) for this alignment meeting once its transcript is parsed. */}
+      {(parsedNotes.length > 0 || savedMinutes) && (
+        <MeetingMinutesViewer
+          cycleId={cycleId}
+          meetingId={meetingId}
+          heading={`Alignment Meeting ${index} Minutes`}
+          notes={parsedNotes}
+          initialMinutes={savedMinutes}
+          vendorName={vendorName}
+          quarter={quarter}
+          year={year}
+          onApproved={() => { /* per-meeting MoM — no workflow gate */ }}
+        />
+      )}
     </div>
   )
 }

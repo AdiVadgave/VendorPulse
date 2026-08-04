@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { FileText, Sparkles, CheckCircle2, RotateCcw } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { FileText, Sparkles, CheckCircle2, RotateCcw, Paperclip, Loader2 } from 'lucide-react'
 import type { MeetingNote } from '@/types/meeting.types'
-import { parseTranscript } from '@/lib/meetingApi'
+import { parseTranscript, extractTranscriptFile } from '@/lib/meetingApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { AgentStatus } from '@/types/agent.types'
 
@@ -162,6 +162,10 @@ export default function TranscriptInput({ cycleId, onParsed, meetingId, alreadyE
   const [error, setError] = useState<string | null>(null)
   const [parsedCount, setParsedCount] = useState<number | null>(null)
   const [reopened, setReopened] = useState(false)
+  // File-upload (.docx/.vtt → text) state.
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [attachedName, setAttachedName] = useState<string | null>(null)
 
   // Collapse to the "done" state when a transcript has been parsed this session or
   // was already parsed before — unless the user explicitly reopens to parse another.
@@ -190,6 +194,34 @@ export default function TranscriptInput({ cycleId, onParsed, meetingId, alreadyE
     }
   }
 
+  // Attach a .docx or .vtt file — the backend extracts its text, which we drop into
+  // the transcript box for the coordinator to review/edit before parsing.
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    // Reset the input so re-selecting the same file fires onChange again.
+    e.target.value = ''
+    if (!file) return
+
+    const lower = file.name.toLowerCase()
+    if (!lower.endsWith('.docx') && !lower.endsWith('.vtt')) {
+      setError('Unsupported file type. Attach a .docx or .vtt transcript.')
+      return
+    }
+
+    setUploading(true)
+    setError(null)
+    try {
+      const res = await extractTranscriptFile(cycleId, file)
+      // Append to any existing text so an attachment doesn't wipe a manual paste.
+      setTranscript((prev) => (prev.trim() ? `${prev.trim()}\n\n${res.text}` : res.text))
+      setAttachedName(res.filename)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to read the file.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   if (showDone) {
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
@@ -206,7 +238,7 @@ export default function TranscriptInput({ cycleId, onParsed, meetingId, alreadyE
             </div>
           </div>
           <button
-            onClick={() => { setReopened(true); setTranscript(''); setAgentStatus('idle'); setError(null) }}
+            onClick={() => { setReopened(true); setTranscript(''); setAgentStatus('idle'); setError(null); setAttachedName(null) }}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shrink-0"
           >
             <RotateCcw size={13} /> Parse a different transcript
@@ -227,6 +259,22 @@ export default function TranscriptInput({ cycleId, onParsed, meetingId, alreadyE
         </div>
         <div className="flex items-center gap-2">
           <AgentStatusBadge status={agentStatus} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".docx,.vtt"
+            onChange={handleFile}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || agentStatus === 'running'}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 disabled:opacity-50 font-medium"
+            title="Attach a .docx or .vtt transcript file"
+          >
+            {uploading ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
+            {uploading ? 'Reading…' : 'Attach file'}
+          </button>
           <button
             onClick={() => setTranscript(DEMO_TRANSCRIPT)}
             className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline"
@@ -236,10 +284,17 @@ export default function TranscriptInput({ cycleId, onParsed, meetingId, alreadyE
         </div>
       </div>
 
+      {attachedName && (
+        <p className="mb-2 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+          <Paperclip size={11} className="shrink-0" />
+          Loaded from <span className="font-medium text-slate-600 dark:text-slate-300">{attachedName}</span> — review the text below before parsing.
+        </p>
+      )}
+
       <textarea
         value={transcript}
         onChange={(e) => setTranscript(e.target.value)}
-        placeholder="Paste full meeting transcript here. Claude will parse it into structured note types: questions, objections, decisions, appreciations, and action items..."
+        placeholder="Paste the full meeting transcript here — or use “Attach file” to load a .docx or .vtt (e.g. a Teams transcript export). Claude will parse it into structured note types: questions, objections, decisions, appreciations, and action items..."
         rows={8}
         className="w-full text-sm text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400"
       />

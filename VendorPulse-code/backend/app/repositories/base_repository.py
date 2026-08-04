@@ -22,6 +22,7 @@ previous store did.
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -30,6 +31,24 @@ from psycopg.types.json import Jsonb
 from app.db.pool import get_pool
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_value(value: Any) -> Any:
+    """Keep the dict-out contract stable across column-type changes.
+
+    Timestamp/date columns are stored as TIMESTAMPTZ/DATE, but the whole
+    application (models, routes, frontend) has always treated these fields as
+    ISO-8601 *strings*. psycopg returns them as datetime/date objects, so we
+    convert them back to the exact same UTC ISO string the app wrote — callers
+    never see a behavioural change. Every other type (bool/int/float/JSONB
+    dict|list/str/None) is already native and passes through untouched."""
+    if isinstance(value, datetime):
+        # datetime is a subclass of date — must be checked first. Always emit UTC
+        # (+00:00), matching the app's datetime.now(timezone.utc).isoformat().
+        return value.astimezone(timezone.utc).isoformat() if value.tzinfo else value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    return value
 
 
 class BaseRepository:
@@ -63,8 +82,10 @@ class BaseRepository:
 
     def _row_to_dict(self, row: tuple) -> dict:
         # psycopg already decodes JSONB columns to Python dict/list and
-        # bool/int/float columns to native types.
-        return {col: val for col, val in zip(self.columns, row)}
+        # bool/int/float columns to native types. Timestamp/date columns come
+        # back as datetime/date objects — _normalize_value converts those to the
+        # ISO strings the app has always used, so nothing downstream changes.
+        return {col: _normalize_value(val) for col, val in zip(self.columns, row)}
 
     def _adapt(self, col: str, value: Any) -> Any:
         return Jsonb(value) if col in self.json_columns else value

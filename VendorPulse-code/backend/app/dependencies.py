@@ -35,7 +35,10 @@ from app.services.slot_ranking_service import SlotRankingService
 from app.services.user_service import UserService
 
 
-# ── Repositories (stateless JSON wrappers — safe to cache) ───────────────────
+# ── Repositories (stateless, Postgres-backed — safe to cache) ────────────────
+# Each repository is a thin column-mapper over its normalized table; it holds no
+# per-request state, so a single cached instance is shared across requests. (The
+# `data_dir` argument is a vestige of the former JSON store and is unused.)
 
 
 @lru_cache(maxsize=None)

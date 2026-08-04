@@ -386,6 +386,9 @@ _ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
     ],
     "scorecard_submissions": [
         ("rag_scores", "JSONB"),
+        # attendee_id gained referential integrity to attendees — see
+        # _ADDITIVE_CONSTRAINTS below (added NOT VALID so it never fails on a
+        # live table that may hold legacy rows).
     ],
     "scorecard_final": [
         ("computed_at", "TEXT"),
@@ -401,10 +404,134 @@ _ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
 }
 
 
+# ── Column type upgrades: TEXT → TIMESTAMPTZ / DATE ──────────────────────────
+# These columns have always held ISO-8601 strings; typing them properly gives
+# real chronological ordering, timezone correctness and efficient range queries.
+# The change is SAFE on a live database:
+#   • Applied only if the column is still `text` (idempotent — never re-rewrites).
+#   • The USING cast goes through `_vp_to_timestamptz` / `_vp_to_date`, which
+#     return NULL for any unparseable/blank value instead of raising — so the
+#     migration can never fail on legacy data.
+#   • The repository read layer converts the returned datetime/date back to the
+#     same ISO string the app has always seen (see base_repository), so no
+#     model, route, or frontend consumer changes behaviour.
+# action_items.due_date is deliberately EXCLUDED — it can hold free-form text
+# (e.g. "by 11 April"), so it stays TEXT.
+_TIMESTAMP_COLUMNS: list[tuple[str, str]] = [
+    ("users", "created_at"),
+    ("cycles", "created_at"),
+    ("cycles", "updated_at"),
+    ("cycles", "teams_meeting_scheduled_at"),
+    ("cycles", "scorecard_dispatched_at"),
+    ("attendees", "outreach_sent_at"),
+    ("meetings", "created_at"),
+    ("meeting_participants", "responded_at"),
+    ("slot_proposals", "approved_at"),
+    ("scorecard_submissions", "submitted_at"),
+    ("scorecard_final", "updated_at"),
+    ("scorecard_final", "computed_at"),
+    ("pushback_items", "created_at"),
+    ("pushback_items", "updated_at"),
+    ("action_items", "created_at"),
+    ("action_items", "updated_at"),
+    ("meeting_artifacts", "parsed_at"),
+    ("meeting_artifacts", "minutes_generated_at"),
+    ("agent_runs", "created_at"),
+    ("agent_runs", "approved_at"),
+]
+_DATE_COLUMNS: list[tuple[str, str]] = [
+    ("user_availability", "date"),
+]
+
+# Fault-tolerant cast helpers (created transiently during ensure_schema). A bad or
+# blank value becomes NULL rather than raising, so a type migration never crashes.
+_CAST_HELPERS = """
+CREATE OR REPLACE FUNCTION _vp_to_timestamptz(txt text) RETURNS timestamptz AS $$
+BEGIN
+  IF txt IS NULL OR btrim(txt) = '' THEN RETURN NULL; END IF;
+  RETURN txt::timestamptz;
+EXCEPTION WHEN others THEN RETURN NULL;
+END; $$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION _vp_to_date(txt text) RETURNS date AS $$
+BEGIN
+  IF txt IS NULL OR btrim(txt) = '' THEN RETURN NULL; END IF;
+  RETURN txt::date;
+EXCEPTION WHEN others THEN RETURN NULL;
+END; $$ LANGUAGE plpgsql IMMUTABLE;
+"""
+
+
+def _type_change_sql(table: str, col: str, target: str, cast_fn: str) -> str:
+    """Idempotent, non-failing column retype: only runs while the column is still
+    `text`, and casts through the fault-tolerant helper."""
+    return f"""
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = '{table}' AND column_name = '{col}' AND data_type = 'text'
+      ) THEN
+        ALTER TABLE "{table}" ALTER COLUMN "{col}" TYPE {target} USING {cast_fn}("{col}");
+      END IF;
+    END $$;
+    """
+
+
+# Foreign-key + NOT NULL constraints added to tables that predate them. Each is
+# applied with NOT VALID so it NEVER fails on a live table that may hold legacy
+# rows: the constraint is enforced on every NEW insert/update, while pre-existing
+# rows are left unchecked (they can be validated later with
+# `ALTER TABLE ... VALIDATE CONSTRAINT`). Every statement is guarded by a
+# pg_constraint existence check, so it is fully idempotent — safe on every startup.
+#
+#   scorecard_submissions.attendee_id → attendees(attendee_id) ON DELETE CASCADE
+#   The submit endpoint already rejects a submission whose attendee is not in the
+#   cycle, so new writes always satisfy this; the FK also auto-removes a team's
+#   submissions if its attendee row is ever deleted (no orphans).
+_ADDITIVE_CONSTRAINTS: list[str] = [
+    """
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'scorecard_submissions_attendee_fk'
+      ) THEN
+        ALTER TABLE scorecard_submissions
+          ADD CONSTRAINT scorecard_submissions_attendee_fk
+          FOREIGN KEY (attendee_id) REFERENCES attendees (attendee_id)
+          ON DELETE CASCADE NOT VALID;
+      END IF;
+    END $$;
+    """,
+]
+
+# NOT NULL enforcement on invariants the application always sets, expressed as
+# CHECK (... IS NOT NULL) NOT VALID so existing rows are never rejected. Guarded by
+# name for idempotency. constraint name: {table}_{col}_nn.
+_NOT_NULL_INVARIANTS: list[tuple[str, str]] = [
+    ("cycles", "workflow_state"),
+    ("scorecard_submissions", "attendee_id"),
+    ("scorecard_submissions", "submitted_at"),
+]
+for _t, _c in _NOT_NULL_INVARIANTS:
+    _ADDITIVE_CONSTRAINTS.append(
+        f"""
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '{_t}_{_c}_nn') THEN
+            ALTER TABLE "{_t}" ADD CONSTRAINT "{_t}_{_c}_nn"
+              CHECK ("{_c}" IS NOT NULL) NOT VALID;
+          END IF;
+        END $$;
+        """
+    )
+
+
 def ensure_schema(pool: Optional[ConnectionPool] = None) -> None:
-    """Create every table + index if absent (parent→child order), then additively
-    add any columns in `_ADDITIVE_COLUMNS` that a pre-existing table is missing.
-    Fully idempotent and non-destructive — safe on a live database."""
+    """Create every table + index if absent (parent→child order), additively add
+    any missing `_ADDITIVE_COLUMNS`, upgrade timestamp/date column types, then
+    apply `_ADDITIVE_CONSTRAINTS`. Fully idempotent and non-destructive — safe on
+    a live database (every step tolerates pre-existing data)."""
     pool = pool or get_pool()
     with pool.connection() as conn:
         for table in KNOWN_TABLES:
@@ -415,4 +542,16 @@ def ensure_schema(pool: Optional[ConnectionPool] = None) -> None:
         for table, cols in _ADDITIVE_COLUMNS.items():
             for col, col_type in cols:
                 conn.execute(f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS "{col}" {col_type}')
-    logger.info("PostgreSQL schema ensured — %d tables (3NF)", len(KNOWN_TABLES))
+
+        # TEXT → TIMESTAMPTZ / DATE upgrades (only while still text; fault-tolerant).
+        conn.execute(_CAST_HELPERS)
+        for table, col in _TIMESTAMP_COLUMNS:
+            conn.execute(_type_change_sql(table, col, "timestamptz", "_vp_to_timestamptz"))
+        for table, col in _DATE_COLUMNS:
+            conn.execute(_type_change_sql(table, col, "date", "_vp_to_date"))
+        conn.execute("DROP FUNCTION IF EXISTS _vp_to_timestamptz(text)")
+        conn.execute("DROP FUNCTION IF EXISTS _vp_to_date(text)")
+
+        for stmt in _ADDITIVE_CONSTRAINTS:
+            conn.execute(stmt)
+    logger.info("PostgreSQL schema ensured — %d tables (3NF, typed timestamps)", len(KNOWN_TABLES))

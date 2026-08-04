@@ -14,12 +14,9 @@ class VendorRepository(BaseRepository):
         return self.find_by_id("vendor_id", vendor_id)
 
     def find_by_name(self, name: str) -> Optional[dict]:
-        """Case-insensitive name lookup."""
-        name_lower = name.strip().lower()
-        return next(
-            (v for v in self.find_all() if (v.get("name") or "").lower() == name_lower),
-            None,
-        )
+        """Case-insensitive name lookup (index-backed on lower(name))."""
+        rows = self._select(' WHERE lower("name") = %s', (name.strip().lower(),))
+        return rows[0] if rows else None
 
     def find_or_create(self, name: str, vendor_id: str, category: str = "Custom") -> dict:
         """Return the vendor with the given name if it exists, otherwise insert

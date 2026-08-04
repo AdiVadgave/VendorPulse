@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # ── Database (PostgreSQL) ────────────────────────────────────────────────
-    # The app stores every entity in Postgres (one JSONB table per entity). A
+    # The app stores every entity in a normalized 3NF Postgres schema — one real
+    # table per entity with typed columns, domain PKs and FK constraints; JSONB
+    # is used only for genuinely nested/variable data (see app/db/schema.py). A
     # full DSN in DATABASE_URL takes precedence; otherwise it is assembled from
     # the PG_* parts below. Azure Database for PostgreSQL requires SSL.
     #   DATABASE_URL=postgresql://user:pass@host:5432/vendorpulse?sslmode=require

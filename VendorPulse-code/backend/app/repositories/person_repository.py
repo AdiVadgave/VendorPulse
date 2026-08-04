@@ -20,11 +20,9 @@ class PersonRepository(BaseRepository):
     def get_by_email(self, email: str) -> Optional[dict]:
         if not email:
             return None
-        target = email.strip().lower()
-        return next(
-            (p for p in self.find_all() if (p.get("email") or "").strip().lower() == target),
-            None,
-        )
+        # Index-backed lookup (unique index on lower(email)) — no full-table scan.
+        rows = self._select(' WHERE lower("email") = %s', (email.strip().lower(),))
+        return rows[0] if rows else None
 
     def upsert(
         self,

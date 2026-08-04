@@ -14,16 +14,16 @@ class UserRepository(BaseRepository):
         return self.find_by_id("user_id", user_id)
 
     def get_by_email(self, email: str) -> Optional[dict]:
-        return next(
-            (u for u in self.find_all() if (u.get("email") or "").lower() == email.lower()),
-            None,
-        )
+        if not email:
+            return None
+        # Index-backed lookup (index on lower(email)) — no full-table scan.
+        rows = self._select(' WHERE lower("email") = %s', (email.strip().lower(),))
+        return rows[0] if rows else None
 
     def search(self, query: str) -> list[dict]:
-        """Search users by name, email, or organisation."""
-        q = query.lower()
-        return self.find_by_predicate(
-            lambda u: q in (u.get("name") or "").lower()
-            or q in (u.get("email") or "").lower()
-            or q in (u.get("organisation") or "").lower()
+        """Search users by name, email, or organisation (case-insensitive substring)."""
+        like = f"%{query.lower()}%"
+        return self._select(
+            ' WHERE lower("name") LIKE %s OR lower("email") LIKE %s OR lower("organisation") LIKE %s',
+            (like, like, like),
         )

@@ -92,8 +92,11 @@ def get_current_user(request: Request) -> CurrentUser:
     """
     FastAPI dependency. Returns the authenticated user.
 
-    • SSO off → the dev principal (never raises).
+    • SSO off → the dev principal (for local development/testing without a login).
     • SSO on  → validates the bearer token; raises 401 if missing/invalid.
+
+    PRODUCTION: SSO_ENABLED must be true so every API call requires a valid Entra
+    ID token. With SSO off the API is open — intended for local dev only.
     """
     if not settings.sso_enabled:
         return _DEV_USER

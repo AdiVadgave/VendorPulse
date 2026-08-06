@@ -1,4 +1,4 @@
-﻿import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock, Key, Star } from 'lucide-react'
+import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock, Key, Star } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { SlotProposal } from '@/types/scheduling.types'
 import { SCHEDULING_CONFIG } from '@/config/scheduling.config'

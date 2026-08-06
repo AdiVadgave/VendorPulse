@@ -50,7 +50,7 @@ used only to preserve insertion order on reads. Full DDL: `app/db/schema.py`.
 Set a connection in the backend `.env` (see `.env.example`). Either a full DSN:
 
 ```
-DATABASE_URL=postgresql://user:pass@myserver.postgres.database.azure.com:5432/vendorpulse?sslmode=require
+DATABASE_URL=postgresql://<user>:<password>@<host>.postgres.database.azure.com:5432/vendorpulse?sslmode=require
 ```
 
 …or the individual `PG_*` parts (`PG_HOST`, `PG_USER`, `PG_PASSWORD`, …). The

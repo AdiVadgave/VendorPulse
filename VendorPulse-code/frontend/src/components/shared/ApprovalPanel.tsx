@@ -28,8 +28,12 @@ export default function ApprovalPanel({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
+        role="button"
+        tabIndex={-1}
+        aria-label="Close"
         className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
         onClick={onCancel}
+        onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }}
       />
 
       {/* Panel */}

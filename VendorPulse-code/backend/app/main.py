@@ -44,6 +44,11 @@ async def lifespan(_app: FastAPI):
     pool.wait()
     ensure_schema(pool)
     logger.info("VendorPulse backend ready — PostgreSQL connected, schema ensured")
+    if not settings.sso_enabled:
+        logger.warning(
+            "SSO_ENABLED is false — the API is OPEN (no login required). "
+            "This is for local development only; set SSO_ENABLED=true in production."
+        )
     # Start the daily scorecard-reminder scheduler (no-op if APScheduler absent).
     from app.services.reminder_scheduler import start_reminder_scheduler, stop_reminder_scheduler
     start_reminder_scheduler()
@@ -60,8 +65,8 @@ app = FastAPI(
         "Handles meeting scheduling, availability management, and the Module A "
         "scheduling agent workflow."
     ),
-    # Public API docs expose the full endpoint map — disable them in production
-    # (whenever SSO is enforced). In local dev (SSO off) they stay available.
+    # Public API docs expose the full endpoint map — disabled once SSO is enforced
+    # (production). Available only in local dev (SSO off).
     docs_url=None if settings.sso_enabled else "/docs",
     redoc_url=None if settings.sso_enabled else "/redoc",
     openapi_url=None if settings.sso_enabled else "/openapi.json",
@@ -83,6 +88,21 @@ app.add_middleware(
 
 # Request/response logging with request IDs
 app.add_middleware(RequestLoggingMiddleware)
+
+
+# Security response headers (defense-in-depth) applied to every response.
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
+    # HSTS is honoured only over HTTPS; harmless on plain-HTTP dev.
+    response.headers.setdefault(
+        "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+    )
+    return response
 
 # ── Register routers ──────────────────────────────────────────────────────────
 # Every API router requires a valid signed-in user. get_current_user validates the
@@ -163,14 +183,20 @@ if _FRONTEND_DIST.is_dir():
     if _ASSETS_DIR.is_dir():
         app.mount("/assets", StaticFiles(directory=_ASSETS_DIR), name="assets")
 
+    _INDEX_HTML = _FRONTEND_DIST / "index.html"
+
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa_fallback(full_path: str):
-        candidate = _FRONTEND_DIST / full_path
         # A real file at the root (favicon, vite.svg, etc.) is served directly;
         # everything else returns index.html for the SPA router to resolve.
-        if full_path and candidate.is_file():
-            return FileResponse(candidate)
-        return FileResponse(_FRONTEND_DIST / "index.html")
+        # SECURITY: resolve the candidate and confirm it stays INSIDE the static
+        # directory, so a crafted path (e.g. "../../etc/passwd") can never escape
+        # the web root (path-traversal defense-in-depth).
+        if full_path:
+            candidate = (_FRONTEND_DIST / full_path).resolve()
+            if candidate.is_file() and candidate.is_relative_to(_FRONTEND_DIST):
+                return FileResponse(candidate)
+        return FileResponse(_INDEX_HTML)
 
     logger.info("Serving frontend static build from %s", _FRONTEND_DIST)
 else:

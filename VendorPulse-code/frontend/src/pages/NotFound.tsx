@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { Home, AlertTriangle } from 'lucide-react'
 
 export default function NotFound() {

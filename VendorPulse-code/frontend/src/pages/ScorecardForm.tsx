@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 import { ClipboardList, CheckCircle2, AlertCircle, AlertTriangle, Loader2, Send, User } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { ScorecardFormMeta, WeightedScorecard } from '@/types/scorecard.types'

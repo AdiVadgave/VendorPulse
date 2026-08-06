@@ -1,15 +1,18 @@
-fastapi==0.115.6
-uvicorn[standard]==0.32.1
-gunicorn==23.0.0
-pydantic==2.10.4
-pydantic-settings==2.7.0
-httpx==0.28.1
-python-dotenv==1.0.1
+# VendorPulse backend dependencies — pinned to patched (CVE-free) floors.
+# Run `python -m pip_audit` after any change to confirm no known vulnerabilities.
+
+fastapi>=0.118.0            # pulls a patched Starlette (older 0.41.x had DoS/CVE advisories)
+uvicorn[standard]>=0.34.0
+gunicorn>=23.0.0
+pydantic>=2.10.4
+pydantic-settings>=2.7.0
+httpx>=0.28.1
+python-dotenv>=1.2.2       # PYSEC-2026-2270 fixed in 1.2.2
 psycopg[binary]>=3.2.0
 psycopg-pool>=3.2.0
 msal>=1.31.0
-cryptography>=43.0.0
-pyjwt>=2.9.0
+cryptography>=50.0.0       # PYSEC-2026-3552 fixed in 50.0.0
+pyjwt>=2.10.1              # HS256/JWK confusion (GHSA-75c5-xw7c-p5pm) fixed in 2.10.1
 apscheduler>=3.10.0
 openai>=1.50.0
 truststore>=0.10.0

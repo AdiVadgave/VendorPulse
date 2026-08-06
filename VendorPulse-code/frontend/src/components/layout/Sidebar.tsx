@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink } from 'react-router'
 import {
   LayoutDashboard,
   BarChart3,
@@ -104,7 +104,7 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation — clicking any link closes the mobile drawer. */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" onClick={() => setMobileNavOpen(false)}>
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" onClick={() => setMobileNavOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setMobileNavOpen(false) }}>
         <NavItem
           to="/"
           icon={<LayoutDashboard size={18} />}

@@ -126,7 +126,10 @@ export default function SubmissionTracker({ cycleId, vendorName, quarter, year, 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
       <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((o) => !o) } }}
         className="px-5 py-4 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
       >
         <div className="flex items-start gap-2">

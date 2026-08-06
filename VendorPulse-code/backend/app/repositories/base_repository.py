@@ -80,6 +80,16 @@ class BaseRepository:
     def _collist(self) -> str:
         return ", ".join(f'"{c}"' for c in self.columns)
 
+    def _validate_column(self, col: str) -> None:
+        """Reject any column name not declared in ``self.columns``.
+
+        Column/field names are interpolated into the SQL text (they cannot be
+        bound as parameters), so they MUST come from a trusted allow-list. This
+        guard ensures a caller can never inject arbitrary SQL through a field
+        name (CWE-89)."""
+        if col not in self.columns:
+            raise ValueError(f"Unknown column '{col}' for table '{self.table}'")
+
     def _row_to_dict(self, row: tuple) -> dict:
         # psycopg already decodes JSONB columns to Python dict/list and
         # bool/int/float columns to native types. Timestamp/date columns come
@@ -104,10 +114,12 @@ class BaseRepository:
         return self._select()
 
     def find_by_id(self, id_field: str, id_value: Any) -> Optional[dict]:
+        self._validate_column(id_field)
         rows = self._select(f' WHERE "{id_field}" = %s', (id_value,))
         return rows[0] if rows else None
 
     def find_by_field(self, field: str, value: Any) -> list[dict]:
+        self._validate_column(field)
         return self._select(f' WHERE "{field}" = %s', (value,))
 
     def find_by_predicate(self, predicate: Callable[[dict], bool]) -> list[dict]:
@@ -128,6 +140,7 @@ class BaseRepository:
     def update_by_id(self, id_field: str, id_value: Any, updates: dict) -> Optional[dict]:
         """Update only the supplied columns (the relational analogue of the old
         shallow dict merge)."""
+        self._validate_column(id_field)
         sets = [c for c in updates if c in self.columns and c != id_field]
         if not sets:
             return self.find_by_id(id_field, id_value)
@@ -147,6 +160,7 @@ class BaseRepository:
 
     def replace_by_id(self, id_field: str, id_value: Any, new_record: dict) -> Optional[dict]:
         """Full replace: every column is set from *new_record* (absent → NULL)."""
+        self._validate_column(id_field)
         sets = [c for c in self.columns if c != id_field]
         assignments = ", ".join(f'"{c}" = %s' for c in sets)
         values = [self._adapt(c, new_record.get(c)) for c in sets]
@@ -163,6 +177,7 @@ class BaseRepository:
         return self._row_to_dict(row)
 
     def delete_by_id(self, id_field: str, id_value: Any) -> bool:
+        self._validate_column(id_field)
         with get_pool().connection() as conn:
             cur = conn.execute(
                 f'DELETE FROM "{self.table}" WHERE "{id_field}" = %s', (id_value,)
@@ -170,6 +185,7 @@ class BaseRepository:
             return cur.rowcount > 0
 
     def delete_by_field(self, field: str, value: Any) -> int:
+        self._validate_column(field)
         with get_pool().connection() as conn:
             cur = conn.execute(
                 f'DELETE FROM "{self.table}" WHERE "{field}" = %s', (value,)

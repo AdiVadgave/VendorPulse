@@ -32,6 +32,30 @@ FILE_FORMAT = (
 CONSOLE_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+# Neutralize CR/LF in log records so user-controlled data cannot forge extra log
+# lines (log injection / log forging — CWE-117). Installed centrally on every
+# handler, so no route/service code needs to sanitize before logging.
+_CRLF = str.maketrans({"\r": "\\r", "\n": "\\n"})
+
+
+class _LogSanitizer(logging.Filter):
+    """Strip CR/LF from the log message and any string args."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = record.msg.translate(_CRLF)
+        if isinstance(record.args, tuple):
+            record.args = tuple(
+                a.translate(_CRLF) if isinstance(a, str) else a
+                for a in record.args
+            )
+        elif isinstance(record.args, dict):
+            record.args = {
+                k: (v.translate(_CRLF) if isinstance(v, str) else v)
+                for k, v in record.args.items()
+            }
+        return True
+
 
 def setup_logging(level: str = "INFO") -> None:
     """Initialize logging for the entire application. Call once at startup."""
@@ -58,6 +82,11 @@ def setup_logging(level: str = "INFO") -> None:
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(getattr(logging, level.upper(), logging.INFO))
     console_handler.setFormatter(logging.Formatter(CONSOLE_FORMAT, datefmt=DATE_FORMAT))
+
+    # Strip CR/LF from every record (log-injection defense) on both handlers.
+    _sanitizer = _LogSanitizer()
+    file_handler.addFilter(_sanitizer)
+    console_handler.addFilter(_sanitizer)
 
     root.addHandler(file_handler)
     root.addHandler(console_handler)

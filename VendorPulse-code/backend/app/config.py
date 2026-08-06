@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # is used only for genuinely nested/variable data (see app/db/schema.py). A
     # full DSN in DATABASE_URL takes precedence; otherwise it is assembled from
     # the PG_* parts below. Azure Database for PostgreSQL requires SSL.
-    #   DATABASE_URL=postgresql://user:pass@host:5432/vendorpulse?sslmode=require
+    #   DATABASE_URL=postgresql://<user>:<password>@<host>:5432/vendorpulse?sslmode=require
     database_url: str = ""
     pg_host: str = ""
     pg_port: int = 5432
@@ -141,6 +141,9 @@ class Settings(BaseSettings):
     # logs in (SPA + OIDC), whereas graph_* authenticates the *app* that sends
     # mail. While sso_enabled is False, get_current_user() returns a dev principal
     # and no route is gated, so the app runs unchanged.
+    # PRODUCTION: SSO_ENABLED must be true so every API call requires a valid
+    # Entra ID token. With SSO off the API is open (dev principal) — intended for
+    # local development/testing only.
     sso_enabled: bool = False
     sso_client_id: str = ""            # Application (client) ID of the SPA registration
     sso_tenant_id: str = ""            # Directory (tenant) ID (Shell: db1e96a8-...)

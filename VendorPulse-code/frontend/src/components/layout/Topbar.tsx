@@ -1,5 +1,5 @@
 import { Bell, Sun, Moon, Menu, LogOut } from 'lucide-react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router'
 import { useUIStore } from '@/store/useUIStore'
 import { useCurrentUser, logout } from '@/lib/auth/currentUser'
 import { useCycleStore } from '@/store/useCycleStore'

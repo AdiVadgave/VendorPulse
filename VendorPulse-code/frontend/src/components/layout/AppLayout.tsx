@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet } from 'react-router'
 import { useUIStore } from '@/store/useUIStore'
 import { cn } from '@/utils/cn'
 import Sidebar from './Sidebar'

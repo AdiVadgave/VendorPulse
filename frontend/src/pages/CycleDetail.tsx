@@ -1074,9 +1074,11 @@ function SchedulingTab({
           onConfirmationComplete={async (confirmed) => {
             onAttendeesUpdated(confirmed)
 
-            // Persist workflow state for backend-enforced actions (e.g., rank-slots).
-            // Only do this when we actually have attendees to confirm.
-            if (!isMockCycle && confirmed.length > 0) {
+            // Persist the confirmation on the backend: this also DROPS anyone marked
+            // "Not attending" so the removal sticks. Fire whenever there were
+            // carried-over attendees to reconcile (even if all were declined), not
+            // only when at least one is confirmed.
+            if (!isMockCycle && attendees.length > 0) {
               await completeAttendanceConfirmation(cycle.cycle_id)
             }
 

@@ -176,7 +176,15 @@ class SchedulingService:
                 "email": old.get("email"),
                 "role": old.get("role"),
                 "organisation": old.get("organisation"),
+                # Preserve the full classification so carried-over attendees keep their
+                # identity: 'type' (Internal vs Vendor) and 'shell_department' drive who
+                # is asked to fill the scorecard — dropping them made every seeded person
+                # look like an internal key stakeholder.
+                "type": old.get("type"),
                 "is_key": old.get("is_key"),
+                "attendance_requirement": old.get("attendance_requirement"),
+                "lt_status": old.get("lt_status"),
+                "shell_department": old.get("shell_department"),
                 "invite_status": "PENDING",
                 "availability_submitted": False,
                 "user_id": old.get("user_id"),
@@ -257,19 +265,35 @@ class SchedulingService:
         if not cycle:
             raise ValueError(f"Cycle '{cycle_id}' not found")
 
-        # Idempotent: if we're already past this point, just return the cycle.
-        if workflow_engine.state_index(cycle.get("workflow_state", "CYCLE_CREATED")) >= workflow_engine.state_index(
-            "ATTENDEE_REFRESH_SENT"
-        ):
-            return cycle
-
         attendees = self._attendees.get_for_cycle(cycle_id)
         if not attendees:
             raise ValueError("No attendees found to confirm")
 
+        # Drop anyone marked "Not attending" so the removal STICKS in the database —
+        # otherwise the record survives and re-appears in the RSVP tracker and the
+        # scorecard on the next load. Done before the idempotent gate below so that
+        # re-confirming an already-advanced cycle still cleans up any stragglers.
+        declined = [a for a in attendees if a.get("confirmation_status") == "DECLINED"]
+        for a in declined:
+            self._attendees.delete_by_id("attendee_id", a["attendee_id"])
+        if declined:
+            logger.info(
+                "complete_attendance_confirmation: dropped %d 'Not attending' attendee(s) from cycle %s",
+                len(declined), sanitize_for_log(cycle_id),
+            )
+        remaining = [a for a in attendees if a.get("confirmation_status") != "DECLINED"]
+
+        # Idempotent: if we're already past this point, the cleanup above is all that
+        # is needed — just return the current cycle.
+        if workflow_engine.state_index(cycle.get("workflow_state", "CYCLE_CREATED")) >= workflow_engine.state_index(
+            "ATTENDEE_REFRESH_SENT"
+        ):
+            return self._cycles.get_by_cycle_id(cycle_id) or cycle
+
+        # Everyone still attending must be confirmed (not left pending) before we proceed.
         pending = [
             a
-            for a in attendees
+            for a in remaining
             if (a.get("confirmation_status") in (None, "PENDING"))
         ]
         if pending:

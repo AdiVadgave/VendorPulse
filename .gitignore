@@ -1,108 +1,39 @@
-# VendorPulse (root)
-# --- OS / editor ---
-.DS_Store
-Thumbs.db
-Desktop.ini
-*.swp
-*.swo
-*.swn
+# Environment
+*.env
+*.venv*
+*venv*
+*.env.sh
+!.example.env
+!.example-test.env
 
-#claude
-**/claude/
-.claude/
+# Python local dev
+*.pytest_cache
+*.log
+*.coverage
+**coverage.json
 
-**/google sheet/
-client_secret.json
+# Python cache
+**/__pycache__
 
-# VS Code
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-
-# JetBrains
-.idea/
-
-# Visual Studio / MSBuild
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-*.ntvs*
-*.njsproj
-*.sln
-
-# --- Node / JS ---
-**/node_modules/
-**/logs/
-**/*.log
-**/npm-debug.log*
-**/yarn-debug.log*
-**/yarn-error.log*
-**/pnpm-debug.log*
-**/lerna-debug.log*
-
-# Vite / build outputs
-**/dist/
-**/dist-ssr/
-**/.vite/
-**/*.local
-
-# TypeScript
-**/*.tsbuildinfo
-
-# Temp / scratch / editor-duplicate files
-**/*.tmp
-**/*.bak
-**/*.orig
-
-# dotenv (do not commit secrets)
+# Env files (any nested .env / .env.local), keep the examples
 **/.env
 **/.env.*
 !**/.env.example
 
-# certificates / private keys (never commit)
-**/secrets/
-**/*.pfx
-**/*.p12
-**/*.pem
-**/*.key
+# Node / frontend build artifacts
+**/node_modules/
+frontend/dist/
+**/.vite/
 
-# --- Python (repo has scripts in dev artifacts) ---
-**/__pycache__/
-**/*.py[cod]
-**/.pytest_cache/
-**/.mypy_cache/
-**/.ruff_cache/
+# Python virtualenvs
 **/.venv/
-**/venv/
 
-# --- Backend common (if/when used) ---
-# Java / Maven / Gradle
-**/target/
-**/.gradle/
+# Local logs & data output
+backend/logs/
+backend/secrets/
 
-# .NET
-**/bin/
-**/obj/
+# Build zips produced by CI
+*.zip
 
-# --- Project-specific ---
-/dev artifacts/.ipynb_checkpoints/
-
-# Backend runtime datastore (per-cycle data written at runtime — not source)
-VendorPulse-code/backend/data/cycles.json
-VendorPulse-code/backend/data/slot_proposals.json
-VendorPulse-code/backend/data/attendees.json
-VendorPulse-code/backend/data/scorecard_responses.json
-VendorPulse-code/backend/data/google_token.json
-VendorPulse-code/backend/slide3.txt
-
-dev artifacts/VendorPulse-Demo-Script.md
-dev artifacts/demo-qa-cheatsheet.md
-dev artifacts/slide-script.md
-dev artifacts/build_deck.py
-
-# Shell INTERNAL / CONFIDENTIAL source documents — never commit (IRM 3.6.1 data-leakage)
-msft-agentic-docs/*.pdf
-msft-agentic-docs/*.mhtml
+# OS / editor
+.DS_Store

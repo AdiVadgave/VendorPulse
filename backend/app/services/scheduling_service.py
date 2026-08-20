@@ -91,7 +91,6 @@ class SchedulingService:
         if not vendor_id:
             return []
 
-        quarter = cycle.get("quarter")
         vendor_name = cycle.get("vendor_name")
 
         def _parse_dt(value: str) -> Optional[datetime]:
@@ -136,26 +135,15 @@ class SchedulingService:
 
         previous_cycles.sort(key=_sort_key, reverse=True)
 
-        # Prefer the most recent cycle for the same quarter first.
-        same_quarter_cycles = (
-            [c for c in previous_cycles if quarter and c.get("quarter") == quarter]
-            if quarter
-            else []
-        )
-        candidate_groups: list[list[dict]] = []
-        if same_quarter_cycles:
-            candidate_groups.append(same_quarter_cycles)
-        candidate_groups.append(previous_cycles)
-
-        # Walk back until we find the most recent cycle that *actually* has attendees.
-        # This avoids false "no attendees" when the immediately previous cycle was created
-        # but never had attendees added.
+        # Seed from the MOST RECENT previous cycle that actually has attendees.
+        # Recency wins over quarter-match: the newest cycle holds the up-to-date
+        # attendee list (anyone added or removed since), so carrying it forward
+        # preserves those edits. Previously a same-quarter cycle was preferred, which
+        # could pull an older, shorter roster and silently drop a person who had been
+        # added in a more-recent cycle of a different quarter.
         prev_attendee_records: list[dict] = []
-        for group in candidate_groups:
-            for prev in group:
-                prev_attendee_records = self._attendees.get_for_cycle(prev["cycle_id"])
-                if prev_attendee_records:
-                    break
+        for prev in previous_cycles:  # already sorted most-recent → oldest
+            prev_attendee_records = self._attendees.get_for_cycle(prev["cycle_id"])
             if prev_attendee_records:
                 break
         if not prev_attendee_records:

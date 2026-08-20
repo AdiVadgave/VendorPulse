@@ -173,7 +173,7 @@ function LoginGate({ children }: { children: ReactNode }) {
       >
         <img src="/shell-logo.svg" alt="Vendor Pulse" style={{ width: '56px', height: '56px' }} />
         <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#0f172a' }}>Mobility Vendor Pulse</div>
-        <div style={{ color: '#475569' }}>Sign in with your Shell account to continue.</div>
+        <div style={{ color: '#475569' }}>Sign in to continue.</div>
         <button
           onClick={() => instance.loginRedirect(loginRequest)}
           style={{
@@ -187,7 +187,7 @@ function LoginGate({ children }: { children: ReactNode }) {
             cursor: 'pointer',
           }}
         >
-          Sign in with Shell
+          Sign in
         </button>
       </div>
     </div>

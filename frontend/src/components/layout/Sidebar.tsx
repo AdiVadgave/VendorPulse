@@ -88,7 +88,7 @@ export default function Sidebar() {
           )}
         >
           <div className="w-8 h-8 flex items-center justify-center shrink-0">
-            <img src="/shell-logo.svg" alt="Shell" className="w-7 h-7" />
+            <img src="/shell-logo.svg" alt="Vendor Pulse" className="w-7 h-7" />
           </div>
           {!sidebarCollapsed && (
             <div className="min-w-0">

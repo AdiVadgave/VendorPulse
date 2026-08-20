@@ -154,7 +154,7 @@ function LoginGate({ children }: { children: ReactNode }) {
           boxShadow: 'inset 0 -2px 0 0 #fbce07',
         }}
       >
-        <img src="/shell-logo.svg" alt="Shell" style={{ width: '28px', height: '28px' }} />
+        <img src="/shell-logo.svg" alt="Vendor Pulse" style={{ width: '28px', height: '28px' }} />
         <span style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' }}>
           Mobility Vendor Pulse
         </span>
@@ -171,7 +171,7 @@ function LoginGate({ children }: { children: ReactNode }) {
           gap: '1.25rem',
         }}
       >
-        <img src="/shell-logo.svg" alt="Shell" style={{ width: '56px', height: '56px' }} />
+        <img src="/shell-logo.svg" alt="Vendor Pulse" style={{ width: '56px', height: '56px' }} />
         <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#0f172a' }}>Mobility Vendor Pulse</div>
         <div style={{ color: '#475569' }}>Sign in with your Shell account to continue.</div>
         <button

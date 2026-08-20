@@ -13,7 +13,7 @@ function BrandHeader() {
   return (
     <div className="flex items-center gap-3">
       <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center shrink-0">
-        <img src="/shell-logo.svg" alt="Shell" className="w-7 h-7" />
+        <img src="/shell-logo.svg" alt="Vendor Pulse" className="w-7 h-7" />
       </div>
       <div className="min-w-0">
         <p className="font-semibold text-white text-sm leading-tight">Mobility Vendor Pulse</p>

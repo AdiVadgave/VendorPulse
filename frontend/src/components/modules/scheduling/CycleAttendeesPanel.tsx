@@ -116,7 +116,7 @@ export default function CycleAttendeesPanel({ cycleId, attendees, onAttendeesCha
                     <button
                       onClick={() => toggleKey(a)}
                       disabled={busyId === a.attendee_id}
-                      title={a.is_key ? 'Key stakeholder (fills the scorecard) — click to unset' : 'Mark as key (will be asked to fill the scorecard)'}
+                      title={a.is_key ? 'Scorecard reviewer (fills the scorecard) — click to unset' : 'Mark as scorecard reviewer (will be asked to fill the scorecard)'}
                       className={cn(
                         'flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg border shrink-0 transition-colors disabled:opacity-50',
                         a.is_key
@@ -124,7 +124,7 @@ export default function CycleAttendeesPanel({ cycleId, attendees, onAttendeesCha
                           : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                       )}
                     >
-                      <Key size={12} /> {a.is_key ? 'Key' : 'Not key'}
+                      <Key size={12} /> {a.is_key ? 'Reviewer' : 'Not a reviewer'}
                     </button>
                   )}
                   {confirmRemove === a.attendee_id ? (

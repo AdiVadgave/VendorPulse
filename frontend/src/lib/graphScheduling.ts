@@ -269,7 +269,7 @@ export async function findMeetingSlots(
     score = clamp(Math.round(score))
 
     const bits: string[] = [`${attending.length}/${totalSearched} free`]
-    if (keyTotal) bits.push(`key ${keyFree}/${keyTotal}`)
+    if (keyTotal) bits.push(`reviewers ${keyFree}/${keyTotal}`)
     if (ltTotal) bits.push(`LT ${ltFree}/${ltTotal}`)
     if (tentative.length) bits.push(`${tentative.length} tentative`)
     if (conflicts.length) bits.push(`${conflicts.length} conflict`)

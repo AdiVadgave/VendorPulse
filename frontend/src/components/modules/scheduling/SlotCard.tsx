@@ -216,9 +216,9 @@ export default function SlotCard({
                   ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
                   : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400'
               )}
-              title="Key stakeholders free at this time"
+              title="Scorecard reviewers free at this time"
             >
-              <Key size={11} /> Key {slot.key_free ?? 0}/{slot.key_total} free
+              <Key size={11} /> Reviewers {slot.key_free ?? 0}/{slot.key_total} free
             </span>
           )}
           {(slot.lt_total ?? 0) > 0 && (

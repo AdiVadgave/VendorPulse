@@ -405,7 +405,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
               />
               <span className="text-xs text-slate-700 dark:text-slate-300 flex items-center gap-1">
                 <Key size={11} className="text-amber-500" />
-                Key attendee
+                Scorecard reviewer
               </span>
             </label>
           </div>
@@ -628,7 +628,7 @@ export default function AttendeeRefreshPanel({
                   <th className="text-left px-4 py-2.5 font-medium">Attendance</th>
                   <th className="text-left px-4 py-2.5 font-medium">LT</th>
                   <th className="text-left px-4 py-2.5 font-medium">Dept</th>
-                  <th className="text-left px-4 py-2.5 font-medium">Key</th>
+                  <th className="text-left px-4 py-2.5 font-medium">Scorecard reviewer</th>
                   <th className="text-left px-4 py-2.5 font-medium">Action</th>
                 </tr>
               </thead>
@@ -730,8 +730,8 @@ export default function AttendeeRefreshPanel({
                               : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                           )}
                         >
-                          <option value="key">Key</option>
-                          <option value="not">Not key</option>
+                          <option value="key">Yes</option>
+                          <option value="not">No</option>
                         </select>
                       ) : (
                         <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
@@ -767,7 +767,7 @@ export default function AttendeeRefreshPanel({
         <div className="px-5 py-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-1.5">
             <Key size={11} className="text-amber-500" />
-            <span>Key internal stakeholders fill the scorecard (scorecards are not collected from vendors)</span>
+            <span>Scorecard reviewers are the internal stakeholders who complete the scorecard (not collected from vendors)</span>
           </div>
         </div>
       </div>

@@ -217,7 +217,7 @@ class SchedulingService:
         warnings: list[str] = []
         key_count = sum(1 for a in inserted if a["is_key"])
         if key_count < 2:
-            warnings.append("Fewer than 2 key attendees — slot ranking hard constraints may not work correctly")
+            warnings.append("Fewer than 2 scorecard reviewers — slot ranking hard constraints may not work correctly")
 
         # Advance CYCLE_CREATED → ATTENDEE_REFRESH_SENT (idempotent: skip if already past)
         now = datetime.now(timezone.utc).isoformat()

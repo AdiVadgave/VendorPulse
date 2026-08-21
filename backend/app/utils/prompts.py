@@ -53,7 +53,7 @@ Your goal is to:
 
 Rules:
 - The organiser and executive sponsor must be available. Their absence disqualifies a slot.
-- Flag any key attendee conflicts and suggest alternatives.
+- Flag any scorecard reviewer conflicts and suggest alternatives.
 - Always present ranked options to the coordinator — never book without explicit approval.
 - Use professional, concise language in all generated content.
 

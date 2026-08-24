@@ -4,6 +4,7 @@
  */
 import { apiFetch } from './api'
 import type { VendorBrief, PushbackResponse, PushbackCategory } from '@/types/vendor-prep.types'
+import type { CycleAttendee } from '@/types/scheduling.types'
 
 // ── Response shape ──────────────────────────────────────────────────────────
 
@@ -170,5 +171,36 @@ export async function getVendorPrepMeeting(
 ): Promise<{ meeting: VendorPrepMeeting | null }> {
   return apiFetch<{ meeting: VendorPrepMeeting | null }>(
     `/api/cycles/${cycleId}/vendor-prep/meeting`
+  )
+}
+
+// ── Vendor-prep meeting attendee roster (independent of the cycle attendees) ──
+
+export async function getVendorPrepAttendees(
+  cycleId: string,
+  meetingIndex = 1
+): Promise<{ attendees: CycleAttendee[]; count: number }> {
+  return apiFetch<{ attendees: CycleAttendee[]; count: number }>(
+    `/api/cycles/${cycleId}/vendor-prep/attendees`,
+    { params: { index: String(meetingIndex) } }
+  )
+}
+
+export async function addVendorPrepAttendee(
+  cycleId: string,
+  attendee: {
+    name: string; email: string; role?: string; organisation?: string; is_key?: boolean
+    type?: string; attendance_requirement?: string; lt_status?: string
+    shell_department?: string | null; user_id?: string; stakeholder_id?: string
+  },
+  meetingIndex = 1
+): Promise<{ attendee: CycleAttendee; message: string }> {
+  return apiFetch<{ attendee: CycleAttendee; message: string }>(
+    `/api/cycles/${cycleId}/vendor-prep/attendees/add`,
+    {
+      method: 'POST',
+      params: { index: String(meetingIndex) },
+      body: JSON.stringify({ cycle_id: cycleId, ...attendee }),
+    }
   )
 }

@@ -19,7 +19,13 @@ from pydantic import BaseModel, Field
 
 from app.config import Settings, settings
 from app.core.logging_config import sanitize_for_log
-from app.dependencies import get_llm_service, get_cycle_repo, get_attendee_repo, get_meeting_repo, get_meeting_participant_repo
+from app.dependencies import (
+    get_llm_service, get_cycle_repo, get_attendee_repo, get_meeting_repo,
+    get_meeting_participant_repo, get_meeting_attendee_repo, get_meeting_attendee_seed_repo,
+)
+from app.services.meeting_attendee_service import (
+    list_meeting_attendees, add_meeting_attendee, remove_meeting_attendee,
+)
 from app.models.common import AgentResponse
 from app.services.graph_service import GraphService
 from app.utils.prompts import ALIGNMENT_SYSTEM_PROMPT
@@ -354,11 +360,18 @@ def delete_alignment_meeting(
 @router.get("/attendees")
 def get_alignment_attendees(
     cycleId: str,
+    index: int = 1,
     attendee_repo=Depends(get_attendee_repo),
+    ma_repo=Depends(get_meeting_attendee_repo),
+    seed_repo=Depends(get_meeting_attendee_seed_repo),
 ):
-    """Return internal stakeholders for the alignment meeting attendee list."""
-    internal = _get_internal_attendees(attendee_repo, cycleId)
-    return {"attendees": internal, "count": len(internal)}
+    """This alignment meeting's OWN internal-stakeholder roster — independent of
+    the cycle's master attendee list. Seeded once from the cycle's internal
+    stakeholders, then edited here without ever touching the QBR/scorecard roster."""
+    attendees = list_meeting_attendees(
+        ma_repo, seed_repo, attendee_repo, cycleId, "alignment", index, include_vendors=False
+    )
+    return {"attendees": attendees, "count": len(attendees)}
 
 
 class AddAttendeeRequest(BaseModel):
@@ -368,6 +381,12 @@ class AddAttendeeRequest(BaseModel):
     role: str = "VMO_COORDINATOR"
     organisation: str = ""
     is_key: bool = False
+    type: str = "Internal Stakeholder"
+    attendance_requirement: str = "Required"
+    lt_status: str = "Non-LT"
+    shell_department: Optional[str] = None
+    user_id: Optional[str] = None
+    stakeholder_id: Optional[str] = None
 
 
 class RemoveAttendeeRequest(BaseModel):
@@ -379,56 +398,41 @@ class RemoveAttendeeRequest(BaseModel):
 def add_alignment_attendee(
     cycleId: str,
     payload: AddAttendeeRequest,
-    attendee_repo=Depends(get_attendee_repo),
+    index: int = 1,
+    ma_repo=Depends(get_meeting_attendee_repo),
+    seed_repo=Depends(get_meeting_attendee_seed_repo),
 ):
-    """Add an attendee to this cycle (internal stakeholder only)."""
+    """Add an attendee to THIS alignment meeting's roster only (internal stakeholder)."""
     if payload.cycle_id != cycleId:
         raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
-
-    new_attendee = {
-        "attendee_id": f"att_{uuid.uuid4().hex}",
-        "cycle_id": cycleId,
-        "stakeholder_id": f"s_{uuid.uuid4().hex}",
-        "name": payload.name,
-        "email": payload.email,
-        "role": payload.role,
-        "organisation": payload.organisation,
+    created = add_meeting_attendee(ma_repo, seed_repo, cycleId, "alignment", index, {
+        "name": payload.name, "email": payload.email, "role": payload.role,
+        "organisation": payload.organisation, "is_key": payload.is_key,
         "type": "Internal Stakeholder",
-        "is_key": payload.is_key,
-        # Complete the record so the scheduling table always renders Dept/LT/Attendance.
-        "attendance_requirement": "Required",
-        "lt_status": "Non-LT",
-        "shell_department": "IDTM",
-        "invite_status": "PENDING",
-        "availability_submitted": False,
-    }
-    attendee_repo.insert(new_attendee)
-    logger.info("ALIGNMENT: added attendee %s to cycle %s", sanitize_for_log(payload.name), sanitize_for_log(cycleId))
-    return {"attendee": new_attendee, "message": f"Added {payload.name} to alignment meeting"}
+        "attendance_requirement": payload.attendance_requirement,
+        "lt_status": payload.lt_status, "shell_department": payload.shell_department,
+        "user_id": payload.user_id, "stakeholder_id": payload.stakeholder_id,
+    })
+    logger.info("ALIGNMENT: added attendee %s to meeting %s of cycle %s", sanitize_for_log(payload.name), sanitize_for_log(str(index)), sanitize_for_log(cycleId))
+    return {"attendee": created, "message": f"Added {payload.name} to alignment meeting"}
 
 
 @router.post("/attendees/remove")
 def remove_alignment_attendee(
     cycleId: str,
     payload: RemoveAttendeeRequest,
-    attendee_repo=Depends(get_attendee_repo),
+    index: int = 1,
+    ma_repo=Depends(get_meeting_attendee_repo),
 ):
-    """Remove an attendee from this cycle's alignment meeting."""
+    """Remove an attendee from THIS alignment meeting's roster only. Never touches
+    the cycle attendees or their scorecard submission."""
     if payload.cycle_id != cycleId:
         raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
-
-    attendee = attendee_repo.get_by_attendee_id(payload.attendee_id)
-    if not attendee:
-        raise HTTPException(status_code=404, detail="Attendee not found")
-    if attendee.get("cycle_id") != cycleId:
-        raise HTTPException(status_code=400, detail="Attendee does not belong to this cycle")
-
-    attendee_repo.delete_by_id("attendee_id", payload.attendee_id)
-    # Cascade their scorecard submission so it can't dangle (same as the scheduling path).
-    from app.api.routes.scorecard_v2 import _submissions_repo
-    _submissions_repo().delete_by_field("attendee_id", payload.attendee_id)
-    logger.info("ALIGNMENT: removed attendee %s from cycle %s", sanitize_for_log(payload.attendee_id), sanitize_for_log(cycleId))
-    return {"message": f"Removed {attendee.get('name', '')} from alignment meeting", "attendee_id": payload.attendee_id}
+    ok = remove_meeting_attendee(ma_repo, cycleId, "alignment", index, payload.attendee_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Attendee not found in this alignment meeting")
+    logger.info("ALIGNMENT: removed attendee %s from meeting %s of cycle %s", sanitize_for_log(payload.attendee_id), sanitize_for_log(str(index)), sanitize_for_log(cycleId))
+    return {"message": "Removed from alignment meeting", "attendee_id": payload.attendee_id}
 
 
 def _strip_markdown_json(text: str) -> str:

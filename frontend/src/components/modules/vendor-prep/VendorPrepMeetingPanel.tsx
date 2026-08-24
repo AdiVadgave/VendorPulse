@@ -4,8 +4,8 @@ import {
 } from 'lucide-react'
 import {
   scheduleVendorPrepMeetingManual, getVendorPrepMeeting,
+  getVendorPrepAttendees, addVendorPrepAttendee,
 } from '@/lib/vendorPrepApi'
-import { fetchAttendees } from '@/lib/schedulingApi'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
@@ -74,11 +74,11 @@ export default function VendorPrepMeetingPanel({
   // Load cycle attendees (internal + vendor); default-select everyone.
   useEffect(() => {
     let cancelled = false
-    fetchAttendees(cycleId)
-      .then((list) => {
+    getVendorPrepAttendees(cycleId)
+      .then((res) => {
         if (cancelled) return
-        // Exclude anyone marked "Not attending" in attendance confirmation (DECLINED).
-        const active = list.filter((a) => a.confirmation_status !== 'DECLINED')
+        // This vendor-prep meeting's OWN roster (separate from the cycle attendees).
+        const active = res.attendees.filter((a) => a.confirmation_status !== 'DECLINED')
         setAttendees(active)
         setSelected(new Set(active.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
       })
@@ -152,6 +152,18 @@ export default function VendorPrepMeetingPanel({
       existingAttendeeIds={attendees.map((a) => a.user_id ?? a.attendee_id)}
       onAdded={handleInviteeAdded}
       onCancel={() => setAddingInvitee(false)}
+      // Save into THIS vendor-prep meeting's own roster — never the cycle attendees.
+      submitOverride={async (data) => {
+        const res = await addVendorPrepAttendee(cycleId, {
+          name: data.name, email: data.email, role: data.role,
+          organisation: data.organisation, is_key: data.is_key, type: data.type,
+          attendance_requirement: data.attendance_requirement, lt_status: data.lt_status,
+          shell_department: data.shell_department, user_id: data.user_id,
+          stakeholder_id: data.stakeholder_id,
+        })
+        return res.attendee
+      }}
+      hideKey
     />
   )
 

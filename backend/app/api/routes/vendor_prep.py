@@ -23,6 +23,8 @@ from app.dependencies import (
     get_agent_run_repo,
     get_attendee_repo,
     get_cycle_repo,
+    get_meeting_attendee_repo,
+    get_meeting_attendee_seed_repo,
     get_meeting_participant_repo,
     get_meeting_repo,
     get_scorecard_submission_repo,
@@ -31,6 +33,11 @@ from app.dependencies import (
 from app.models.common import AgentResponse
 from app.models.vendor_prep import GenerateBriefRequest, HandlePushbackRequest
 from app.services.graph_service import GraphService
+from app.services.meeting_attendee_service import (
+    add_meeting_attendee,
+    list_meeting_attendees,
+    remove_meeting_attendee,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +223,84 @@ def _resolve_invite_emails(payload_emails: Optional[list[str]], attendee_repo, c
     allowed = set(all_emails)
     chosen = [e.strip().lower() for e in payload_emails if e and e.strip().lower() in allowed]
     return chosen or all_emails
+
+
+# ── Per-meeting attendee roster (independent of the cycle attendees) ──────────
+
+
+class VPAddAttendeeRequest(BaseModel):
+    cycle_id: str
+    name: str
+    email: str
+    role: str = "VMO_COORDINATOR"
+    organisation: str = ""
+    is_key: bool = False
+    type: str = "Internal Stakeholder"
+    attendance_requirement: str = "Required"
+    lt_status: str = "Non-LT"
+    shell_department: Optional[str] = None
+    user_id: Optional[str] = None
+    stakeholder_id: Optional[str] = None
+
+
+class VPRemoveAttendeeRequest(BaseModel):
+    cycle_id: str
+    attendee_id: str
+
+
+@router.get("/attendees")
+def get_vendor_prep_attendees(
+    cycleId: str,
+    index: int = 1,
+    attendee_repo=Depends(get_attendee_repo),
+    ma_repo=Depends(get_meeting_attendee_repo),
+    seed_repo=Depends(get_meeting_attendee_seed_repo),
+):
+    """This vendor-prep meeting's OWN attendee roster (internal + vendor), separate
+    from the cycle's master attendee list. Seeded once from the cycle roster."""
+    attendees = list_meeting_attendees(
+        ma_repo, seed_repo, attendee_repo, cycleId, "vendor_prep", index, include_vendors=True
+    )
+    return {"attendees": attendees, "count": len(attendees)}
+
+
+@router.post("/attendees/add")
+def add_vendor_prep_attendee(
+    cycleId: str,
+    payload: VPAddAttendeeRequest,
+    index: int = 1,
+    ma_repo=Depends(get_meeting_attendee_repo),
+    seed_repo=Depends(get_meeting_attendee_seed_repo),
+):
+    """Add an attendee to THIS vendor-prep meeting's roster only."""
+    if payload.cycle_id != cycleId:
+        raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
+    created = add_meeting_attendee(ma_repo, seed_repo, cycleId, "vendor_prep", index, {
+        "name": payload.name, "email": payload.email, "role": payload.role,
+        "organisation": payload.organisation, "is_key": payload.is_key,
+        "type": payload.type, "attendance_requirement": payload.attendance_requirement,
+        "lt_status": payload.lt_status, "shell_department": payload.shell_department,
+        "user_id": payload.user_id, "stakeholder_id": payload.stakeholder_id,
+    })
+    logger.info("VENDOR-PREP: added attendee %s to meeting %s of cycle %s", sanitize_for_log(payload.name), sanitize_for_log(str(index)), sanitize_for_log(cycleId))
+    return {"attendee": created, "message": f"Added {payload.name} to vendor prep meeting"}
+
+
+@router.post("/attendees/remove")
+def remove_vendor_prep_attendee(
+    cycleId: str,
+    payload: VPRemoveAttendeeRequest,
+    index: int = 1,
+    ma_repo=Depends(get_meeting_attendee_repo),
+):
+    """Remove an attendee from THIS vendor-prep meeting's roster only."""
+    if payload.cycle_id != cycleId:
+        raise HTTPException(status_code=400, detail="cycle_id in body must match URL")
+    ok = remove_meeting_attendee(ma_repo, cycleId, "vendor_prep", index, payload.attendee_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Attendee not found in this vendor prep meeting")
+    logger.info("VENDOR-PREP: removed attendee %s from meeting %s of cycle %s", sanitize_for_log(payload.attendee_id), sanitize_for_log(str(index)), sanitize_for_log(cycleId))
+    return {"message": "Removed from vendor prep meeting", "attendee_id": payload.attendee_id}
 
 
 class VPManualScheduleRequest(BaseModel):

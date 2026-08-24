@@ -17,6 +17,10 @@ from app.repositories.attendee_repository import AttendeeRepository
 from app.repositories.cycle_repository import CycleRepository
 from app.repositories.meeting_artifact_repository import MeetingArtifactRepository
 from app.repositories.meeting_repository import MeetingParticipantRepository, MeetingRepository
+from app.repositories.meeting_attendee_repository import (
+    MeetingAttendeeRepository,
+    MeetingAttendeeSeedRepository,
+)
 from app.repositories.person_repository import PersonRepository
 from app.repositories.pushback_repository import PushbackRepository, PushbackResponseRepository
 from app.repositories.scorecard_repository import (
@@ -104,6 +108,14 @@ def get_user_availability_repo() -> UserAvailabilityRepository:
 @lru_cache(maxsize=None)
 def get_meeting_participant_repo() -> MeetingParticipantRepository:
     return MeetingParticipantRepository(settings.data_dir)
+
+
+def get_meeting_attendee_repo() -> MeetingAttendeeRepository:
+    return MeetingAttendeeRepository(settings.data_dir)
+
+
+def get_meeting_attendee_seed_repo() -> MeetingAttendeeSeedRepository:
+    return MeetingAttendeeSeedRepository(settings.data_dir)
 
 
 @lru_cache(maxsize=None)

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { CalendarPlus, Users, CheckCircle2, ExternalLink, X, UserPlus, Trash2, Link2Off, CalendarClock, CalendarCheck } from 'lucide-react'
-import { scheduleAlignmentMeetingManual, getAlignmentMeeting, getAlignmentAttendees, removeAlignmentAttendee } from '@/lib/alignmentApi'
+import { scheduleAlignmentMeetingManual, getAlignmentMeeting, getAlignmentAttendees, addAlignmentAttendee, removeAlignmentAttendee } from '@/lib/alignmentApi'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
@@ -55,7 +55,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
   const fetchAttendees = useCallback(async () => {
     setAttendeesLoading(true)
     try {
-      const res = await getAlignmentAttendees(cycleId)
+      const res = await getAlignmentAttendees(cycleId, meetingIndex)
       // Exclude anyone marked "Not attending" in attendance confirmation (DECLINED).
       setInternalAttendees(res.attendees.filter((a) => a.confirmation_status !== 'DECLINED'))
     } catch {
@@ -63,7 +63,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
     } finally {
       setAttendeesLoading(false)
     }
-  }, [cycleId])
+  }, [cycleId, meetingIndex])
 
   // Check for existing meeting on mount (state persistence)
   useEffect(() => {
@@ -111,7 +111,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
   async function handleRemoveAttendee(attendeeId: string) {
     setRemoveLoading(attendeeId)
     try {
-      await removeAlignmentAttendee(cycleId, attendeeId)
+      await removeAlignmentAttendee(cycleId, attendeeId, meetingIndex)
       setInternalAttendees(prev => prev.filter(a => a.attendee_id !== attendeeId))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to remove attendee')
@@ -200,6 +200,19 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
                 existingAttendeeIds={internalAttendees.map((a) => a.user_id ?? a.attendee_id)}
                 onAdded={handleAttendeeAdded}
                 onCancel={() => setShowAddForm(false)}
+                // Save into THIS alignment meeting's own roster — never the cycle attendees.
+                submitOverride={async (data) => {
+                  const res = await addAlignmentAttendee(cycleId, {
+                    name: data.name, email: data.email, role: data.role,
+                    organisation: data.organisation, is_key: data.is_key, type: data.type,
+                    attendance_requirement: data.attendance_requirement, lt_status: data.lt_status,
+                    shell_department: data.shell_department, user_id: data.user_id,
+                    stakeholder_id: data.stakeholder_id,
+                  }, meetingIndex)
+                  return res.attendee
+                }}
+                hideKey
+                hideType
               />
             </div>
           )}

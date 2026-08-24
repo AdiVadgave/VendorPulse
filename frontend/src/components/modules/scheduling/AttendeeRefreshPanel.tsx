@@ -40,14 +40,36 @@ interface AttendeeRefreshPanelProps {
 
 // ── Search & Add Attendee Form ───────────────────────────────────────────────
 
+export interface NewAttendeeInput {
+  stakeholder_id: string
+  name: string
+  email: string
+  role: string
+  organisation: string
+  type: string
+  is_key: boolean
+  attendance_requirement: string
+  lt_status: string
+  shell_department: string | null
+  user_id?: string
+}
+
 interface SearchAddAttendeeFormProps {
   cycleId: string
   existingAttendeeIds: string[]
   onAdded: (attendee: CycleAttendee) => void
   onCancel: () => void
+  /** When set, the form saves via this instead of POSTing to the cycle attendees —
+   *  used by alignment/vendor-prep meetings so their roster edits never touch the
+   *  cycle (QBR/scorecard) attendee list. */
+  submitOverride?: (data: NewAttendeeInput) => Promise<CycleAttendee>
+  /** Hide the "Scorecard reviewer" (is_key) control — irrelevant outside the QBR. */
+  hideKey?: boolean
+  /** Hide the Type (Internal/Vendor) control — e.g. alignment is internal-only. */
+  hideType?: boolean
 }
 
-export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel }: SearchAddAttendeeFormProps) {
+export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel, submitOverride, hideKey, hideType }: SearchAddAttendeeFormProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<PeopleSearchResult[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
@@ -182,27 +204,29 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
     }
     setIsSubmitting(true)
     setError(null)
+    const data: NewAttendeeInput = {
+      stakeholder_id: `s_${Date.now()}`,
+      name: selected.name,
+      email: selected.email,
+      role,
+      organisation: selected.organisation,
+      type: attendeeType,
+      is_key: isKey,
+      attendance_requirement: attendanceRequirement,
+      lt_status: ltStatus,
+      shell_department: attendeeType === 'Internal Stakeholder' ? shellDepartment : null,
+      user_id: selected.user_id,
+    }
     try {
+      // Meeting-scoped save (alignment / vendor-prep) — never touches cycle attendees.
+      if (submitOverride) {
+        const created = await submitOverride(data)
+        onAdded(created)
+        return
+      }
       const res = await apiFetch<{ attendees: CycleAttendee[]; data?: { attendees: CycleAttendee[] } }>(
         `/api/cycles/${cycleId}/attendees`,
-        {
-          method: 'POST',
-          body: JSON.stringify([
-            {
-              stakeholder_id: `s_${Date.now()}`,
-              name: selected.name,
-              email: selected.email,
-              role,
-              organisation: selected.organisation,
-              type: attendeeType,
-              is_key: isKey,
-              attendance_requirement: attendanceRequirement,
-              lt_status: ltStatus,
-              shell_department: attendeeType === 'Internal Stakeholder' ? shellDepartment : null,
-              user_id: selected.user_id,
-            },
-          ]),
-        }
+        { method: 'POST', body: JSON.stringify([data]) }
       )
       const added =
         (res as unknown as { data: { attendees: CycleAttendee[] } }).data?.attendees ??
@@ -212,6 +236,10 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
         onAdded(added[0])
       }
     } catch {
+      if (submitOverride) {
+        setError('Could not add the attendee to this meeting. Please try again.')
+        return
+      }
       const localAttendee: CycleAttendee = {
         attendee_id: `a_${Date.now()}`,
         stakeholder_id: `s_${Date.now()}`,
@@ -384,6 +412,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
               ))}
             </select>
           </div>
+          {!hideType && (
           <div className="space-y-1">
             <label className="text-xs text-slate-600 dark:text-slate-400">Type *</label>
             <select
@@ -395,6 +424,8 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
               <option value="Vendor">Vendor</option>
             </select>
           </div>
+          )}
+          {!hideKey && (
           <div className="flex items-end pb-1.5">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -409,6 +440,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
               </span>
             </label>
           </div>
+          )}
 
           {/* Invitee classification */}
           <div className="space-y-1">

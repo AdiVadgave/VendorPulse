@@ -165,21 +165,29 @@ export interface AlignmentAttendeesResponse {
 }
 
 export async function getAlignmentAttendees(
-  cycleId: string
+  cycleId: string,
+  meetingIndex = 1
 ): Promise<AlignmentAttendeesResponse> {
   return apiFetch<AlignmentAttendeesResponse>(
-    `/api/cycles/${cycleId}/alignment/attendees`
+    `/api/cycles/${cycleId}/alignment/attendees`,
+    { params: { index: String(meetingIndex) } }
   )
 }
 
 export async function addAlignmentAttendee(
   cycleId: string,
-  attendee: { name: string; email: string; role?: string; organisation?: string; is_key?: boolean }
+  attendee: {
+    name: string; email: string; role?: string; organisation?: string; is_key?: boolean
+    type?: string; attendance_requirement?: string; lt_status?: string
+    shell_department?: string | null; user_id?: string; stakeholder_id?: string
+  },
+  meetingIndex = 1
 ): Promise<{ attendee: CycleAttendee; message: string }> {
   return apiFetch<{ attendee: CycleAttendee; message: string }>(
     `/api/cycles/${cycleId}/alignment/attendees/add`,
     {
       method: 'POST',
+      params: { index: String(meetingIndex) },
       body: JSON.stringify({
         cycle_id: cycleId,
         ...attendee,
@@ -190,12 +198,14 @@ export async function addAlignmentAttendee(
 
 export async function removeAlignmentAttendee(
   cycleId: string,
-  attendeeId: string
+  attendeeId: string,
+  meetingIndex = 1
 ): Promise<{ message: string; attendee_id: string }> {
   return apiFetch<{ message: string; attendee_id: string }>(
     `/api/cycles/${cycleId}/alignment/attendees/remove`,
     {
       method: 'POST',
+      params: { index: String(meetingIndex) },
       body: JSON.stringify({
         cycle_id: cycleId,
         attendee_id: attendeeId,

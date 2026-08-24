@@ -40,6 +40,8 @@ KNOWN_TABLES: list[str] = [
     "attendees",
     "meetings",
     "meeting_participants",
+    "meeting_attendees",
+    "meeting_attendee_seeds",
     "slot_proposals",
     "scorecard_submissions",
     "scorecard_final",
@@ -201,6 +203,49 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             "CREATE INDEX IF NOT EXISTS mp_meeting ON meeting_participants (meeting_id)",
             "CREATE INDEX IF NOT EXISTS mp_user ON meeting_participants (user_id)",
         ],
+    ),
+    "meeting_attendees": (
+        # Per-meeting attendee roster for internal-alignment and vendor-prep meetings,
+        # kept SEPARATE from the cycle's master `attendees` table so editing a meeting's
+        # roster never mutates the QBR / scorecard attendees. Keyed by
+        # (cycle_id, meeting_kind, meeting_index); seeded once from the cycle roster.
+        """
+        CREATE TABLE IF NOT EXISTS meeting_attendees (
+            row_id                 TEXT PRIMARY KEY,
+            cycle_id               TEXT NOT NULL REFERENCES cycles(cycle_id) ON DELETE CASCADE,
+            meeting_kind           TEXT NOT NULL,
+            meeting_index          INTEGER NOT NULL,
+            stakeholder_id         TEXT,
+            name                   TEXT,
+            email                  TEXT,
+            role                   TEXT,
+            organisation           TEXT,
+            type                   TEXT,
+            is_key                 BOOLEAN,
+            attendance_requirement TEXT,
+            lt_status              TEXT,
+            shell_department       TEXT,
+            user_id                TEXT,
+            seq                    BIGSERIAL UNIQUE NOT NULL
+        )
+        """,
+        ["CREATE INDEX IF NOT EXISTS ma_cycle_kind ON meeting_attendees (cycle_id, meeting_kind, meeting_index)"],
+    ),
+    "meeting_attendee_seeds": (
+        # One row per (cycle, meeting_kind, meeting_index) that has been seeded, so a
+        # meeting's roster is populated from the cycle exactly ONCE. Without this, a
+        # meeting the user emptied would be silently re-seeded on the next load.
+        """
+        CREATE TABLE IF NOT EXISTS meeting_attendee_seeds (
+            seed_id       TEXT PRIMARY KEY,
+            cycle_id      TEXT NOT NULL REFERENCES cycles(cycle_id) ON DELETE CASCADE,
+            meeting_kind  TEXT NOT NULL,
+            meeting_index INTEGER NOT NULL,
+            seeded_at     TEXT,
+            seq           BIGSERIAL UNIQUE NOT NULL
+        )
+        """,
+        [],
     ),
     "slot_proposals": (
         """

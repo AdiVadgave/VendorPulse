@@ -204,3 +204,18 @@ export async function addVendorPrepAttendee(
     }
   )
 }
+
+export async function removeVendorPrepAttendee(
+  cycleId: string,
+  attendeeId: string,
+  meetingIndex = 1
+): Promise<{ message: string; attendee_id: string }> {
+  return apiFetch<{ message: string; attendee_id: string }>(
+    `/api/cycles/${cycleId}/vendor-prep/attendees/remove`,
+    {
+      method: 'POST',
+      params: { index: String(meetingIndex) },
+      body: JSON.stringify({ cycle_id: cycleId, attendee_id: attendeeId }),
+    }
+  )
+}

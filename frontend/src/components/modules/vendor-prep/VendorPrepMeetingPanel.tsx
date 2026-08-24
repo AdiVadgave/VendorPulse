@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
-  CalendarPlus, Users, ExternalLink, CheckCircle2, RotateCcw, Building2, Link2Off, UserPlus, X, CalendarCheck,
+  CalendarPlus, Users, ExternalLink, CheckCircle2, RotateCcw, Building2, Link2Off, UserPlus, X, CalendarCheck, Trash2,
 } from 'lucide-react'
 import {
   scheduleVendorPrepMeetingManual, getVendorPrepMeeting,
-  getVendorPrepAttendees, addVendorPrepAttendee,
+  getVendorPrepAttendees, addVendorPrepAttendee, removeVendorPrepAttendee,
 } from '@/lib/vendorPrepApi'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
@@ -68,6 +68,7 @@ export default function VendorPrepMeetingPanel({
 
   const [rescheduling, setRescheduling] = useState(false)
   const [addingInvitee, setAddingInvitee] = useState(false)
+  const [removeLoading, setRemoveLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [persistenceChecked, setPersistenceChecked] = useState(false)
 
@@ -144,6 +145,21 @@ export default function VendorPrepMeetingPanel({
     const email = (attendee.email || '').toLowerCase()
     if (email) setSelected((prev) => new Set(prev).add(email))
     setAddingInvitee(false)
+  }
+
+  async function handleRemoveAttendee(attendeeId: string) {
+    const removed = attendees.find((a) => a.attendee_id === attendeeId)
+    setRemoveLoading(attendeeId)
+    try {
+      await removeVendorPrepAttendee(cycleId, attendeeId)
+      setAttendees((prev) => prev.filter((a) => a.attendee_id !== attendeeId))
+      const email = (removed?.email || '').toLowerCase()
+      if (email) setSelected((prev) => { const next = new Set(prev); next.delete(email); return next })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to remove attendee')
+    } finally {
+      setRemoveLoading(null)
+    }
   }
 
   const addInviteeForm = addingInvitee && (
@@ -242,6 +258,58 @@ export default function VendorPrepMeetingPanel({
                 </button>
               </div>
               {addInviteeForm}
+
+              {/* Persistent invitee roster — visible after the meeting is scheduled. */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users size={13} className="text-slate-400" />
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    Invitees ({attendees.length})
+                  </span>
+                </div>
+                {attendees.length === 0 ? (
+                  <p className="text-xs text-slate-400">No attendees found for this cycle.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {attendees.map((a) => {
+                      const isVendor = a.type === 'Vendor'
+                      return (
+                        <div key={a.attendee_id} className="flex items-center justify-between group">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={cn(
+                              'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0',
+                              isVendor
+                                ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400'
+                                : 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400'
+                            )}>
+                              {(a.name || '?').charAt(0).toUpperCase()}
+                            </span>
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{a.name}</span>
+                            <span className={cn(
+                              'text-[9px] px-1 py-0.5 rounded font-semibold flex items-center gap-0.5 shrink-0',
+                              isVendor
+                                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+                                : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
+                            )}>
+                              {isVendor && <Building2 size={9} />}
+                              {isVendor ? 'VENDOR' : 'INTERNAL'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 truncate">{a.email}</span>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveAttendee(a.attendee_id)}
+                            disabled={removeLoading === a.attendee_id}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-500 disabled:opacity-30 shrink-0 ml-2"
+                            title="Remove attendee"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <p className="text-sm text-slate-600 dark:text-slate-400">

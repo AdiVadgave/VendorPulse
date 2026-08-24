@@ -156,6 +156,8 @@ def schedule_alignment_meeting_manual(
     attendee_repo=Depends(get_attendee_repo),
     meeting_repo=Depends(get_meeting_repo),
     participant_repo=Depends(get_meeting_participant_repo),
+    ma_repo=Depends(get_meeting_attendee_repo),
+    seed_repo=Depends(get_meeting_attendee_seed_repo),
 ):
     """Record an internal-alignment meeting at a coordinator-chosen time with no
     Microsoft Graph / calendar access. Invites all internal stakeholders and
@@ -167,9 +169,15 @@ def schedule_alignment_meeting_manual(
     if not cycle:
         raise HTTPException(status_code=404, detail=f"Cycle '{cycleId}' not found")
 
-    internal_emails = _get_internal_emails(attendee_repo, cycleId)
+    # Invite THIS alignment meeting's own roster (not the cycle attendees), so any
+    # add/remove the coordinator made here is reflected in the persisted invite list.
+    roster = list_meeting_attendees(
+        ma_repo, seed_repo, attendee_repo, cycleId, "alignment",
+        payload.meeting_index, include_vendors=False,
+    )
+    internal_emails = [(a.get("email") or "").strip().lower() for a in roster if a.get("email")]
     if not internal_emails:
-        raise HTTPException(status_code=400, detail="No internal stakeholder emails found for this cycle")
+        raise HTTPException(status_code=400, detail="No internal stakeholder emails found for this alignment meeting")
 
     vendor_name = cycle.get("vendor_name", "TBD")
     quarter = cycle.get("quarter", "")

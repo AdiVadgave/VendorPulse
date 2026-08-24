@@ -115,6 +115,42 @@ def create_cycle(
         vendor_id = persisted["vendor_id"]
         logger.info("create_cycle: resolved vendor '%s' → vendor_id=%s", sanitize_for_log(vendor_name), sanitize_for_log(vendor_id))
 
+    # Soft duplicate guard: a cycle for the same vendor + quarter + year is
+    # almost always a mistake, but the coordinator is allowed to proceed. We warn
+    # (409 DUPLICATE_CYCLE) unless they explicitly confirm. Archived cycles do not
+    # count, so a cancelled cycle can be recreated without a prompt.
+    if not payload.confirm_duplicate:
+        try:
+            year_int = int(payload.year)
+        except (TypeError, ValueError):
+            year_int = payload.year
+        duplicate = next(
+            (
+                c for c in cycle_repo.get_by_vendor(vendor_id)
+                if c.get("quarter") == payload.quarter
+                and int(c.get("year") or 0) == year_int
+                and c.get("workflow_state") != "ARCHIVED"
+            ),
+            None,
+        )
+        if duplicate:
+            logger.info(
+                "create_cycle: duplicate detected — vendor_id=%s, quarter=%s, year=%s, existing_cycle_id=%s",
+                sanitize_for_log(vendor_id), sanitize_for_log(payload.quarter),
+                sanitize_for_log(payload.year), sanitize_for_log(duplicate.get("cycle_id")),
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "DUPLICATE_CYCLE",
+                    "message": (
+                        f"A {payload.quarter} {payload.year} cycle already exists for "
+                        f"{vendor_name}. Do you still want to create it?"
+                    ),
+                    "existing_cycle_id": duplicate.get("cycle_id"),
+                },
+            )
+
     now = datetime.now(timezone.utc).isoformat()
     cycle = {
         "cycle_id": f"c_{uuid.uuid4().hex}",

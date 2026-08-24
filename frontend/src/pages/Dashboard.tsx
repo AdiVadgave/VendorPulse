@@ -28,6 +28,28 @@ import { CYCLE_TYPE_LABELS } from '@/types/cycle.types'
 import { fetchVendors } from '@/lib/schedulingApi'
 import type { VendorRecord } from '@/lib/schedulingApi'
 import { useCurrentUser, friendlyFirstName } from '@/lib/auth/currentUser'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
+
+/**
+ * The create-cycle endpoint returns HTTP 409 with detail.code === 'DUPLICATE_CYCLE'
+ * when a same vendor+quarter+year cycle already exists. apiFetch surfaces that as
+ * an Error whose message is the JSON-stringified detail — parse it back out so we
+ * can show a "still create?" prompt instead of a raw error.
+ */
+function extractDuplicateMessage(err: unknown): string | null {
+  if (!(err instanceof Error)) return null
+  try {
+    const parsed = JSON.parse(err.message)
+    if (parsed && typeof parsed === 'object' && parsed.code === 'DUPLICATE_CYCLE') {
+      return typeof parsed.message === 'string'
+        ? parsed.message
+        : 'A cycle for this vendor, quarter and year already exists. Do you still want to create it?'
+    }
+  } catch {
+    // Not a JSON duplicate payload — treat as a normal error.
+  }
+  return null
+}
 
 const STATE_BADGE: Record<string, { classes: string; progress: number }> = {
   CYCLE_CREATED:         { classes: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400', progress: 5 },
@@ -88,8 +110,12 @@ function NewCycleModal({
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Duplicate (same vendor+quarter+year) soft-warning prompt. Non-null => open.
+  const [duplicatePrompt, setDuplicatePrompt] = useState<string | null>(null)
+  const [confirmingDuplicate, setConfirmingDuplicate] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const quarterRef = useRef<HTMLSelectElement>(null)
 
   // Load vendors from API on mount
   useEffect(() => {
@@ -141,6 +167,27 @@ function NewCycleModal({
     setDropdownOpen(false)
   }
 
+  // Single POST used both for the first attempt and the "create anyway" retry.
+  // confirmDuplicate === true tells the backend to skip its same-quarter warning.
+  async function postCycle(confirmDuplicate: boolean) {
+    const res = await apiFetch<{ cycle: GovernanceCycle; message: string }>('/api/cycles', {
+      method: 'POST',
+      body: JSON.stringify({
+        vendor_id: form.vendor_id,
+        vendor_name: form.vendor_name.trim(),
+        // Category is carried from the selected vendor (or defaulted for a new one);
+        // it is no longer entered manually — the cycle description replaces it.
+        category: form.category.trim() || 'IT Infrastructure',
+        description: form.description.trim(),
+        cycle_type: form.cycle_type,
+        quarter: form.quarter,
+        year: form.year,
+        confirm_duplicate: confirmDuplicate,
+      }),
+    })
+    onCreate(res.cycle)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.vendor_name.trim()) {
@@ -150,29 +197,45 @@ function NewCycleModal({
     setIsSubmitting(true)
     setError(null)
     try {
-      const res = await apiFetch<{ cycle: GovernanceCycle; message: string }>('/api/cycles', {
-        method: 'POST',
-        body: JSON.stringify({
-          vendor_id: form.vendor_id,
-          vendor_name: form.vendor_name.trim(),
-          // Category is carried from the selected vendor (or defaulted for a new one);
-          // it is no longer entered manually — the cycle description replaces it.
-          category: form.category.trim() || 'IT Infrastructure',
-          description: form.description.trim(),
-          cycle_type: form.cycle_type,
-          quarter: form.quarter,
-          year: form.year,
-        }),
-      })
-      onCreate(res.cycle)
+      await postCycle(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create cycle')
+      // Same vendor+quarter+year already exists → warn instead of failing; the
+      // coordinator can still choose to create it.
+      const dupMessage = extractDuplicateMessage(err)
+      if (dupMessage) {
+        setDuplicatePrompt(dupMessage)
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to create cycle')
+      }
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  // "Create anyway" — proceed with the normal flow despite the duplicate.
+  async function handleConfirmDuplicate() {
+    setConfirmingDuplicate(true)
+    setError(null)
+    try {
+      await postCycle(true)
+      // onCreate navigates away / closes the modal on success.
+    } catch (err) {
+      setDuplicatePrompt(null)
+      setError(err instanceof Error ? err.message : 'Failed to create cycle')
+    } finally {
+      setConfirmingDuplicate(false)
+    }
+  }
+
+  // "Choose a different quarter" — dismiss the prompt and return the coordinator
+  // to the form, focusing the Quarter field.
+  function handleCancelDuplicate() {
+    setDuplicatePrompt(null)
+    setTimeout(() => quarterRef.current?.focus(), 0)
+  }
+
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
@@ -298,6 +361,7 @@ function NewCycleModal({
                 Quarter
               </label>
               <select
+                ref={quarterRef}
                 value={form.quarter}
                 onChange={(e) => setForm((f) => ({ ...f, quarter: e.target.value as NewCycleForm['quarter'] }))}
                 className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -361,6 +425,19 @@ function NewCycleModal({
         </form>
       </div>
     </div>
+
+    <ConfirmDialog
+      open={duplicatePrompt !== null}
+      tone="default"
+      title="Cycle already exists"
+      confirmLabel="Create anyway"
+      cancelLabel="Choose a different quarter"
+      busy={confirmingDuplicate}
+      onConfirm={handleConfirmDuplicate}
+      onCancel={handleCancelDuplicate}
+      message={duplicatePrompt}
+    />
+    </>
   )
 }
 

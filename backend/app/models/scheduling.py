@@ -230,6 +230,10 @@ class CycleCreate(BaseModel):
     year: int
     category: str = "IT Infrastructure"
     description: str = Field(default="", description="Free-text purpose/scope of this governance cycle")
+    # When a cycle already exists for the same vendor+quarter+year, creation is
+    # not blocked — the coordinator is warned (HTTP 409, code=DUPLICATE_CYCLE) and
+    # may retry with this flag set to proceed anyway.
+    confirm_duplicate: bool = Field(default=False, description="Proceed even if a same vendor+quarter+year cycle already exists")
 
 
 class Cycle(BaseModel):

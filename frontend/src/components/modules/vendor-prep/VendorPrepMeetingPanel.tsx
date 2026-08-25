@@ -7,6 +7,7 @@ import {
   getVendorPrepAttendees, addVendorPrepAttendee, removeVendorPrepAttendee,
 } from '@/lib/vendorPrepApi'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
+import SendAddedInvitePanel from '@/components/modules/scheduling/SendAddedInvitePanel'
 import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
 
@@ -310,6 +311,15 @@ export default function VendorPrepMeetingPanel({
                   </div>
                 )}
               </div>
+
+              {meetingResult.teamsUrl && (
+                <SendAddedInvitePanel
+                  attendees={attendees}
+                  meetingUrl={meetingResult.teamsUrl}
+                  subject="Mobility Vendor Pulse — Vendor Prep Meeting"
+                  body={VENDOR_PREP_BODY_HTML}
+                />
+              )}
             </div>
           ) : (
             <p className="text-sm text-slate-600 dark:text-slate-400">

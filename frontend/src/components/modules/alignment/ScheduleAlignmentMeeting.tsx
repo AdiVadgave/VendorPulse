@@ -3,6 +3,7 @@ import { CalendarPlus, Users, CheckCircle2, ExternalLink, X, UserPlus, Trash2, L
 import { scheduleAlignmentMeetingManual, getAlignmentMeeting, getAlignmentAttendees, addAlignmentAttendee, removeAlignmentAttendee } from '@/lib/alignmentApi'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
+import SendAddedInvitePanel from '@/components/modules/scheduling/SendAddedInvitePanel'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
 import type { CycleAttendee } from '@/types/scheduling.types'
 
@@ -231,6 +232,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
 
         {meetingResult && !rescheduling ? (
           /* Meeting already scheduled — show confirmation */
+          <>
           <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-4 py-3 space-y-2">
             <div className="flex items-center gap-2">
               <CheckCircle2 size={15} className="text-emerald-600 dark:text-emerald-400" />
@@ -271,6 +273,15 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
               </button>
             </div>
           </div>
+          {meetingResult.teamsUrl && (
+            <SendAddedInvitePanel
+              attendees={internalAttendees}
+              meetingUrl={meetingResult.teamsUrl}
+              subject="Mobility Vendor Pulse — Internal Alignment Meeting"
+              body={ALIGNMENT_BODY_HTML}
+            />
+          )}
+          </>
         ) : (
           /* Delegated Graph scheduling: find free slots across internal calendars,
              rank them, then create the Teams meeting + invites as the coordinator. */

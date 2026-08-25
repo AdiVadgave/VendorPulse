@@ -8,6 +8,7 @@
 import { useState } from 'react'
 import { CalendarSearch, Loader2, AlertCircle } from 'lucide-react'
 import { findMeetingSlots, isSchedulingAvailable } from '@/lib/graphScheduling'
+import { useCurrentUser } from '@/lib/auth/currentUser'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 
 interface Props {
@@ -42,8 +43,21 @@ export default function FindSlotsControl({
   const [toDate, setToDate] = useState(defaultToDate ?? maxToDate ?? isoDate(14))
   const [duration, setDuration] = useState<number>(defaultDuration)
 
-  const shellCount = attendees.filter((a) => (a.email || '').toLowerCase().endsWith('@shell.com')).length
-  const externalCount = attendees.length - shellCount
+  // The signed-in coordinator is always the meeting ORGANISER — findMeetingTimes
+  // treats the organiser as a hard constraint and reports their free/busy separately
+  // (never in attendeeAvailability). If they've also added themselves to the attendee
+  // list, including them here would inflate the denominator (e.g. show 2/3 free
+  // instead of 2/2). Drop self from the availability search — unless they are the only
+  // attendee, in which case keep the list so the search still runs.
+  const currentUser = useCurrentUser()
+  const selfEmail = currentUser.authenticated ? currentUser.subtitle.trim().toLowerCase() : ''
+  const withoutSelf = selfEmail
+    ? attendees.filter((a) => (a.email || '').trim().toLowerCase() !== selfEmail)
+    : attendees
+  const searchAttendees = withoutSelf.length > 0 ? withoutSelf : attendees
+
+  const shellCount = searchAttendees.filter((a) => (a.email || '').toLowerCase().endsWith('@shell.com')).length
+  const externalCount = searchAttendees.length - shellCount
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -71,7 +85,7 @@ export default function FindSlotsControl({
     }
     setLoading(true)
     try {
-      const slots = await findMeetingSlots(cycleId, attendees, fromDate, toDate, duration)
+      const slots = await findMeetingSlots(cycleId, searchAttendees, fromDate, toDate, duration)
       onSlotsFound(slots)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to find slots.')

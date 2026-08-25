@@ -17,6 +17,8 @@ interface Props {
   subject: string
   /** Default invite HTML body (editable in the review dialog). */
   body: string
+  /** Fired after a successful invite so the parent can mark the roster as invited. */
+  onSent?: () => void
 }
 
 /**
@@ -26,7 +28,7 @@ interface Props {
  * the Graph event id) and PATCHes the attendee list so new invitees receive the
  * Outlook/Teams invite. Delegated Calendars.ReadWrite, as the signed-in coordinator.
  */
-export default function SendAddedInvitePanel({ attendees, meetingUrl, subject, body }: Props) {
+export default function SendAddedInvitePanel({ attendees, meetingUrl, subject, body, onSent }: Props) {
   const [status, setStatus] = useState<'idle' | 'working' | 'done' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [draftOpen, setDraftOpen] = useState(false)
@@ -60,6 +62,7 @@ export default function SendAddedInvitePanel({ attendees, meetingUrl, subject, b
       })
       setStatus('done')
       setDraftOpen(false)
+      onSent?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to invite the added attendees.')
       setStatus('error')

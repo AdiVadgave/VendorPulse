@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   CalendarPlus, Users, ExternalLink, CheckCircle2, RotateCcw, Building2, Link2Off, UserPlus, X, CalendarCheck, Trash2,
 } from 'lucide-react'
 import {
   scheduleVendorPrepMeetingManual, getVendorPrepMeeting,
-  getVendorPrepAttendees, addVendorPrepAttendee, removeVendorPrepAttendee,
+  getVendorPrepAttendees, addVendorPrepAttendee, removeVendorPrepAttendee, resetVendorPrepAttendees,
 } from '@/lib/vendorPrepApi'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import SendAddedInvitePanel from '@/components/modules/scheduling/SendAddedInvitePanel'
@@ -70,23 +70,25 @@ export default function VendorPrepMeetingPanel({
   const [rescheduling, setRescheduling] = useState(false)
   const [addingInvitee, setAddingInvitee] = useState(false)
   const [removeLoading, setRemoveLoading] = useState<string | null>(null)
+  // Snapshot of emails already on the Teams invite (captured at schedule time). null =
+  // not captured. Anyone in the roster but not here was added after scheduling — only
+  // then do we offer "Send invite to added attendees".
+  const [invitedBaseline, setInvitedBaseline] = useState<Set<string> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [persistenceChecked, setPersistenceChecked] = useState(false)
 
-  // Load cycle attendees (internal + vendor); default-select everyone.
-  useEffect(() => {
-    let cancelled = false
-    getVendorPrepAttendees(cycleId)
-      .then((res) => {
-        if (cancelled) return
-        // This vendor-prep meeting's OWN roster (separate from the cycle attendees).
-        const active = res.attendees.filter((a) => a.confirmation_status !== 'DECLINED')
-        setAttendees(active)
-        setSelected(new Set(active.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
-      })
-      .catch(() => { /* backend offline — leave empty */ })
-    return () => { cancelled = true }
+  // Load this vendor-prep meeting's OWN roster (separate from the cycle attendees);
+  // default-tick everyone.
+  const loadAttendees = useCallback(async () => {
+    try {
+      const res = await getVendorPrepAttendees(cycleId)
+      const active = res.attendees.filter((a) => a.confirmation_status !== 'DECLINED')
+      setAttendees(active)
+      setSelected(new Set(active.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
+    } catch { /* backend offline — leave empty */ }
   }, [cycleId])
+
+  useEffect(() => { loadAttendees() }, [loadAttendees])
 
   // Recover an already-scheduled meeting on mount (state persistence).
   useEffect(() => {
@@ -122,6 +124,20 @@ export default function VendorPrepMeetingPanel({
       .catch(() => { /* backend offline / never parsed */ })
     return () => { cancelled = true }
   }, [cycleId, meetingId])
+
+  // Once a meeting is scheduled and the roster has loaded, snapshot the current
+  // invitees as the baseline. Anyone added afterward is a "pending" invitee.
+  useEffect(() => {
+    if (invitedBaseline !== null) return
+    if (!meetingResult) return
+    if (attendees.length === 0) return
+    setInvitedBaseline(new Set(attendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
+  }, [meetingResult, attendees, invitedBaseline])
+
+  // People added to the roster AFTER the meeting was scheduled (not yet on the invite).
+  const pendingInvitees = invitedBaseline
+    ? attendees.filter((a) => a.email && !invitedBaseline.has((a.email || '').toLowerCase()))
+    : []
 
   const selectedEmails = attendees
     .map((a) => (a.email || '').toLowerCase())
@@ -245,7 +261,18 @@ export default function VendorPrepMeetingPanel({
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => setRescheduling(true)}
+                  onClick={async () => {
+                    setError(null)
+                    setRescheduling(true)
+                    // Bring the full cycle attendee list back so the coordinator can re-pick.
+                    try {
+                      await resetVendorPrepAttendees(cycleId)
+                      setInvitedBaseline(null)
+                      await loadAttendees()
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : 'Failed to reload attendees')
+                    }
+                  }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <RotateCcw size={13} /> Reschedule
@@ -312,12 +339,13 @@ export default function VendorPrepMeetingPanel({
                 )}
               </div>
 
-              {meetingResult.teamsUrl && (
+              {meetingResult.teamsUrl && pendingInvitees.length > 0 && (
                 <SendAddedInvitePanel
                   attendees={attendees}
                   meetingUrl={meetingResult.teamsUrl}
                   subject="Mobility Vendor Pulse — Vendor Prep Meeting"
                   body={VENDOR_PREP_BODY_HTML}
+                  onSent={() => setInvitedBaseline(new Set(attendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))}
                 />
               )}
             </div>
@@ -407,11 +435,23 @@ export default function VendorPrepMeetingPanel({
                   const res = await scheduleVendorPrepMeetingManual(cycleId, {
                     startTime, durationMinutes, timeZone, attendeeEmails: selectedEmails, meetingUrl: teamsUrl,
                   })
+                  // Drop anyone left unticked from this meeting's roster so only the
+                  // invited people remain (persists). Re-add later via "Add invitee".
+                  const unticked = attendees.filter(
+                    (a) => !(a.email && selected.has((a.email || '').toLowerCase()))
+                  )
+                  for (const u of unticked) {
+                    try { await removeVendorPrepAttendee(cycleId, u.attendee_id) } catch { /* best effort */ }
+                  }
+                  // The invited set is now the baseline — only people added AFTER this
+                  // surface the "Send invite to added attendees" button.
+                  setInvitedBaseline(new Set(selectedAttendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
                   setMeetingResult({
                     teamsUrl: res.teams_meeting_url, webLink: res.web_link, attendeeCount: res.attendee_count,
                     startISO: startTime, timeZone, durationMinutes,
                   })
                   setRescheduling(false)
+                  await loadAttendees()
                 }}
               />
             </>

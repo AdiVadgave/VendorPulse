@@ -219,3 +219,15 @@ export async function removeVendorPrepAttendee(
     }
   )
 }
+
+/** Reset this vendor-prep meeting's roster back to the cycle attendees (internal +
+ *  vendor) — used on reschedule so the full attendee list is available to re-pick. */
+export async function resetVendorPrepAttendees(
+  cycleId: string,
+  meetingIndex = 1
+): Promise<{ attendees: CycleAttendee[]; count: number }> {
+  return apiFetch<{ attendees: CycleAttendee[]; count: number }>(
+    `/api/cycles/${cycleId}/vendor-prep/attendees/reset`,
+    { method: 'POST', params: { index: String(meetingIndex) } }
+  )
+}

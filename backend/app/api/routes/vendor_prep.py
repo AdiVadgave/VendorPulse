@@ -37,6 +37,7 @@ from app.services.meeting_attendee_service import (
     add_meeting_attendee,
     list_meeting_attendees,
     remove_meeting_attendee,
+    reset_meeting_attendees,
 )
 
 logger = logging.getLogger(__name__)
@@ -301,6 +302,24 @@ def remove_vendor_prep_attendee(
         raise HTTPException(status_code=404, detail="Attendee not found in this vendor prep meeting")
     logger.info("VENDOR-PREP: removed attendee %s from meeting %s of cycle %s", sanitize_for_log(payload.attendee_id), sanitize_for_log(str(index)), sanitize_for_log(cycleId))
     return {"message": "Removed from vendor prep meeting", "attendee_id": payload.attendee_id}
+
+
+@router.post("/attendees/reset")
+def reset_vendor_prep_attendees(
+    cycleId: str,
+    index: int = 1,
+    attendee_repo=Depends(get_attendee_repo),
+    ma_repo=Depends(get_meeting_attendee_repo),
+    seed_repo=Depends(get_meeting_attendee_seed_repo),
+):
+    """Reset THIS vendor-prep meeting's roster back to the cycle attendees (internal
+    + vendor) — used on reschedule so the full QBR attendee list is available to
+    re-pick. Never touches the cycle's master attendee list."""
+    attendees = reset_meeting_attendees(
+        ma_repo, seed_repo, attendee_repo, cycleId, "vendor_prep", index, include_vendors=True
+    )
+    logger.info("VENDOR-PREP: reset roster for meeting %s of cycle %s", sanitize_for_log(str(index)), sanitize_for_log(cycleId))
+    return {"attendees": attendees, "count": len(attendees)}
 
 
 class VPManualScheduleRequest(BaseModel):

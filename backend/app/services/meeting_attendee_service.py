@@ -112,3 +112,19 @@ def remove_meeting_attendee(ma_repo, cycle_id: str, kind: str, index: int, row_i
         return False
     ma_repo.delete_by_id("row_id", row_id)
     return True
+
+
+def reset_meeting_attendees(
+    ma_repo, seed_repo, attendee_repo,
+    cycle_id: str, kind: str, index: int, include_vendors: bool,
+) -> list[dict]:
+    """Wipe this meeting's roster and re-seed it from the cycle's master attendee
+    list. Used on reschedule so the coordinator gets the full QBR attendee list
+    back to re-pick who attends. Only this (cycle, kind, index) roster is cleared;
+    the cycle attendees are never touched."""
+    for row in ma_repo.get_for_meeting(cycle_id, kind, index):
+        ma_repo.delete_by_id("row_id", row["row_id"])
+    seed_repo.delete_by_id("seed_id", _seed_id(cycle_id, kind, index))
+    return list_meeting_attendees(
+        ma_repo, seed_repo, attendee_repo, cycle_id, kind, index, include_vendors
+    )

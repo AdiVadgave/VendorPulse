@@ -213,3 +213,15 @@ export async function removeAlignmentAttendee(
     }
   )
 }
+
+/** Reset this alignment meeting's roster back to the cycle's internal stakeholders
+ *  (used on reschedule so the full attendee list is available to re-pick). */
+export async function resetAlignmentAttendees(
+  cycleId: string,
+  meetingIndex = 1
+): Promise<AlignmentAttendeesResponse> {
+  return apiFetch<AlignmentAttendeesResponse>(
+    `/api/cycles/${cycleId}/alignment/attendees/reset`,
+    { method: 'POST', params: { index: String(meetingIndex) } }
+  )
+}

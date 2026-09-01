@@ -21,6 +21,10 @@ interface Props {
   /** True when this meeting already contributed action items (persisted queue) — so
    *  the transcript panel doesn't re-prompt for an upload that already happened. */
   alreadyExtracted?: boolean
+  /** Fired when this alignment meeting is scheduled (or recovered as scheduled) — the
+   *  parent advances the workflow so Vendor Prep unlocks without waiting for the
+   *  transcript to be parsed. Idempotent (the store advance is forward-only). */
+  onScheduled?: () => void
 }
 
 /**
@@ -29,7 +33,7 @@ interface Props {
  * section — not here. Each instance is scoped by its 1-based index so a cycle can
  * run several independent alignment meetings.
  */
-export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quarter, year, onActionsExtracted, alreadyExtracted, qbrMeetingDate }: Props) {
+export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quarter, year, onActionsExtracted, alreadyExtracted, qbrMeetingDate, onScheduled }: Props) {
   const [meetingResult, setMeetingResult] = useState<AlignmentMeetingResult | null>(null)
   // Parsed transcript notes + any previously-generated MoM for THIS alignment meeting.
   const meetingId = `align-${cycleId}-${index}`
@@ -70,7 +74,7 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
         cycleId={cycleId}
         meetingIndex={index}
         meetingResult={meetingResult}
-        onMeetingScheduled={setMeetingResult}
+        onMeetingScheduled={(result) => { setMeetingResult(result); onScheduled?.() }}
         qbrMeetingDate={qbrMeetingDate}
       />
       <TranscriptInput

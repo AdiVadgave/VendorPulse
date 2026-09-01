@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import {
   CalendarPlus, Users, ExternalLink, CheckCircle2, RotateCcw, Building2, Link2Off, UserPlus, X, CalendarCheck, Trash2,
 } from 'lucide-react'
@@ -35,6 +35,9 @@ interface Props {
   alreadyExtracted?: boolean
   /** Final QBR date — vendor-prep slots end the day before it. */
   qbrMeetingDate?: string | null
+  /** The vendor-pushback section — rendered here once the transcript is parsed, i.e.
+   *  after the prep meeting (when the vendor's actual objections are known). */
+  pushbackSlot?: ReactNode
 }
 
 interface MeetingResult {
@@ -57,7 +60,7 @@ interface MeetingResult {
  * is manual (no Microsoft Graph / calendar access required).
  */
 export default function VendorPrepMeetingPanel({
-  cycleId, vendorName, quarter, year, onActionsExtracted, alreadyExtracted, qbrMeetingDate,
+  cycleId, vendorName, quarter, year, onActionsExtracted, alreadyExtracted, qbrMeetingDate, pushbackSlot,
 }: Props) {
   const [attendees, setAttendees] = useState<CycleAttendee[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -470,6 +473,9 @@ export default function VendorPrepMeetingPanel({
         onParsed={handleParsed}
         alreadyExtracted={alreadyExtracted}
       />
+      {/* Vendor pushback — only after the transcript is parsed (the vendor's actual
+          objections are known), and above the minutes so they feed the MoM/QBR. */}
+      {(parsedNotes.length > 0 || savedMinutes) && pushbackSlot}
       {(parsedNotes.length > 0 || savedMinutes) && (
         <MeetingMinutesViewer
           cycleId={cycleId}

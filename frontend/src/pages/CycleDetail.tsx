@@ -727,6 +727,10 @@ export default function CycleDetail() {
               // Module C: advance to INTERNAL_ALIGNMENT when actions are extracted
               advanceWorkflow(cycle!.cycle_id, 'INTERNAL_ALIGNMENT')
             }}
+            // Unlock Vendor Prep as soon as the alignment meeting is scheduled — the
+            // coordinator can line up the vendor-prep call in parallel, without waiting
+            // for the alignment transcript to be parsed.
+            onAlignmentScheduled={() => advanceWorkflow(cycle!.cycle_id, 'INTERNAL_ALIGNMENT')}
           />
         )}
 
@@ -1389,7 +1393,7 @@ function ScorecardTab({
 
 /* ── Alignment Tab ────────────────────────────────────────── */
 function AlignmentTab({
-  cycleId, cycle, actions, onActionsExtracted, compiledScores, compiledScorecard,
+  cycleId, cycle, actions, onActionsExtracted, compiledScores, compiledScorecard, onAlignmentScheduled,
 }: {
   cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
@@ -1397,6 +1401,8 @@ function AlignmentTab({
   onActionsExtracted: (a: ExtractedAction[], origin?: string) => void
   compiledScores: CompiledCategoryScore[] | null
   compiledScorecard?: CompiledScorecard | null
+  /** Called when any alignment meeting is scheduled — unlocks Vendor Prep early. */
+  onAlignmentScheduled: () => void
 }) {
   // Alignment meetings — a cycle can run several. Start with one; the VMO can add
   // more (with a confirm step) and delete any added by mistake. `indices` holds the
@@ -1613,6 +1619,7 @@ function AlignmentTab({
               qbrMeetingDate={cycle.teams_meeting_scheduled_at ?? null}
               onActionsExtracted={(acts) => onActionsExtracted(acts, ACTION_ORIGIN.alignmentMeeting(indices.indexOf(n) + 1))}
               alreadyExtracted={actions.some((a) => a.origin === ACTION_ORIGIN.alignmentMeeting(indices.indexOf(n) + 1))}
+              onScheduled={onAlignmentScheduled}
             />
           </div>
         ))}
@@ -1644,17 +1651,12 @@ function VendorPrepTab({
   onActionsExtracted: (a: ExtractedAction[]) => void
   alreadyExtracted: boolean
 }) {
-  return (
-    <div className="max-w-5xl mx-auto space-y-5">
-      <VendorBriefPanel
-        cycleId={cycleId}
-        vendorName={cycle.vendor_name}
-        quarter={cycle.quarter}
-        year={cycle.year}
-        brief={vendorBrief}
-        onBriefGenerated={onBriefGenerated}
-        onBriefReady={onBriefReady}
-      />
+  // The pushback section (log the vendor's objections + AI responses + tracker) now
+  // lives AFTER the vendor-prep meeting — it surfaces once the meeting transcript is
+  // parsed (rendered inside VendorPrepMeetingPanel), because that's when the vendor's
+  // actual objections are known. Its state/handlers still live here in CycleDetail.
+  const pushbackSection = (
+    <>
       <PushbackInput onAdd={onPushbackAdd} />
       <PushbackResponseCards
         cycleId={cycleId}
@@ -1670,6 +1672,20 @@ function VendorPrepTab({
         onEditResponses={onEditResponses}
         onDelete={onPushbackDelete}
       />
+    </>
+  )
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-5">
+      <VendorBriefPanel
+        cycleId={cycleId}
+        vendorName={cycle.vendor_name}
+        quarter={cycle.quarter}
+        year={cycle.year}
+        brief={vendorBrief}
+        onBriefGenerated={onBriefGenerated}
+        onBriefReady={onBriefReady}
+      />
       <FaceOffModelEditor positions={MOCK_FACE_OFF} />
       <VendorPrepMeetingPanel
         cycleId={cycleId}
@@ -1679,6 +1695,7 @@ function VendorPrepTab({
         qbrMeetingDate={cycle.teams_meeting_scheduled_at ?? null}
         onActionsExtracted={onActionsExtracted}
         alreadyExtracted={alreadyExtracted}
+        pushbackSlot={pushbackSection}
       />
     </div>
   )

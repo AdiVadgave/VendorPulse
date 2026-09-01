@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.config import Settings, settings
@@ -269,7 +269,7 @@ def get_vendor_prep_attendees(
 def add_vendor_prep_attendee(
     cycleId: str,
     payload: VPAddAttendeeRequest,
-    index: int = 1,
+    index: int = Query(1, ge=1),
     ma_repo=Depends(get_meeting_attendee_repo),
     seed_repo=Depends(get_meeting_attendee_seed_repo),
 ):
@@ -291,7 +291,7 @@ def add_vendor_prep_attendee(
 def remove_vendor_prep_attendee(
     cycleId: str,
     payload: VPRemoveAttendeeRequest,
-    index: int = 1,
+    index: int = Query(1, ge=1),
     ma_repo=Depends(get_meeting_attendee_repo),
 ):
     """Remove an attendee from THIS vendor-prep meeting's roster only."""
@@ -307,7 +307,7 @@ def remove_vendor_prep_attendee(
 @router.post("/attendees/reset")
 def reset_vendor_prep_attendees(
     cycleId: str,
-    index: int = 1,
+    index: int = Query(1, ge=1),
     attendee_repo=Depends(get_attendee_repo),
     ma_repo=Depends(get_meeting_attendee_repo),
     seed_repo=Depends(get_meeting_attendee_seed_repo),

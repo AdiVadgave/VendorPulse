@@ -40,6 +40,8 @@ _CRLF = str.maketrans({"\r": "\\r", "\n": "\\n"})
 
 def sanitize_for_log(value):
     """Sanitize untrusted values before interpolating into log fields."""
+    if value is None:
+        return ""
     if isinstance(value, str):
         return value.translate(_CRLF)
     if isinstance(value, tuple):
@@ -49,8 +51,8 @@ def sanitize_for_log(value):
     if isinstance(value, set):
         return {sanitize_for_log(v) for v in value}
     if isinstance(value, dict):
-        return {k: sanitize_for_log(v) for k, v in value.items()}
-    return value
+        return {sanitize_for_log(k): sanitize_for_log(v) for k, v in value.items()}
+    return str(value).translate(_CRLF)
 
 
 class _LogSanitizer(logging.Filter):
@@ -64,6 +66,21 @@ class _LogSanitizer(logging.Filter):
         elif isinstance(record.args, dict):
             record.args = sanitize_for_log(record.args)
         return True
+
+
+class _SanitizingFormatter(logging.Formatter):
+    """Sanitize the final rendered log message to prevent log forging."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        original_msg = record.msg
+        original_args = record.args
+        try:
+            record.msg = sanitize_for_log(record.getMessage())
+            record.args = ()
+            return super().format(record)
+        finally:
+            record.msg = original_msg
+            record.args = original_args
 
 
 def setup_logging(level: str = "INFO") -> None:
@@ -85,12 +102,12 @@ def setup_logging(level: str = "INFO") -> None:
         encoding="utf-8",
     )
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(logging.Formatter(FILE_FORMAT, datefmt=DATE_FORMAT))
+    file_handler.setFormatter(_SanitizingFormatter(FILE_FORMAT, datefmt=DATE_FORMAT))
 
     # ── Console handler (concise) ─────────────────────────────────────
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(getattr(logging, level.upper(), logging.INFO))
-    console_handler.setFormatter(logging.Formatter(CONSOLE_FORMAT, datefmt=DATE_FORMAT))
+    console_handler.setFormatter(_SanitizingFormatter(CONSOLE_FORMAT, datefmt=DATE_FORMAT))
 
     # Strip CR/LF from every record (log-injection defense) on both handlers.
     _sanitizer = _LogSanitizer()

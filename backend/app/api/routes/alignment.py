@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.config import Settings, settings
@@ -368,7 +368,7 @@ def delete_alignment_meeting(
 @router.get("/attendees")
 def get_alignment_attendees(
     cycleId: str,
-    index: int = 1,
+    index: int = Query(1, ge=1),
     attendee_repo=Depends(get_attendee_repo),
     ma_repo=Depends(get_meeting_attendee_repo),
     seed_repo=Depends(get_meeting_attendee_seed_repo),
@@ -406,7 +406,7 @@ class RemoveAttendeeRequest(BaseModel):
 def add_alignment_attendee(
     cycleId: str,
     payload: AddAttendeeRequest,
-    index: int = 1,
+    index: int = Query(1, ge=1),
     ma_repo=Depends(get_meeting_attendee_repo),
     seed_repo=Depends(get_meeting_attendee_seed_repo),
 ):
@@ -421,7 +421,10 @@ def add_alignment_attendee(
         "lt_status": payload.lt_status, "shell_department": payload.shell_department,
         "user_id": payload.user_id, "stakeholder_id": payload.stakeholder_id,
     })
-    logger.info("ALIGNMENT: added attendee %s to meeting %s of cycle %s", sanitize_for_log(payload.name), sanitize_for_log(str(index)), sanitize_for_log(cycleId))
+    safe_name = str(payload.name).replace("\r", "\\r").replace("\n", "\\n")
+    safe_index = str(index).replace("\r", "\\r").replace("\n", "\\n")
+    safe_cycle_id = str(cycleId).replace("\r", "\\r").replace("\n", "\\n")
+    logger.info("ALIGNMENT: added attendee %s to meeting %s of cycle %s", safe_name, safe_index, safe_cycle_id)
     return {"attendee": created, "message": f"Added {payload.name} to alignment meeting"}
 
 
@@ -429,7 +432,7 @@ def add_alignment_attendee(
 def remove_alignment_attendee(
     cycleId: str,
     payload: RemoveAttendeeRequest,
-    index: int = 1,
+    index: int = Query(1, ge=1),
     ma_repo=Depends(get_meeting_attendee_repo),
 ):
     """Remove an attendee from THIS alignment meeting's roster only. Never touches
@@ -439,7 +442,8 @@ def remove_alignment_attendee(
     ok = remove_meeting_attendee(ma_repo, cycleId, "alignment", index, payload.attendee_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Attendee not found in this alignment meeting")
-    logger.info("ALIGNMENT: removed attendee %s from meeting %s of cycle %s", sanitize_for_log(payload.attendee_id), sanitize_for_log(str(index)), sanitize_for_log(cycleId))
+    safe_attendee_id = str(payload.attendee_id).replace("\r", "\\r").replace("\n", "\\n")
+    logger.info("ALIGNMENT: removed attendee %s from meeting %s of cycle %s", safe_attendee_id, sanitize_for_log(str(index)), sanitize_for_log(cycleId))
     return {"message": "Removed from alignment meeting", "attendee_id": payload.attendee_id}
 
 

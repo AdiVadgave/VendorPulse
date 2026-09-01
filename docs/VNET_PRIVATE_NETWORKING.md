@@ -568,7 +568,7 @@ az webapp deploy -g AZ-AS-RGP-EX-N-SEQ02296-NVM-DEV -n AZ-AS-N-Mobility-VendorPu
 
 # Backend (unchanged, but use config-zip for reliable builds)
 cd VendorPulse-code/backend
-tar -a -c -f backend.zip --exclude=./.venv --exclude=./__pycache__ --exclude=./data --exclude=./logs -C . .
+tar -a -c -f backend.zip --exclude=./.venv --exclude=./__pycache__ --exclude=./data --exclude=./logs --exclude=./.env -C . .
 az webapp deployment source config-zip -g AZ-AS-RGP-EX-N-SEQ02296-NVM-DEV -n AZ-AS-N-Mobility-VendorPulse-API --src backend.zip
 ```
 

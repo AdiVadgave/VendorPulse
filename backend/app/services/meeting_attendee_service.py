@@ -108,7 +108,12 @@ def add_meeting_attendee(ma_repo, seed_repo, cycle_id: str, kind: str, index: in
 def remove_meeting_attendee(ma_repo, cycle_id: str, kind: str, index: int, row_id: str) -> bool:
     """Remove one attendee from a meeting's roster by row_id (scoped to the meeting)."""
     row = ma_repo.find_by_id("row_id", row_id)
-    if not row or row.get("cycle_id") != cycle_id or row.get("meeting_kind") != kind:
+    if (
+        not row
+        or row.get("cycle_id") != cycle_id
+        or row.get("meeting_kind") != kind
+        or int(row.get("meeting_index") or 0) != int(index)
+    ):
         return False
     ma_repo.delete_by_id("row_id", row_id)
     return True

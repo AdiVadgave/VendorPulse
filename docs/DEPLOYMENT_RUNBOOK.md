@@ -230,7 +230,7 @@ This serves the static files; `--spa` makes client-side routes (like `/cycles/12
 ```
 cd "C:\Users\Anup.Kesarwani\OneDrive - Shell\Desktop\VendorPulse\VendorPulse-code\backend"
 Remove-Item backend.zip -Force -ErrorAction SilentlyContinue
-tar -a -c -f backend.zip --exclude=./.venv --exclude=./__pycache__ --exclude=./data --exclude=./logs -C . .
+tar -a -c -f backend.zip --exclude=./.venv --exclude=./__pycache__ --exclude=./data --exclude=./logs --exclude=./.env -C . .
 az webapp deploy -g AZ-AS-RGP-EX-N-SEQ02296-NVM-DEV -n AZ-AS-N-Mobility-VendorPulse-API --src-path backend.zip --type zip
 ```
 Then check `…/api/health`.
@@ -468,7 +468,7 @@ Items that are **not yet completed** — track these to close out the deployment
 |---|--------|-----|--------|
 | 4 | **Delete old workflow template files** from `main` branch. These are leftover template YAML files in `.github/workflows/` that Apiiro flagged as pipeline misconfiguration. Delete via GitHub UI (edit branch → delete files → commit). | Anup | ⏳ Pending |
 | 5 | **Inactive admin permissions** — review and remove inactive admin users from the GitHub repo. Needs confirmation from Jaydev on who to remove. | Jaydev / Anup | ⏳ Needs confirmation |
-| 6 | **Rotate PostgreSQL password** — the current password (`Mobility@12345`) is weak and was briefly exposed in git history. Reset it on the PostgreSQL server and update the Key Vault secret `VENDORPULSE-PG-PASSWORD`. Also update the local `.env` for dev. | Anup | ⏳ Recommended |
+| 6 | **Rotate PostgreSQL password** — the current password is weak and was briefly exposed in git history. Reset it on the PostgreSQL server and update the Key Vault secret `VENDORPULSE-PG-PASSWORD`. Also update the local `.env` for dev. | Anup | ⏳ Recommended |
 
 ### Deployment reliability
 | # | Action | Who | Status |

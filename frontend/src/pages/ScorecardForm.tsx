@@ -267,6 +267,11 @@ export default function ScorecardForm() {
             </ul>
           </div>
 
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <p>Do not include personal information in comments. Names and other personal data are automatically removed before storage and shown as placeholders, for example <span className="font-semibold">[PERSON NAME]</span>.</p>
+          </div>
+
           {/* Read-only reviewer identity */}
           {respondent && (
             <div className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">

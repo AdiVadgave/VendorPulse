@@ -49,6 +49,12 @@ from app.services.mail_provider import get_mail_provider, MailSendError
 from app.services import reminder_service
 from app.models.scheduling import ScorecardConfigUpdate
 from app.utils.prompts import SCORECARD_COMMENT_SUMMARY_SYSTEM_PROMPT
+from app.utils.pii_redaction import (
+    CommentRedactionError,
+    redact_scorecard_comments,
+    redact_scorecard_comments_with_ai,
+)
+from app.utils.scorecard_recipients import is_scorecard_recipient
 from app.utils.scorecard_structure import (
     SCORECARD_CATALOG,
     WEIGHTED_SCORECARD_STRUCTURE,
@@ -296,6 +302,30 @@ def submit_scorecard(payload: ScorecardSubmission):
             detail="A scorecard has already been submitted for this reviewer in this cycle.",
         )
 
+    attendee_repo = get_attendee_repo()
+    known_names = {
+        attendee.get("name", "")
+        for attendee in attendee_repo.get_for_cycle(payload.cycle_id)
+        if attendee.get("name")
+    }
+    known_names.update(
+        user.get("name", "")
+        for user in get_user_repo().find_all()
+        if user.get("name")
+    )
+    try:
+        ai_redacted_comments = redact_scorecard_comments_with_ai(
+            payload.comments,
+            get_llm_service(),
+        )
+    except (CommentRedactionError, RuntimeError) as exc:
+        logger.error("scorecard submit blocked because AI comment redaction failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="Scorecard comments could not be redacted. No submission was saved; please try again.",
+        ) from exc
+    redacted_comments = redact_scorecard_comments(ai_redacted_comments, known_names)
+
     # Snapshot identity from the attendee record (authoritative — never trust the client).
     record = {
         "submission_id": f"sub_{uuid.uuid4().hex}",
@@ -306,7 +336,7 @@ def submit_scorecard(payload: ScorecardSubmission):
         "team": att.get("shell_department") or att.get("name", ""),
         "scores": payload.scores,
         "rag_scores": payload.rag_scores,
-        "comments": payload.comments,
+        "comments": redacted_comments,
         "skipped_measures": payload.skipped_measures,
         "skipped_themes": payload.skipped_themes,
         "submitted_at": now,
@@ -341,10 +371,7 @@ def get_team_submissions(cycle_id: str):
     """Tracker of key internal-stakeholder teams and whether each has submitted."""
     attendee_repo = get_attendee_repo()
     attendees = [a for a in attendee_repo.find_all() if a.get("cycle_id") == cycle_id]
-    key_internal = [
-        a for a in attendees
-        if a.get("is_key") and a.get("type") != "Vendor"
-    ]
+    key_internal = [a for a in attendees if is_scorecard_recipient(a)]
 
     submissions = _submissions_repo().get_for_cycle(cycle_id)
     # Submissions are keyed by the stable attendee_id — no fragile email matching.
@@ -1122,6 +1149,17 @@ def dispatch_inapp(payload: InAppDispatchRequest):
     cycle = cycle_repo.get_by_cycle_id(payload.cycle_id)
     if cycle is None:
         raise HTTPException(status_code=404, detail=f"Cycle '{payload.cycle_id}' not found")
+
+    declined = []
+    for recipient in payload.recipients:
+        attendee = _get_cycle_attendee(payload.cycle_id, recipient.attendee_id)
+        if attendee and attendee.get("confirmation_status") == "DECLINED":
+            declined.append(recipient.attendee_id)
+    if declined:
+        raise HTTPException(
+            status_code=400,
+            detail="Scorecard requests cannot be sent to attendees who declined attendance.",
+        )
 
     # An edited body MUST keep the {{link}} token, otherwise recipients get an email
     # with no way to reach their scorecard (and the cycle would still lock as dispatched).

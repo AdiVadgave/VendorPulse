@@ -175,7 +175,10 @@ export async function sendMeetingMinutes(
   minutes: MeetingMinutes,
   vendorName: string,
   quarter: string,
-  year: number
+  year: number,
+  /** Which meeting these minutes belong to, so the email goes to that meeting's own
+   *  edited roster ("align-…"/"vprep-…"); omit/undefined for the QBR (cycle list). */
+  meetingId?: string
 ): Promise<SendMinutesResult> {
   return apiFetch<SendMinutesResult>(
     `/api/cycles/${cycleId}/meeting/minutes/send`,
@@ -184,6 +187,7 @@ export async function sendMeetingMinutes(
       body: JSON.stringify({
         run_id: runId,
         minutes: { ...minutes, vendor_name: vendorName, quarter, year },
+        meeting_id: meetingId,
       }),
     }
   )

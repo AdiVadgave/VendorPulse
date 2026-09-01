@@ -16,7 +16,7 @@ import logging
 import re
 import zipfile
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 from xml.sax.saxutils import unescape
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,11 +28,14 @@ from app.dependencies import (
     get_attendee_repo,
     get_meeting_agent,
     get_meeting_artifact_repo,
+    get_meeting_attendee_repo,
+    get_meeting_attendee_seed_repo,
 )
 from app.models.common import AgentResponse
 from app.models.meeting_agent import GenerateMinutesRequest, ParseTranscriptRequest
 from app.services.email_templates import build_minutes_email
 from app.services.mail_provider import get_mail_provider, MailSendError
+from app.services.meeting_attendee_service import list_meeting_attendees
 
 logger = logging.getLogger(__name__)
 
@@ -316,6 +319,11 @@ def approve_minutes(cycleId: str, payload: ApproveMinutesRequest):
 class SendMinutesRequest(BaseModel):
     run_id: str
     minutes: dict[str, Any]
+    # Identifies WHICH meeting these minutes belong to, so the email goes to that
+    # meeting's own edited roster. "align-{cycleId}-{index}" / "vprep-{cycleId}" use
+    # the per-meeting roster; anything else (the QBR "mtg-{cycleId}", or null) uses
+    # the cycle's master attendee list.
+    meeting_id: Optional[str] = None
 
 
 
@@ -329,7 +337,28 @@ def send_minutes(cycleId: str, payload: SendMinutesRequest):
 
     attendee_repo = get_attendee_repo()
 
-    all_attendees = attendee_repo.get_for_cycle(cycleId)
+    # Resolve recipients from the RIGHT source. Alignment / vendor-prep minutes go to
+    # that meeting's OWN edited roster (meeting_attendees), so add/remove edits are
+    # honoured. The QBR (mtg-…) and any unknown/legacy id use the cycle master list.
+    meeting_id = (payload.meeting_id or "").strip()
+    align_prefix = f"align-{cycleId}-"
+    if meeting_id.startswith(align_prefix):
+        try:
+            idx = int(meeting_id[len(align_prefix):])
+        except ValueError:
+            idx = 1
+        all_attendees = list_meeting_attendees(
+            get_meeting_attendee_repo(), get_meeting_attendee_seed_repo(), attendee_repo,
+            cycleId, "alignment", idx, include_vendors=False,
+        )
+    elif meeting_id.startswith(f"vprep-{cycleId}"):
+        all_attendees = list_meeting_attendees(
+            get_meeting_attendee_repo(), get_meeting_attendee_seed_repo(), attendee_repo,
+            cycleId, "vendor_prep", 1, include_vendors=True,
+        )
+    else:
+        all_attendees = attendee_repo.get_for_cycle(cycleId)
+
     # Minutes go to internal stakeholders (everyone who is NOT a vendor). Treating
     # null/missing type as internal is robust to legacy data where `type` is unset.
     internal = [

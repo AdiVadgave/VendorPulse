@@ -136,7 +136,10 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
     setSendStatus('sending')
     setSendError(null)
     try {
-      const result = await sendMeetingMinutes(cycleId, runId, minutes, vendorName, quarter, year)
+      // Send to THIS meeting's own roster (alignment/vendor-prep); the QBR falls
+      // back to mtg-… which the backend maps to the cycle attendee list.
+      const meetingId = meetingIdProp ?? `mtg-${cycleId}`
+      const result = await sendMeetingMinutes(cycleId, runId, minutes, vendorName, quarter, year, meetingId)
       setSentRecipients(result.sent_to)
       setSendStatus('sent')
     } catch (e) {

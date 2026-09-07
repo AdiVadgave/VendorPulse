@@ -569,7 +569,24 @@ export default function CycleDetail() {
     }
   }
 
-  // Edit the drafted responses (content + which one is selected) from the Unresolved Item Tracker.
+  // Choose one of the generated responses — sets is_selected on that one (and clears
+  // the others) and persists. The item then moves to the "Chosen Responses" section.
+  function handleSelectResponse(pushbackId: string, responseId: string) {
+    const current = pushbackResponses[pushbackId] ?? []
+    const updated = current.map((r) => ({ ...r, is_selected: r.response_id === responseId }))
+    setPushbackResponses((prev) => ({ ...prev, [pushbackId]: updated }))
+    if (cycleId) {
+      savePushbackResponses(
+        cycleId,
+        pushbackId,
+        updated.map((r) => ({ stance: r.stance, content: r.content, is_selected: r.is_selected })),
+      )
+        .then((res) => setPushbackResponses((prev) => ({ ...prev, [pushbackId]: res.responses })))
+        .catch(() => { /* keep in-memory copy */ })
+    }
+  }
+
+  // Edit the drafted responses (content + which one is selected) from the Chosen Responses section.
   function handleEditPushbackResponses(pushbackId: string, edited: PushbackResponse[]) {
     setPushbackResponses((prev) => ({ ...prev, [pushbackId]: edited }))
     if (cycleId) {
@@ -748,6 +765,7 @@ export default function CycleDetail() {
             pushbackResponses={pushbackResponses}
             onPushbackAdd={handlePushbackAdd}
             onGenerateResponses={handleGeneratePushbackResponses}
+            onSelectResponse={handleSelectResponse}
             onEditResponses={handleEditPushbackResponses}
             onPushbackStatusChange={handlePushbackStatusChange}
             onPushbackEdit={handlePushbackEdit}
@@ -1632,7 +1650,7 @@ function AlignmentTab({
 /* ── Vendor Prep Tab ──────────────────────────────────────── */
 function VendorPrepTab({
   cycleId, cycle, vendorBrief, onBriefGenerated, onBriefReady,
-  pushbackItems, pushbackResponses, onPushbackAdd, onGenerateResponses, onEditResponses, onPushbackStatusChange,
+  pushbackItems, pushbackResponses, onPushbackAdd, onGenerateResponses, onSelectResponse, onEditResponses, onPushbackStatusChange,
   onPushbackEdit, onPushbackDelete, onActionsExtracted, alreadyExtracted,
 }: {
   cycleId: string
@@ -1644,6 +1662,7 @@ function VendorPrepTab({
   pushbackResponses: Record<string, PushbackResponse[]>
   onPushbackAdd: (item: Omit<PushbackItem, 'pushback_id' | 'cycle_id' | 'created_at'>) => void
   onGenerateResponses: (id: string, responses: PushbackResponse[]) => void
+  onSelectResponse: (id: string, responseId: string) => void
   onEditResponses: (id: string, responses: PushbackResponse[]) => void
   onPushbackStatusChange: (id: string, s: PushbackItem['status']) => void
   onPushbackEdit: (id: string, patch: Partial<Pick<PushbackItem, 'category' | 'description' | 'raised_by' | 'needs_legal_review'>>) => void
@@ -1663,6 +1682,7 @@ function VendorPrepTab({
         items={pushbackItems}
         responses={pushbackResponses}
         onGenerate={onGenerateResponses}
+        onSelectResponse={onSelectResponse}
       />
       <UnresolvedItemTracker
         items={pushbackItems}

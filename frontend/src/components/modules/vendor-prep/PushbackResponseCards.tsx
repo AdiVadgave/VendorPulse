@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { Sparkles, Check, Lock, ChevronDown, ChevronRight } from 'lucide-react'
-import type { PushbackItem, PushbackResponse, PushbackCategory } from '@/types/vendor-prep.types'
+import {
+  Sparkles, Check, Lock, ChevronDown, ChevronRight,
+  Shield, Handshake, AlertOctagon, RotateCcw,
+} from 'lucide-react'
+import type { PushbackItem, PushbackResponse } from '@/types/vendor-prep.types'
 import { PUSHBACK_CATEGORY_LABELS } from '@/types/vendor-prep.types'
 import { generatePushbackResponses } from '@/lib/vendorPrepApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
@@ -12,6 +15,14 @@ interface Props {
   items: PushbackItem[]
   responses: Record<string, PushbackResponse[]>
   onGenerate: (pushbackId: string, responses: PushbackResponse[]) => void
+  /** Choose one of the generated responses — moves the item to the "Chosen Responses" section. */
+  onSelectResponse: (pushbackId: string, responseId: string) => void
+}
+
+const STANCE_CONFIG = {
+  factual: { label: 'Factual', icon: <Shield size={11} />, dot: 'text-blue-500' },
+  neutral: { label: 'Neutral', icon: <Handshake size={11} />, dot: 'text-emerald-500' },
+  escalation: { label: 'Escalation', icon: <AlertOctagon size={11} />, dot: 'text-red-500' },
 }
 
 function PushbackCard({
@@ -19,17 +30,17 @@ function PushbackCard({
   item,
   responses,
   onGenerate,
+  onSelectResponse,
 }: {
   cycleId: string
   item: PushbackItem
   responses: PushbackResponse[]
   onGenerate: (responses: PushbackResponse[]) => void
+  onSelectResponse: (responseId: string) => void
 }) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(responses.length > 0 ? 'complete' : 'idle')
   const [error, setError] = useState<string | null>(null)
-  // Collapsed by default once handled (drafts ready or legal-locked); open when the
-  // coordinator still needs to generate drafts — so a long list stays tidy.
-  const [open, setOpen] = useState(responses.length === 0 && !item.needs_legal_review)
+  const [open, setOpen] = useState(true)
 
   async function handleGenerate() {
     setAgentStatus('running')
@@ -75,7 +86,6 @@ function PushbackCard({
             <span className="text-xs bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400 px-2 py-0.5 rounded font-medium shrink-0">
               {PUSHBACK_CATEGORY_LABELS[item.category]}
             </span>
-            {/* Collapsed: show a one-line preview inline so the card is a single row. */}
             {!open && (
               <span className="text-sm text-slate-600 dark:text-slate-400 truncate">{item.description}</span>
             )}
@@ -90,7 +100,6 @@ function PushbackCard({
             <AgentStatusBadge status={agentStatus} />
           </div>
         </div>
-        {/* Expanded: full description + who raised it. */}
         {open && (
           <>
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-1 pl-6">{item.description}</p>
@@ -99,18 +108,48 @@ function PushbackCard({
         )}
       </div>
 
-      {/* Response options — only when expanded */}
+      {/* Body — generate, then show the 3 responses inline with a "choose" action. */}
       {!open ? null : item.needs_legal_review ? (
         <div className="px-5 py-4 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           <Lock size={14} />
           AI response drafts excluded — requires legal/commercial review before Shell can respond.
         </div>
       ) : responses.length > 0 ? (
-        // Once drafted, the select/edit UI lives in the Unresolved Item Tracker — keep this compact.
-        <div className="px-5 py-4 flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
-          <Check size={14} />
-          {responses.length} response draft{responses.length === 1 ? '' : 's'} ready — review, edit &amp; select in the
-          Unresolved Item Tracker below.
+        <div className="px-5 py-4 space-y-2.5">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+            Choose the response to use
+          </p>
+          {responses.map((r) => {
+            const scfg = STANCE_CONFIG[r.stance]
+            return (
+              <div
+                key={r.response_id}
+                className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30 p-3 space-y-2"
+              >
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <span className={scfg.dot}>{scfg.icon}</span>
+                  {scfg.label}
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-wrap">{r.content}</p>
+                <button
+                  onClick={() => onSelectResponse(r.response_id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+                >
+                  <Check size={12} /> Choose this response
+                </button>
+              </div>
+            )
+          })}
+          <button
+            onClick={handleGenerate}
+            disabled={agentStatus === 'running'}
+            className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 font-medium disabled:opacity-60"
+          >
+            <RotateCcw size={12} /> {agentStatus === 'running' ? 'Regenerating…' : 'Regenerate options'}
+          </button>
+          {error && (
+            <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>
+          )}
         </div>
       ) : (
         <div className="px-5 py-4 space-y-2">
@@ -123,9 +162,7 @@ function PushbackCard({
             {agentStatus === 'running' ? 'Drafting responses...' : 'Generate 3 Response Options'}
           </button>
           {error && (
-            <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
-              {error}
-            </p>
+            <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>
           )}
         </div>
       )}
@@ -133,79 +170,29 @@ function PushbackCard({
   )
 }
 
-export default function PushbackResponseCards({ cycleId, items, responses, onGenerate }: Props) {
-  // Track which category groups are collapsed (all expanded by default).
-  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set())
-  const toggleCat = (cat: string) =>
-    setCollapsedCats((prev) => {
-      const next = new Set(prev)
-      if (next.has(cat)) next.delete(cat)
-      else next.add(cat)
-      return next
-    })
+export default function PushbackResponseCards({ cycleId, items, responses, onGenerate, onSelectResponse }: Props) {
+  // Only items that still need an AI-response decision — they live right under the
+  // "Add Vendor Disagreement" form (same section). Legal-review items (no AI drafts)
+  // and any item with a chosen response skip this and go straight to the Pushback
+  // Tracker below.
+  const pending = items.filter(
+    (i) => !i.needs_legal_review && !(responses[i.pushback_id] ?? []).some((r) => r.is_selected)
+  )
 
-  if (items.length === 0) {
-    return (
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center">
-        <p className="text-sm text-slate-400 dark:text-slate-500">
-          No pushback items yet. Use the form above to add vendor objections.
-        </p>
-      </div>
-    )
-  }
-
-  // Group by category (in the standard category order) so all "Data Dispute" items
-  // sit together, then "Process Concern", etc.
-  const order = Object.keys(PUSHBACK_CATEGORY_LABELS) as PushbackCategory[]
-  const groups = order
-    .map((cat) => ({ cat, list: items.filter((i) => i.category === cat) }))
-    .filter((g) => g.list.length > 0)
+  if (pending.length === 0) return null
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-      {/* Panel header */}
-      <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800">
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Pushback Items &amp; Response Drafts ({items.length})
-        </h3>
-      </div>
-
-      {/* One collapsible section per category */}
-      <div className="divide-y divide-slate-100 dark:divide-slate-800">
-        {groups.map((g) => {
-          const catOpen = !collapsedCats.has(g.cat)
-          return (
-            <div key={g.cat}>
-              <button
-                type="button"
-                onClick={() => toggleCat(g.cat)}
-                className="w-full flex items-center gap-2 px-5 py-3 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                {catOpen ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
-                <span className="text-xs font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wide">
-                  {PUSHBACK_CATEGORY_LABELS[g.cat]}
-                </span>
-                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full px-1.5 min-w-[18px] text-center">
-                  {g.list.length}
-                </span>
-              </button>
-              {catOpen && (
-                <div className="p-4 space-y-2 bg-slate-50/30 dark:bg-slate-800/20">
-                  {g.list.map((item) => (
-                    <PushbackCard
-                      key={item.pushback_id}
-                      cycleId={cycleId}
-                      item={item}
-                      responses={responses[item.pushback_id] ?? []}
-                      onGenerate={(generated) => onGenerate(item.pushback_id, generated)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+    <div className="space-y-2">
+      {pending.map((item) => (
+        <PushbackCard
+          key={item.pushback_id}
+          cycleId={cycleId}
+          item={item}
+          responses={responses[item.pushback_id] ?? []}
+          onGenerate={(generated) => onGenerate(item.pushback_id, generated)}
+          onSelectResponse={(responseId) => onSelectResponse(item.pushback_id, responseId)}
+        />
+      ))}
     </div>
   )
 }

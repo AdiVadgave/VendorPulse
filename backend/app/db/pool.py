@@ -34,7 +34,7 @@ def get_pool() -> ConnectionPool:
         open=True,
     )
     logger.info(
-        "PostgreSQL pool opened — host=%s db=%s (min=%d max=%d)",
+        "PostgreSQL pool opened — host=%s db=%s (min=%s max=%s)",
         settings.pg_host or "<from DATABASE_URL>",
         settings.pg_database,
         settings.pg_pool_min,

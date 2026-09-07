@@ -235,6 +235,25 @@ function ItemRow({
         </div>
       </div>
 
+      {/* The chosen response — always shown for a prepared item. */}
+      {selected && (
+        <div className="mt-2 rounded-lg border border-indigo-300 dark:border-indigo-700 bg-indigo-50/60 dark:bg-indigo-900/15 p-2.5">
+          <div className="flex items-center gap-1.5 mb-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <span className={STANCE_CONFIG[selected.stance].dot}>{STANCE_CONFIG[selected.stance].icon}</span>
+            Chosen response · {STANCE_CONFIG[selected.stance].label}
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-wrap">{selected.content}</p>
+        </div>
+      )}
+
+      {/* Legal-review items get no AI draft — flag them for offline handling. */}
+      {!selected && item.needs_legal_review && (
+        <div className="mt-2 rounded-lg border border-red-200 dark:border-red-900/40 bg-red-50/60 dark:bg-red-900/15 p-2.5 flex items-start gap-2 text-xs text-red-700 dark:text-red-400">
+          <Lock size={13} className="mt-0.5 shrink-0" />
+          Requires legal / commercial review — no AI response is drafted; handle this objection offline.
+        </div>
+      )}
+
       {/* Drafted responses (persisted) — selected one highlighted. */}
       {showResponses && responses.length > 0 && (
         <div className="mt-2 space-y-1.5 pl-1">
@@ -266,7 +285,27 @@ function ItemRow({
 }
 
 export default function UnresolvedItemTracker({ items, responses = {}, onStatusChange, onEdit, onEditResponses, onDelete }: Props) {
-  const openCount = items.filter((i) => i.status === 'OPEN' || i.status === 'ESCALATED').length
+  // Track which category groups are collapsed (all expanded by default).
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set())
+  const toggleCat = (cat: string) =>
+    setCollapsedCats((prev) => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat)
+      else next.add(cat)
+      return next
+    })
+
+  // Items that are "handled" and tracked here: any item with a chosen response, plus
+  // legal-review items (which get no AI draft and must be handled offline). Items
+  // still awaiting an AI-response decision live in the "Add Vendor Disagreement"
+  // section above. Grouped by category.
+  const tracked = items.filter(
+    (i) => i.needs_legal_review || (responses[i.pushback_id] ?? []).some((r) => r.is_selected)
+  )
+  const order = Object.keys(PUSHBACK_CATEGORY_LABELS) as PushbackCategory[]
+  const groups = order
+    .map((cat) => ({ cat, list: tracked.filter((i) => i.category === cat) }))
+    .filter((g) => g.list.length > 0)
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -274,39 +313,65 @@ export default function UnresolvedItemTracker({ items, responses = {}, onStatusC
         <div className="flex items-center gap-2">
           <AlertTriangle size={15} className="text-amber-400" />
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-            Unresolved Item Tracker
+            Pushback Tracker
           </h3>
         </div>
-        {openCount > 0 && (
-          <span className="text-xs bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 px-2 py-0.5 rounded-full font-medium">
-            {openCount} unresolved
+        {tracked.length > 0 && (
+          <span className="text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400 px-2 py-0.5 rounded-full font-medium">
+            {tracked.length} item{tracked.length === 1 ? '' : 's'}
           </span>
         )}
       </div>
 
-      {items.length === 0 ? (
+      {groups.length === 0 ? (
         <div className="px-5 py-6 text-center">
-          <p className="text-sm text-slate-400 dark:text-slate-500">No pushback items logged yet.</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500">
+            Nothing tracked yet — choose a response above (or flag an item for legal review) and it will appear here, grouped by category.
+          </p>
         </div>
       ) : (
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-          {items.map((item) => (
-            <ItemRow
-              key={item.pushback_id}
-              item={item}
-              responses={responses[item.pushback_id] ?? []}
-              onStatusChange={onStatusChange}
-              onEdit={onEdit}
-              onEditResponses={onEditResponses}
-              onDelete={onDelete}
-            />
-          ))}
+          {groups.map((g) => {
+            const catOpen = !collapsedCats.has(g.cat)
+            return (
+              <div key={g.cat}>
+                <button
+                  type="button"
+                  onClick={() => toggleCat(g.cat)}
+                  className="w-full flex items-center gap-2 px-5 py-3 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  {catOpen ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
+                  <span className="text-xs font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wide">
+                    {PUSHBACK_CATEGORY_LABELS[g.cat]}
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full px-1.5 min-w-[18px] text-center">
+                    {g.list.length}
+                  </span>
+                </button>
+                {catOpen && (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {g.list.map((item) => (
+                      <ItemRow
+                        key={item.pushback_id}
+                        item={item}
+                        responses={responses[item.pushback_id] ?? []}
+                        onStatusChange={onStatusChange}
+                        onEdit={onEdit}
+                        onEditResponses={onEditResponses}
+                        onDelete={onDelete}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
       <div className="px-5 py-2.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30">
         <p className="text-xs text-slate-400 dark:text-slate-500">
-          Unresolved items are carried forward to the EGB/QBR live meeting and stored in the issues tracker.
+          These items and their chosen responses are carried forward to the EGB/QBR live meeting and stored in the issues tracker.
         </p>
       </div>
     </div>

@@ -195,6 +195,15 @@ export default function VendorPrepMeetingPanel({
     })
   }
 
+  // Select-all / deselect-all across everyone who has an email.
+  const selectableEmails = attendees
+    .map((a) => (a.email || '').toLowerCase())
+    .filter(Boolean)
+  const allSelected = selectableEmails.length > 0 && selectableEmails.every((e) => selected.has(e))
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(selectableEmails))
+  }
+
   // A last-moment invitee added to the cycle roster — append it and auto-select
   // so it's included the next time the meeting is (re)scheduled.
   function handleInviteeAdded(attendee: CycleAttendee) {
@@ -413,6 +422,15 @@ export default function VendorPrepMeetingPanel({
                     <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                       Invitees ({selectedEmails.length}/{attendees.length})
                     </span>
+                    {selectableEmails.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={toggleAll}
+                        className="text-[11px] font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700"
+                      >
+                        {allSelected ? 'Deselect all' : 'Select all'}
+                      </button>
+                    )}
                   </div>
                   <button
                     onClick={() => setAddingInvitee((v) => !v)}

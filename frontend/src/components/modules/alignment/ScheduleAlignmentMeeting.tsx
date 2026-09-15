@@ -158,6 +158,15 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
     (a) => !!a.email && selected.has((a.email || '').toLowerCase())
   )
 
+  // Select-all / deselect-all across everyone who has an email.
+  const selectableEmails = internalAttendees
+    .map((a) => (a.email || '').toLowerCase())
+    .filter(Boolean)
+  const allSelected = selectableEmails.length > 0 && selectableEmails.every((e) => selected.has(e))
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(selectableEmails))
+  }
+
   // People added to the roster AFTER the meeting was scheduled (not yet on the invite).
   const pendingInvitees = invitedBaseline
     ? internalAttendees.filter((a) => a.email && !invitedBaseline.has((a.email || '').toLowerCase()))
@@ -191,6 +200,15 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Invitees ({selectedInternalAttendees.length}/{internalAttendees.length})
               </span>
+              {selectableEmails.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:text-violet-700"
+                >
+                  {allSelected ? 'Deselect all' : 'Select all'}
+                </button>
+              )}
             </div>
             <button
               onClick={() => setShowAddForm(!showAddForm)}

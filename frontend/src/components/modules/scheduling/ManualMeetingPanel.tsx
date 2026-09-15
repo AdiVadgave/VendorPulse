@@ -16,8 +16,7 @@ interface Props {
   /** Existing meeting join link — used to locate the event when its id isn't stored. */
   existingMeetingUrl: string | null
   vendorName: string
-  quarter: string
-  year: number
+  period: string
   onBack?: () => void
   /** Called after the meeting has been rescheduled on the calendar + persisted. */
   onScheduled: (info: {
@@ -48,8 +47,7 @@ export default function ManualMeetingPanel({
   existingEventId,
   existingMeetingUrl,
   vendorName,
-  quarter,
-  year,
+  period,
   onBack,
   onScheduled,
 }: Props) {
@@ -62,10 +60,10 @@ export default function ManualMeetingPanel({
 
   // Default subject/body for the updated invite (the coordinator can edit before sending).
   const prettyTime = startLocal ? `${startLocal.replace('T', ' ')} ${timeZone}` : ''
-  const defaultSubject = `EGB/QBR Meeting — Updated Time — ${vendorName} ${quarter} ${year}`
+  const defaultSubject = `EGB/QBR Meeting — Updated Time — ${vendorName} ${period}`
   const defaultBody =
     `<p>Dear Team,</p>` +
-    `<p>The <strong>EGB/QBR governance review</strong> for <strong>${vendorName} — ${quarter} ${year}</strong> has been rescheduled.</p>` +
+    `<p>The <strong>EGB/QBR governance review</strong> for <strong>${vendorName} — ${period}</strong> has been rescheduled.</p>` +
     (prettyTime ? `<p>🕙 <strong>New time:</strong> ${prettyTime}</p>` : '') +
     `<p>The updated invitation will appear in your calendar. Please accept or decline via Microsoft Teams.</p>` +
     `<p>— Mobility Vendor Pulse</p>`

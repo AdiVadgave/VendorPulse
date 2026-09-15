@@ -331,10 +331,8 @@ class SchedulingService:
 
         cycle = self._cycles.get_by_cycle_id(cycle_id) or {}
         vendor_name = cycle.get("vendor_name") or "Vendor"
-        quarter = cycle.get("quarter") or ""
-        year = cycle.get("year") or ""
-
-        subject = f"Attendance Confirmation — {vendor_name} {quarter} {year}".strip()
+        from app.utils.period import period_label
+        subject = f"Attendance Confirmation — {vendor_name} {period_label(cycle)}".strip()
         body = (
             "Hello,\n\n"
             "Please confirm whether you are still part of the team for the upcoming governance cycle.\n"

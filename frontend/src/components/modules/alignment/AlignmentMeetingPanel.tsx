@@ -12,8 +12,7 @@ interface Props {
   /** 1-based alignment-meeting index (a cycle can have several). */
   index: number
   vendorName: string
-  quarter: string
-  year: number
+  period: string
   /** Final QBR date — alignment slots end the day before it. */
   qbrMeetingDate?: string | null
   /** Bubble action items parsed from this meeting's transcript to the shared log. */
@@ -33,7 +32,7 @@ interface Props {
  * section — not here. Each instance is scoped by its 1-based index so a cycle can
  * run several independent alignment meetings.
  */
-export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quarter, year, onActionsExtracted, alreadyExtracted, qbrMeetingDate, onScheduled }: Props) {
+export default function AlignmentMeetingPanel({ cycleId, index, vendorName, period, onActionsExtracted, alreadyExtracted, qbrMeetingDate, onScheduled }: Props) {
   const [meetingResult, setMeetingResult] = useState<AlignmentMeetingResult | null>(null)
   // Parsed transcript notes + any previously-generated MoM for THIS alignment meeting.
   const meetingId = `align-${cycleId}-${index}`
@@ -92,8 +91,7 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
           notes={parsedNotes}
           initialMinutes={savedMinutes}
           vendorName={vendorName}
-          quarter={quarter}
-          year={year}
+          period={period}
           onApproved={() => { /* per-meeting MoM — no workflow gate */ }}
         />
       )}

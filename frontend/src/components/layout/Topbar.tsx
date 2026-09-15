@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router'
 import { useUIStore } from '@/store/useUIStore'
 import { useCurrentUser, logout } from '@/lib/auth/currentUser'
 import { useCycleStore } from '@/store/useCycleStore'
+import { formatPeriod } from '@/utils/period'
 
 function PageTitle() {
   const location = useLocation()
@@ -28,7 +29,7 @@ function PageTitle() {
     return (
       <div>
         <h1 className="text-base font-semibold text-slate-900 dark:text-white leading-tight">
-          {cycle ? `${cycle.vendor_name} — ${cycle.quarter} ${cycle.year}` : 'Cycle Workspace'}
+          {cycle ? `${cycle.vendor_name} — ${formatPeriod(cycle)}` : 'Cycle Workspace'}
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400">
           Governance Cycle

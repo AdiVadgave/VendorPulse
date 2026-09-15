@@ -21,6 +21,7 @@ import {
 import { WORKFLOW_STATE_LABELS, WORKFLOW_STATES, getDefaultTabFromState } from '@/utils/constants'
 import type { WorkflowState } from '@/utils/constants'
 import { cn } from '@/utils/cn'
+import { formatPeriod } from '@/utils/period'
 import { apiFetch } from '@/lib/api'
 import { useCycleStore } from '@/store/useCycleStore'
 import type { CycleType, GovernanceCycle } from '@/types/cycle.types'
@@ -43,7 +44,7 @@ function extractDuplicateMessage(err: unknown): string | null {
     if (parsed && typeof parsed === 'object' && parsed.code === 'DUPLICATE_CYCLE') {
       return typeof parsed.message === 'string'
         ? parsed.message
-        : 'A cycle for this vendor, quarter and year already exists. Do you still want to create it?'
+        : 'This period overlaps an existing cycle for this vendor. Do you still want to create it?'
     }
   } catch {
     // Not a JSON duplicate payload — treat as a normal error.
@@ -84,8 +85,9 @@ interface NewCycleForm {
   category: string
   description: string
   cycle_type: CycleType
-  quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4'
-  year: number
+  /** Free SPR period — FROM/TO months as "YYYY-MM". */
+  periodStart: string
+  periodEnd: string
 }
 
 function NewCycleModal({
@@ -95,7 +97,7 @@ function NewCycleModal({
   onClose: () => void
   onCreate: (cycle: GovernanceCycle) => void
 }) {
-  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().toISOString().slice(0, 7) // "YYYY-MM"
   const [vendors, setVendors] = useState<VendorRecord[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -105,17 +107,17 @@ function NewCycleModal({
     category: '',
     description: '',
     cycle_type: 'SPR',
-    quarter: 'Q1',
-    year: currentYear,
+    periodStart: currentMonth,
+    periodEnd: currentMonth,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Duplicate (same vendor+quarter+year) soft-warning prompt. Non-null => open.
+  // Duplicate (overlapping period) soft-warning prompt. Non-null => open.
   const [duplicatePrompt, setDuplicatePrompt] = useState<string | null>(null)
   const [confirmingDuplicate, setConfirmingDuplicate] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const quarterRef = useRef<HTMLSelectElement>(null)
+  const periodFromRef = useRef<HTMLInputElement>(null)
 
   // Load vendors from API on mount
   useEffect(() => {
@@ -168,7 +170,7 @@ function NewCycleModal({
   }
 
   // Single POST used both for the first attempt and the "create anyway" retry.
-  // confirmDuplicate === true tells the backend to skip its same-quarter warning.
+  // confirmDuplicate === true tells the backend to skip its overlapping-period warning.
   async function postCycle(confirmDuplicate: boolean) {
     const res = await apiFetch<{ cycle: GovernanceCycle; message: string }>('/api/cycles', {
       method: 'POST',
@@ -180,8 +182,8 @@ function NewCycleModal({
         category: form.category.trim() || 'IT Infrastructure',
         description: form.description.trim(),
         cycle_type: form.cycle_type,
-        quarter: form.quarter,
-        year: form.year,
+        period_start: form.periodStart,
+        period_end: form.periodEnd,
         confirm_duplicate: confirmDuplicate,
       }),
     })
@@ -192,6 +194,14 @@ function NewCycleModal({
     e.preventDefault()
     if (!form.vendor_name.trim()) {
       setError('Vendor name is required.')
+      return
+    }
+    if (!form.periodStart || !form.periodEnd) {
+      setError('Please choose the period (from and to months).')
+      return
+    }
+    if (form.periodEnd < form.periodStart) {
+      setError('The "to" month must be on or after the "from" month.')
       return
     }
     setIsSubmitting(true)
@@ -227,11 +237,11 @@ function NewCycleModal({
     }
   }
 
-  // "Choose a different quarter" — dismiss the prompt and return the coordinator
-  // to the form, focusing the Quarter field.
+  // "Choose a different period" — dismiss the prompt and return the coordinator
+  // to the form, focusing the "from" month field.
   function handleCancelDuplicate() {
     setDuplicatePrompt(null)
-    setTimeout(() => quarterRef.current?.focus(), 0)
+    setTimeout(() => periodFromRef.current?.focus(), 0)
   }
 
   return (
@@ -354,39 +364,43 @@ function NewCycleModal({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            {/* Quarter */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Quarter
-              </label>
-              <select
-                ref={quarterRef}
-                value={form.quarter}
-                onChange={(e) => setForm((f) => ({ ...f, quarter: e.target.value as NewCycleForm['quarter'] }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="Q1">Q1</option>
-                <option value="Q2">Q2</option>
-                <option value="Q3">Q3</option>
-                <option value="Q4">Q4</option>
-              </select>
+          {/* Period covered — free month range (FROM / TO), not tied to quarters. */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              Period covered
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">From</span>
+                <input
+                  ref={periodFromRef}
+                  type="month"
+                  value={form.periodStart}
+                  onChange={(e) => setForm((f) => {
+                    const periodStart = e.target.value
+                    // Keep TO ≥ FROM.
+                    const periodEnd = f.periodEnd && f.periodEnd < periodStart ? periodStart : f.periodEnd
+                    return { ...f, periodStart, periodEnd }
+                  })}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">To</span>
+                <input
+                  type="month"
+                  value={form.periodEnd}
+                  min={form.periodStart}
+                  onChange={(e) => setForm((f) => ({ ...f, periodEnd: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
             </div>
-
-            {/* Year */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Year
-              </label>
-              <input
-                type="number"
-                value={form.year}
-                onChange={(e) => setForm((f) => ({ ...f, year: parseInt(e.target.value, 10) || currentYear }))}
-                min={currentYear - 1}
-                max={currentYear + 3}
-                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
+            {form.periodStart && form.periodEnd && (
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Period: <span className="font-medium text-slate-700 dark:text-slate-300">{formatPeriod({ period_start: form.periodStart, period_end: form.periodEnd })}</span>
+              </p>
+            )}
           </div>
 
           {error && (
@@ -431,7 +445,7 @@ function NewCycleModal({
       tone="default"
       title="Cycle already exists"
       confirmLabel="Create anyway"
-      cancelLabel="Choose a different quarter"
+      cancelLabel="Choose a different period"
       busy={confirmingDuplicate}
       onConfirm={handleConfirmDuplicate}
       onCancel={handleCancelDuplicate}
@@ -563,7 +577,7 @@ export default function Dashboard() {
             <div className="min-w-0">
               <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm truncate">{cycle.vendor_name}</p>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                {cycle.quarter} {cycle.year} · {cycle.cycle_type ?? 'SPR'}
+                {formatPeriod(cycle)} · {cycle.cycle_type ?? 'SPR'}
               </p>
             </div>
           </div>

@@ -39,7 +39,8 @@ def portfolio_analytics():
     submissions, computes the consolidated weighted overall + per-theme scores, and
     derives the trajectory (latest vs previous overall). Only cycles with at least
     one submission are included, so vendors without data simply don't appear."""
-    from app.api.routes.scorecard_v2 import _compile_weighted, _QUARTER_NUM
+    from app.api.routes.scorecard_v2 import _compile_weighted
+    from app.utils.period import period_sort_key, period_label
 
     cycles = get_cycle_repo().find_all()
     by_vendor: dict[str, list[dict]] = defaultdict(list)
@@ -51,7 +52,7 @@ def portfolio_analytics():
     theme_seen: set[str] = set()
 
     for vid, vcycles in by_vendor.items():
-        vcycles.sort(key=lambda c: (int(c.get("year") or 0), _QUARTER_NUM.get(c.get("quarter", ""), 0)))
+        vcycles.sort(key=period_sort_key)
         points: list[dict] = []
         for c in vcycles:
             w = _compile_weighted(c["cycle_id"])
@@ -68,9 +69,11 @@ def portfolio_analytics():
                     theme_order.append(cat["label"])
             points.append({
                 "cycle_id": c["cycle_id"],
-                "label": f"{c.get('quarter', '')} {c.get('year', '')}".strip(),
+                "label": period_label(c),
                 "quarter": c.get("quarter"),
                 "year": c.get("year"),
+                "period_start": c.get("period_start"),
+                "period_end": c.get("period_end"),
                 "overall_score": w.get("overall_score"),
                 "themes": themes,
                 "team_count": w.get("submitted_count"),

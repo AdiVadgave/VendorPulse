@@ -164,8 +164,8 @@ export interface InAppDispatchRecipient {
 export async function dispatchInAppScorecard(payload: {
   cycle_id: string
   vendor_name: string
-  quarter: string
-  year: number
+  /** SPR period label (display only — the server derives it from the cycle too). */
+  period?: string
   form_base_url: string
   recipients: InAppDispatchRecipient[]
   /** True when re-sending after a mistake — reviewers get the correction notice. */

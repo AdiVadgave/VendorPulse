@@ -32,6 +32,7 @@ from app.dependencies import (
 from app.core.workflow_engine import WORKFLOW_STATES
 from app.services.email_templates import build_reminder_email, build_escalation_email
 from app.services.mail_provider import get_mail_provider, MailSendError
+from app.utils.period import period_label
 
 logger = logging.getLogger(__name__)
 
@@ -151,8 +152,7 @@ def send_tier(
     escalation to coordinators always uses its own template."""
     cycle_id = cycle.get("cycle_id")
     vendor = cycle.get("vendor_name", "")
-    quarter = cycle.get("quarter", "")
-    year = cycle.get("year")
+    period = period_label(cycle)
     deadline = get_settings(cycle).get("deadline") or ""
     pending = pending_respondents(cycle_id)
 
@@ -160,14 +160,14 @@ def send_tier(
     for p in pending:
         link = _form_link(base_url or get_settings(cycle).get("form_base_url"), cycle_id, p["attendee_id"])
         if html_override:
-            default_subject = f"Reminder — {vendor} QBR Scorecard ({quarter} {year})"
+            default_subject = f"Reminder — {vendor} QBR Scorecard ({period})"
             safe_name = _html_escape(p["name"])
             subject = (subject_override or default_subject).replace("{{name}}", p["name"]).replace("\r", " ").replace("\n", " ").strip()
             html_body = html_override.replace("{{name}}", safe_name).replace("{{link}}", link)
             text_body = (text_override or "").replace("{{name}}", p["name"]).replace("{{link}}", link) or None
         else:
             email = build_reminder_email(
-                attendee_name=p["name"], vendor_name=vendor, quarter=quarter, year=year,
+                attendee_name=p["name"], vendor_name=vendor, period=period,
                 form_url=link, deadline=deadline, days_left=days_left, tone_label=_tone_label(days_left),
             )
             subject, html_body, text_body = email["subject"], email["html_body"], email["text_body"]
@@ -185,7 +185,7 @@ def send_tier(
     if days_left <= 0 and pending:
         for c in _coordinators(cycle_id):
             esc = build_escalation_email(
-                coordinator_name=c["name"], vendor_name=vendor, quarter=quarter, year=year,
+                coordinator_name=c["name"], vendor_name=vendor, period=period,
                 deadline=deadline, pending=pending,
             )
             try:

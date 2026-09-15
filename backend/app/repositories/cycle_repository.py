@@ -17,7 +17,7 @@ class CycleRepository(BaseRepository):
     table = "cycles"
     pk = "cycle_id"
     columns = (
-        "cycle_id", "vendor_id", "cycle_type", "quarter", "year", "description",
+        "cycle_id", "vendor_id", "cycle_type", "quarter", "year", "period_start", "period_end", "description",
         "workflow_state", "created_at", "updated_at", "meeting_plan", "scorecard_config",
         "teams_meeting_url", "teams_meeting_web_link", "teams_meeting_event_id",
         "teams_meeting_scheduled_at", "scorecard_dispatched_at", "scorecard_dispatched_to",

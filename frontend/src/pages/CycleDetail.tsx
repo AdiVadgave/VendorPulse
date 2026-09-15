@@ -91,6 +91,7 @@ import ActionQueuePanel from '@/components/shared/ActionQueuePanel'
 import AddActionForm from '@/components/shared/AddActionForm'
 import EmptyState from '@/components/shared/EmptyState'
 import { cn } from '@/utils/cn'
+import { formatPeriod } from '@/utils/period'
 import type { TabKey, WorkflowState } from '@/utils/constants'
 import { WORKFLOW_STATES, TAB_KEYS, TAB_LABELS, TAB_MIN_STATE_INDEX, ACTION_ORIGIN, getDefaultTabFromState } from '@/utils/constants'
 import { useCycleStore } from '@/store/useCycleStore'
@@ -633,7 +634,7 @@ export default function CycleDetail() {
               {cycle.vendor_name}
             </h2>
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
-              <span>{cycle.quarter} {cycle.year}</span>
+              <span>{formatPeriod(cycle)}</span>
               <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
               <span>EGB/QBR Governance Cycle</span>
               <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600 hidden sm:inline-block" />
@@ -843,7 +844,7 @@ function OverviewTab({
 
   const stats = [
     { label: 'Current Stage', value: currentStateLabel, sub: `Step ${currentStateIndex + 1} of ${WORKFLOW_STATES.length}`, icon: <Activity size={16} /> },
-    { label: 'Governance Cycle', value: `${cycle.quarter} ${cycle.year}`, sub: `${cycle.cycle_type ?? 'SPR'} · Supplier Performance Review`, icon: <CalendarClock size={16} /> },
+    { label: 'Governance Cycle', value: formatPeriod(cycle), sub: `${cycle.cycle_type ?? 'SPR'} · Supplier Performance Review`, icon: <CalendarClock size={16} /> },
     { label: 'Vendor', value: cycle.vendor_name, sub: 'Supplier under review', icon: <Building2 size={16} /> },
   ]
 
@@ -859,7 +860,7 @@ function OverviewTab({
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">{cycle.vendor_name}</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {cycle.cycle_type ?? 'SPR'} · {cycle.quarter} {cycle.year} · EGB/QBR Governance Cycle
+                {cycle.cycle_type ?? 'SPR'} · {formatPeriod(cycle)} · EGB/QBR Governance Cycle
               </p>
             </div>
           </div>
@@ -1149,8 +1150,7 @@ function SchedulingTab({
             slot={selectedSlot}
             attendees={attendees}
             vendorName={cycle.vendor_name}
-            quarter={cycle.quarter}
-            year={cycle.year}
+            period={formatPeriod(cycle)}
             timeZoneOverride={selectedSlotTimeZone}
             onBack={() => onPhaseChange('slot_ranking')}
             onInviteSent={(teamsUrl, eventId) => {
@@ -1174,8 +1174,7 @@ function SchedulingTab({
           existingEventId={scheduledEventId}
           existingMeetingUrl={meetingUrl}
           vendorName={cycle.vendor_name}
-          quarter={cycle.quarter}
-          year={cycle.year}
+          period={formatPeriod(cycle)}
           onBack={() => onPhaseChange('confirmation_tracking')}
           onScheduled={({ startTime, timeZone, durationMinutes, meetingUrl, eventId }) => {
             // Build a synthetic approved slot from the new date so the
@@ -1231,8 +1230,7 @@ function SchedulingTab({
                     eventId={scheduledEventId}
                     meetingUrl={meetingUrl}
                     vendorName={cycle.vendor_name}
-                    quarter={cycle.quarter}
-                    year={cycle.year}
+                    period={formatPeriod(cycle)}
                     timeZone={selectedSlotTimeZone}
                     onUpdated={onEventUpdated}
                     onClose={() => setShowAddAttendee(false)}
@@ -1345,8 +1343,7 @@ function ScorecardTab({
           <ScorecardDispatchPanel
             vendorName={cycle.vendor_name}
             cycleId={cycleId}
-            quarter={cycle.quarter}
-            year={cycle.year}
+            period={formatPeriod(cycle)}
             attendees={attendees}
             onDispatched={onDispatched}
             onRedo={handleRedo}
@@ -1358,8 +1355,7 @@ function ScorecardTab({
             key={`tracker-${redoNonce}`}
             cycleId={cycleId}
             vendorName={cycle.vendor_name}
-            quarter={cycle.quarter}
-            year={cycle.year}
+            period={formatPeriod(cycle)}
             attendees={attendees}
             onSubmissionsUpdated={handleSubmissionsUpdated}
           />
@@ -1632,8 +1628,7 @@ function AlignmentTab({
               cycleId={cycleId}
               index={n}
               vendorName={cycle.vendor_name}
-              quarter={cycle.quarter}
-              year={cycle.year}
+              period={formatPeriod(cycle)}
               qbrMeetingDate={cycle.teams_meeting_scheduled_at ?? null}
               onActionsExtracted={(acts) => onActionsExtracted(acts, ACTION_ORIGIN.alignmentMeeting(indices.indexOf(n) + 1))}
               alreadyExtracted={actions.some((a) => a.origin === ACTION_ORIGIN.alignmentMeeting(indices.indexOf(n) + 1))}
@@ -1700,8 +1695,7 @@ function VendorPrepTab({
       <VendorBriefPanel
         cycleId={cycleId}
         vendorName={cycle.vendor_name}
-        quarter={cycle.quarter}
-        year={cycle.year}
+        period={formatPeriod(cycle)}
         brief={vendorBrief}
         onBriefGenerated={onBriefGenerated}
         onBriefReady={onBriefReady}
@@ -1710,8 +1704,7 @@ function VendorPrepTab({
       <VendorPrepMeetingPanel
         cycleId={cycleId}
         vendorName={cycle.vendor_name}
-        quarter={cycle.quarter}
-        year={cycle.year}
+        period={formatPeriod(cycle)}
         qbrMeetingDate={cycle.teams_meeting_scheduled_at ?? null}
         onActionsExtracted={onActionsExtracted}
         alreadyExtracted={alreadyExtracted}
@@ -1781,8 +1774,7 @@ function MeetingTab({
         notes={meetingNotes}
         initialMinutes={initialMinutes}
         vendorName={cycle.vendor_name}
-        quarter={cycle.quarter}
-        year={cycle.year}
+        period={formatPeriod(cycle)}
         onApproved={onMinutesApproved}
       />
       {/* The shared action queue is rendered once, persistently, below the tab. */}

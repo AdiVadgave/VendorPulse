@@ -22,8 +22,7 @@ interface InviteApprovalPanelProps {
   slot: SlotProposal
   attendees: CycleAttendee[]
   vendorName: string
-  quarter: string
-  year: number
+  period: string
   timeZoneOverride?: 'IST' | 'UTC' | 'GMT'
   onInviteSent: (teamsMeetingUrl: string | null, eventId: string | null) => void
   onBack?: () => void
@@ -35,8 +34,7 @@ export default function InviteApprovalPanel({
   slot,
   attendees,
   vendorName,
-  quarter,
-  year,
+  period,
   timeZoneOverride,
   onInviteSent,
   onBack,
@@ -90,16 +88,16 @@ export default function InviteApprovalPanel({
   }
 
   // The default invite subject + HTML body (the coordinator can edit before sending).
-  const defaultSubject = `EGB/QBR Meeting Invitation — ${vendorName} ${quarter} ${year}`
+  const defaultSubject = `EGB/QBR Meeting Invitation — ${vendorName} ${period}`
   const defaultBody =
     `<p>Dear Team,</p>` +
     `<p>You are invited to the <strong>EGB/QBR governance review</strong> for ` +
-    `<strong>${vendorName} — ${quarter} ${year}</strong>.</p>` +
+    `<strong>${vendorName} — ${period}</strong>.</p>` +
     `<p>📅 <strong>Date:</strong> ${formatDateInZone(dateObj)}<br/>` +
     `🕙 <strong>Time:</strong> ${formatTimeInZone(dateObj)} – ${formatTimeInZone(endTime)} ${displayZone}<br/>` +
     `📍 <strong>Location:</strong> Microsoft Teams</p>` +
     `<p><strong>Agenda</strong></p>` +
-    `<ol><li>${quarter} Performance Review &amp; Scorecard Discussion</li>` +
+    `<ol><li>${period} Performance Review &amp; Scorecard Discussion</li>` +
     `<li>Key Issues, Concerns and Pushback Responses</li>` +
     `<li>Commitments and Action Items Review</li>` +
     `<li>Forward Planning &amp; AOB</li></ol>` +
@@ -274,7 +272,7 @@ export default function InviteApprovalPanel({
               <div className="flex gap-3">
                 <span className="text-slate-500 dark:text-slate-400 w-14 shrink-0">Subject:</span>
                 <span className="text-slate-700 dark:text-slate-300 font-medium">
-                  EGB/QBR Meeting Invitation — {vendorName} {quarter} {year}
+                  EGB/QBR Meeting Invitation — {vendorName} {period}
                 </span>
               </div>
             </div>
@@ -285,7 +283,7 @@ export default function InviteApprovalPanel({
                 You are invited to the{' '}
                 <strong>EGB/QBR governance review</strong> for{' '}
                 <strong>
-                  {vendorName} — {quarter} {year}
+                  {vendorName} — {period}
                 </strong>
                 .
               </p>
@@ -304,7 +302,7 @@ export default function InviteApprovalPanel({
                 Agenda:
               </p>
               <ol className="list-decimal list-inside space-y-0.5 text-xs text-slate-600 dark:text-slate-400">
-                <li>{quarter} Performance Review &amp; Scorecard Discussion</li>
+                <li>{period} Performance Review &amp; Scorecard Discussion</li>
                 <li>Key Issues, Concerns and Pushback Responses</li>
                 <li>Commitments and Action Items Review</li>
                 <li>Forward Planning &amp; AOB</li>

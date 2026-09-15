@@ -123,8 +123,8 @@ class InAppDispatchRecipient(BaseModel):
 class InAppDispatchRequest(BaseModel):
     cycle_id: str
     vendor_name: str
-    quarter: str
-    year: int
+    # SPR period label (display only — the server derives it from the cycle anyway).
+    period: Optional[str] = None
     form_base_url: str = Field(..., description="Frontend origin, e.g. http://localhost:5173")
     recipients: list[InAppDispatchRecipient] = Field(..., min_length=1)
     # True when re-sending after a mistake — uses the formal correction email.
@@ -256,6 +256,9 @@ def get_form_meta(cycle_id: str, attendee: str = ""):
         "cycle_type": cycle.get("cycle_type", "SPR"),
         "quarter": cycle.get("quarter", ""),
         "year": cycle.get("year"),
+        "period_start": cycle.get("period_start"),
+        "period_end": cycle.get("period_end"),
+        "period_label": period_label(cycle),
         "structure": structure,
         "respondent": respondent,
     }
@@ -535,15 +538,7 @@ def get_weighted_scorecard(cycle_id: str):
 # ── Cross-cycle context (current + previous cycle, for LLM narration) ─────────
 
 
-_QUARTER_NUM = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
-
-
-def _cycle_sort_key(cycle: dict) -> tuple[int, int]:
-    try:
-        year = int(cycle.get("year") or 0)
-    except (TypeError, ValueError):
-        year = 0  # tolerate a non-numeric year rather than 500 the whole request
-    return (year, _QUARTER_NUM.get(cycle.get("quarter", ""), 0))
+from app.utils.period import period_sort_key as _cycle_sort_key, period_label  # (year, month) + label
 
 
 def find_previous_cycle_id(cycle_id: str) -> Optional[str]:
@@ -591,7 +586,7 @@ def _compact_scorecard(weighted: dict, cycle: Optional[dict]) -> dict:
         })
     label = ""
     if cycle:
-        label = f"{cycle.get('quarter', '')} {cycle.get('year', '')}".strip()
+        label = period_label(cycle)
     return {
         "label": label or weighted.get("cycle_id", ""),
         "overall_score": weighted.get("overall_score"),
@@ -1072,7 +1067,7 @@ def export_scorecard(cycle_id: str):
 
     data = _scorecard_workbook(cycle_id)
     vendor = (cycle.get("vendor_name") or "vendor").replace(" ", "_")
-    fname = f"SPR_Scorecard_{vendor}_{cycle.get('quarter', '')}_{cycle.get('year', '')}.xlsx"
+    fname = f"SPR_Scorecard_{vendor}_{cycle.get('period_start') or cycle.get('quarter', '')}_{cycle.get('period_end') or cycle.get('year', '')}.xlsx"
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1180,7 +1175,7 @@ def dispatch_inapp(payload: InAppDispatchRequest):
         if payload.html_body_override:
             # Coordinator edited the draft — send it verbatim, substituting the
             # per-recipient tokens {{name}} (HTML-escaped) and {{link}}.
-            default_subject = f"{payload.vendor_name} — QBR Scorecard Input Request ({payload.quarter} {payload.year})"
+            default_subject = f"{payload.vendor_name} — QBR Scorecard Input Request ({period_label(cycle)})"
             safe_name = html_escape(r.name)
             subject = _clean_subject((payload.subject_override or default_subject).replace("{{name}}", r.name))
             html_body = payload.html_body_override.replace("{{name}}", safe_name).replace("{{link}}", link)
@@ -1191,8 +1186,7 @@ def dispatch_inapp(payload: InAppDispatchRequest):
                 attendee_email=email,
                 vendor_name=payload.vendor_name,
                 cycle_id=payload.cycle_id,
-                quarter=payload.quarter,
-                year=payload.year,
+                period=period_label(cycle),
                 form_url=link,
                 reissue=payload.reissue,
             )
@@ -1237,8 +1231,7 @@ def dispatch_preview(cycle_id: str, reissue: bool = False):
         attendee_email="",
         vendor_name=cycle.get("vendor_name", ""),
         cycle_id=cycle_id,
-        quarter=cycle.get("quarter", ""),
-        year=cycle.get("year") or 0,
+        period=period_label(cycle),
         form_url="{{link}}",
         reissue=reissue,
     )
@@ -1406,8 +1399,7 @@ def reminder_preview(cycle_id: str):
     email_data = build_reminder_email(
         attendee_name="{{name}}",
         vendor_name=cycle.get("vendor_name", ""),
-        quarter=cycle.get("quarter", ""),
-        year=cycle.get("year") or 0,
+        period=period_label(cycle),
         form_url="{{link}}",
         deadline=deadline,
         days_left=days_left,

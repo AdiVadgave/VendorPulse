@@ -180,11 +180,10 @@ def schedule_alignment_meeting_manual(
         raise HTTPException(status_code=400, detail="No internal stakeholder emails found for this alignment meeting")
 
     vendor_name = cycle.get("vendor_name", "TBD")
-    quarter = cycle.get("quarter", "")
-    year = cycle.get("year", "")
+    from app.utils.period import period_label
     meeting_index = max(1, int(payload.meeting_index or 1))
     suffix = f" #{meeting_index}" if meeting_index > 1 else ""
-    subject = f"Internal Alignment{suffix} — {vendor_name} ({quarter} {year})"
+    subject = f"Internal Alignment{suffix} — {vendor_name} ({period_label(cycle)})"
     meeting_url = (payload.meeting_url or "").strip() or None
 
     # Reschedule-in-place: keep the same record (and meeting_id) for this index.

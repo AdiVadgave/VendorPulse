@@ -114,6 +114,8 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             cycle_type                 TEXT,
             quarter                    TEXT,
             year                       INTEGER,
+            period_start               TEXT,
+            period_end                 TEXT,
             description                TEXT,
             workflow_state             TEXT,
             created_at                 TEXT,
@@ -417,6 +419,10 @@ _ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
     "cycles": [
         ("meeting_time_zone", "TEXT"),
         ("meeting_duration_minutes", "INTEGER"),
+        # Free SPR period (YYYY-MM). Supersedes quarter/year; legacy rows are
+        # backfilled from quarter+year on startup (see ensure_schema).
+        ("period_start", "TEXT"),
+        ("period_end", "TEXT"),
     ],
     "meetings": [
         ("time_zone", "TEXT"),
@@ -599,4 +605,21 @@ def ensure_schema(pool: Optional[ConnectionPool] = None) -> None:
 
         for stmt in _ADDITIVE_CONSTRAINTS:
             conn.execute(stmt)
+
+        # Backfill the free SPR period for legacy quarter/year cycles so every row
+        # has period_start/period_end and the app can sort/label uniformly. Q1→Jan-Mar,
+        # Q2→Apr-Jun, Q3→Jul-Sep, Q4→Oct-Dec. Idempotent: only fills NULL periods.
+        conn.execute(
+            """
+            UPDATE cycles SET
+              period_start = year::text || '-' || lpad((
+                  CASE quarter WHEN 'Q1' THEN 1 WHEN 'Q2' THEN 4
+                               WHEN 'Q3' THEN 7 WHEN 'Q4' THEN 10 ELSE 1 END)::text, 2, '0'),
+              period_end = year::text || '-' || lpad((
+                  CASE quarter WHEN 'Q1' THEN 3 WHEN 'Q2' THEN 6
+                               WHEN 'Q3' THEN 9 WHEN 'Q4' THEN 12 ELSE 12 END)::text, 2, '0')
+            WHERE (period_start IS NULL OR period_start = '')
+              AND year IS NOT NULL AND quarter IS NOT NULL
+            """
+        )
     logger.info("PostgreSQL schema ensured — %d tables (3NF, typed timestamps)", len(KNOWN_TABLES))

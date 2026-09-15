@@ -19,8 +19,12 @@ export interface GovernanceCycle {
   vendor_id: string
   vendor_name: string
   cycle_type?: CycleType
-  quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4'
-  year: number
+  /** Free SPR period — FROM/TO months as "YYYY-MM". Supersedes quarter/year. */
+  period_start?: string | null
+  period_end?: string | null
+  /** Legacy quarter/year — derived from the period; kept for back-compat. */
+  quarter?: string | null
+  year?: number | null
   description?: string
   workflow_state: WorkflowState
   created_at: string

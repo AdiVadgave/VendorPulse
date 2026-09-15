@@ -17,8 +17,7 @@ interface Props {
   /** Existing meeting join link — used to locate the event when its id isn't stored (avoids duplicate meetings). */
   meetingUrl?: string | null
   vendorName: string
-  quarter: string
-  year: number
+  period: string
   timeZone: 'IST' | 'UTC' | 'GMT'
   /** Called after a successful invite so the parent can refresh the stored event id / join link. */
   onUpdated: (eventId: string | null, meetingUrl: string | null) => void
@@ -43,8 +42,7 @@ export default function AddAttendeesToMeetingPanel({
   eventId,
   meetingUrl,
   vendorName,
-  quarter,
-  year,
+  period,
   timeZone,
   onUpdated,
   onClose,
@@ -54,11 +52,11 @@ export default function AddAttendeesToMeetingPanel({
   const [draftOpen, setDraftOpen] = useState(false)
 
   // Default invite text (editable in the draft dialog before sending).
-  const defaultSubject = `EGB/QBR Meeting Invitation — ${vendorName} ${quarter} ${year}`
+  const defaultSubject = `EGB/QBR Meeting Invitation — ${vendorName} ${period}`
   const defaultBody =
     `<p>Dear Team,</p>` +
     `<p>You have been added to the <strong>EGB/QBR governance review</strong> for ` +
-    `<strong>${vendorName} — ${quarter} ${year}</strong>.</p>` +
+    `<strong>${vendorName} — ${period}</strong>.</p>` +
     `<p>Please accept or decline via Microsoft Teams.</p><p>— Mobility Vendor Pulse</p>`
 
   function handleAdded(added: CycleAttendee) {

@@ -417,7 +417,12 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
             <label className="text-xs text-slate-600 dark:text-slate-400">Type *</label>
             <select
               value={attendeeType}
-              onChange={(e) => setAttendeeType(e.target.value as 'Internal Stakeholder' | 'Vendor')}
+              onChange={(e) => {
+                const t = e.target.value as 'Internal Stakeholder' | 'Vendor'
+                setAttendeeType(t)
+                // Vendors never review the scorecard — clear any reviewer flag.
+                if (t === 'Vendor') setIsKey(false)
+              }}
               className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="Internal Stakeholder">Internal Stakeholder</option>
@@ -425,7 +430,9 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
             </select>
           </div>
           )}
-          {!hideKey && (
+          {/* Scorecard reviewer only applies to internal stakeholders — vendors never
+              review the scorecard, so the option is hidden when Type = Vendor. */}
+          {!hideKey && attendeeType !== 'Vendor' && (
           <div className="flex items-end pb-1.5">
             <label className="flex items-center gap-2 cursor-pointer">
               <input

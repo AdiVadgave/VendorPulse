@@ -17,8 +17,6 @@ import {
   Loader2,
   Trash2,
   Search,
-  Pencil,
-  Check,
 } from 'lucide-react'
 import { WORKFLOW_STATE_LABELS, WORKFLOW_STATES, getDefaultTabFromState } from '@/utils/constants'
 import type { WorkflowState } from '@/utils/constants'
@@ -28,7 +26,7 @@ import { apiFetch } from '@/lib/api'
 import { useCycleStore } from '@/store/useCycleStore'
 import type { CycleType, GovernanceCycle } from '@/types/cycle.types'
 import { CYCLE_TYPE_LABELS } from '@/types/cycle.types'
-import { fetchVendors, renameVendor } from '@/lib/schedulingApi'
+import { fetchVendors } from '@/lib/schedulingApi'
 import type { VendorRecord } from '@/lib/schedulingApi'
 import { useCurrentUser, friendlyFirstName } from '@/lib/auth/currentUser'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -95,20 +93,13 @@ interface NewCycleForm {
 function NewCycleModal({
   onClose,
   onCreate,
-  onVendorRenamed,
 }: {
   onClose: () => void
   onCreate: (cycle: GovernanceCycle) => void
-  onVendorRenamed: (vendorId: string, name: string) => void
 }) {
   const currentMonth = new Date().toISOString().slice(0, 7) // "YYYY-MM"
   const [vendors, setVendors] = useState<VendorRecord[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  // Inline vendor rename (typo fix) — which vendor row is being edited + its draft.
-  const [editingVendorId, setEditingVendorId] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
-  const [renameError, setRenameError] = useState<string | null>(null)
-  const [renameBusy, setRenameBusy] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [form, setForm] = useState<NewCycleForm>({
     vendor_id: '',
@@ -176,51 +167,6 @@ function NewCycleModal({
   function handleSelectNew() {
     setForm((f) => ({ ...f, vendor_id: 'v_custom', vendor_name: searchQuery.trim(), category: '' }))
     setDropdownOpen(false)
-  }
-
-  // ── Inline vendor rename (fix typos) ───────────────────────────────────────
-  function startRename(v: VendorRecord) {
-    setEditingVendorId(v.vendor_id)
-    setEditName(v.name)
-    setRenameError(null)
-  }
-
-  function cancelRename() {
-    setEditingVendorId(null)
-    setEditName('')
-    setRenameError(null)
-  }
-
-  async function saveRename(v: VendorRecord) {
-    const next = editName.trim()
-    if (!next) {
-      setRenameError('Vendor name cannot be empty.')
-      return
-    }
-    if (next === v.name) {
-      cancelRename()
-      return
-    }
-    setRenameBusy(true)
-    setRenameError(null)
-    try {
-      const updated = await renameVendor(v.vendor_id, next)
-      // Reflect the new name locally: the vendor list, the current search box /
-      // selected vendor (if it was the one renamed), and the parent's cycle cards.
-      setVendors((list) =>
-        list.map((x) => (x.vendor_id === v.vendor_id ? { ...x, name: updated.name } : x))
-      )
-      setForm((f) =>
-        f.vendor_id === v.vendor_id ? { ...f, vendor_name: updated.name } : f
-      )
-      setSearchQuery((q) => (q === v.name ? updated.name : q))
-      onVendorRenamed(v.vendor_id, updated.name)
-      cancelRename()
-    } catch (err) {
-      setRenameError(err instanceof Error ? err.message : 'Failed to rename vendor.')
-    } finally {
-      setRenameBusy(false)
-    }
   }
 
   // Single POST used both for the first attempt and the "create anyway" retry.
@@ -343,97 +289,23 @@ function NewCycleModal({
 
               {dropdownOpen && (filteredVendors.length > 0 || isNewVendor) && (
                 <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-                  {filteredVendors.map((v) =>
-                    editingVendorId === v.vendor_id ? (
-                      // Inline rename (typo fix) — keeps mouse events from bubbling
-                      // to the row's select handler or closing the dropdown.
-                      <div
-                        key={v.vendor_id}
-                        className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 last:border-b-0"
-                        onMouseDown={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <Building2 size={13} className="text-slate-400 shrink-0" />
-                          <input
-                            autoFocus
-                            type="text"
-                            value={editName}
-                            disabled={renameBusy}
-                            onChange={(e) => setEditName(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault()
-                                saveRename(v)
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault()
-                                cancelRename()
-                              }
-                            }}
-                            className="flex-1 min-w-0 px-2 py-1 text-sm border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                          <button
-                            type="button"
-                            title="Save name"
-                            disabled={renameBusy}
-                            onClick={() => saveRename(v)}
-                            className="p-1 rounded text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50 shrink-0"
-                          >
-                            {renameBusy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                          </button>
-                          <button
-                            type="button"
-                            title="Cancel"
-                            disabled={renameBusy}
-                            onClick={cancelRename}
-                            className="p-1 rounded text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 shrink-0"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                        {renameError && (
-                          <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">{renameError}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div
-                        key={v.vendor_id}
-                        className={cn(
-                          'group flex items-center hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors',
-                          form.vendor_id === v.vendor_id && searchQuery === v.name
-                            ? 'bg-indigo-50 dark:bg-indigo-900/20'
-                            : ''
-                        )}
-                      >
-                        <button
-                          type="button"
-                          onMouseDown={() => handleSelectVendor(v)}
-                          className={cn(
-                            'flex-1 min-w-0 text-left pl-3 pr-1 py-2 text-sm flex items-center gap-2',
-                            form.vendor_id === v.vendor_id && searchQuery === v.name
-                              ? 'text-indigo-700 dark:text-indigo-400'
-                              : 'text-slate-700 dark:text-slate-300'
-                          )}
-                        >
-                          <Building2 size={13} className="text-slate-400 shrink-0" />
-                          <span className="truncate">{v.name}</span>
-                          <span className="ml-auto text-xs text-slate-400 shrink-0">{v.category}</span>
-                        </button>
-                        <button
-                          type="button"
-                          title="Rename vendor (fix typo)"
-                          aria-label={`Rename ${v.name}`}
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            startRename(v)
-                          }}
-                          className="p-1.5 mr-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-700 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                      </div>
-                    )
-                  )}
+                  {filteredVendors.map((v) => (
+                    <button
+                      key={v.vendor_id}
+                      type="button"
+                      onMouseDown={() => handleSelectVendor(v)}
+                      className={cn(
+                        'w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors',
+                        form.vendor_id === v.vendor_id && searchQuery === v.name
+                          ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400'
+                          : 'text-slate-700 dark:text-slate-300'
+                      )}
+                    >
+                      <Building2 size={13} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{v.name}</span>
+                      <span className="ml-auto text-xs text-slate-400 shrink-0">{v.category}</span>
+                    </button>
+                  ))}
                   {isNewVendor && (
                     <button
                       type="button"
@@ -668,14 +540,6 @@ export default function Dashboard() {
     navigate(`/cycles/${cycle.cycle_id}?tab=${preferredTab}`)
   }
 
-  // A vendor was renamed (typo fix) — update the denormalized vendor_name on every
-  // cycle card in the store so the new name shows without a full reload.
-  function handleVendorRenamed(vendorId: string, name: string) {
-    setCycles(
-      cycles.map((c) => (c.vendor_id === vendorId ? { ...c, vendor_name: name } : c))
-    )
-  }
-
   async function handleDeleteCycle(cycleId: string) {
     const ok = window.confirm('Delete this cycle and related attendee/slot data?')
     if (!ok) return
@@ -761,7 +625,6 @@ export default function Dashboard() {
         <NewCycleModal
           onClose={() => setShowNewCycleModal(false)}
           onCreate={handleCycleCreated}
-          onVendorRenamed={handleVendorRenamed}
         />
       )}
 

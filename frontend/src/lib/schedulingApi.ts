@@ -159,16 +159,6 @@ export async function fetchVendors(): Promise<VendorRecord[]> {
   }
 }
 
-/** Rename an existing vendor (typo fix). Propagates to every cycle because
- *  `cycle.vendor_name` is derived from the vendors table, not stored. */
-export async function renameVendor(vendorId: string, name: string): Promise<VendorRecord> {
-  const res = await apiFetch<{ vendor: VendorRecord }>(
-    `/api/vendors/${encodeURIComponent(vendorId)}`,
-    { method: 'PATCH', body: JSON.stringify({ name }) }
-  )
-  return res.vendor
-}
-
 export async function fetchCategories(): Promise<string[]> {
   try {
     const res = await apiFetch<{ categories: string[] }>('/api/categories')

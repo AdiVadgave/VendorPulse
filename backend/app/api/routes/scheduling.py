@@ -250,13 +250,20 @@ def set_manual_meeting(
     cycleId: str,
     payload: ManualMeetingRequest,
     cycle_repo=Depends(get_cycle_repo),
+    meeting_repo=Depends(get_meeting_repo),
 ):
     """Record a manually-chosen meeting date/time (no Microsoft Graph / calendar access
     required). Persists the scheduled time — and an optional pasted meeting link — on the
     cycle, then advances the workflow to MEETING_SCHEDULED so the date lives in the DB."""
     from datetime import datetime, timezone
+    from app.utils.meeting_precedence import check_precedence, SPR
 
     cycle = _get_cycle_or_404(cycleId, cycle_repo)
+    # The SPR is the final meeting — it must start after every prep call (alignment /
+    # vendor prep). Reject an out-of-order date (defense in depth behind the UI guard).
+    conflict = check_precedence(SPR, payload.start_time, cycle=cycle, meetings=meeting_repo.get_for_cycle(cycleId))
+    if conflict:
+        raise HTTPException(status_code=409, detail=conflict)
     cycle_repo.mark_teams_meeting_scheduled(
         cycleId,
         teams_meeting_url=(payload.meeting_url or None),

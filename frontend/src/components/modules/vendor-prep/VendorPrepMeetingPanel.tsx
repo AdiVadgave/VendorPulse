@@ -112,6 +112,13 @@ export default function VendorPrepMeetingPanel({
     ]
   })()
 
+  // The prep call must start AFTER the latest alignment call (and before the SPR).
+  const latestAlignmentStart = alignmentMeetings
+    .map((m) => m.start_time)
+    .filter((s): s is string => !!s)
+    .sort()
+    .slice(-1)[0] ?? null
+
   // Load this vendor-prep meeting's OWN roster (separate from the cycle attendees);
   // default-tick everyone.
   const loadAttendees = useCallback(async () => {
@@ -467,6 +474,9 @@ export default function VendorPrepMeetingPanel({
                 inviteAttendees={selectedAttendees}
                 defaultDuration={30}
                 qbrMeetingDate={qbrMeetingDate}
+                earliestMeetingDate={latestAlignmentStart}
+                beforeLabel="the SPR meeting"
+                afterLabel="the Internal Alignment call"
                 existingMeetingUrl={rescheduling ? (meetingResult?.teamsUrl ?? null) : null}
                 subject="Mobility Vendor Pulse — Vendor Prep Meeting"
                 bodyHtml={VENDOR_PREP_BODY_HTML}

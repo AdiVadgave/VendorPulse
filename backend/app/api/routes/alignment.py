@@ -187,6 +187,14 @@ def schedule_alignment_meeting_manual(
     subject = f"Internal Alignment{suffix} — {vendor_name} ({quarter} {year})"
     meeting_url = (payload.meeting_url or "").strip() or None
 
+    # The alignment call must start before the Vendor Prep call and the SPR meeting.
+    # Reject an out-of-order time here (outside the try below, so the 409 isn't turned
+    # into a 500). Belt-and-braces behind the UI's own date guard.
+    from app.utils.meeting_precedence import check_precedence, ALIGNMENT
+    conflict = check_precedence(ALIGNMENT, payload.start_time, cycle=cycle, meetings=meeting_repo.get_for_cycle(cycleId))
+    if conflict:
+        raise HTTPException(status_code=409, detail=conflict)
+
     # Reschedule-in-place: keep the same record (and meeting_id) for this index.
     existing = next(
         (m for m in meeting_repo.get_for_cycle(cycleId)

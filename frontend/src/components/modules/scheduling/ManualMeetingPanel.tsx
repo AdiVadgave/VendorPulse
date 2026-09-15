@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CalendarClock, Loader2, AlertCircle, Users, ArrowRight } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { CycleAttendee } from '@/types/scheduling.types'
 import { scheduleManualMeeting } from '@/lib/schedulingApi'
+import { listAlignmentMeetings } from '@/lib/alignmentApi'
+import { getVendorPrepMeeting } from '@/lib/vendorPrepApi'
+import { formatMeetingTime } from '@/utils/formatMeetingTime'
 import { updateMeetingTime, createMeetingEvent, findEventIdByJoinUrl, isSchedulingAvailable, wallClockToUtcIso } from '@/lib/graphScheduling'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 
@@ -59,6 +62,25 @@ export default function ManualMeetingPanel({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [draftOpen, setDraftOpen] = useState(false)
+  // The SPR is the final meeting — it must start AFTER every prep call (alignment /
+  // vendor prep). Load their times so we can block an out-of-order reschedule BEFORE
+  // moving the Teams event (the backend also rejects it as a 409).
+  const [earliestAllowed, setEarliestAllowed] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      listAlignmentMeetings(cycleId).then((r) => r.meetings ?? []).catch(() => []),
+      getVendorPrepMeeting(cycleId).then((r) => r.meeting).catch(() => null),
+    ]).then(([aligns, vp]) => {
+      if (cancelled) return
+      const starts = [...aligns.map((m) => m.start_time), vp?.start_time ?? null]
+        .filter((s): s is string => !!s)
+        .sort()
+      setEarliestAllowed(starts.length ? starts[starts.length - 1] : null)
+    })
+    return () => { cancelled = true }
+  }, [cycleId])
 
   // Default subject/body for the updated invite (the coordinator can edit before sending).
   const prettyTime = startLocal ? `${startLocal.replace('T', ' ')} ${timeZone}` : ''
@@ -74,6 +96,15 @@ export default function ManualMeetingPanel({
   // once the coordinator confirms (with any edits) in the dialog.
   function openDraft() {
     if (!startLocal) { setError('Pick a date and time first.'); return }
+    // Precedence: the SPR must start after the last prep meeting. Block here — before
+    // any calendar change — so we never move the Teams event to an invalid time.
+    if (earliestAllowed) {
+      const startUtc = wallClockToUtcIso(startLocal, timeZone)
+      if (new Date(startUtc).getTime() <= new Date(earliestAllowed).getTime()) {
+        setError(`The SPR meeting must start after the last prep meeting (${formatMeetingTime(earliestAllowed)}). Pick a later time.`)
+        return
+      }
+    }
     if (!isSchedulingAvailable()) {
       setError("You can't reschedule — you're not signed in with Shell (SSO). Sign in with your Shell account and try again.")
       return

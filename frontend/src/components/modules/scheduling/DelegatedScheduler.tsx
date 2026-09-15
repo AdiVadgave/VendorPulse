@@ -16,6 +16,7 @@ import FindSlotsControl from './FindSlotsControl'
 import SlotRankingPanel from './SlotRankingPanel'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import { createMeetingEvent, updateMeetingTime, findEventIdByJoinUrl, wallClockToUtcIso } from '@/lib/graphScheduling'
+import { formatMeetingTime } from '@/utils/formatMeetingTime'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 
 type TZ = 'IST' | 'UTC' | 'GMT'
@@ -27,9 +28,17 @@ interface Props {
   subject: string
   bodyHtml: string
   defaultDuration?: number
-  /** The final QBR meeting date — this meeting must be held before it, so the slot
-   *  search window ends the day before the QBR (From defaults to today). */
+  /** The final QBR/SPR meeting date — this meeting must START BEFORE it. The slot
+   *  window ends on the SPR day and any slot at/after the SPR start time is filtered
+   *  out (same-day-but-earlier is allowed). */
   qbrMeetingDate?: string | null
+  /** Earliest allowed start (ISO): this meeting must START AFTER it — e.g. the latest
+   *  Internal Alignment call, when scheduling the Vendor Prep. */
+  earliestMeetingDate?: string | null
+  /** Label for the meeting this one must come BEFORE (default "the SPR meeting"). */
+  beforeLabel?: string
+  /** Label for the meeting this one must come AFTER (default "the earlier meeting"). */
+  afterLabel?: string
   /** Rescheduling an existing meeting: MOVE that event instead of creating a new one.
    *  Provide its join link (and/or Graph event id) so we can locate + patch it. */
   existingEventId?: string | null
@@ -52,6 +61,9 @@ export default function DelegatedScheduler({
   bodyHtml,
   defaultDuration = 30,
   qbrMeetingDate,
+  earliestMeetingDate,
+  beforeLabel = 'the SPR meeting',
+  afterLabel = 'the earlier meeting',
   existingEventId,
   existingMeetingUrl,
   onScheduled,
@@ -62,17 +74,35 @@ export default function DelegatedScheduler({
   function localISODate(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
-  // From = today (when the coordinator opens this); To = day before the QBR.
-  const todayStr = localISODate(new Date())
-  let dayBeforeQbr: string | undefined
+
+  // Precedence bounds (by exact start time): this meeting must start AFTER the
+  // earlier meeting (min) and BEFORE the SPR (max). Same-day-but-earlier is allowed.
+  const minMs = (() => { const d = earliestMeetingDate ? new Date(earliestMeetingDate) : null; return d && !Number.isNaN(d.getTime()) ? d.getTime() : null })()
+  const maxMs = (() => { const d = qbrMeetingDate ? new Date(qbrMeetingDate) : null; return d && !Number.isNaN(d.getTime()) ? d.getTime() : null })()
+
+  /** null when the instant is inside the allowed window, else a reason to reject it. */
+  function boundsError(iso: string): string | null {
+    const t = new Date(iso).getTime()
+    if (Number.isNaN(t)) return null
+    if (minMs !== null && t <= minMs) return `This time is not after ${afterLabel} (${formatMeetingTime(earliestMeetingDate)}). Pick a later time.`
+    if (maxMs !== null && t >= maxMs) return `This time is not before ${beforeLabel} (${formatMeetingTime(qbrMeetingDate)}). Pick an earlier time.`
+    return null
+  }
+
+  // From = later of today and the earlier meeting's day; To = the SPR day (inclusive —
+  // same-day slots that start before the SPR survive the time filter below).
+  let fromStr = localISODate(new Date())
+  if (earliestMeetingDate) {
+    const e = new Date(earliestMeetingDate)
+    if (!Number.isNaN(e.getTime())) { const s = localISODate(e); if (s > fromStr) fromStr = s }
+  }
+  let sprDayStr: string | undefined
   if (qbrMeetingDate) {
     const q = new Date(qbrMeetingDate)
-    if (!Number.isNaN(q.getTime())) {
-      q.setDate(q.getDate() - 1)
-      dayBeforeQbr = localISODate(q)
-    }
+    if (!Number.isNaN(q.getTime())) sprDayStr = localISODate(q)
   }
   const [slots, setSlots] = useState<SlotProposal[]>([])
+  const [hiddenCount, setHiddenCount] = useState(0)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // A slot chosen and awaiting draft review before the invite is created/updated.
@@ -125,13 +155,18 @@ export default function DelegatedScheduler({
   // Manual override: build a synthetic slot at the chosen time and route it
   // through the same draft-review + delegated create-event path as a suggested slot.
   function handleManual(startISO: string, tz: TZ, dur: number) {
+    const utcIso = wallClockToUtcIso(startISO, tz)
+    // Enforce precedence before opening the invite draft (backend also rejects it).
+    const err = boundsError(utcIso)
+    if (err) { setError(err); return }
+    setError(null)
     setPending({
       tz,
       slot: {
         slot_id: 'manual-slot',
         cycle_id: cycleId,
         // Wall-clock entry in the chosen zone → real UTC instant.
-        proposed_time: wallClockToUtcIso(startISO, tz),
+        proposed_time: utcIso,
         proposed_time_zone: tz,
         duration_minutes: dur,
         organiser_available: true,
@@ -175,24 +210,42 @@ export default function DelegatedScheduler({
           cycleId={cycleId}
           attendees={findAttendees}
           defaultDuration={defaultDuration}
-          defaultFromDate={todayStr}
-          minFromDate={todayStr}
-          defaultToDate={dayBeforeQbr}
-          maxToDate={dayBeforeQbr}
+          defaultFromDate={fromStr}
+          minFromDate={fromStr}
+          defaultToDate={sprDayStr}
+          maxToDate={sprDayStr}
           onSlotsFound={(found) => {
-            setSlots(found)
+            // Drop any suggested slot that breaks precedence (e.g. a slot at/after the
+            // SPR start, or before the alignment call) so only valid times are offered.
+            const ok = found.filter((s) => !boundsError(s.proposed_time))
+            setHiddenCount(found.length - ok.length)
+            setSlots(ok)
             setPhase('rank')
           }}
         />
       )}
 
       {phase === 'rank' && (
-        <SlotRankingPanel
-          slots={slots}
-          onSlotApproved={handleApprove}
-          onBackToAttendees={() => setPhase('find')}
-          onScheduleManual={handleManual}
-        />
+        <>
+          {hiddenCount > 0 && (
+            <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+              {hiddenCount} suggested slot{hiddenCount === 1 ? ' was' : 's were'} hidden because {hiddenCount === 1 ? 'it falls' : 'they fall'} outside the allowed window
+              {minMs !== null && maxMs !== null
+                ? ` (after ${afterLabel} and before ${beforeLabel})`
+                : maxMs !== null
+                  ? ` (must be before ${beforeLabel})`
+                  : minMs !== null
+                    ? ` (must be after ${afterLabel})`
+                    : ''}.
+            </p>
+          )}
+          <SlotRankingPanel
+            slots={slots}
+            onSlotApproved={handleApprove}
+            onBackToAttendees={() => setPhase('find')}
+            onScheduleManual={handleManual}
+          />
+        </>
       )}
 
       {error && (

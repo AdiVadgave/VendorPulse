@@ -393,6 +393,14 @@ def schedule_vendor_prep_meeting_manual(
     subject = f"Vendor Prep Call — {vendor_name} ({quarter} {year})".strip()
     meeting_url = (payload.meeting_url or "").strip() or None
 
+    # The Vendor Prep call must start after every Internal Alignment call and before
+    # the SPR meeting. Reject an out-of-order time here (outside the try below, so the
+    # 409 isn't turned into a 500). Belt-and-braces behind the UI's own date guard.
+    from app.utils.meeting_precedence import check_precedence, VENDOR_PREP
+    conflict = check_precedence(VENDOR_PREP, payload.start_time, cycle=cycle, meetings=meeting_repo.get_for_cycle(cycleId))
+    if conflict:
+        raise HTTPException(status_code=409, detail=conflict)
+
     existing = next(
         (m for m in meeting_repo.get_for_cycle(cycleId)
          if m.get("meeting_type") == VP_MEETING_TYPE and m.get("status") != "cancelled"),

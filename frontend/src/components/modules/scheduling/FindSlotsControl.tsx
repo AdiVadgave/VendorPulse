@@ -138,7 +138,9 @@ export default function FindSlotsControl({
             className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value={30}>30 minutes</option>
+            <option value={45}>45 minutes</option>
             <option value={60}>60 minutes</option>
+            <option value={75}>75 minutes</option>
             <option value={90}>90 minutes</option>
             <option value={120}>120 minutes</option>
           </select>

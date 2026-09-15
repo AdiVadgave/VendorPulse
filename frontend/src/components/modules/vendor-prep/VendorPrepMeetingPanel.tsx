@@ -9,6 +9,8 @@ import {
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import SendAddedInvitePanel from '@/components/modules/scheduling/SendAddedInvitePanel'
 import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
+import MeetingReferenceBanner, { type ReferenceDate } from '@/components/modules/scheduling/MeetingReferenceBanner'
+import { listAlignmentMeetings, type AlignmentMeeting } from '@/lib/alignmentApi'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
 
 const VENDOR_PREP_BODY_HTML =
@@ -32,8 +34,10 @@ interface Props {
   /** Bubble action items parsed from this meeting's transcript to the shared log. */
   onActionsExtracted?: (actions: ExtractedAction[]) => void
   alreadyExtracted?: boolean
-  /** Final QBR date — vendor-prep slots end the day before it. */
+  /** Final QBR/SPR date — vendor-prep slots end the day before it. */
   qbrMeetingDate?: string | null
+  /** Timezone the SPR meeting was scheduled in (for the reference banner). */
+  qbrTimeZone?: string | null
   /** The vendor-pushback section — rendered here once the transcript is parsed, i.e.
    *  after the prep meeting (when the vendor's actual objections are known). */
   pushbackSlot?: ReactNode
@@ -59,7 +63,7 @@ interface MeetingResult {
  * is manual (no Microsoft Graph / calendar access required).
  */
 export default function VendorPrepMeetingPanel({
-  cycleId, vendorName, period, onActionsExtracted, alreadyExtracted, qbrMeetingDate, pushbackSlot,
+  cycleId, vendorName, period, onActionsExtracted, alreadyExtracted, qbrMeetingDate, qbrTimeZone, pushbackSlot,
 }: Props) {
   const [attendees, setAttendees] = useState<CycleAttendee[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -78,6 +82,34 @@ export default function VendorPrepMeetingPanel({
   const [invitedBaseline, setInvitedBaseline] = useState<Set<string> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [persistenceChecked, setPersistenceChecked] = useState(false)
+  // Scheduled internal-alignment meeting(s) — shown as reference dates so the prep
+  // call can be scheduled between the alignment call(s) and the SPR.
+  const [alignmentMeetings, setAlignmentMeetings] = useState<AlignmentMeeting[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    listAlignmentMeetings(cycleId)
+      .then((res) => { if (!cancelled) setAlignmentMeetings(res.meetings ?? []) })
+      .catch(() => { /* backend offline / none scheduled */ })
+    return () => { cancelled = true }
+  }, [cycleId])
+
+  // Reference dates for the banner: the SPR, plus every scheduled alignment call.
+  const referenceDates: ReferenceDate[] = (() => {
+    const scheduled = alignmentMeetings
+      .filter((m) => m.start_time)
+      .sort((a, b) => new Date(a.start_time!).getTime() - new Date(b.start_time!).getTime())
+    const alignmentRows: ReferenceDate[] = scheduled.map((m) => ({
+      label: scheduled.length > 1 ? `Alignment meeting ${m.meeting_index}` : 'Internal Alignment meeting',
+      iso: m.start_time,
+      timeZone: m.time_zone,
+      durationMinutes: m.duration_minutes,
+    }))
+    return [
+      ...alignmentRows,
+      { label: 'SPR meeting', iso: qbrMeetingDate, timeZone: qbrTimeZone },
+    ]
+  })()
 
   // Load this vendor-prep meeting's OWN roster (separate from the cycle attendees);
   // default-tick everyone.
@@ -359,6 +391,12 @@ export default function VendorPrepMeetingPanel({
 
           {showScheduler && (
             <>
+              {/* Alignment call + SPR dates for reference — schedule the prep between them. */}
+              <MeetingReferenceBanner
+                dates={referenceDates}
+                note="Schedule the vendor prep call after the alignment meeting and before the SPR."
+              />
+
               {/* Attendee selection (internal + vendor, editable) */}
               <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
                 <div className="flex items-center justify-between mb-2">

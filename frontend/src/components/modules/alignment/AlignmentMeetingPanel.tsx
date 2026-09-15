@@ -14,8 +14,10 @@ interface Props {
   vendorName: string
   quarter: string
   year: number
-  /** Final QBR date — alignment slots end the day before it. */
+  /** Final QBR/SPR date — alignment slots end the day before it. */
   qbrMeetingDate?: string | null
+  /** Timezone the SPR meeting was scheduled in (for the reference banner). */
+  qbrTimeZone?: string | null
   /** Bubble action items parsed from this meeting's transcript to the shared log. */
   onActionsExtracted?: (actions: ExtractedAction[]) => void
   /** True when this meeting already contributed action items (persisted queue) — so
@@ -33,7 +35,7 @@ interface Props {
  * section — not here. Each instance is scoped by its 1-based index so a cycle can
  * run several independent alignment meetings.
  */
-export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quarter, year, onActionsExtracted, alreadyExtracted, qbrMeetingDate, onScheduled }: Props) {
+export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quarter, year, onActionsExtracted, alreadyExtracted, qbrMeetingDate, qbrTimeZone, onScheduled }: Props) {
   const [meetingResult, setMeetingResult] = useState<AlignmentMeetingResult | null>(null)
   // Parsed transcript notes + any previously-generated MoM for THIS alignment meeting.
   const meetingId = `align-${cycleId}-${index}`
@@ -76,6 +78,7 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
         meetingResult={meetingResult}
         onMeetingScheduled={(result) => { setMeetingResult(result); onScheduled?.() }}
         qbrMeetingDate={qbrMeetingDate}
+        qbrTimeZone={qbrTimeZone}
       />
       <TranscriptInput
         cycleId={cycleId}

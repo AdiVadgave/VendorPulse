@@ -1635,6 +1635,7 @@ function AlignmentTab({
               quarter={cycle.quarter}
               year={cycle.year}
               qbrMeetingDate={cycle.teams_meeting_scheduled_at ?? null}
+              qbrTimeZone={cycle.meeting_time_zone ?? null}
               onActionsExtracted={(acts) => onActionsExtracted(acts, ACTION_ORIGIN.alignmentMeeting(indices.indexOf(n) + 1))}
               alreadyExtracted={actions.some((a) => a.origin === ACTION_ORIGIN.alignmentMeeting(indices.indexOf(n) + 1))}
               onScheduled={onAlignmentScheduled}
@@ -1713,6 +1714,7 @@ function VendorPrepTab({
         quarter={cycle.quarter}
         year={cycle.year}
         qbrMeetingDate={cycle.teams_meeting_scheduled_at ?? null}
+        qbrTimeZone={cycle.meeting_time_zone ?? null}
         onActionsExtracted={onActionsExtracted}
         alreadyExtracted={alreadyExtracted}
         pushbackSlot={pushbackSection}

@@ -4,7 +4,6 @@ import { scheduleAlignmentMeetingManual, getAlignmentMeeting, getAlignmentAttend
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
 import SendAddedInvitePanel from '@/components/modules/scheduling/SendAddedInvitePanel'
-import MeetingReferenceBanner from '@/components/modules/scheduling/MeetingReferenceBanner'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
 import type { CycleAttendee } from '@/types/scheduling.types'
 
@@ -32,13 +31,11 @@ interface Props {
   onMeetingScheduled: (result: AlignmentMeetingResult) => void
   /** Which alignment meeting (1-based) — a cycle may have several. */
   meetingIndex?: number
-  /** Final QBR/SPR date — alignment must be before it, so slots end the day before. */
+  /** Final QBR date — alignment must be before it, so slots end the day before. */
   qbrMeetingDate?: string | null
-  /** Timezone the SPR meeting was scheduled in (for the reference banner). */
-  qbrTimeZone?: string | null
 }
 
-export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMeetingScheduled, meetingIndex = 1, qbrMeetingDate, qbrTimeZone }: Props) {
+export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMeetingScheduled, meetingIndex = 1, qbrMeetingDate }: Props) {
   const [error, setError] = useState<string | null>(null)
 
   // Internal attendees state
@@ -176,12 +173,6 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Schedule a meeting for internal stakeholders to discuss score differences and alignment points before the vendor call.
         </p>
-
-        {/* SPR date for reference — the alignment call must land before it. */}
-        <MeetingReferenceBanner
-          dates={[{ label: 'SPR meeting', iso: qbrMeetingDate, timeZone: qbrTimeZone }]}
-          note="Schedule the alignment call before the SPR."
-        />
 
         {/* Internal Attendees list with management */}
         <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">

@@ -151,6 +151,28 @@ def create_cycle(
                 },
             )
 
+    # Inherit the vendor's most recently CONFIGURED scorecard so a repeat cycle for the
+    # same vendor starts from the last agreed measures/weights instead of the default.
+    # It's still fully editable until the scorecard is dispatched. Falls back to the
+    # default when the vendor has no previously-configured cycle.
+    import copy
+
+    inherited_config = None
+    prior_cycles = sorted(
+        cycle_repo.get_by_vendor(vendor_id),
+        key=lambda c: c.get("created_at") or "",
+        reverse=True,
+    )
+    for c in prior_cycles:
+        cfg = c.get("scorecard_config") or {}
+        if cfg.get("configured") and cfg.get("categories"):
+            inherited_config = copy.deepcopy(cfg)
+            logger.info(
+                "create_cycle: inheriting scorecard config from cycle_id=%s for vendor_id=%s",
+                sanitize_for_log(c.get("cycle_id")), sanitize_for_log(vendor_id),
+            )
+            break
+
     now = datetime.now(timezone.utc).isoformat()
     cycle = {
         "cycle_id": f"c_{uuid.uuid4().hex}",
@@ -163,7 +185,7 @@ def create_cycle(
         "workflow_state": "CYCLE_CREATED",
         "created_at": now,
         "updated_at": now,
-        "scorecard_config": default_scorecard_config(),
+        "scorecard_config": inherited_config or default_scorecard_config(),
     }
     result = cycle_repo.insert(cycle)
     logger.info("create_cycle success — cycle_id=%s", cycle["cycle_id"])

@@ -10,13 +10,14 @@ import { getTeamSubmissions, dispatchInAppScorecard, deleteScorecardSubmission, 
 interface Props {
   cycleId: string
   vendorName: string
-  period: string
+  quarter: string
+  year: number
   /** Full attendee list — used to resolve the delivery email address for a resend. */
   attendees: CycleAttendee[]
   onSubmissionsUpdated?: ((data: TeamSubmissionsData) => void) | (() => void) | (() => Promise<void>)
 }
 
-export default function SubmissionTracker({ cycleId, vendorName, period, attendees, onSubmissionsUpdated }: Props) {
+export default function SubmissionTracker({ cycleId, vendorName, quarter, year, attendees, onSubmissionsUpdated }: Props) {
   const [open, setOpen] = useState(false)
   const [tracker, setTracker] = useState<TeamSubmissionsData | null>(null)
   const [isPolling, setIsPolling] = useState(false)
@@ -66,7 +67,8 @@ export default function SubmissionTracker({ cycleId, vendorName, period, attende
       await dispatchInAppScorecard({
         cycle_id: cycleId,
         vendor_name: vendorName,
-        period,
+        quarter,
+        year,
         form_base_url: window.location.origin,
         recipients: [{
           attendee_id: entry.attendee_id,
@@ -82,7 +84,7 @@ export default function SubmissionTracker({ cycleId, vendorName, period, attende
     } finally {
       setBusyId(null)
     }
-  }, [attendees, cycleId, vendorName, period])
+  }, [attendees, cycleId, vendorName, quarter, year])
 
   const copyLink = useCallback(async (attendeeId: string) => {
     try {

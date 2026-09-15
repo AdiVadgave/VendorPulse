@@ -14,7 +14,8 @@ interface Props {
   /** Previously-generated minutes, restored on load so the MoM isn't regenerated. */
   initialMinutes?: MeetingMinutes | null
   vendorName: string
-  period: string
+  quarter: string
+  year: number
   onApproved: () => void
   /** Persistence key for this meeting's MoM. Defaults to the first note's meeting_id.
    *  Pass explicitly for alignment / vendor-prep meetings so each MoM stores separately. */
@@ -23,7 +24,7 @@ interface Props {
   heading?: string
 }
 
-export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = null, vendorName, period, onApproved, meetingId: meetingIdProp, heading = 'Meeting Minutes' }: Props) {
+export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = null, vendorName, quarter, year, onApproved, meetingId: meetingIdProp, heading = 'Meeting Minutes' }: Props) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(initialMinutes ? 'complete' : 'idle')
   const [minutes, setMinutes] = useState<MeetingMinutes | null>(initialMinutes)
   const [editing, setEditing] = useState(false)
@@ -88,7 +89,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
   function handleCopy() {
     if (!minutes) return
     const text = [
-      `${heading} — ${vendorName} ${period}`,
+      `${heading} — ${vendorName} ${quarter} ${year}`,
       `Date: ${minutes.meeting_date}`,
       `Attendees: ${minutes.attendees.join(', ')}`,
       '',
@@ -138,7 +139,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
       // Send to THIS meeting's own roster (alignment/vendor-prep); the QBR falls
       // back to mtg-… which the backend maps to the cycle attendee list.
       const meetingId = meetingIdProp ?? `mtg-${cycleId}`
-      const result = await sendMeetingMinutes(cycleId, runId, minutes, vendorName, period, meetingId)
+      const result = await sendMeetingMinutes(cycleId, runId, minutes, vendorName, quarter, year, meetingId)
       setSentRecipients(result.sent_to)
       setSendStatus('sent')
     } catch (e) {
@@ -157,7 +158,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
             </div>
             <div>
               <h3 className="font-semibold text-slate-900 dark:text-white text-sm">{heading}</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{vendorName} {period}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{vendorName} {quarter} {year}</p>
             </div>
           </div>
           <AgentStatusBadge status={agentStatus} />
@@ -483,10 +484,10 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
       {showApproval && minutes && (
         <ApprovalPanel
           title="Approve Meeting Minutes"
-          summary={`Approve and finalise the ${vendorName} ${period} EGB/QBR minutes.`}
+          summary={`Approve and finalise the ${vendorName} ${quarter} ${year} EGB/QBR minutes.`}
           previewContent={
             <div className="space-y-2 text-sm">
-              <p className="font-medium text-slate-800 dark:text-slate-200">{vendorName} {period} EGB/QBR Meeting Minutes</p>
+              <p className="font-medium text-slate-800 dark:text-slate-200">{vendorName} {quarter} {year} EGB/QBR Meeting Minutes</p>
               <p className="text-slate-600 dark:text-slate-400">{minutes.executive_summary}</p>
               <p className="text-xs text-slate-400">{minutes.action_items.length} action items will be merged into the unified Action Log.</p>
             </div>

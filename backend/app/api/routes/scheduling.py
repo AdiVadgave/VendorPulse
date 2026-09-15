@@ -37,7 +37,6 @@ from app.models.scheduling import (
     CycleCreate,
 )
 from app.utils.scorecard_structure import default_scorecard_config
-from app.utils.period import quarter_year_from_period, periods_overlap, period_label
 from app.services.scheduling_service import SchedulingService
 from app.config import settings
 
@@ -99,9 +98,8 @@ def create_cycle(
     from datetime import datetime, timezone
 
     logger.info(
-        "create_cycle called — vendor_id=%s, vendor_name=%s, period=%s..%s",
-        sanitize_for_log(payload.vendor_id), sanitize_for_log(payload.vendor_name),
-        sanitize_for_log(payload.period_start), sanitize_for_log(payload.period_end),
+        "create_cycle called — vendor_id=%s, vendor_name=%s, quarter=%s, year=%s",
+        sanitize_for_log(payload.vendor_id), sanitize_for_log(payload.vendor_name), sanitize_for_log(payload.quarter), sanitize_for_log(payload.year),
     )
 
     # Resolve or persist the vendor so future cycles can reuse it.
@@ -117,37 +115,37 @@ def create_cycle(
         vendor_id = persisted["vendor_id"]
         logger.info("create_cycle: resolved vendor '%s' → vendor_id=%s", sanitize_for_log(vendor_name), sanitize_for_log(vendor_id))
 
-    # Derive legacy quarter/year from the period start so back-compat readers still work.
-    derived_quarter, derived_year = quarter_year_from_period(payload.period_start)
-
-    # Soft duplicate guard: warn if the new period OVERLAPS an existing (non-archived)
-    # cycle for the same vendor. The coordinator may still proceed with confirm_duplicate.
-    # Archived cycles don't count, so a cancelled cycle can be recreated without a prompt.
+    # Soft duplicate guard: a cycle for the same vendor + quarter + year is
+    # almost always a mistake, but the coordinator is allowed to proceed. We warn
+    # (409 DUPLICATE_CYCLE) unless they explicitly confirm. Archived cycles do not
+    # count, so a cancelled cycle can be recreated without a prompt.
     if not payload.confirm_duplicate:
+        try:
+            year_int = int(payload.year)
+        except (TypeError, ValueError):
+            year_int = payload.year
         duplicate = next(
             (
                 c for c in cycle_repo.get_by_vendor(vendor_id)
-                if c.get("workflow_state") != "ARCHIVED"
-                and c.get("period_start") and c.get("period_end")
-                and periods_overlap(payload.period_start, payload.period_end,
-                                    c["period_start"], c["period_end"])
+                if c.get("quarter") == payload.quarter
+                and int(c.get("year") or 0) == year_int
+                and c.get("workflow_state") != "ARCHIVED"
             ),
             None,
         )
         if duplicate:
             logger.info(
-                "create_cycle: overlapping period — vendor_id=%s, period=%s..%s, existing_cycle_id=%s",
-                sanitize_for_log(vendor_id), sanitize_for_log(payload.period_start),
-                sanitize_for_log(payload.period_end), sanitize_for_log(duplicate.get("cycle_id")),
+                "create_cycle: duplicate detected — vendor_id=%s, quarter=%s, year=%s, existing_cycle_id=%s",
+                sanitize_for_log(vendor_id), sanitize_for_log(payload.quarter),
+                sanitize_for_log(payload.year), sanitize_for_log(duplicate.get("cycle_id")),
             )
-            new_label = period_label({"period_start": payload.period_start, "period_end": payload.period_end})
             raise HTTPException(
                 status_code=409,
                 detail={
                     "code": "DUPLICATE_CYCLE",
                     "message": (
-                        f"This period ({new_label}) overlaps an existing cycle "
-                        f"({period_label(duplicate)}) for {vendor_name}. Do you still want to create it?"
+                        f"A {payload.quarter} {payload.year} cycle already exists for "
+                        f"{vendor_name}. Do you still want to create it?"
                     ),
                     "existing_cycle_id": duplicate.get("cycle_id"),
                 },
@@ -159,10 +157,8 @@ def create_cycle(
         "vendor_id": vendor_id,
         "vendor_name": vendor_name,
         "cycle_type": payload.cycle_type,
-        "quarter": derived_quarter,
-        "year": derived_year,
-        "period_start": payload.period_start,
-        "period_end": payload.period_end,
+        "quarter": payload.quarter,
+        "year": payload.year,
         "description": (payload.description or "").strip(),
         "workflow_state": "CYCLE_CREATED",
         "created_at": now,
@@ -456,7 +452,7 @@ def approve_slot(
             draft = result.data["invite_draft"]
             user_prompt = (
                 f"Vendor: {cycle.get('vendor_name', 'the vendor')}, "
-                f"Period: {period_label(cycle)}, "
+                f"Quarter: {cycle.get('quarter', '')} {cycle.get('year', '')}, "
                 f"Meeting time: {draft.get('proposed_time', '')}, "
                 f"Timezone: {payload.time_zone or 'UTC'}, "
                 f"Attending: {', '.join(draft.get('attending', []))}"
@@ -467,7 +463,7 @@ def approve_slot(
             )
             draft["draft_subject"] = (
                 f"VendorPulse QBR — {cycle.get('vendor_name', 'Vendor')} "
-                f"{period_label(cycle)} Governance Meeting"
+                f"{cycle.get('quarter', '')} {cycle.get('year', '')} Governance Meeting"
             )
         except Exception:
             pass  # fall back to static draft

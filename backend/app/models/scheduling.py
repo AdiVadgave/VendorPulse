@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
-
-from app.utils.period import is_valid_ym
+from pydantic import BaseModel, Field
 
 InviteStatus = Literal["PENDING", "ACCEPTED", "DECLINED"]
 AttendanceConfirmationStatus = Literal["PENDING", "CONFIRMED", "REPLACED", "DECLINED"]
@@ -228,33 +226,14 @@ class CycleCreate(BaseModel):
     vendor_id: str
     vendor_name: str
     cycle_type: CycleType = "SPR"
-    # Free SPR period — the FROM and TO months as "YYYY-MM". Supersedes the old
-    # quarter/year model; quarter/year are derived server-side for back-compat.
-    period_start: str = Field(..., description='Period start month "YYYY-MM", e.g. "2026-03"')
-    period_end: str = Field(..., description='Period end month "YYYY-MM", e.g. "2026-09"')
-    quarter: Optional[str] = None
-    year: Optional[int] = None
+    quarter: Literal["Q1", "Q2", "Q3", "Q4"]
+    year: int
     category: str = "IT Infrastructure"
     description: str = Field(default="", description="Free-text purpose/scope of this governance cycle")
-    # When the period OVERLAPS an existing (non-archived) cycle for the same vendor,
-    # creation is not blocked — the coordinator is warned (HTTP 409,
-    # code=DUPLICATE_CYCLE) and may retry with this flag set to proceed anyway.
-    confirm_duplicate: bool = Field(default=False, description="Proceed even if the period overlaps an existing cycle for this vendor")
-
-    @field_validator("period_start", "period_end")
-    @classmethod
-    def _check_ym(cls, v: str) -> str:
-        v = (v or "").strip()
-        if not is_valid_ym(v):
-            raise ValueError('must be a month in "YYYY-MM" format, e.g. "2026-03"')
-        return v
-
-    @model_validator(mode="after")
-    def _check_order(self) -> "CycleCreate":
-        # "YYYY-MM" strings compare chronologically.
-        if self.period_end < self.period_start:
-            raise ValueError("period_end must be on or after period_start")
-        return self
+    # When a cycle already exists for the same vendor+quarter+year, creation is
+    # not blocked — the coordinator is warned (HTTP 409, code=DUPLICATE_CYCLE) and
+    # may retry with this flag set to proceed anyway.
+    confirm_duplicate: bool = Field(default=False, description="Proceed even if a same vendor+quarter+year cycle already exists")
 
 
 class Cycle(BaseModel):
@@ -262,11 +241,8 @@ class Cycle(BaseModel):
     vendor_id: str
     vendor_name: str
     cycle_type: CycleType = "SPR"
-    # Free SPR period ("YYYY-MM"); quarter/year kept for back-compat/legacy rows.
-    period_start: Optional[str] = None
-    period_end: Optional[str] = None
-    quarter: Optional[str] = None
-    year: Optional[int] = None
+    quarter: Literal["Q1", "Q2", "Q3", "Q4"]
+    year: int
     description: str = ""
     workflow_state: str
     created_at: str

@@ -28,7 +28,8 @@ import { cn } from '@/utils/cn'
 interface Props {
   cycleId: string
   vendorName: string
-  period: string
+  quarter: string
+  year: number
   /** Bubble action items parsed from this meeting's transcript to the shared log. */
   onActionsExtracted?: (actions: ExtractedAction[]) => void
   alreadyExtracted?: boolean
@@ -59,7 +60,7 @@ interface MeetingResult {
  * is manual (no Microsoft Graph / calendar access required).
  */
 export default function VendorPrepMeetingPanel({
-  cycleId, vendorName, period, onActionsExtracted, alreadyExtracted, qbrMeetingDate, pushbackSlot,
+  cycleId, vendorName, quarter, year, onActionsExtracted, alreadyExtracted, qbrMeetingDate, pushbackSlot,
 }: Props) {
   const [attendees, setAttendees] = useState<CycleAttendee[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -483,7 +484,8 @@ export default function VendorPrepMeetingPanel({
           notes={parsedNotes}
           initialMinutes={savedMinutes}
           vendorName={vendorName}
-          period={period}
+          quarter={quarter}
+          year={year}
           onApproved={() => { /* per-meeting MoM — no workflow gate */ }}
         />
       )}

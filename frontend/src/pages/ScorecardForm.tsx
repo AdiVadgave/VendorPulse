@@ -211,7 +211,7 @@ export default function ScorecardForm() {
           <CheckCircle2 className="mx-auto text-emerald-500" size={40} />
           <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Thank you!</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Your scorecard for <strong>{meta?.vendor_name}</strong> ({meta?.period_label}) has been submitted.
+            Your scorecard for <strong>{meta?.vendor_name}</strong> ({meta?.quarter} {meta?.year}) has been submitted.
           </p>
           <p className="text-xs text-slate-400 dark:text-slate-500">
             This tab will close automatically. You can close it now if it stays open.
@@ -230,7 +230,7 @@ export default function ScorecardForm() {
           <p className="text-sm font-semibold text-white leading-tight">
             {meta?.cycle_type ?? 'SPR'} Scorecard — {meta?.vendor_name}
           </p>
-          <p className="text-xs text-slate-400">{meta?.period_label}</p>
+          <p className="text-xs text-slate-400">{meta?.quarter} {meta?.year}</p>
         </div>
       </header>
 
@@ -249,7 +249,7 @@ export default function ScorecardForm() {
                 {meta?.cycle_type ?? 'SPR'} Scorecard — {meta?.vendor_name}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {meta?.period_label} · rate each measure 1 (systemic gaps) – 5 (significantly proactive)
+                {meta?.quarter} {meta?.year} · rate each measure 1 (systemic gaps) – 5 (significantly proactive)
               </p>
             </div>
           </div>

@@ -7,11 +7,8 @@ import { apiFetch } from './api'
 export interface AnalyticsCyclePoint {
   cycle_id: string
   label: string
-  /** SPR period ("YYYY-MM") — used to order the trend chronologically. */
-  period_start?: string | null
-  period_end?: string | null
-  quarter?: string | null
-  year?: number | null
+  quarter: string
+  year: number
   overall_score: number | null
   themes: Record<string, number>
   team_count: number

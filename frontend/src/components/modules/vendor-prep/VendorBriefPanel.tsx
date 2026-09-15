@@ -9,7 +9,8 @@ import { cn } from '@/utils/cn'
 interface Props {
   cycleId: string
   vendorName: string
-  period: string
+  quarter: string
+  year: number
   brief: VendorBrief | null
   onBriefGenerated: (brief: VendorBrief) => void
   /** Fired once the brief exists (generation is the terminal step — no approval gate).

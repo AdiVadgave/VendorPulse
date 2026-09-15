@@ -13,11 +13,12 @@ def build_minutes_email(
     *,
     attendee_name: str,
     vendor_name: str,
-    period: str,
+    quarter: str,
+    year: int,
     minutes: dict,
 ) -> dict[str, str]:
     """Generate a professional meeting minutes email (subject + HTML body + text body)."""
-    subject = f"Meeting Minutes — {vendor_name} {period} EGB/QBR"
+    subject = f"Meeting Minutes — {vendor_name} {quarter} {year} EGB/QBR"
 
     meeting_date = minutes.get("meeting_date", "")
     executive_summary = minutes.get("executive_summary", "")
@@ -49,12 +50,12 @@ def build_minutes_email(
 <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:680px;margin:0 auto;color:#1e293b;">
   <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px 32px;border-radius:12px 12px 0 0;">
     <h1 style="color:#fff;margin:0;font-size:20px;">VendorPulse — Meeting Minutes</h1>
-    <p style="color:#c7d2fe;margin:6px 0 0 0;font-size:14px;">{vendor_name} · {period} EGB/QBR</p>
+    <p style="color:#c7d2fe;margin:6px 0 0 0;font-size:14px;">{vendor_name} · {quarter} {year} EGB/QBR</p>
   </div>
 
   <div style="background:#ffffff;border:1px solid #e2e8f0;border-top:none;padding:32px;border-radius:0 0 12px 12px;">
     <p style="font-size:15px;line-height:1.6;">Dear <strong>{attendee_name}</strong>,</p>
-    <p style="font-size:14px;color:#475569;">Please find below the finalised minutes for the <strong>{vendor_name} {period} EGB/QBR</strong>{f" held on {meeting_date}" if meeting_date else ""}.</p>
+    <p style="font-size:14px;color:#475569;">Please find below the finalised minutes for the <strong>{vendor_name} {quarter} {year} EGB/QBR</strong>{f" held on {meeting_date}" if meeting_date else ""}.</p>
 
     {"<div style='background:#f8fafc;border-left:4px solid #6366f1;padding:16px 20px;border-radius:0 8px 8px 0;margin:20px 0;'><p style='margin:0 0 6px 0;font-size:11px;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:0.5px;'>Executive Summary</p><p style='margin:0;font-size:14px;color:#334155;line-height:1.6;'>" + executive_summary + "</p></div>" if executive_summary else ""}
 
@@ -75,7 +76,7 @@ def build_minutes_email(
 """
 
     text_lines = [
-        f"Meeting Minutes — {vendor_name} {period} EGB/QBR",
+        f"Meeting Minutes — {vendor_name} {quarter} {year} EGB/QBR",
         f"Date: {meeting_date}" if meeting_date else "",
         "",
     ]
@@ -104,7 +105,8 @@ def build_scorecard_email(
     attendee_email: str,
     vendor_name: str,
     cycle_id: str,
-    period: str,
+    quarter: str,
+    year: int,
     form_url: str,
     reissue: bool = False,
 ) -> dict[str, str]:
@@ -118,9 +120,9 @@ def build_scorecard_email(
     completed (used by the 'redo scorecard' flow).
     """
     subject = (
-        f"{vendor_name} — Corrected QBR Scorecard, Action Required ({period})"
+        f"{vendor_name} — Corrected QBR Scorecard, Action Required ({quarter} {year})"
         if reissue
-        else f"{vendor_name} — QBR Scorecard Input Request ({period})"
+        else f"{vendor_name} — QBR Scorecard Input Request ({quarter} {year})"
     )
 
     # Formal correction notice shown at the top when re-issuing.
@@ -149,7 +151,7 @@ def build_scorecard_email(
 {reissue_notice}
     <p style="font-size: 15px; line-height: 1.6;">
       You have been identified as a key reviewer for the <strong>{vendor_name}</strong>
-      QBR governance cycle (<strong>{period}</strong>).
+      QBR governance cycle (<strong>{quarter} {year}</strong>).
     </p>
 
     <p style="font-size: 15px; line-height: 1.6;">
@@ -196,7 +198,7 @@ def build_scorecard_email(
             else ""
         )
         + f"You have been selected as a key reviewer for the {vendor_name} "
-        f"QBR governance cycle ({period}).\n\n"
+        f"QBR governance cycle ({quarter} {year}).\n\n"
         f"Please complete your scorecard at: {form_url}\n\n"
         f"Categories: Risk & Compliance, Performance, Commercial, Relationship\n"
         f"Scale: 1 (Poor) to 5 (Excellent)\n\n"
@@ -209,7 +211,8 @@ def build_reminder_email(
     *,
     attendee_name: str,
     vendor_name: str,
-    period: str,
+    quarter: str,
+    year: int,
     form_url: str,
     deadline: str,
     days_left: int,
@@ -224,18 +227,18 @@ def build_reminder_email(
     )
     subject = (
         f"{'FINAL REMINDER' if urgent else 'Reminder'} — {vendor_name} QBR Scorecard "
-        f"{'due today' if urgent else f'due {deadline}'} ({period})"
+        f"{'due today' if urgent else f'due {deadline}'} ({quarter} {year})"
     )
     html_body = f"""\
 <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
   <div style="background:{accent};padding:22px 32px;border-radius:12px 12px 0 0;">
     <h1 style="color:#fff;margin:0;font-size:19px;">VendorPulse — Scorecard {tone_label}</h1>
-    <p style="color:#ffffffcc;margin:6px 0 0 0;font-size:13px;">{vendor_name} · {period}</p>
+    <p style="color:#ffffffcc;margin:6px 0 0 0;font-size:13px;">{vendor_name} · {quarter} {year}</p>
   </div>
   <div style="background:#fff;border:1px solid #e2e8f0;border-top:none;padding:30px 32px;border-radius:0 0 12px 12px;">
     <p style="font-size:15px;line-height:1.6;">Dear <strong>{attendee_name}</strong>,</p>
     <p style="font-size:15px;line-height:1.6;">
-      Our records show your scorecard input for the <strong>{vendor_name} {period}</strong>
+      Our records show your scorecard input for the <strong>{vendor_name} {quarter} {year}</strong>
       governance cycle {when}. Please submit it at your earliest convenience.
     </p>
     <div style="text-align:center;margin:26px 0;">
@@ -251,7 +254,7 @@ def build_reminder_email(
 """
     text_body = (
         f"Dear {attendee_name},\n\n"
-        f"Reminder: your scorecard for {vendor_name} {period} "
+        f"Reminder: your scorecard for {vendor_name} {quarter} {year} "
         f"{'is due today' if urgent else f'is due in {days_left} day(s) (by {deadline})'}.\n\n"
         f"Complete it here: {form_url}\n\n"
         f"If already submitted, please disregard.\n\nVendorPulse"
@@ -263,7 +266,8 @@ def build_escalation_email(
     *,
     coordinator_name: str,
     vendor_name: str,
-    period: str,
+    quarter: str,
+    year: int,
     deadline: str,
     pending: list[dict],
 ) -> dict[str, str]:
@@ -278,12 +282,12 @@ def build_escalation_email(
 <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:620px;margin:0 auto;color:#1e293b;">
   <div style="background:#dc2626;padding:22px 32px;border-radius:12px 12px 0 0;">
     <h1 style="color:#fff;margin:0;font-size:19px;">VendorPulse — Scorecard Escalation</h1>
-    <p style="color:#ffffffcc;margin:6px 0 0 0;font-size:13px;">{vendor_name} · {period}</p>
+    <p style="color:#ffffffcc;margin:6px 0 0 0;font-size:13px;">{vendor_name} · {quarter} {year}</p>
   </div>
   <div style="background:#fff;border:1px solid #e2e8f0;border-top:none;padding:30px 32px;border-radius:0 0 12px 12px;">
     <p style="font-size:15px;line-height:1.6;">Dear <strong>{coordinator_name or 'VMO Coordinator'}</strong>,</p>
     <p style="font-size:15px;line-height:1.6;">
-      Today is the scorecard deadline (<strong>{deadline}</strong>) for <strong>{vendor_name} {period}</strong>,
+      Today is the scorecard deadline (<strong>{deadline}</strong>) for <strong>{vendor_name} {quarter} {year}</strong>,
       and <strong>{len(pending)}</strong> reviewer{'s' if len(pending) != 1 else ''} {'have' if len(pending) != 1 else 'has'} not yet submitted:
     </p>
     <table style="width:100%;border-collapse:collapse;margin:16px 0;">
@@ -302,7 +306,7 @@ def build_escalation_email(
     text_lines = [
         f"Dear {coordinator_name or 'VMO Coordinator'},",
         "",
-        f"Today is the scorecard deadline ({deadline}) for {vendor_name} {period}.",
+        f"Today is the scorecard deadline ({deadline}) for {vendor_name} {quarter} {year}.",
         f"{len(pending)} reviewer(s) have not submitted:",
         *[f"  - {p.get('name','')} <{p.get('email','')}>" for p in pending],
         "",

@@ -15,7 +15,8 @@ import { cn } from '@/utils/cn'
 interface Props {
   vendorName: string
   cycleId: string
-  period: string
+  quarter: string
+  year: number
   attendees: CycleAttendee[]
   onDispatched: () => void
   onAttendeesChanged?: (updated: CycleAttendee[]) => void
@@ -305,7 +306,7 @@ function CategoriesDropdown({ structure }: { structure: WeightedCategoryDef[] })
   )
 }
 
-export default function ScorecardDispatchPanel({ vendorName, cycleId, period, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false, structure, onRedo }: Props) {
+export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false, structure, onRedo }: Props) {
   const effectiveStructure = structure && structure.length > 0 ? structure : WEIGHTED_SCORECARD_STRUCTURE
   const totalMeasures = effectiveStructure.reduce((sum, c) => sum + c.measures.length, 0)
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(alreadyDispatched ? 'complete' : 'idle')
@@ -396,7 +397,8 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, period, at
       const result = await dispatchInAppScorecard({
         cycle_id: cycleId,
         vendor_name: vendorName,
-        period,
+        quarter,
+        year,
         form_base_url: window.location.origin,
         recipients: recipients.map((a) => ({
           attendee_id: a.attendee_id,

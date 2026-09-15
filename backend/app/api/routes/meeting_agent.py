@@ -384,7 +384,8 @@ def send_minutes(cycleId: str, payload: SendMinutesRequest):
         email_content = build_minutes_email(
             attendee_name=name,
             vendor_name=minutes.get("vendor_name", ""),
-            period=minutes.get("period") or f"{minutes.get('quarter', '')} {minutes.get('year', '')}".strip(),
+            quarter=minutes.get("quarter", ""),
+            year=minutes.get("year", 0),
             minutes=minutes,
         )
 

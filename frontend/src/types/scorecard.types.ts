@@ -344,12 +344,8 @@ export interface ScorecardFormMeta {
   cycle_id: string
   vendor_name: string
   cycle_type: string
-  /** SPR period label, e.g. "Mar 2026 – Sep 2026". */
-  period_label?: string
-  period_start?: string | null
-  period_end?: string | null
-  quarter?: string | null
-  year?: number | null
+  quarter: string
+  year: number
   structure: WeightedCategoryDef[]
   respondent: ScorecardRespondent | null
 }

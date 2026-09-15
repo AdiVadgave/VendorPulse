@@ -388,8 +388,9 @@ def schedule_vendor_prep_meeting_manual(
         raise HTTPException(status_code=400, detail="No attendee emails found for this cycle")
 
     vendor_name = cycle.get("vendor_name", "TBD")
-    from app.utils.period import period_label
-    subject = f"Vendor Prep Call — {vendor_name} ({period_label(cycle)})".strip()
+    quarter = cycle.get("quarter", "")
+    year = cycle.get("year", "")
+    subject = f"Vendor Prep Call — {vendor_name} ({quarter} {year})".strip()
     meeting_url = (payload.meeting_url or "").strip() or None
 
     existing = next(

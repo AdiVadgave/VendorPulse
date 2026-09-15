@@ -131,21 +131,20 @@ function CompareVendorsChart({ vendors, themes }: { vendors: AnalyticsVendor[]; 
   const cat = pal.dark ? CAT_DARK : CAT_LIGHT
   const colorFor = (vendorId: string) => cat[Math.max(0, vendors.findIndex((v) => v.vendor_id === vendorId)) % cat.length]
 
-  // Periods available across all vendors, ordered oldest→newest by the period start
-  // ("YYYY-MM" sorts chronologically), with the count of vendors that have data in
-  // each (so we can default to the richest period).
+  // Quarters available across all vendors, ordered oldest→newest, with the count of
+  // vendors that have data in each (so we can default to the richest period).
+  const Q = { Q1: 1, Q2: 2, Q3: 3, Q4: 4 } as Record<string, number>
   const periods = useMemo(() => {
-    const map = new Map<string, { label: string; sortKey: string; count: number }>()
+    const map = new Map<string, { label: string; year: number; q: string; count: number }>()
     vendors.forEach((v) => v.cycles.forEach((c) => {
-      const sortKey = c.period_start || `${c.year ?? ''}-${c.quarter ?? ''}`
-      const e = map.get(c.label) ?? { label: c.label, sortKey, count: 0 }
+      const e = map.get(c.label) ?? { label: c.label, year: c.year, q: c.quarter, count: 0 }
       e.count += 1
       map.set(c.label, e)
     }))
-    return Array.from(map.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+    return Array.from(map.values()).sort((a, b) => a.year - b.year || (Q[a.q] ?? 0) - (Q[b.q] ?? 0))
   }, [vendors])
 
-  const richest = useMemo(() => [...periods].sort((a, b) => b.count - a.count || b.sortKey.localeCompare(a.sortKey))[0], [periods]) // eslint-disable-line
+  const richest = useMemo(() => [...periods].sort((a, b) => b.count - a.count || b.year - a.year || (Q[b.q] ?? 0) - (Q[a.q] ?? 0))[0], [periods]) // eslint-disable-line
   const [period, setPeriod] = useState<string>('')
   const activePeriod = period || richest?.label || ''
 

@@ -617,7 +617,7 @@ The backend had **two** App Settings that contained the database password:
 
 | App Setting | Key Vault Secret | Content |
 |-------------|-----------------|----------|
-| `PG_PASSWORD` | `VENDORPULSE-PG-PASSWORD` | Just the password (stored only in Key Vault — never in this doc) |
+| `PG_PASSWORD` | `VENDORPULSE-PG-PASSWORD` | Just the password: `Mobility@12345` |
 | `DATABASE_URL` | `VENDORPULSE-DATABASE-URL` | Full connection string with password baked in |
 
 The code checks `DATABASE_URL` **first** (see `config.py` → `effective_database_url`).

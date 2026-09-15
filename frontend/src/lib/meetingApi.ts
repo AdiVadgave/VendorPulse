@@ -174,8 +174,8 @@ export async function sendMeetingMinutes(
   runId: string,
   minutes: MeetingMinutes,
   vendorName: string,
-  /** SPR period label, e.g. "Mar 2026 – Sep 2026" — embedded in the minutes email. */
-  period: string,
+  quarter: string,
+  year: number,
   /** Which meeting these minutes belong to, so the email goes to that meeting's own
    *  edited roster ("align-…"/"vprep-…"); omit/undefined for the QBR (cycle list). */
   meetingId?: string
@@ -186,7 +186,7 @@ export async function sendMeetingMinutes(
       method: 'POST',
       body: JSON.stringify({
         run_id: runId,
-        minutes: { ...minutes, vendor_name: vendorName, period },
+        minutes: { ...minutes, vendor_name: vendorName, quarter, year },
         meeting_id: meetingId,
       }),
     }

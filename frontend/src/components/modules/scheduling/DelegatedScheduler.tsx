@@ -14,6 +14,7 @@ import { useState } from 'react'
 import { Loader2, AlertCircle } from 'lucide-react'
 import FindSlotsControl from './FindSlotsControl'
 import SlotRankingPanel from './SlotRankingPanel'
+import ManualTimeCard from './ManualTimeCard'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import { createMeetingEvent, updateMeetingTime, findEventIdByJoinUrl, wallClockToUtcIso } from '@/lib/graphScheduling'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
@@ -205,6 +206,17 @@ export default function DelegatedScheduler({
         </div>
       )}
 
+      {/* No internal calendars to check (e.g. a vendor-only invite list) → free/busy
+          slot suggestions aren't possible, so go straight to picking a specific time. */}
+      {findAttendees.length === 0 ? (
+        <>
+          <p className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+            No internal stakeholders are on this invite, so their calendars can't be checked for free slots — choose a specific time instead.
+          </p>
+          <ManualTimeCard defaultDuration={defaultDuration} onSchedule={handleManual} />
+        </>
+      ) : (
+        <>
       {phase === 'find' && (
         <FindSlotsControl
           cycleId={cycleId}
@@ -245,6 +257,8 @@ export default function DelegatedScheduler({
             onBackToAttendees={() => setPhase('find')}
             onScheduleManual={handleManual}
           />
+        </>
+      )}
         </>
       )}
 

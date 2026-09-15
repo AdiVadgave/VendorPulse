@@ -19,8 +19,6 @@ import type {
   ShellDepartment,
 } from '@/types/scheduling.types'
 import { SHELL_DEPARTMENTS } from '@/types/scheduling.types'
-import { ROLE_LABELS } from '@/types/cycle.types'
-import type { StakeholderRole } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
 import type { SystemUser } from '@/lib/schedulingApi'
 import { createUser } from '@/lib/usersApi'
@@ -76,7 +74,6 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
   const [searching, setSearching] = useState(false)
   const shellSearchAvailable = isGraphPeopleSearchAvailable()
   const [selected, setSelected] = useState<PeopleSearchResult | null>(null)
-  const [role, setRole] = useState<StakeholderRole>('VMO_COORDINATOR')
   const [attendeeType, setAttendeeType] = useState<'Internal Stakeholder' | 'Vendor'>('Internal Stakeholder')
   const [isKey, setIsKey] = useState(false)
   const [attendanceRequirement, setAttendanceRequirement] = useState<AttendanceRequirement>('Required')
@@ -112,7 +109,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
     setCreating(true)
     setError(null)
     try {
-      const created = await createUser({ name, email, role, organisation: newOrg.trim() })
+      const created = await createUser({ name, email, organisation: newOrg.trim() })
       // Immediately select the freshly-created person so the normal add flow proceeds.
       setSelected(created)
       setQuery(created.name)
@@ -208,7 +205,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
       stakeholder_id: `s_${Date.now()}`,
       name: selected.name,
       email: selected.email,
-      role,
+      role: '',
       organisation: selected.organisation,
       type: attendeeType,
       is_key: isKey,
@@ -245,7 +242,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
         stakeholder_id: `s_${Date.now()}`,
         name: selected.name,
         email: selected.email,
-        role,
+        role: '',
         organisation: selected.organisation,
         type: attendeeType,
         is_key: isKey,
@@ -400,18 +397,6 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
 
       {selected && (
         <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <label className="text-xs text-slate-600 dark:text-slate-400">Role *</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as StakeholderRole)}
-              className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              {(Object.keys(ROLE_LABELS) as StakeholderRole[]).map((r) => (
-                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-              ))}
-            </select>
-          </div>
           {!hideType && (
           <div className="space-y-1">
             <label className="text-xs text-slate-600 dark:text-slate-400">Type *</label>
@@ -661,7 +646,6 @@ export default function AttendeeRefreshPanel({
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-500 dark:text-slate-400">
                   <th className="text-left px-5 py-2.5 font-medium">Name</th>
-                  <th className="text-left px-4 py-2.5 font-medium">Role</th>
                   <th className="text-left px-4 py-2.5 font-medium">Organisation</th>
                   <th className="text-left px-4 py-2.5 font-medium">Type</th>
                   <th className="text-left px-4 py-2.5 font-medium">Attendance</th>
@@ -686,9 +670,6 @@ export default function AttendeeRefreshPanel({
                       <span className="font-medium text-slate-800 dark:text-slate-200">
                         {a.name}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
-                      {ROLE_LABELS[a.role] ?? a.role}
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
                       {a.organisation}

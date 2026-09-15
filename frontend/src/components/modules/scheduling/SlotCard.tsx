@@ -197,12 +197,6 @@ export default function SlotCard({
             : <XCircle size={13} className="text-red-500" />}
           <span className="text-slate-600 dark:text-slate-400">Organiser available</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          {slot.exec_sponsor_available
-            ? <CheckCircle2 size={13} className="text-emerald-500" />
-            : <XCircle size={13} className="text-red-500" />}
-          <span className="text-slate-600 dark:text-slate-400">Exec Sponsor available</span>
-        </div>
       </div>
 
       {/* Key-stakeholder & leadership coverage (what the ranking weights most) */}

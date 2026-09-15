@@ -18,7 +18,6 @@ import {
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
-import { ROLE_LABELS } from '@/types/cycle.types'
 import { getEventAttendeeResponses, isSchedulingAvailable, type RsvpResponse } from '@/lib/graphScheduling'
 
 interface ConfirmationTrackerProps {
@@ -268,7 +267,6 @@ export default function ConfirmationTracker({
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-500 dark:text-slate-400">
                 <th className="text-left px-5 py-2.5 font-medium">Name</th>
-                <th className="text-left px-4 py-2.5 font-medium">Role</th>
                 <th className="text-left px-4 py-2.5 font-medium">Organisation</th>
                 <th className="text-left px-4 py-2.5 font-medium">Status</th>
                 <th className="text-left px-4 py-2.5 font-medium">Action</th>
@@ -292,9 +290,6 @@ export default function ConfirmationTracker({
                           {a.name}
                         </span>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-400">
-                      {ROLE_LABELS[a.role]}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-400">
                       {a.organisation}

@@ -1,5 +1,3 @@
-import type { StakeholderRole } from './cycle.types'
-
 export type InviteStatus = 'ACCEPTED' | 'DECLINED' | 'PENDING'
 
 export type AttendanceConfirmationStatus = 'PENDING' | 'CONFIRMED' | 'REPLACED' | 'DECLINED'
@@ -34,7 +32,8 @@ export interface CycleAttendee {
   cycle_id?: string
   name: string
   email: string
-  role: StakeholderRole
+  /** Deprecated — stakeholder roles were removed; kept as an inert field for API/DB compatibility. */
+  role?: string
   organisation: string
   type: AttendeeType
   is_key: boolean

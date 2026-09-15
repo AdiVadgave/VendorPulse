@@ -37,23 +37,6 @@ export interface GovernanceCycle {
   meeting_duration_minutes?: number | null
 }
 
-export type StakeholderRole =
-  | 'VMO_COORDINATOR'
-  | 'INTERNAL_LEAD'
-  | 'VENDOR_MANAGER'
-  | 'EGB_CHAIR'
-  | 'TECHNICAL_LEAD'
-  | 'COMMERCIAL_LEAD'
-
-export const ROLE_LABELS: Record<StakeholderRole, string> = {
-  VMO_COORDINATOR: 'VMO Coordinator',
-  INTERNAL_LEAD: 'Internal Lead',
-  VENDOR_MANAGER: 'Vendor Manager',
-  EGB_CHAIR: 'EGB Chair',
-  TECHNICAL_LEAD: 'Technical Lead',
-  COMMERCIAL_LEAD: 'Commercial Lead',
-}
-
 export interface ActionItem {
   action_id: string
   cycle_id: string

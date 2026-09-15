@@ -5,21 +5,12 @@ import {
 } from 'lucide-react'
 import { listUsers, createUser, updateUser, deleteUser } from '@/lib/usersApi'
 import type { SystemUser, UserInput } from '@/lib/usersApi'
-import { ROLE_LABELS } from '@/types/cycle.types'
-import type { StakeholderRole } from '@/types/cycle.types'
 import { cn } from '@/utils/cn'
-
-const ROLE_KEYS = Object.keys(ROLE_LABELS) as StakeholderRole[]
 
 const EMPTY_FORM: UserInput = {
   name: '',
   email: '',
-  role: 'VMO_COORDINATOR',
   organisation: '',
-}
-
-function roleLabel(role: string): string {
-  return (ROLE_LABELS as Record<string, string>)[role] ?? role
 }
 
 export default function AdminUsers() {
@@ -55,7 +46,7 @@ export default function AdminUsers() {
     const q = query.trim().toLowerCase()
     if (!q) return users
     return users.filter((u) =>
-      [u.name, u.email, u.organisation, roleLabel(u.role)]
+      [u.name, u.email, u.organisation]
         .some((v) => (v ?? '').toLowerCase().includes(q))
     )
   }, [users, query])
@@ -70,7 +61,6 @@ export default function AdminUsers() {
     setForm({
       name: u.name,
       email: u.email,
-      role: ROLE_KEYS.includes(u.role as StakeholderRole) ? u.role : 'VMO_COORDINATOR',
       organisation: u.organisation ?? '',
     })
     setEditingId(u.user_id)
@@ -94,7 +84,6 @@ export default function AdminUsers() {
       const payload: UserInput = {
         name,
         email,
-        role: form.role,
         organisation: form.organisation?.trim() || '',
       }
       if (editingId) await updateUser(editingId, payload)
@@ -179,13 +168,6 @@ export default function AdminUsers() {
                 placeholder="alex@shell.com" />
             </label>
             <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Role
-              <select className={cn(field, 'mt-1')} value={form.role}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}>
-                {ROLE_KEYS.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-              </select>
-            </label>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
               Organisation
               <input className={cn(field, 'mt-1')} value={form.organisation}
                 onChange={(e) => setForm((f) => ({ ...f, organisation: e.target.value }))}
@@ -221,7 +203,7 @@ export default function AdminUsers() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name, email, organisation, or role…"
+          placeholder="Search by name, email, or organisation…"
           className="w-full pl-9 pr-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
       </div>
@@ -256,9 +238,6 @@ export default function AdminUsers() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{u.name}</span>
-                    <span className="text-[11px] px-1.5 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      {roleLabel(u.role)}
-                    </span>
                     {u.organisation && (
                       <span className="text-[11px] px-1.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 flex items-center gap-1">
                         <Building2 size={10} /> {u.organisation}

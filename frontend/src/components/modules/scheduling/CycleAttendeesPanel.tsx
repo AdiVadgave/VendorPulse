@@ -4,7 +4,6 @@ import { cn } from '@/utils/cn'
 import { apiFetch } from '@/lib/api'
 import { SearchAddAttendeeForm } from './AttendeeRefreshPanel'
 import type { CycleAttendee } from '@/types/scheduling.types'
-import { ROLE_LABELS } from '@/types/cycle.types'
 
 interface Props {
   cycleId: string
@@ -109,7 +108,7 @@ export default function CycleAttendeesPanel({ cycleId, attendees, onAttendeesCha
                       )}
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                      {ROLE_LABELS[a.role] ?? a.role} · {a.email}
+                      {a.email}
                     </p>
                   </div>
                   {a.type === 'Internal Stakeholder' && (

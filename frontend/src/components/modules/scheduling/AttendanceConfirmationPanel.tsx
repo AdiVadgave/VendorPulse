@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Users, CheckCircle2, ArrowRight, Loader2, UserCheck, UserX } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { CycleAttendee, AttendanceConfirmationStatus } from '@/types/scheduling.types'
-import { ROLE_LABELS } from '@/types/cycle.types'
 import { apiFetch } from '@/lib/api'
 
 interface AttendanceConfirmationPanelProps {
@@ -118,8 +117,6 @@ export default function AttendanceConfirmationPanel({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm text-slate-800 dark:text-slate-200">{a.name}</span>
-                      <span className="text-xs text-slate-400 dark:text-slate-500">{ROLE_LABELS[a.role] ?? a.role}</span>
-                      <span className="text-xs text-slate-400 dark:text-slate-500">·</span>
                       <span className="text-xs text-slate-400 dark:text-slate-500">{a.organisation}</span>
                     </div>
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{a.email}</p>

@@ -80,7 +80,6 @@ function attendeeWeight(a: CycleAttendee): number {
   let w = 1
   if (a.is_key) w += 3
   if (a.lt_status === 'LT') w += 2
-  if (a.role === 'EGB_CHAIR') w += 3
   if (a.attendance_requirement === 'Optional') w *= 0.4
   return w
 }
@@ -204,11 +203,10 @@ export async function findMeetingSlots(
   const data = (await res.json()) as { meetingTimeSuggestions?: GraphSuggestion[] }
   const suggestions = data.meetingTimeSuggestions ?? []
 
-  // Which attendee is the exec sponsor (hard-constraint role)? Only treat them as a
-  // constraint when their calendar is actually searchable (a Shell mailbox) — an
-  // external EGB chair has unreadable free/busy, so we must NOT mark every slot
-  // "exec busy" or penalise it for availability we can't see.
-  const execEmail = searchable.find((a) => a.role === 'EGB_CHAIR')?.email?.toLowerCase() ?? null
+  // Stakeholder roles were removed, so there is no longer a role-tagged exec sponsor
+  // to treat as a hard constraint. The exec-sponsor scoring below no-ops when this is
+  // null; overall availability is still captured via is_key / LT weighting.
+  const execEmail: string | null = null
   // Per-searched-attendee importance metadata, keyed by lowercased email.
   const META = new Map(
     searchable.map((a) => [

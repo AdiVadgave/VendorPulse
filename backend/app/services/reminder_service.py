@@ -112,11 +112,13 @@ def pending_respondents(cycle_id: str) -> list[dict]:
 
 
 def _coordinators(cycle_id: str) -> list[dict]:
+    """Escalation recipients. Stakeholder roles were removed, so there is no
+    role-tagged coordinator any more — escalate to the key internal reviewers."""
     attendees = [a for a in get_attendee_repo().find_all() if a.get("cycle_id") == cycle_id]
     return [
         {"name": a.get("name", ""), "email": (a.get("email") or "").strip()}
         for a in attendees
-        if "COORDINATOR" in str(a.get("role", "")).upper() and (a.get("email") or "").strip()
+        if a.get("is_key") and a.get("type") != "Vendor" and (a.get("email") or "").strip()
     ]
 
 

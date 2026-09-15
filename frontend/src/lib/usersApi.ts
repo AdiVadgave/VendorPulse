@@ -11,7 +11,8 @@ export type { SystemUser }
 export interface UserInput {
   name: string
   email: string
-  role: string
+  /** Deprecated — stakeholder roles were removed; kept optional for API compatibility. */
+  role?: string
   organisation?: string
 }
 
@@ -34,7 +35,7 @@ export async function createUser(input: UserInput): Promise<SystemUser> {
     name: u.name ?? input.name,
     email: u.email ?? input.email,
     organisation: u.organisation ?? input.organisation ?? '',
-    role: u.role ?? input.role,
+    role: u.role ?? input.role ?? '',
     avatar: u.avatar ?? '',
   }
 }

@@ -35,7 +35,9 @@ class CycleAttendeeCreate(BaseModel):
     stakeholder_id: str
     name: str
     email: str
-    role: StakeholderRole
+    # Stakeholder roles were removed — kept as an inert free-text field (default empty)
+    # for DB compatibility; no longer constrained to the old role vocabulary.
+    role: str = ""
     organisation: str
     type: AttendeeType = Field(default="Internal Stakeholder", description="Internal Stakeholder or Vendor")
     is_key: bool = False
@@ -79,7 +81,7 @@ class CycleAttendee(BaseModel):
     stakeholder_id: str
     name: str
     email: str
-    role: StakeholderRole
+    role: str = ""
     organisation: str
     type: AttendeeType = "Internal Stakeholder"
     is_key: bool = False

@@ -14,6 +14,7 @@ export type ShellDepartment =
   | 'Business'
   | 'CP'
   | 'IRM'
+  | 'SRE'
   | 'Other'
 
 export const SHELL_DEPARTMENTS: ShellDepartment[] = [
@@ -23,6 +24,7 @@ export const SHELL_DEPARTMENTS: ShellDepartment[] = [
   'Business',
   'CP',
   'IRM',
+  'SRE',
   'Other',
 ]
 

@@ -20,7 +20,7 @@ StakeholderRole = Literal[
 AttendanceRequirement = Literal["Required", "Optional"]
 LTStatus = Literal["LT", "Non-LT"]
 # Shell-internal invitee department (Shell / Internal Stakeholder invitees only)
-ShellDepartment = Literal["IDTM", "IDE", "SOM", "Business", "CP", "IRM", "Other"]
+ShellDepartment = Literal["IDTM", "IDE", "SOM", "Business", "CP", "IRM", "SRE", "Other"]
 
 # Cycle type — currently SPR (Supplier Performance Review) is the only option.
 CycleType = Literal["SPR"]

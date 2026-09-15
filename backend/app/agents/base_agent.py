@@ -26,7 +26,7 @@ When LLM is disabled (settings.enable_llm = False):
   - All agent_runs logging still happens (full traceability)
 
 When LLM is enabled:
-  - Claude API drives which tools to call in sequence
+  - the LLM drives which tools to call in sequence
   - execute_tool() routes each call to the correct service method
   - Swap enable_llm=true in .env to activate
 
@@ -53,7 +53,7 @@ class BaseAgent(ABC):
     All VendorPulse agents inherit from this class.
 
     Provides:
-    - Standard Claude API tool-calling loop (when LLM enabled)
+    - Standard LLM tool-calling loop (when LLM enabled)
     - Deterministic fallback path (when LLM disabled)
     - agent_runs logging for full traceability
     - Standardised AgentResponse output envelope
@@ -83,7 +83,7 @@ class BaseAgent(ABC):
 
     @abstractmethod
     def get_system_prompt(self) -> str:
-        """Return the Claude system prompt for this agent."""
+        """Return the system prompt for this agent."""
         ...
 
     @abstractmethod
@@ -100,7 +100,7 @@ class BaseAgent(ABC):
     def execute_tool(self, tool_name: str, tool_input: dict) -> str:
         """
         Execute a single tool call and return the result as a JSON string.
-        Called by the tool-calling loop for each tool_use block from Claude.
+        Called by the tool-calling loop for each tool_use block from the LLM.
         """
         ...
 

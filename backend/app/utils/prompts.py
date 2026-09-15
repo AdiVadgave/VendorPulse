@@ -1,5 +1,5 @@
 """
-All Claude system prompts for VendorPulse agents.
+All LLM system prompts for VendorPulse agents.
 
 Keeping prompts in one place makes them easy to review, version, and test
 before going live. Never embed prompts directly in agent code.

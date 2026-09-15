@@ -294,7 +294,7 @@ export default function TranscriptInput({ cycleId, onParsed, meetingId, alreadyE
       <textarea
         value={transcript}
         onChange={(e) => setTranscript(e.target.value)}
-        placeholder="Paste the full meeting transcript here — or use “Attach file” to load a .docx or .vtt (e.g. a Teams transcript export). Claude will parse it into structured note types: questions, objections, decisions, appreciations, and action items..."
+        placeholder="Paste the full meeting transcript here — or use “Attach file” to load a .docx or .vtt (e.g. a Teams transcript export). AI will parse it into structured note types: questions, objections, decisions, appreciations, and action items..."
         rows={8}
         className="w-full text-sm text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400"
       />

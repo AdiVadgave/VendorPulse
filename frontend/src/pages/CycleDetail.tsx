@@ -390,6 +390,32 @@ export default function CycleDetail() {
       .catch(() => { /* backend not ready / demo cycle — keep seeded notes */ })
   }, [cycleId])
 
+  // Progress-bar "completed" signals for Alignment / Vendor Prep. A meeting counts as
+  // completed once its transcript has been PARSED (notes persisted) — not when merely
+  // scheduled. The QBR uses meetingNotes (loaded above). Re-checked when the workflow
+  // advances or an action item is extracted (both follow a transcript parse).
+  const [alignmentParsed, setAlignmentParsed] = useState(false)
+  const [vendorPrepParsed, setVendorPrepParsed] = useState(false)
+  useEffect(() => {
+    if (!cycleId) return
+    let cancelled = false
+    getMeetingArtifact(cycleId, `vprep-${cycleId}`)
+      .then((a) => { if (!cancelled) setVendorPrepParsed((a.notes?.length ?? 0) > 0) })
+      .catch(() => { /* offline / never parsed */ })
+    listAlignmentMeetings(cycleId)
+      .then(async (r) => {
+        const mets = r.meetings ?? []
+        if (mets.length === 0) { if (!cancelled) setAlignmentParsed(false); return }
+        const arts = await Promise.all(
+          mets.map((m) => getMeetingArtifact(cycleId, `align-${cycleId}-${m.meeting_index}`).catch(() => null))
+        )
+        if (!cancelled) setAlignmentParsed(arts.some((a) => (a?.notes?.length ?? 0) > 0))
+      })
+      .catch(() => { /* offline / none scheduled */ })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cycleId, storeWorkflowState, actions.length])
+
   const dedupeMerge = (prev: ActionItem[], incoming: ActionItem[]) => {
     const seen = new Set(prev.map((a) => a.action_id))
     return [...prev, ...incoming.filter((a) => !seen.has(a.action_id))]
@@ -476,6 +502,20 @@ export default function CycleDetail() {
   // Derive current workflow state: store override takes precedence over static mock
   const workflowState: WorkflowState = storeWorkflowState ?? cycle.workflow_state
   const currentStateIndex = WORKFLOW_STATES.indexOf(workflowState)
+
+  // Independent per-step completion for the progress bar. A meeting step counts as
+  // DONE once its transcript has been PARSED (the meeting actually happened), NOT when
+  // it was merely scheduled. Each step reads its own real signal, so steps completed
+  // out of order are shown truthfully (Vendor Prep can be done while Alignment is still
+  // pending), and scheduling never marks a step done.
+  const progressSteps = [
+    { label: 'Scheduling', done: !!cycle.teams_meeting_scheduled_at },
+    { label: 'Scorecard', done: !!compiledScorecard },
+    { label: 'Alignment', done: alignmentParsed },
+    { label: 'Vendor Prep', done: vendorPrepParsed },
+    { label: 'Meeting', done: meetingNotes.length > 0 },
+    { label: 'Complete', done: currentStateIndex >= WORKFLOW_STATES.indexOf('POST_MEETING_COMPLETE') },
+  ]
 
   function changeTab(tab: TabKey) {
     const minIndex = TAB_MIN_STATE_INDEX[tab]
@@ -644,31 +684,25 @@ export default function CycleDetail() {
 
         {/* Workflow progress bar — always visible above tabs */}
         <div className="mb-3 px-1">
-          <WorkflowProgressBar currentState={workflowState} compact />
+          <WorkflowProgressBar steps={progressSteps} compact />
         </div>
 
         <div className="flex items-center gap-0.5 overflow-x-auto">
           {(Object.keys(TAB_LABELS) as TabKey[]).map((tab) => {
-            const minIndex = TAB_MIN_STATE_INDEX[tab]
-            const isLocked = currentStateIndex < minIndex
             const isActive = activeTab === tab
             return (
               <button
                 key={tab}
                 onClick={() => changeTab(tab)}
-                disabled={isLocked}
                 className={cn(
                   'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                   isActive
                     ? 'border-indigo-600 text-indigo-700 dark:text-indigo-200 dark:border-indigo-300 bg-indigo-50/60 dark:bg-indigo-500/10'
-                    : isLocked
-                      ? 'border-transparent text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                      : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
+                    : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
                 )}
               >
                 {TAB_ICONS[tab]}
                 {TAB_LABELS[tab]}
-                {isLocked && <Lock size={11} className="ml-0.5" />}
               </button>
             )
           })}

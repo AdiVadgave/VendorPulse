@@ -69,15 +69,24 @@ export const TAB_LABELS: Record<TabKey, string> = {
   actions: 'Actions',
 }
 
-/** Returns the minimum workflow state index required to access a tab */
+/**
+ * Minimum workflow state index required to access a tab.
+ *
+ * All tabs are now ALWAYS accessible (every value is 0). The old rigid
+ * "steps-to-unlock" order (scorecard → alignment → vendor prep → meeting) proved
+ * impractical — teams routinely schedule every meeting of a cycle up front (often
+ * on the same day) to block calendars, before any scorecard input exists. Tabs are
+ * no longer gated; the workflow progress bar tracks each step's completion
+ * independently instead.
+ */
 export const TAB_MIN_STATE_INDEX: Record<TabKey, number> = {
   overview: 0,
   scheduling: 0,
-  scorecard: 3, // MEETING_SCHEDULED
-  alignment: 6, // SCORECARD_COMPILED
-  'vendor-prep': 7, // INTERNAL_ALIGNMENT
-  meeting: 8, // VENDOR_PREP
-  actions: 0, // always open — the action queue is available at any point in the cycle
+  scorecard: 0,
+  alignment: 0,
+  'vendor-prep': 0,
+  meeting: 0,
+  actions: 0,
 }
 
 /**

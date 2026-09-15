@@ -374,11 +374,13 @@ export async function createMeetingEvent(params: {
 export async function addAttendeesToEvent(params: {
   eventId: string
   attendees: CycleAttendee[]
-  /** Optionally update the invite subject/body so Graph re-notifies with fresh text. */
+  /** Optionally update the invite subject so Graph re-notifies with fresh text. */
   subject?: string
+  /** Deprecated / ignored: the event body is intentionally NOT overwritten (see below)
+   *  so the Teams join link survives. */
   bodyHtml?: string
 }): Promise<void> {
-  const { eventId, attendees, subject, bodyHtml } = params
+  const { eventId, attendees, subject } = params
   const body: Record<string, unknown> = {
     attendees: attendees
       .filter((a) => a.email)
@@ -388,7 +390,10 @@ export async function addAttendeesToEvent(params: {
       })),
   }
   if (subject) body.subject = subject
-  if (bodyHtml) body.body = { contentType: 'HTML', content: bodyHtml }
+  // IMPORTANT: do NOT PATCH `body` here — same reason as updateMeetingTime. Overwriting
+  // the event body replaces the Graph-injected Teams join block and the link is lost for
+  // everyone. Newly-added attendees receive the event's existing body (which already
+  // contains the Teams join link) when Graph sends them the invite.
   const res = await fetch(`${GRAPH}/me/events/${encodeURIComponent(eventId)}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
@@ -456,11 +461,13 @@ export async function updateMeetingTime(params: {
   eventId: string
   startISO: string
   durationMinutes: number
-  /** Optionally update the invite subject/body alongside the new time. */
+  /** Optionally update the invite subject alongside the new time. */
   subject?: string
+  /** Deprecated / ignored: the event body is intentionally NOT overwritten on a
+   *  reschedule (see below) so the Teams join link survives. */
   bodyHtml?: string
 }): Promise<{ teams_meeting_url: string | null }> {
-  const { eventId, startISO, durationMinutes, subject, bodyHtml } = params
+  const { eventId, startISO, durationMinutes, subject } = params
   const start = new Date(startISO)
   const end = new Date(start.getTime() + durationMinutes * 60 * 1000)
   const body: Record<string, unknown> = {
@@ -468,7 +475,12 @@ export async function updateMeetingTime(params: {
     end: { dateTime: end.toISOString().replace('Z', ''), timeZone: 'UTC' },
   }
   if (subject) body.subject = subject
-  if (bodyHtml) body.body = { contentType: 'HTML', content: bodyHtml }
+  // IMPORTANT: do NOT PATCH `body` on a reschedule. For a Teams online meeting, Graph
+  // injects the "Join the meeting" link + dial-in block into the event body when the
+  // event is created. Overwriting body.content here would replace that block, so the
+  // join link disappears from the rescheduled Outlook appointment. Updating only
+  // start/end (and subject) preserves the link — Graph still re-sends the updated
+  // invite (with the original body + link) to all attendees.
   const res = await fetch(`${GRAPH}/me/events/${encodeURIComponent(eventId)}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },

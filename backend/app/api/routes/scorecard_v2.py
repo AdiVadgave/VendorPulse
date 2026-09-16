@@ -237,16 +237,32 @@ def get_form_meta(cycle_id: str, attendee: str = ""):
 
     respondent = None
     respondent_team: str | None = None
-    if attendee:
-        att = get_attendee_repo().find_by_id("attendee_id", attendee)
-        if att and att.get("cycle_id") == cycle_id:
-            respondent_team = att.get("shell_department") or att.get("name", "")
-            respondent = {
-                "attendee_id": att.get("attendee_id"),
-                "name": att.get("name", ""),
-                "email": att.get("email", ""),
-                "team": respondent_team,
-            }
+    att = get_attendee_repo().find_by_id("attendee_id", attendee) if attendee else None
+    if att and att.get("cycle_id") == cycle_id:
+        respondent_team = att.get("shell_department") or att.get("name", "")
+        respondent = {
+            "attendee_id": att.get("attendee_id"),
+            "name": att.get("name", ""),
+            "email": att.get("email", ""),
+            "team": respondent_team,
+        }
+    else:
+        # The link didn't resolve to a reviewer (the frontend shows "does not match a
+        # known reviewer"). This is NOT a timeout — the request succeeded. Log the
+        # precise reason so an intermittent report can be diagnosed. The usual cause is
+        # the reviewer being removed and re-added after the link was sent (which mints a
+        # new attendee_id, invalidating the old link), or the link's `attendee` query
+        # param being dropped/truncated when the email link was opened.
+        if not attendee:
+            reason = "no attendee id in the link (attendee param missing/empty)"
+        elif att is None:
+            reason = "attendee_id not found — likely removed & re-added since the link was sent (new id)"
+        else:
+            reason = f"attendee belongs to a different cycle ({att.get('cycle_id')})"
+        logger.warning(
+            "form-meta: link did not resolve to a reviewer — cycle=%s attendee=%s reason=%s",
+            sanitize_for_log(cycle_id), sanitize_for_log(attendee), sanitize_for_log(reason),
+        )
 
     # Show each respondent only the measures assigned to their team.
     structure = _filter_structure_for_team(_effective_config(cycle)["categories"], respondent_team)

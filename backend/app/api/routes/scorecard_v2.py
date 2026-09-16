@@ -250,6 +250,16 @@ def get_form_meta(cycle_id: str, attendee: str = ""):
 
     # Show each respondent only the measures assigned to their team.
     structure = _filter_structure_for_team(_effective_config(cycle)["categories"], respondent_team)
+
+    # The vendor's most recent prior cycle that has consolidated scores, so reviewers
+    # can consult the previous scorecard (all teams) while filling this one in.
+    prev_id = find_previous_cycle_id(cycle_id)
+    prev_label = None
+    if prev_id:
+        prev = get_cycle_repo().get_by_cycle_id(prev_id)
+        if prev:
+            prev_label = f"{prev.get('quarter', '')} {prev.get('year', '') or ''}".strip() or None
+
     return {
         "cycle_id": cycle_id,
         "vendor_name": cycle.get("vendor_name", ""),
@@ -258,6 +268,8 @@ def get_form_meta(cycle_id: str, attendee: str = ""):
         "year": cycle.get("year"),
         "structure": structure,
         "respondent": respondent,
+        "previous_cycle_id": prev_id,
+        "previous_label": prev_label,
     }
 
 

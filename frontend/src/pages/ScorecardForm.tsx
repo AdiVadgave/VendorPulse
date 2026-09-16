@@ -55,6 +55,10 @@ export default function ScorecardForm() {
 
   // Consolidated scorecard so far (shown pinned beside the form).
   const [weighted, setWeighted] = useState<WeightedScorecard | null>(null)
+  // The previous cycle's consolidated scorecard, so reviewers can consult it while
+  // filling this one in. A toggle switches the pinned panel between the two.
+  const [previousWeighted, setPreviousWeighted] = useState<WeightedScorecard | null>(null)
+  const [scoreView, setScoreView] = useState<'current' | 'previous'>('current')
 
   const structure = meta?.structure ?? WEIGHTED_SCORECARD_STRUCTURE
   const respondent = meta?.respondent ?? null
@@ -76,6 +80,10 @@ export default function ScorecardForm() {
         if (done) setAlreadySubmitted(true)
         // Load other teams' submitted scorecards (visible to the reviewer).
         try { setWeighted(await getWeightedScorecard(cycleId)) } catch { /* none yet */ }
+        // Load the previous cycle's consolidated scorecard for the "previous" view.
+        if (m.previous_cycle_id) {
+          try { setPreviousWeighted(await getWeightedScorecard(m.previous_cycle_id)) } catch { /* none */ }
+        }
       })
       .catch((e) => setLoadError(e instanceof Error ? e.message : 'Could not load the scorecard'))
       .finally(() => setLoading(false))
@@ -420,10 +428,46 @@ export default function ScorecardForm() {
         </div>
         </div>
 
-        {/* Right — Consolidated Scorecard (pinned) */}
+        {/* Right — Consolidated Scorecard (pinned), with a toggle to consult the
+            previous cycle's scorecard (all teams) while filling this one in. */}
         <aside className="w-full lg:w-[560px] shrink-0 lg:sticky lg:top-[76px] self-stretch lg:self-start">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Consolidated Scorecard</p>
-          {weighted && weighted.teams.length > 0 ? (
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              {scoreView === 'previous'
+                ? `Previous Scorecard${meta?.previous_label ? ` — ${meta.previous_label}` : ''}`
+                : 'Consolidated Scorecard'}
+            </p>
+            {meta?.previous_cycle_id && previousWeighted && previousWeighted.teams.length > 0 && (
+              <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 shrink-0">
+                {(['current', 'previous'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setScoreView(v)}
+                    className={cn(
+                      'px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors',
+                      scoreView === v
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    )}
+                  >
+                    {v === 'current' ? 'This cycle' : `Previous${meta?.previous_label ? ` (${meta.previous_label})` : ''}`}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {scoreView === 'previous' ? (
+            previousWeighted && previousWeighted.teams.length > 0 ? (
+              <div className="lg:max-h-[calc(100vh-96px)] overflow-y-auto">
+                <WeightedScorecardTable data={previousWeighted} />
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                No consolidated scores were recorded for the previous cycle.
+              </div>
+            )
+          ) : weighted && weighted.teams.length > 0 ? (
             <div className="lg:max-h-[calc(100vh-96px)] overflow-y-auto">
               <WeightedScorecardTable data={weighted} />
             </div>

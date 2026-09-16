@@ -348,6 +348,10 @@ export interface ScorecardFormMeta {
   year: number
   structure: WeightedCategoryDef[]
   respondent: ScorecardRespondent | null
+  /** The vendor's most recent prior cycle with scores (for the "previous scorecard"
+   *  view), plus a human label like "Q1 2026". Null when this is the first cycle. */
+  previous_cycle_id?: string | null
+  previous_label?: string | null
 }
 
 export interface TeamSubmissionEntry {

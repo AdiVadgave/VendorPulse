@@ -1174,6 +1174,7 @@ function SchedulingTab({
           }}
           onBackToAttendees={() => onPhaseChange('attendee_refresh')}
           onScheduleManual={scheduleManual}
+          showReviewers={false}
         />
       )}
       {schedulingPhase === 'invite_approval' && (

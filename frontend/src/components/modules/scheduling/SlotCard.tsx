@@ -9,6 +9,9 @@ interface SlotCardProps {
   onApprove: (slotId: string) => void
   isProcessing?: boolean
   timeZoneView?: 'IST' | 'UTC' | 'GMT'
+  /** Show the "Reviewers X/Y free" coverage chip. Hidden for the main SPR session,
+   *  where scorecard-reviewer status is not relevant to who should attend. */
+  showReviewers?: boolean
 }
 
 const RANK_CONFIG = [
@@ -58,6 +61,7 @@ export default function SlotCard({
   onApprove,
   isProcessing = false,
   timeZoneView = 'IST',
+  showReviewers = true,
 }: SlotCardProps) {
   const baseCfg = RANK_CONFIG[rank - 1] ?? FALLBACK_RANK_CFG
   const cfg = {
@@ -200,9 +204,9 @@ export default function SlotCard({
       </div>
 
       {/* Key-stakeholder & leadership coverage (what the ranking weights most) */}
-      {((slot.key_total ?? 0) > 0 || (slot.lt_total ?? 0) > 0) && (
+      {(((showReviewers && (slot.key_total ?? 0) > 0)) || (slot.lt_total ?? 0) > 0) && (
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          {(slot.key_total ?? 0) > 0 && (
+          {showReviewers && (slot.key_total ?? 0) > 0 && (
             <span
               className={cn(
                 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',

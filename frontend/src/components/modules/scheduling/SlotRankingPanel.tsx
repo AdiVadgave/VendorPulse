@@ -15,6 +15,8 @@ interface SlotRankingPanelProps {
   onBackToAttendees: () => void
   /** Optional: schedule at a coordinator-chosen time instead of a suggested slot. */
   onScheduleManual?: (startLocalISO: string, timeZone: TimeZoneView, durationMinutes: number) => void
+  /** Show the "Reviewers X/Y free" chip on each slot (hidden for the main SPR session). */
+  showReviewers?: boolean
 }
 
 export default function SlotRankingPanel({
@@ -22,6 +24,7 @@ export default function SlotRankingPanel({
   onSlotApproved,
   onBackToAttendees,
   onScheduleManual,
+  showReviewers = true,
 }: SlotRankingPanelProps) {
   const PAGE_SIZE = SCHEDULING_CONFIG.PAGE_SIZE
 
@@ -111,6 +114,7 @@ export default function SlotRankingPanel({
             onApprove={handleApprove}
             isProcessing={false}
             timeZoneView={timeZoneView}
+            showReviewers={showReviewers}
           />
         ))}
       </div>

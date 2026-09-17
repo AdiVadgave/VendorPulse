@@ -84,6 +84,13 @@ def add_meeting_attendee(ma_repo, seed_repo, cycle_id: str, kind: str, index: in
     # Mark seeded so a later list() won't re-seed over the manual edit.
     if not seed_repo.is_seeded(_seed_id(cycle_id, kind, index)):
         _mark_seeded(seed_repo, cycle_id, kind, index)
+    # De-duplicate by email (case-insensitive): the same person must not appear twice on
+    # a meeting's roster. If they're already on it, return the existing row unchanged.
+    email_key = (data.get("email") or "").strip().lower()
+    if email_key:
+        for existing in ma_repo.get_for_meeting(cycle_id, kind, index):
+            if (existing.get("email") or "").strip().lower() == email_key:
+                return _to_dto(existing)
     row = {
         "row_id": f"ma_{uuid.uuid4().hex}",
         "cycle_id": cycle_id,

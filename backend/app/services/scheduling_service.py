@@ -192,8 +192,24 @@ class SchedulingService:
         suggest additional stakeholders based on past cycle records.
         """
         logger.info("add_attendees — cycle_id=%s, count=%d", sanitize_for_log(cycle_id), len(attendees))
+        # De-duplicate by email (case-insensitive): the same person must never appear
+        # twice in a cycle's attendee list. Skip anyone whose email is already on the
+        # cycle, and collapse repeats within this same request (e.g. a double-click).
+        existing_emails = {
+            (a.get("email") or "").strip().lower()
+            for a in self._attendees.get_for_cycle(cycle_id)
+            if (a.get("email") or "").strip()
+        }
         inserted: list[dict] = []
+        skipped: list[str] = []
         for a in attendees:
+            email_key = (a.email or "").strip().lower()
+            if email_key and email_key in existing_emails:
+                skipped.append(a.email)
+                logger.info("add_attendees: skipped duplicate email=%s cycle_id=%s", sanitize_for_log(a.email), sanitize_for_log(cycle_id))
+                continue
+            if email_key:
+                existing_emails.add(email_key)
             record = {
                 "attendee_id": f"att_{uuid.uuid4().hex}",
                 "cycle_id": cycle_id,
@@ -215,6 +231,10 @@ class SchedulingService:
             inserted.append(record)
 
         warnings: list[str] = []
+        if skipped:
+            warnings.append(
+                f"{len(skipped)} attendee(s) were already in the list and were not added again."
+            )
         key_count = sum(1 for a in inserted if a["is_key"])
         if key_count < 2:
             warnings.append("Fewer than 2 scorecard reviewers — slot ranking hard constraints may not work correctly")

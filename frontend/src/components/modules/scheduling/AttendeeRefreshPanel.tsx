@@ -231,6 +231,9 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
         []
       if (added.length > 0) {
         onAdded(added[0])
+      } else {
+        // Backend skipped it as a duplicate (same email already on the cycle).
+        setError('This person is already in the attendee list.')
       }
     } catch {
       if (submitOverride) {

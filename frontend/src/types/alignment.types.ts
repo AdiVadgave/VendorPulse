@@ -87,5 +87,5 @@ export interface ExtractedAction {
   owner: string
   due_date: string | null
   source: 'alignment' | 'vendor_prep' | 'meeting'
-  status: 'OPEN' | 'IN_PROGRESS' | 'CLOSED'
+  status: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED' | 'NEXT_CYCLE'
 }

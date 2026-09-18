@@ -103,7 +103,11 @@ PUSHBACK_CATEGORIES = [
 # Action item statuses
 # ---------------------------------------------------------------------------
 
-ACTION_STATUSES = ["OPEN", "IN_PROGRESS", "CLOSED"]
+ACTION_STATUSES = ["OPEN", "IN_PROGRESS", "COMPLETED", "CLOSED", "NEXT_CYCLE"]
+
+# Statuses that count as still-active work. While any action is in one of these,
+# the cycle cannot be closed/archived.
+OPEN_ACTION_STATUSES = ["OPEN", "IN_PROGRESS"]
 
 # ---------------------------------------------------------------------------
 # Agent names

@@ -99,7 +99,7 @@ import type { SchedulingPhase, CycleAttendee, SlotProposal } from '@/types/sched
 import type { ExtractedAction, AlignmentInsight } from '@/types/alignment.types'
 import { getAlignmentInsights, listAlignmentMeetings, deleteAlignmentMeeting } from '@/lib/alignmentApi'
 import {
-  getActions, addAction, addActionsBulk, updateAction, deleteAction,
+  getActions, addAction, addActionsBulk, updateAction, deleteAction, getLegacyActions,
   type ActionItem, type NewActionInput,
 } from '@/lib/actionsApi'
 import {
@@ -886,6 +886,25 @@ function OverviewTab({
   const progressPct = Math.round(((currentStateIndex + 1) / WORKFLOW_STATES.length) * 100)
   const description = (cycle.description ?? '').trim()
 
+  // "Next cycle" actions carried over from this vendor's previous cycle — reminders
+  // whose completion only becomes relevant now, at the start of this cycle.
+  const [legacyActions, setLegacyActions] = useState<ActionItem[]>([])
+  const [legacyLabel, setLegacyLabel] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await getLegacyActions(cycle.cycle_id)
+        if (cancelled) return
+        setLegacyActions(res.actions)
+        setLegacyLabel(res.previous_label)
+      } catch {
+        if (!cancelled) { setLegacyActions([]); setLegacyLabel(null) }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [cycle.cycle_id])
+
   const stats = [
     { label: 'Current Stage', value: currentStateLabel, sub: `Step ${currentStateIndex + 1} of ${WORKFLOW_STATES.length}`, icon: <Activity size={16} /> },
     { label: 'Governance Cycle', value: `${cycle.quarter} ${cycle.year}`, sub: `${cycle.cycle_type ?? 'SPR'} · Supplier Performance Review`, icon: <CalendarClock size={16} /> },
@@ -939,6 +958,35 @@ function OverviewTab({
           </div>
         </div>
       </div>
+
+      {/* Legacy actions carried over from the previous cycle ("next cycle" items). */}
+      {legacyActions.length > 0 && (
+        <div className="bg-indigo-50/60 dark:bg-indigo-900/15 border border-indigo-200 dark:border-indigo-900/50 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <CalendarClock size={16} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <h3 className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">
+              Carried over from last cycle{legacyLabel ? ` (${legacyLabel})` : ''}
+            </h3>
+          </div>
+          <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 mb-3">
+            These “next cycle” actions were deferred to the start of this cycle. Add them to this cycle's Action Log if you still need to track them.
+          </p>
+          <ul className="space-y-2">
+            {legacyActions.map((a) => (
+              <li key={a.action_id} className="bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/40 rounded-lg px-3 py-2">
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{a.description}</p>
+                {a.details && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{a.details}</p>
+                )}
+                <div className="flex items-center gap-2 flex-wrap mt-1 text-xs text-slate-400 dark:text-slate-500">
+                  <span>Owner: <span className="font-medium text-slate-600 dark:text-slate-300">{a.owner}</span></span>
+                  {a.due_date && <span>· Due: {a.due_date}</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Key facts */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1869,7 +1917,9 @@ function ActionsTab({
 }) {
   const [adding, setAdding] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(false)
-  const openCount = actions.filter((a) => a.status !== 'CLOSED').length
+  // Still-active work: Open + In Progress. These block closing the cycle. Completed,
+  // Closed and Next-cycle items do not (Next-cycle is deferred to the next cycle).
+  const blockingCount = actions.filter((a) => a.status === 'OPEN' || a.status === 'IN_PROGRESS').length
   const isArchived = workflowState === 'ARCHIVED'
   // Archiving is only allowed once the final QBR meeting is done.
   const finalMeetingDone =
@@ -1934,6 +1984,25 @@ function ActionsTab({
               Archive Cycle
             </button>
           </div>
+        ) : blockingCount > 0 ? (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-5 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle size={16} className="text-red-500 dark:text-red-400 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-red-700 dark:text-red-300">Cannot close the cycle yet</p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+                  {blockingCount} action item{blockingCount > 1 ? 's are' : ' is'} still Open or In Progress.
+                  Resolve them, or defer with Completed, Closed, or Next cycle, before archiving.
+                </p>
+              </div>
+            </div>
+            <button
+              disabled
+              className="shrink-0 px-4 py-2 bg-red-200/70 dark:bg-red-900/40 text-red-400 dark:text-red-500 text-sm font-medium rounded-lg cursor-not-allowed"
+            >
+              Archive Cycle
+            </button>
+          </div>
         ) : confirmArchive ? (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-5">
             <div className="flex items-start gap-3 mb-3">
@@ -1942,7 +2011,6 @@ function ActionsTab({
                 <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Archive this cycle?</p>
                 <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
                   This marks the governance process complete and moves the cycle to ARCHIVED.
-                  {openCount > 0 && ` ${openCount} action item${openCount > 1 ? 's are' : ' is'} still open.`}
                 </p>
               </div>
             </div>

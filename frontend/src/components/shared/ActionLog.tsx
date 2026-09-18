@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { CheckCircle2, Clock, AlertCircle, Filter, CheckCheck, Pencil, Trash2, Check, X } from 'lucide-react'
+import { CheckCircle2, Clock, AlertCircle, Filter, CheckCheck, Pencil, Trash2, Check, X, CalendarClock, Archive } from 'lucide-react'
 import { format } from 'date-fns'
 import type { ExtractedAction } from '@/types/alignment.types'
 import { cn } from '@/utils/cn'
 
-type StatusFilter = 'ALL' | 'OPEN' | 'IN_PROGRESS' | 'CLOSED'
+type StatusFilter = 'ALL' | 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED' | 'NEXT_CYCLE'
 
 const SOURCE_LABELS: Record<string, string> = {
   alignment: 'Alignment',
@@ -21,7 +21,9 @@ const SOURCE_COLORS: Record<string, string> = {
 const STATUS_CONFIG = {
   OPEN: { label: 'Open', icon: <AlertCircle size={12} />, classes: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' },
   IN_PROGRESS: { label: 'In Progress', icon: <Clock size={12} />, classes: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400' },
-  CLOSED: { label: 'Closed', icon: <CheckCircle2 size={12} />, classes: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' },
+  COMPLETED: { label: 'Completed', icon: <CheckCircle2 size={12} />, classes: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' },
+  CLOSED: { label: 'Closed', icon: <Archive size={12} />, classes: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' },
+  NEXT_CYCLE: { label: 'Next Cycle', icon: <CalendarClock size={12} />, classes: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400' },
 }
 
 export interface ActionEdit {
@@ -74,10 +76,12 @@ export default function ActionLog({ actions, showCycleRef = false, onStatusChang
   const inProgressCount = actions.filter((a) => a.status === 'IN_PROGRESS').length
   const hasUnclosed = openCount + inProgressCount > 0
 
+  // Bulk-resolve the active work only. Completed / Closed / Next-cycle items are
+  // left untouched so a deferred "next cycle" reminder isn't accidentally retired.
   const handleMarkAllClosed = () => {
     if (!onStatusChange) return
     actions.forEach((a) => {
-      if (a.status !== 'CLOSED') {
+      if (a.status === 'OPEN' || a.status === 'IN_PROGRESS') {
         onStatusChange(a.action_id, 'CLOSED')
       }
     })
@@ -90,7 +94,7 @@ export default function ActionLog({ actions, showCycleRef = false, onStatusChang
           <div>
             <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Action Log</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {openCount} open · {inProgressCount} in progress · {actions.length - openCount - inProgressCount} closed
+              {openCount} open · {inProgressCount} in progress · {actions.length - openCount - inProgressCount} resolved
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -100,7 +104,7 @@ export default function ActionLog({ actions, showCycleRef = false, onStatusChang
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
               >
                 <CheckCheck size={14} />
-                Mark All Completed
+                Mark All Closed
               </button>
             )}
             <Filter size={15} className="text-slate-400" />
@@ -116,11 +120,11 @@ export default function ActionLog({ actions, showCycleRef = false, onStatusChang
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors mr-1"
           >
             <CheckCheck size={13} />
-            Mark All Completed
+            Mark All Closed
           </button>
         )}
         <div className="flex items-center gap-1">
-          {(['ALL', 'OPEN', 'IN_PROGRESS', 'CLOSED'] as StatusFilter[]).map((f) => (
+          {(['ALL', 'OPEN', 'IN_PROGRESS', 'COMPLETED', 'CLOSED', 'NEXT_CYCLE'] as StatusFilter[]).map((f) => (
             <button
               key={f}
               onClick={() => setStatusFilter(f)}
@@ -248,7 +252,9 @@ export default function ActionLog({ actions, showCycleRef = false, onStatusChang
                     >
                       <option value="OPEN">Open</option>
                       <option value="IN_PROGRESS">In Progress</option>
+                      <option value="COMPLETED">Completed</option>
                       <option value="CLOSED">Closed</option>
+                      <option value="NEXT_CYCLE">Next Cycle</option>
                     </select>
                   ) : (
                     <span className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', statusCfg.classes)}>

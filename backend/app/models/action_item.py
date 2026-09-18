@@ -12,7 +12,12 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 ActionSource = Literal["alignment", "vendor_prep", "meeting"]
-ActionStatus = Literal["OPEN", "IN_PROGRESS", "CLOSED"]
+# OPEN / IN_PROGRESS are still-active work (they block closing the cycle).
+# COMPLETED = the work is done this cycle (distinct from CLOSED, which retires the
+# item from the log). NEXT_CYCLE = the action only becomes relevant at the start of
+# the FOLLOWING cycle (e.g. "invite the architect next cycle"); it does not block
+# closing and is surfaced as a legacy action in the next cycle's Overview.
+ActionStatus = Literal["OPEN", "IN_PROGRESS", "COMPLETED", "CLOSED", "NEXT_CYCLE"]
 
 
 class ActionItem(BaseModel):

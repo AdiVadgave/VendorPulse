@@ -216,6 +216,7 @@ def set_workflow_state(
     cycleId: str,
     payload: dict = Body(...),
     cycle_repo=Depends(get_cycle_repo),
+    action_repo=Depends(get_action_repo),
 ):
     """
     Fast-forward a cycle's workflow_state to the requested target (forward-only).
@@ -246,6 +247,25 @@ def set_workflow_state(
 
     if target_idx == current_idx:
         return {"cycle": cycle, "message": "No change"}
+
+    # A cycle can't be closed/archived while actions are still active. NEXT_CYCLE
+    # and COMPLETED/CLOSED items don't count — only genuinely open work blocks.
+    if target == "ARCHIVED":
+        from app.utils.constants import OPEN_ACTION_STATUSES
+        open_actions = [
+            a for a in action_repo.get_for_cycle(cycleId)
+            if (a.get("status") or "").upper() in OPEN_ACTION_STATUSES
+        ]
+        if open_actions:
+            n = len(open_actions)
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Cannot close the cycle: {n} action item{'s are' if n != 1 else ' is'} "
+                    "still Open or In Progress. Resolve or defer them (Completed, Closed, "
+                    "or Next cycle) before archiving."
+                ),
+            )
 
     # Walk forward one step at a time so transition history stays consistent.
     updated = cycle

@@ -33,6 +33,18 @@ export async function getActions(cycleId: string): Promise<{ actions: ActionItem
   )
 }
 
+export interface LegacyActionsResult {
+  actions: ActionItem[]
+  count: number
+  previous_cycle_id: string | null
+  previous_label: string | null
+}
+
+/** "Next cycle" actions carried over from this vendor's previous cycle (read-only reminders). */
+export async function getLegacyActions(cycleId: string): Promise<LegacyActionsResult> {
+  return apiFetch<LegacyActionsResult>(`/api/cycles/${cycleId}/actions/legacy`)
+}
+
 export async function addAction(cycleId: string, action: NewActionInput): Promise<{ action: ActionItem }> {
   return apiFetch<{ action: ActionItem }>(
     `/api/cycles/${cycleId}/actions`,

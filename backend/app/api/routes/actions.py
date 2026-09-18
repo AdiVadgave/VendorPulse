@@ -112,6 +112,61 @@ def list_actions(cycleId: str, action_repo=Depends(get_action_repo)):
     return {"actions": items, "count": len(items)}
 
 
+_QUARTER_NUM = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
+
+
+def _cycle_sort_key(cycle: dict) -> tuple[int, int]:
+    try:
+        year = int(cycle.get("year") or 0)
+    except (TypeError, ValueError):
+        year = 0
+    return (year, _QUARTER_NUM.get(cycle.get("quarter", ""), 0))
+
+
+def _previous_cycle(cycle: dict, cycle_repo) -> dict | None:
+    """The most recent prior cycle for the SAME vendor (by year, then quarter),
+    strictly before this one. Unlike the scorecard helper it does NOT require any
+    scorecard data — a cycle can carry 'next cycle' actions without one."""
+    cur_key = _cycle_sort_key(cycle)
+    siblings = [
+        c for c in cycle_repo.get_by_vendor(cycle.get("vendor_id"))
+        if c.get("cycle_id") != cycle.get("cycle_id")
+        and _cycle_sort_key(c) < cur_key
+    ]
+    siblings.sort(key=_cycle_sort_key, reverse=True)
+    return siblings[0] if siblings else None
+
+
+@router.get("/legacy")
+def list_legacy_actions(
+    cycleId: str,
+    action_repo=Depends(get_action_repo),
+    cycle_repo=Depends(get_cycle_repo),
+):
+    """'Next cycle' actions carried over from this vendor's PREVIOUS cycle — the ones
+    whose completion only becomes relevant now, at the start of the following cycle.
+    Surfaced read-only in the Overview tab as a reminder to the coordinator."""
+    cycle = cycle_repo.get_by_cycle_id(cycleId)
+    if not cycle:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycleId}' not found")
+
+    prev = _previous_cycle(cycle, cycle_repo)
+    if not prev:
+        return {"actions": [], "count": 0, "previous_cycle_id": None, "previous_label": None}
+
+    legacy = [
+        a for a in action_repo.get_for_cycle(prev["cycle_id"])
+        if (a.get("status") or "").upper() == "NEXT_CYCLE"
+    ]
+    label = f"{prev.get('quarter', '')} {prev.get('year', '')}".strip()
+    return {
+        "actions": legacy,
+        "count": len(legacy),
+        "previous_cycle_id": prev["cycle_id"],
+        "previous_label": label or None,
+    }
+
+
 @router.post("")
 def add_action(cycleId: str, payload: ActionItemCreate, action_repo=Depends(get_action_repo)):
     """Add a single action item (manual entry)."""

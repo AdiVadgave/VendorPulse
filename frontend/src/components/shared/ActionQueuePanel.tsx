@@ -30,7 +30,7 @@ export default function ActionQueuePanel({
   const [open, setOpen] = useState(defaultOpen)
   const [adding, setAdding] = useState(false)
 
-  const openCount = actions.filter((a) => a.status !== 'CLOSED').length
+  const openCount = actions.filter((a) => a.status === 'OPEN' || a.status === 'IN_PROGRESS').length
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">

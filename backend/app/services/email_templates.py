@@ -169,6 +169,25 @@ def build_scorecard_email(
       </ul>
     </div>
 
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+      <p style="font-size: 13px; color: #64748b; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">How to Complete</p>
+      <ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.9;">
+        <li>The link below is <strong>personal to you</strong> — please don't forward it. Each reviewer submits once.</li>
+        <li>Score every parameter on the <strong>1–5 scale</strong> and add a short comment where it helps explain a rating.</li>
+        <li>Base your input on <strong>objective evidence</strong> from this cycle (delivery, SLAs, incidents, commercials) rather than impressions.</li>
+        <li>Set the link aside and complete it in one sitting — the form is submitted when you press <strong>Submit</strong>.</li>
+      </ul>
+    </div>
+
+    <div style="background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px 20px; margin: 24px 0;">
+      <p style="font-size: 13px; color: #92400e; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Personal Data — Please Do Not Share</p>
+      <p style="font-size: 14px; line-height: 1.6; margin: 0; color: #92400e;">
+        Do not enter any personal or personally identifiable information in your scores or comments —
+        no individual names, contact details, or other personal data. Keep feedback factual and focused on the
+        <strong>vendor's performance and deliverables</strong>. Personal data is not required to assess the vendor and should not be shared here.
+      </p>
+    </div>
+
     <div style="text-align: center; margin: 28px 0;">
       <a href="{form_url}" style="display: inline-block; background: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-size: 15px; font-weight: 600; letter-spacing: 0.3px;">
         Open Scorecard Form
@@ -202,6 +221,16 @@ def build_scorecard_email(
         f"Please complete your scorecard at: {form_url}\n\n"
         f"Categories: Risk & Compliance, Performance, Commercial, Relationship\n"
         f"Scale: 1 (Poor) to 5 (Excellent)\n\n"
+        "HOW TO COMPLETE:\n"
+        "- The link is personal to you — please don't forward it. Each reviewer submits once.\n"
+        "- Score every parameter on the 1-5 scale and add a short comment where it helps.\n"
+        "- Base your input on objective evidence from this cycle, not impressions.\n"
+        "- Complete it in one sitting — the form is submitted when you press Submit.\n\n"
+        "PERSONAL DATA — PLEASE DO NOT SHARE:\n"
+        "Do not enter any personal or personally identifiable information in your scores or "
+        "comments (no individual names, contact details, or other personal data). Keep feedback "
+        "factual and focused on the vendor's performance. Personal data is not required to assess "
+        "the vendor and should not be shared here.\n\n"
         f"Thank you,\nVendorPulse"
     )
     return {"subject": subject, "html_body": html_body, "text_body": text_body}

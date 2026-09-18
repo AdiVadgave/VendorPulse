@@ -169,6 +169,32 @@ export interface SendMinutesResult {
   sent_at: string
 }
 
+/** A candidate recipient for a meeting's minutes. `external` marks vendor attendees. */
+export interface MinutesRecipient {
+  attendee_id: string
+  name: string
+  email: string
+  type: string
+  external: boolean
+}
+
+export interface MinutesRecipientsResult {
+  /** False for the Alignment call (internal-only); true for Vendor Prep / SPR. */
+  allow_external: boolean
+  recipients: MinutesRecipient[]
+}
+
+/** Candidate recipients for a meeting's minutes, so the coordinator can pick who receives them. */
+export async function getMinutesRecipients(
+  cycleId: string,
+  meetingId?: string,
+): Promise<MinutesRecipientsResult> {
+  return apiFetch<MinutesRecipientsResult>(
+    `/api/cycles/${cycleId}/meeting/minutes/recipients`,
+    { params: meetingId ? { meeting_id: meetingId } : undefined },
+  )
+}
+
 export async function sendMeetingMinutes(
   cycleId: string,
   runId: string,
@@ -178,7 +204,9 @@ export async function sendMeetingMinutes(
   year: number,
   /** Which meeting these minutes belong to, so the email goes to that meeting's own
    *  edited roster ("align-…"/"vprep-…"); omit/undefined for the QBR (cycle list). */
-  meetingId?: string
+  meetingId?: string,
+  /** The email addresses the coordinator chose to receive the minutes. */
+  recipientEmails?: string[],
 ): Promise<SendMinutesResult> {
   return apiFetch<SendMinutesResult>(
     `/api/cycles/${cycleId}/meeting/minutes/send`,
@@ -188,6 +216,7 @@ export async function sendMeetingMinutes(
         run_id: runId,
         minutes: { ...minutes, vendor_name: vendorName, quarter, year },
         meeting_id: meetingId,
+        recipient_emails: recipientEmails,
       }),
     }
   )

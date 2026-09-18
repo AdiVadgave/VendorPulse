@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { FileText, Sparkles, Copy, CheckCircle2, Send, Users, Pencil, Plus, Trash2, X, Check } from 'lucide-react'
 import type { MeetingMinutes } from '@/types/meeting.types'
 import type { MeetingNote } from '@/types/meeting.types'
-import { generateMeetingMinutes, approveMinutes, sendMeetingMinutes } from '@/lib/meetingApi'
-import type { SendMinutesRecipient } from '@/lib/meetingApi'
+import { generateMeetingMinutes, approveMinutes, sendMeetingMinutes, getMinutesRecipients } from '@/lib/meetingApi'
+import type { SendMinutesRecipient, MinutesRecipient } from '@/lib/meetingApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
@@ -38,6 +38,13 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
   const [sentRecipients, setSentRecipients] = useState<SendMinutesRecipient[]>([])
   const [sendError, setSendError] = useState<string | null>(null)
+  // Recipient selection: who receives the minutes. Fetched once the minutes are
+  // approved. Internal stakeholders are pre-selected; external (vendor) recipients
+  // are opt-in and only offered for Vendor Prep / SPR (not the Alignment call).
+  const [recipients, setRecipients] = useState<MinutesRecipient[] | null>(null)
+  const [allowExternal, setAllowExternal] = useState(false)
+  const [recipientsError, setRecipientsError] = useState<string | null>(null)
+  const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set())
 
   // Hydrate persisted minutes when they arrive from the async load (after mount).
   // Only fills an empty viewer — never clobbers a freshly-generated set.
@@ -47,6 +54,47 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
       setAgentStatus((prev) => (prev === 'idle' ? 'complete' : prev))
     }
   }, [initialMinutes])
+
+  // Load the candidate recipients once the minutes are approved, so the coordinator
+  // can pick who receives them. Internal stakeholders are pre-selected; external
+  // (vendor) recipients start unchecked and must be chosen deliberately.
+  useEffect(() => {
+    if (!approved || recipients !== null) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const meetingId = meetingIdProp ?? `mtg-${cycleId}`
+        const res = await getMinutesRecipients(cycleId, meetingId)
+        if (cancelled) return
+        setRecipients(res.recipients)
+        setAllowExternal(res.allow_external)
+        setSelectedEmails(new Set(res.recipients.filter((r) => !r.external).map((r) => r.email)))
+      } catch (e) {
+        if (!cancelled) setRecipientsError(e instanceof Error ? e.message : 'Failed to load recipients')
+      }
+    })()
+    return () => { cancelled = true }
+  }, [approved, recipients, cycleId, meetingIdProp])
+
+  function toggleRecipient(email: string) {
+    setSelectedEmails((prev) => {
+      const next = new Set(prev)
+      if (next.has(email)) next.delete(email)
+      else next.add(email)
+      return next
+    })
+  }
+
+  function setGroupSelected(emails: string[], on: boolean) {
+    setSelectedEmails((prev) => {
+      const next = new Set(prev)
+      for (const e of emails) {
+        if (on) next.add(e)
+        else next.delete(e)
+      }
+      return next
+    })
+  }
 
   async function handleGenerate() {
     setAgentStatus('running')
@@ -132,20 +180,65 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
   }
 
   async function handleSend() {
-    if (!minutes || !runId) return
+    if (!minutes || !runId || selectedEmails.size === 0) return
     setSendStatus('sending')
     setSendError(null)
     try {
       // Send to THIS meeting's own roster (alignment/vendor-prep); the QBR falls
-      // back to mtg-… which the backend maps to the cycle attendee list.
+      // back to mtg-… which the backend maps to the cycle attendee list. Only the
+      // recipients the coordinator selected receive the minutes.
       const meetingId = meetingIdProp ?? `mtg-${cycleId}`
-      const result = await sendMeetingMinutes(cycleId, runId, minutes, vendorName, quarter, year, meetingId)
+      const result = await sendMeetingMinutes(
+        cycleId, runId, minutes, vendorName, quarter, year, meetingId, Array.from(selectedEmails),
+      )
       setSentRecipients(result.sent_to)
       setSendStatus('sent')
     } catch (e) {
       setSendError(e instanceof Error ? e.message : 'Failed to send minutes')
       setSendStatus('failed')
     }
+  }
+
+  const internalRecipients = (recipients ?? []).filter((r) => !r.external)
+  const externalRecipients = (recipients ?? []).filter((r) => r.external)
+  const selectedCount = selectedEmails.size
+
+  function renderRecipientGroup(title: string, list: MinutesRecipient[]) {
+    if (list.length === 0) return null
+    const emails = list.map((r) => r.email)
+    const allOn = emails.every((e) => selectedEmails.has(e))
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{title}</span>
+          <button
+            onClick={() => setGroupSelected(emails, !allOn)}
+            className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+          >
+            {allOn ? 'Deselect all' : 'Select all'}
+          </button>
+        </div>
+        <div className="space-y-1">
+          {list.map((r) => (
+            <label
+              key={r.email}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={selectedEmails.has(r.email)}
+                onChange={() => toggleRecipient(r.email)}
+                className="rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="flex-1 min-w-0">
+                <span className="block text-xs font-medium text-slate-800 dark:text-slate-200 truncate">{r.name}</span>
+                <span className="block text-xs text-slate-400 dark:text-slate-500 truncate">{r.email}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -363,15 +456,40 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
                   </button>
                 </div>
 
-                {/* Send to stakeholders */}
+                {/* Send to stakeholders — pick who receives the minutes */}
                 {sendStatus === 'idle' || sendStatus === 'failed' ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-3 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      Choose who receives these minutes.
+                      {allowExternal
+                        ? ' External (vendor) recipients are opt-in.'
+                        : ' Alignment minutes go to internal stakeholders only.'}
+                    </p>
+
+                    {recipientsError ? (
+                      <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+                        {recipientsError}
+                      </p>
+                    ) : recipients === null ? (
+                      <p className="text-xs text-slate-400 dark:text-slate-500">Loading recipients…</p>
+                    ) : recipients.length === 0 ? (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">No stakeholders with an email address on this meeting's roster.</p>
+                    ) : (
+                      <>
+                        {renderRecipientGroup('Internal stakeholders', internalRecipients)}
+                        {allowExternal && renderRecipientGroup('External (vendor) stakeholders', externalRecipients)}
+                      </>
+                    )}
+
                     <button
                       onClick={handleSend}
+                      disabled={selectedCount === 0}
                       className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                     >
                       <Send size={14} />
-                      Send Minutes to Internal Stakeholders
+                      {selectedCount === 0
+                        ? 'Select recipients to send'
+                        : `Send Minutes to ${selectedCount} recipient${selectedCount !== 1 ? 's' : ''}`}
                     </button>
                     {sendStatus === 'failed' && sendError && (
                       <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
@@ -388,7 +506,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
                   <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-4 py-3 space-y-2">
                     <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 font-medium">
                       <CheckCircle2 size={15} />
-                      Sent to {sentRecipients.length} internal stakeholder{sentRecipients.length !== 1 ? 's' : ''}
+                      Sent to {sentRecipients.length} recipient{sentRecipients.length !== 1 ? 's' : ''}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {sentRecipients.map((r) => (

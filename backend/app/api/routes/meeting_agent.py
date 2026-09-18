@@ -316,32 +316,28 @@ def approve_minutes(cycleId: str, payload: ApproveMinutesRequest):
 # ── Send minutes endpoint ───────────────────────────────────────────────────
 
 
-class SendMinutesRequest(BaseModel):
-    run_id: str
-    minutes: dict[str, Any]
-    # Identifies WHICH meeting these minutes belong to, so the email goes to that
-    # meeting's own edited roster. "align-{cycleId}-{index}" / "vprep-{cycleId}" use
-    # the per-meeting roster; anything else (the QBR "mtg-{cycleId}", or null) uses
-    # the cycle's master attendee list.
-    meeting_id: Optional[str] = None
+def _is_vendor(attendee: dict) -> bool:
+    """External stakeholder = vendor attendee. Null/missing type counts as internal
+    (robust to legacy data where `type` is unset)."""
+    return (attendee.get("type") or "").lower() == "vendor"
 
 
+def _resolve_minutes_candidates(cycleId: str, meeting_id: str) -> tuple[list[dict], bool]:
+    """Resolve the candidate recipients for a meeting's minutes and whether external
+    (vendor) recipients are permitted.
 
-@router.post("/minutes/send")
-def send_minutes(cycleId: str, payload: SendMinutesRequest):
+    Alignment / vendor-prep minutes go to that meeting's OWN edited roster
+    (meeting_attendees), so add/remove edits are honoured. The QBR (mtg-…) and any
+    unknown/legacy id use the cycle master list.
+
+    Alignment minutes are internal-only by policy; Vendor Prep and the SPR/QBR may
+    also go to external (vendor) stakeholders. Only attendees with an email address
+    are returned.
     """
-    Send approved meeting minutes to all internal stakeholders via the service
-    mailbox (Microsoft Graph). Uses the attendee's `email` as the delivery address.
-    """
-    logger.info("MEETING-AGENT: send minutes — cycleId=%s, run_id=%s", sanitize_for_log(cycleId), sanitize_for_log(payload.run_id))
-
     attendee_repo = get_attendee_repo()
-
-    # Resolve recipients from the RIGHT source. Alignment / vendor-prep minutes go to
-    # that meeting's OWN edited roster (meeting_attendees), so add/remove edits are
-    # honoured. The QBR (mtg-…) and any unknown/legacy id use the cycle master list.
-    meeting_id = (payload.meeting_id or "").strip()
+    meeting_id = (meeting_id or "").strip()
     align_prefix = f"align-{cycleId}-"
+
     if meeting_id.startswith(align_prefix):
         try:
             idx = int(meeting_id[len(align_prefix):])
@@ -351,33 +347,94 @@ def send_minutes(cycleId: str, payload: SendMinutesRequest):
             get_meeting_attendee_repo(), get_meeting_attendee_seed_repo(), attendee_repo,
             cycleId, "alignment", idx, include_vendors=False,
         )
+        allow_external = False
     elif meeting_id.startswith(f"vprep-{cycleId}"):
         all_attendees = list_meeting_attendees(
             get_meeting_attendee_repo(), get_meeting_attendee_seed_repo(), attendee_repo,
             cycleId, "vendor_prep", 1, include_vendors=True,
         )
+        allow_external = True
     else:
         all_attendees = attendee_repo.get_for_cycle(cycleId)
+        allow_external = True
 
-    # Minutes go to internal stakeholders (everyone who is NOT a vendor). Treating
-    # null/missing type as internal is robust to legacy data where `type` is unset.
-    internal = [
+    # Alignment is internal-only regardless of roster contents; drop any vendor.
+    candidates = [
         a for a in all_attendees
-        if (a.get("type") or "").lower() != "vendor" and (a.get("email") or "").strip()
+        if (a.get("email") or "").strip() and (allow_external or not _is_vendor(a))
     ]
+    return candidates, allow_external
 
-    if not internal:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No internal stakeholders with an email address found for cycle '{cycleId}'"
+
+@router.get("/minutes/recipients")
+def list_minutes_recipients(cycleId: str, meeting_id: str = ""):
+    """Candidate recipients for a meeting's minutes, so the coordinator can pick who
+    receives them. `external` flags vendor (external) stakeholders; `allow_external`
+    is False for the Alignment call (internal-only) and True for Vendor Prep / SPR."""
+    candidates, allow_external = _resolve_minutes_candidates(cycleId, meeting_id)
+    recipients = [
+        {
+            "attendee_id": a.get("attendee_id") or a.get("row_id"),
+            "name": a.get("name") or a.get("email"),
+            "email": (a.get("email") or "").strip(),
+            "type": a.get("type") or "",
+            "external": _is_vendor(a),
+        }
+        for a in candidates
+    ]
+    return {"allow_external": allow_external, "recipients": recipients}
+
+
+class SendMinutesRequest(BaseModel):
+    run_id: str
+    minutes: dict[str, Any]
+    # Identifies WHICH meeting these minutes belong to, so the email goes to that
+    # meeting's own edited roster. "align-{cycleId}-{index}" / "vprep-{cycleId}" use
+    # the per-meeting roster; anything else (the QBR "mtg-{cycleId}", or null) uses
+    # the cycle's master attendee list.
+    meeting_id: Optional[str] = None
+    # Explicit recipient selection (email addresses). Only candidates whose email is
+    # in this list receive the minutes; external (vendor) addresses are still barred
+    # for the Alignment call. When omitted (legacy callers) minutes go to all
+    # internal stakeholders, preserving the previous behaviour.
+    recipient_emails: Optional[list[str]] = None
+
+
+
+@router.post("/minutes/send")
+def send_minutes(cycleId: str, payload: SendMinutesRequest):
+    """
+    Send approved meeting minutes to the selected stakeholders via the service
+    mailbox (Microsoft Graph). Uses the attendee's `email` as the delivery address.
+    """
+    logger.info("MEETING-AGENT: send minutes — cycleId=%s, run_id=%s", sanitize_for_log(cycleId), sanitize_for_log(payload.run_id))
+
+    candidates, _allow_external = _resolve_minutes_candidates(cycleId, payload.meeting_id or "")
+
+    if payload.recipient_emails is None:
+        # Legacy path: no explicit selection → all internal stakeholders.
+        recipients = [a for a in candidates if not _is_vendor(a)]
+    else:
+        # Honour the explicit selection, intersected with the allowed candidate pool
+        # (which already excludes vendors for the Alignment call). This makes it
+        # impossible to email minutes to anyone who isn't a permitted candidate.
+        wanted = {e.strip().lower() for e in payload.recipient_emails if e and e.strip()}
+        recipients = [a for a in candidates if a["email"].strip().lower() in wanted]
+
+    if not recipients:
+        detail = (
+            "Select at least one recipient to send the minutes to."
+            if payload.recipient_emails is not None
+            else f"No internal stakeholders with an email address found for cycle '{cycleId}'"
         )
+        raise HTTPException(status_code=400, detail=detail)
 
     minutes = payload.minutes
 
     sent_to = []
     failed = []
 
-    for attendee in internal:
+    for attendee in recipients:
         email_addr = attendee["email"].strip()
         name = attendee.get("name", email_addr)
 

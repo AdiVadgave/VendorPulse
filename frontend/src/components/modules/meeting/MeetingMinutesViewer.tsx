@@ -592,7 +592,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
                 className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <CheckCircle2 size={14} />
-                Review & Approve Minutes
+                Approve Minutes
               </button>
             )}
           </div>

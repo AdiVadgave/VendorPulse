@@ -208,6 +208,115 @@ def save_scorecard_config(cycle_id: str, payload: ScorecardConfigUpdate):
     return {"cycle_id": cycle_id, "config": cfg, "cycle": updated}
 
 
+# ── Team-scoped reopen (per-team, not the whole cycle) ────────────────────────
+
+
+class ReopenTeamRequest(BaseModel):
+    team: str
+
+
+class TeamMeasuresRequest(BaseModel):
+    team: str
+    measure_keys: list[str] = Field(default_factory=list)
+
+
+def _team_key(attendee: dict) -> str:
+    """How a submission's team is identified — Shell department, else the name."""
+    return (attendee.get("shell_department") or attendee.get("name") or "").strip()
+
+
+@router.post("/config/{cycle_id}/reopen-team")
+def reopen_scorecard_team(cycle_id: str, payload: ReopenTeamRequest):
+    """Reopen the scorecard for a SINGLE team — e.g. a newly added feedback provider,
+    or an existing team whose input must be redone. Discards only that team's
+    submissions and removes that team's reviewers from the dispatched set, so the
+    team's column unlocks for (re)configuration and can be re-sent to that team only.
+    Every other team's config, submissions and lock are left untouched."""
+    cycle_repo = get_cycle_repo()
+    cycle = cycle_repo.get_by_cycle_id(cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+    team = payload.team.strip()
+    if not team:
+        raise HTTPException(status_code=400, detail="A team is required.")
+
+    attendees = [a for a in get_attendee_repo().find_all() if a.get("cycle_id") == cycle_id]
+    team_ids = {a.get("attendee_id") for a in attendees if _team_key(a) == team}
+    team_emails = {
+        (a.get("email") or "").strip().lower()
+        for a in attendees if _team_key(a) == team and a.get("email")
+    }
+
+    repo = _submissions_repo()
+    cleared = 0
+    for s in repo.get_for_cycle(cycle_id):
+        if s.get("attendee_id") in team_ids:
+            repo.delete_by_id("submission_id", s.get("submission_id"))
+            cleared += 1
+
+    dispatched = cycle.get("scorecard_dispatched_to") or []
+    remaining = [e for e in dispatched if (e or "").strip().lower() not in team_emails]
+    updated = cycle_repo.update_by_id("cycle_id", cycle_id, {"scorecard_dispatched_to": remaining})
+
+    # The frozen (admin-adjusted) snapshot is stale once a team's scores change.
+    try:
+        _final_repo().delete_for_cycle(cycle_id)
+    except Exception:  # noqa: BLE001 — snapshot may not exist
+        pass
+
+    logger.info("reopen_scorecard_team — cycle=%s team=%s cleared=%d", sanitize_for_log(cycle_id), sanitize_for_log(team), cleared)
+    return {"cycle_id": cycle_id, "team": team, "submissions_cleared": cleared,
+            "cycle": updated, "config": _effective_config(updated or cycle)}
+
+
+@router.put("/config/{cycle_id}/team-measures")
+def set_team_measures(cycle_id: str, payload: TeamMeasuresRequest):
+    """Set which measures a SINGLE team is asked — allowed even after the scorecard is
+    dispatched, but ONLY for a team that is still 'open' (none of its reviewers have
+    been sent the scorecard yet). Existing/settled teams' assignments, the measure set
+    and the weights are never changed. Reopen a settled team first (reopen-team)."""
+    import copy
+
+    cycle_repo = get_cycle_repo()
+    cycle = cycle_repo.get_by_cycle_id(cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+    team = payload.team.strip()
+    if not team:
+        raise HTTPException(status_code=400, detail="A team is required.")
+
+    attendees = [a for a in get_attendee_repo().find_all() if a.get("cycle_id") == cycle_id]
+    team_emails = {
+        (a.get("email") or "").strip().lower()
+        for a in attendees if _team_key(a) == team and a.get("email")
+    }
+    dispatched = {(e or "").strip().lower() for e in (cycle.get("scorecard_dispatched_to") or [])}
+    if team_emails & dispatched:
+        raise HTTPException(
+            status_code=409,
+            detail=f"The scorecard has already been sent to {team} — reopen the team before changing its measures.",
+        )
+
+    cfg = copy.deepcopy(_effective_config(cycle))
+    selected = set(payload.measure_keys)
+    for cat in cfg.get("categories", []):
+        for m in cat.get("measures", []):
+            teams = m.get("teams")
+            if not isinstance(teams, list):
+                continue  # unrestricted measure (everyone) — leave as-is
+            s = set(teams)
+            if m["key"] in selected:
+                s.add(team)
+            else:
+                s.discard(team)
+            m["teams"] = sorted(s)
+    cfg["configured"] = True
+    now = datetime.now(timezone.utc).isoformat()
+    updated = cycle_repo.update_by_id("cycle_id", cycle_id, {"scorecard_config": cfg, "updated_at": now})
+    logger.info("set_team_measures — cycle=%s team=%s measures=%d", sanitize_for_log(cycle_id), sanitize_for_log(team), len(selected))
+    return {"cycle_id": cycle_id, "team": team, "config": cfg, "cycle": updated}
+
+
 def _filter_structure_for_team(categories: list[dict], team: str | None) -> list[dict]:
     """Return only the measures a given team is asked to score. A measure with
     no ``teams`` list is unrestricted (everyone). A measure with a ``teams`` list

@@ -416,6 +416,16 @@ export default function CycleDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleId, storeWorkflowState, actions.length])
 
+  // Refetch the cycle from the backend into the store — used after a per-team scorecard
+  // reopen so the dispatched-set (and thus which teams are open) refreshes everywhere.
+  const refetchCycle = useCallback(async () => {
+    if (!cycleId) return
+    try {
+      const fresh = await fetchCycle(cycleId)
+      if (fresh) upsertCycle(fresh)
+    } catch { /* backend offline — keep current */ }
+  }, [cycleId, upsertCycle])
+
   const dedupeMerge = (prev: ActionItem[], incoming: ActionItem[]) => {
     const seen = new Set(prev.map((a) => a.action_id))
     return [...prev, ...incoming.filter((a) => !seen.has(a.action_id))]
@@ -750,8 +760,9 @@ export default function CycleDetail() {
           <ScorecardTab
             cycle={cycle}
             dispatched={scorecardDispatched}
-            onDispatched={() => setScorecardDispatched(true)}
+            onDispatched={() => { setScorecardDispatched(true); void refetchCycle() }}
             onScorecardRedo={() => setScorecardDispatched(false)}
+            onReopened={refetchCycle}
             compiledScorecard={compiledScorecard}
             onCompiledFetched={handleCompiledFetched}
             cycleId={cycle.cycle_id}
@@ -1289,7 +1300,7 @@ function SchedulingTab({
 
 /* ── Scorecard Tab ────────────────────────────────────────── */
 function ScorecardTab({
-  cycle, dispatched, onDispatched, onScorecardRedo, onCompiledFetched, cycleId, attendees, onAttendeesChanged,
+  cycle, dispatched, onDispatched, onScorecardRedo, onReopened, onCompiledFetched, cycleId, attendees, onAttendeesChanged,
   onScorecardCompiled, onProceedToAlignment,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
@@ -1297,6 +1308,8 @@ function ScorecardTab({
   onDispatched: () => void
   /** Redo: reopen the scorecard config lock after discarding prior submissions. */
   onScorecardRedo: () => void
+  /** Refetch the cycle after a per-team reopen (dispatched-set changed). */
+  onReopened?: () => void
   compiledScorecard: CompiledScorecard | null
   onCompiledFetched: (cs: CompiledScorecard) => void
   cycleId: string
@@ -1319,7 +1332,8 @@ function ScorecardTab({
     onScorecardRedo()
     setWeighted(null)
     setRedoNonce((n) => n + 1)
-  }, [onScorecardRedo])
+    onReopened?.()  // refetch the cycle so the cleared dispatched-set is reflected
+  }, [onScorecardRedo, onReopened])
 
   const refreshWeighted = useCallback(async () => {
     try {
@@ -1376,7 +1390,14 @@ function ScorecardTab({
 
       {subTab === 'collection' && (
         <>
-          <ScorecardConfigPanel cycleId={cycleId} dispatched={dispatched} onSaved={setConfig} attendees={attendees} />
+          <ScorecardConfigPanel
+            cycleId={cycleId}
+            dispatched={dispatched}
+            onSaved={setConfig}
+            attendees={attendees}
+            dispatchedEmails={cycle.scorecard_dispatched_to ?? []}
+            onReopened={onReopened}
+          />
           <ScorecardDispatchPanel
             vendorName={cycle.vendor_name}
             cycleId={cycleId}
@@ -1387,6 +1408,7 @@ function ScorecardTab({
             onRedo={handleRedo}
             onAttendeesChanged={onAttendeesChanged}
             alreadyDispatched={dispatched}
+            dispatchedEmails={cycle.scorecard_dispatched_to ?? []}
             structure={config?.categories}
           />
           <SubmissionTracker

@@ -73,6 +73,32 @@ export async function saveScorecardConfig(
   return res.config
 }
 
+/** Reopen the scorecard for ONE team: discards that team's submissions and removes it
+ *  from the dispatched set, so its column unlocks and it can be re-sent to that team
+ *  only. Every other team is untouched. */
+export async function reopenScorecardTeam(
+  cycleId: string,
+  team: string,
+): Promise<{ config: ScorecardConfig; submissions_cleared: number }> {
+  return apiFetch(`/api/scorecard/config/${cycleId}/reopen-team`, {
+    method: 'POST',
+    body: JSON.stringify({ team }),
+  })
+}
+
+/** Set which measures a SINGLE (open) team is asked, without touching other teams,
+ *  the measure set or the weights. Allowed post-dispatch only for an unsent team. */
+export async function setTeamMeasures(
+  cycleId: string,
+  team: string,
+  measureKeys: string[],
+): Promise<{ config: ScorecardConfig }> {
+  return apiFetch(`/api/scorecard/config/${cycleId}/team-measures`, {
+    method: 'PUT',
+    body: JSON.stringify({ team, measure_keys: measureKeys }),
+  })
+}
+
 /** Form metadata (vendor/quarter + structure + respondent identity) for the in-app scorecard page */
 export async function getScorecardFormMeta(cycleId: string, attendeeId?: string): Promise<ScorecardFormMeta> {
   return apiFetch<ScorecardFormMeta>(`/api/scorecard/form-meta/${cycleId}`, {

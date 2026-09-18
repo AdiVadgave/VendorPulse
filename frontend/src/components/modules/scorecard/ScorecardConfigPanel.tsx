@@ -3,16 +3,22 @@ import { SlidersHorizontal, ChevronDown, ChevronRight, Save, RotateCcw, Loader2,
 import { cn } from '@/utils/cn'
 import type { ScorecardCatalogTheme, ScorecardConfig } from '@/types/scorecard.types'
 import type { CycleAttendee } from '@/types/scheduling.types'
-import { getScorecardCatalog, getScorecardConfig, saveScorecardConfig } from '@/lib/scorecardApi'
+import { getScorecardCatalog, getScorecardConfig, saveScorecardConfig, reopenScorecardTeam, setTeamMeasures } from '@/lib/scorecardApi'
 
 interface Props {
   cycleId: string
   /** Called after a successful save with the new effective config. */
   onSaved?: (config: ScorecardConfig) => void
-  /** Once dispatched the config is locked (read-only) — reviewers are filling it. */
+  /** Once dispatched the config is locked (read-only) — reviewers are filling it.
+   *  Individual teams can still be reopened (see dispatchedEmails). */
   dispatched?: boolean
   /** Cycle attendees — internal stakeholders define the teams a measure can target. */
   attendees?: CycleAttendee[]
+  /** Emails the scorecard has already been sent to. A team with NO reviewer here is
+   *  still "open" (new or reopened) — its column stays editable even after dispatch. */
+  dispatchedEmails?: string[]
+  /** Fired after a team is reopened, so the parent can refresh the cycle (dispatch set). */
+  onReopened?: () => void
 }
 
 /** A team is identified the same way the backend derives a submission's team. */
@@ -29,7 +35,7 @@ const CB_LG = 'w-5 h-5 rounded border-slate-300 accent-[#dd1d21] focus:ring-2 fo
  * this SPR's scorecard and set the per-theme weightage. Fully catalog-driven —
  * no hardcoded structure. RAG measures are tagged and carry no weight.
  */
-export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = false, attendees = [] }: Props) {
+export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = false, attendees = [], dispatchedEmails = [], onReopened }: Props) {
   const [open, setOpen] = useState(false)
   const [catalog, setCatalog] = useState<ScorecardCatalogTheme[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -51,6 +57,31 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
     for (const a of attendees) if (a.type !== 'Vendor') set.add(teamOf(a))
     return [...set].sort((x, y) => x.localeCompare(y))
   }, [attendees])
+
+  // Per-team "settled" state: a team whose reviewer was already sent the scorecard.
+  // Its column is locked (they're filling the sent config); other teams (new, or
+  // reopened) stay editable even after dispatch. Teams reopened in this session are
+  // treated as editable immediately, without waiting for the parent to refetch.
+  const [reopenedTeams, setReopenedTeams] = useState<Set<string>>(new Set())
+  const [reopeningTeam, setReopeningTeam] = useState<string | null>(null)
+  const dispatchedSet = useMemo(
+    () => new Set(dispatchedEmails.map((e) => (e || '').trim().toLowerCase())),
+    [dispatchedEmails]
+  )
+  const sentTeams = useMemo(() => {
+    const set = new Set<string>()
+    for (const a of attendees) {
+      if (a.type === 'Vendor') continue
+      const email = (a.email || '').trim().toLowerCase()
+      if (email && dispatchedSet.has(email)) set.add(teamOf(a))
+    }
+    return set
+  }, [attendees, dispatchedSet])
+  // Editable pre-dispatch (everything), or post-dispatch for teams not yet sent /
+  // freshly reopened.
+  const isTeamEditable = (t: string) => !dispatched || !sentTeams.has(t) || reopenedTeams.has(t)
+  const isTeamSettled = (t: string) => dispatched && sentTeams.has(t) && !reopenedTeams.has(t)
+  const editableTeams = useMemo(() => teams.filter(isTeamEditable), [teams, sentTeams, reopenedTeams, dispatched])
 
   // Load the catalog + the cycle's current effective config.
   useEffect(() => {
@@ -175,12 +206,28 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selected, measureTeams, teams]
   )
-  const canSave = hasSelection && weightOk && !saving && !loading && !locked
+  // Pre-dispatch: normal full save (needs valid weights). Post-dispatch: save is
+  // team-scoped — only the open/reopened teams' columns, so it's allowed as long as
+  // there's at least one editable team.
+  const canSave = hasSelection && !saving && !loading && (locked ? editableTeams.length > 0 : weightOk)
 
   async function handleSave() {
     setSaving(true)
     setError(null)
     try {
+      if (locked) {
+        // Post-dispatch: persist ONLY each open team's measure set (backend leaves
+        // every settled team, the measure list and the weights untouched).
+        let last: ScorecardConfig | null = null
+        for (const t of editableTeams) {
+          const keys = [...selected].filter((k) => teamsForMeasure(k).has(t))
+          const r = await setTeamMeasures(cycleId, t, keys)
+          last = r.config
+        }
+        setSavedAt(new Date().toISOString())
+        if (last) onSaved?.(last)
+        return
+      }
       const w: Record<string, number> = {}
       for (const t of included) w[t.key] = weights[t.key] ?? 0
       // Persist an explicit team list for every selected measure ([] = nobody).
@@ -199,6 +246,29 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
       setError(e instanceof Error ? e.message : 'Failed to save the scorecard configuration')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Reopen a single settled team: discards its submissions + removes it from the
+  // dispatched set (server-side) so its column unlocks and it can be re-sent alone.
+  async function handleReopenTeam(t: string) {
+    setError(null)
+    setReopeningTeam(t)
+    try {
+      const r = await reopenScorecardTeam(cycleId, t)
+      setReopenedTeams((prev) => new Set(prev).add(t))
+      // Reflect the returned config's team assignments locally.
+      const mt: Record<string, Set<string>> = {}
+      for (const theme of r.config.categories) {
+        for (const m of theme.measures) if (Array.isArray(m.teams)) mt[m.key] = new Set(m.teams)
+      }
+      setMeasureTeams(mt)
+      setSavedAt(null)
+      onReopened?.()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to reopen the team')
+    } finally {
+      setReopeningTeam(null)
     }
   }
 
@@ -262,7 +332,11 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
               {locked && (
                 <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300">
                   <Lock size={14} className="mt-0.5 shrink-0" />
-                  <span><strong>Configuration locked.</strong> The scorecard has been dispatched, so measures, weights and team assignments can no longer be changed.</span>
+                  <span>
+                    <strong>Dispatched.</strong> The measure set and weights are locked. A team already sent the scorecard is locked too —
+                    use <strong>Reopen</strong> on that team&apos;s column to redo just that team, or tick a newly added team&apos;s column to
+                    configure it. Then send the scorecard to that team only from the dispatch step below.
+                  </span>
                 </div>
               )}
 
@@ -286,19 +360,36 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
                         const sel = [...selected]
                         const on = sel.length > 0 && sel.every((k) => teamsForMeasure(k).has(t))
                         const some = sel.some((k) => teamsForMeasure(k).has(t))
+                        const editable = isTeamEditable(t)
+                        const settled = isTeamSettled(t)
                         return (
-                          <th key={t} className="px-4 py-3 text-center whitespace-nowrap border-l border-slate-200 dark:border-slate-700">
-                            <label className={cn('flex flex-col items-center gap-1.5', locked || sel.length === 0 ? 'cursor-not-allowed' : 'cursor-pointer')} title={`Toggle ${t} for every selected measure`}>
-                              <span className="text-sm font-semibold">{t}</span>
+                          <th key={t} className={cn('px-4 py-3 text-center whitespace-nowrap border-l border-slate-200 dark:border-slate-700', dispatched && editable && 'bg-emerald-50/60 dark:bg-emerald-900/10')}>
+                            <label className={cn('flex flex-col items-center gap-1.5', !editable || sel.length === 0 ? 'cursor-not-allowed' : 'cursor-pointer')} title={`Toggle ${t} for every selected measure`}>
+                              <span className="text-sm font-semibold flex items-center gap-1">
+                                {t}
+                                {dispatched && editable && <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">open</span>}
+                              </span>
                               <input
                                 type="checkbox"
                                 checked={on}
                                 ref={(el) => { if (el) el.indeterminate = some && !on }}
-                                disabled={locked || sel.length === 0}
+                                disabled={!editable || sel.length === 0}
                                 onChange={() => toggleTeamColumn(t)}
                                 className={CB}
                               />
                             </label>
+                            {settled && (
+                              <button
+                                type="button"
+                                onClick={() => handleReopenTeam(t)}
+                                disabled={reopeningTeam === t}
+                                title={`Reopen ${t} — discards their scores so they can re-submit, and lets you resend to ${t} only`}
+                                className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 dark:text-amber-400 hover:text-amber-800 disabled:opacity-50"
+                              >
+                                {reopeningTeam === t ? <Loader2 size={10} className="animate-spin" /> : <RotateCcw size={10} />}
+                                Reopen
+                              </button>
+                            )}
                           </th>
                         )
                       })}
@@ -368,19 +459,23 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
                                     )}
                                   </label>
                                 </td>
-                                {/* One checkbox per team */}
-                                {teams.map((t) => (
-                                  <td key={t} className="px-4 py-2.5 text-center border-l border-slate-100 dark:border-slate-800">
+                                {/* One checkbox per team — a team's column stays editable
+                                    post-dispatch only while it's open (new or reopened). */}
+                                {teams.map((t) => {
+                                  const editable = isTeamEditable(t)
+                                  return (
+                                  <td key={t} className={cn('px-4 py-2.5 text-center border-l border-slate-100 dark:border-slate-800', dispatched && editable && 'bg-emerald-50/40 dark:bg-emerald-900/5')}>
                                     <input
                                       type="checkbox"
                                       checked={isSel && mTeams.has(t)}
-                                      disabled={!isSel || locked}
+                                      disabled={!isSel || !editable}
                                       onChange={() => toggleMeasureTeam(m.key, t)}
                                       title={isSel ? `${t}: ${mTeams.has(t) ? 'asked' : 'not asked'} this measure` : 'Include the measure first'}
                                       className={CB_LG}
                                     />
                                   </td>
-                                ))}
+                                  )
+                                })}
                               </tr>
                             )
                           })}
@@ -418,7 +513,7 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
               <div className="mt-4 flex items-center gap-2">
                 <button
                   onClick={resetToCurrent}
-                  disabled={saving || locked}
+                  disabled={saving}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
                 >
                   <RotateCcw size={13} /> Discard changes
@@ -428,17 +523,21 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
                     <CheckCircle2 size={13} /> Saved
                   </span>
                 )}
-                <button
-                  onClick={handleSave}
-                  disabled={!canSave}
-                  className={cn(
-                    'ml-auto flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-lg text-white',
-                    canSave ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed'
-                  )}
-                >
-                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                  Save Configuration
-                </button>
+                {locked && editableTeams.length === 0 ? (
+                  <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">No open team to configure — use “Reopen” on a team, or add a new team.</span>
+                ) : (
+                  <button
+                    onClick={handleSave}
+                    disabled={!canSave}
+                    className={cn(
+                      'ml-auto flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-lg text-white',
+                      canSave ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed'
+                    )}
+                  >
+                    {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                    {locked ? `Save ${editableTeams.length === 1 ? editableTeams[0] : 'open teams'} config` : 'Save Configuration'}
+                  </button>
+                )}
               </div>
             </>
           )}

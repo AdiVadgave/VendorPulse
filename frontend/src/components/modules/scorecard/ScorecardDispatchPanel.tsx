@@ -25,6 +25,9 @@ interface Props {
   structure?: WeightedCategoryDef[]
   /** Reopen the scorecard config (unlock) after a redo so it can be reconfigured. */
   onRedo?: () => void
+  /** Emails already sent the scorecard. After dispatch, only reviewers NOT here (new
+   *  or reopened teams) are offered a (re)send — so a resend never re-emails everyone. */
+  dispatchedEmails?: string[]
 }
 
 interface ReminderTier {
@@ -306,7 +309,7 @@ function CategoriesDropdown({ structure }: { structure: WeightedCategoryDef[] })
   )
 }
 
-export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false, structure, onRedo }: Props) {
+export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false, structure, onRedo, dispatchedEmails = [] }: Props) {
   const effectiveStructure = structure && structure.length > 0 ? structure : WEIGHTED_SCORECARD_STRUCTURE
   const totalMeasures = effectiveStructure.reduce((sum, c) => sum + c.measures.length, 0)
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(alreadyDispatched ? 'complete' : 'idle')
@@ -350,6 +353,12 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   const excludedByTeam = hasTeamConfig ? keyInternal.filter((a) => !assignedTeams.has(teamOf(a))) : []
   // Internal stakeholders that could be added as recipients (not yet key).
   const addable = attendees.filter((a) => a.type !== 'Vendor' && !a.is_key)
+
+  // Only reviewers NOT already sent the scorecard are (re)sent — so after a per-team
+  // reopen or a new team is added, the send goes ONLY to that team, never everyone.
+  // Before the first dispatch, dispatchedEmails is empty → this equals `recipients`.
+  const dispatchedSet = new Set((dispatchedEmails ?? []).map((e) => (e || '').trim().toLowerCase()))
+  const pendingRecipients = recipients.filter((a) => !dispatchedSet.has((a.email || '').trim().toLowerCase()))
 
   async function markKey(attendeeId: string) {
     setAddingId(attendeeId)
@@ -400,7 +409,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
         quarter,
         year,
         form_base_url: window.location.origin,
-        recipients: recipients.map((a) => ({
+        recipients: pendingRecipients.map((a) => ({
           attendee_id: a.attendee_id,
           name: a.name,
           email: a.email,
@@ -566,6 +575,24 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
             <div className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-700 dark:text-emerald-400 text-sm font-medium">
               <Send size={14} /> Scorecard links dispatched via Outlook
             </div>
+            {/* Open teams (newly added or reopened) that haven't been sent yet — send
+                the scorecard to ONLY those reviewers, never the whole list again. */}
+            {pendingRecipients.length > 0 && (
+              <div className="rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/20 p-3 space-y-2">
+                <p className="text-xs text-violet-800 dark:text-violet-300">
+                  {pendingRecipients.length} reviewer{pendingRecipients.length !== 1 ? 's have' : ' has'} not been sent the scorecard yet
+                  ({pendingRecipients.map((a) => a.shell_department || a.name).join(', ')}) — a new or reopened team. Send to them only.
+                </p>
+                <button
+                  onClick={handleGenerate}
+                  disabled={agentStatus === 'running' || agentStatus === 'awaiting_approval'}
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  {agentStatus === 'running' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  Send Scorecard to {pendingRecipients.length} Reviewer{pendingRecipients.length !== 1 ? 's' : ''}
+                </button>
+              </div>
+            )}
             {/* Redo — mistake on the scorecard? Reopen config + re-send. */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between px-1">
               <p className="text-[11px] text-slate-400 dark:text-slate-500">

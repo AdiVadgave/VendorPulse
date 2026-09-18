@@ -63,10 +63,17 @@ class CycleRepository(BaseRepository):
     def mark_scorecard_dispatched(
         self, cycle_id: str, dispatched_at: str, emails: list[str]
     ) -> Optional[dict]:
+        """Record a scorecard dispatch. Emails are UNIONed into the existing
+        ``scorecard_dispatched_to`` (never replaced) so a team-scoped resend adds only
+        that team without erasing the record of teams already sent — the set is what
+        marks which teams' columns are locked."""
+        current = self.get_by_cycle_id(cycle_id) or {}
+        existing = current.get("scorecard_dispatched_to") or []
+        merged = list(dict.fromkeys([*existing, *emails]))  # order-preserving union
         return self.update_by_id(
             "cycle_id",
             cycle_id,
-            {"scorecard_dispatched_at": dispatched_at, "scorecard_dispatched_to": emails},
+            {"scorecard_dispatched_at": dispatched_at, "scorecard_dispatched_to": merged},
         )
 
     def clear_scorecard_dispatch(self, cycle_id: str) -> Optional[dict]:

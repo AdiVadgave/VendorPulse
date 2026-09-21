@@ -322,17 +322,45 @@ def _is_vendor(attendee: dict) -> bool:
     return (attendee.get("type") or "").lower() == "vendor"
 
 
-def _resolve_minutes_candidates(cycleId: str, meeting_id: str) -> tuple[list[dict], bool]:
+def _meeting_roster(
+    cycleId: str, kind: str, index: int, include_vendors: bool, attendee_repo, read_only: bool,
+) -> list[dict]:
+    """A meeting's own attendee roster. With `read_only` the roster is resolved
+    WITHOUT seeding the table, so a GET never writes — two concurrent GETs would
+    otherwise each seed and duplicate the roster, and every duplicate row would be
+    mailed. Until it is seeded the list is derived the same way seeding derives it."""
+    ma_repo = get_meeting_attendee_repo()
+    seed_repo = get_meeting_attendee_seed_repo()
+    if not read_only:
+        return list_meeting_attendees(
+            ma_repo, seed_repo, attendee_repo, cycleId, kind, index, include_vendors=include_vendors,
+        )
+    seeded = any(
+        s.get("meeting_kind") == kind and int(s.get("meeting_index") or 0) == int(index)
+        for s in seed_repo.find_by_field("cycle_id", cycleId)
+    )
+    if seeded:
+        return ma_repo.get_for_meeting(cycleId, kind, index)
+    return [
+        a for a in attendee_repo.get_for_cycle(cycleId)
+        if a.get("confirmation_status") != "DECLINED"
+        and (include_vendors or a.get("type") != "Vendor")
+    ]
+
+
+def _resolve_minutes_candidates(cycleId: str, meeting_id: str, read_only: bool = False) -> tuple[list[dict], bool]:
     """Resolve the candidate recipients for a meeting's minutes and whether external
     (vendor) recipients are permitted.
 
     Alignment / vendor-prep minutes go to that meeting's OWN edited roster
-    (meeting_attendees), so add/remove edits are honoured. The QBR (mtg-…) and any
-    unknown/legacy id use the cycle master list.
+    (meeting_attendees), so add/remove edits are honoured. The QBR (mtg-{cycleId}),
+    and legacy callers that send no meeting_id at all, use the cycle master list.
 
     Alignment minutes are internal-only by policy; Vendor Prep and the SPR/QBR may
-    also go to external (vendor) stakeholders. Only attendees with an email address
-    are returned.
+    also go to external (vendor) stakeholders. An id matching none of those is
+    unrecognised — a typo, or a meeting belonging to another cycle — and fails
+    CLOSED: internal recipients only. Only attendees with an email address are
+    returned. `read_only` keeps the resolution free of writes, for the GET.
     """
     attendee_repo = get_attendee_repo()
     meeting_id = (meeting_id or "").strip()
@@ -343,20 +371,16 @@ def _resolve_minutes_candidates(cycleId: str, meeting_id: str) -> tuple[list[dic
             idx = int(meeting_id[len(align_prefix):])
         except ValueError:
             idx = 1
-        all_attendees = list_meeting_attendees(
-            get_meeting_attendee_repo(), get_meeting_attendee_seed_repo(), attendee_repo,
-            cycleId, "alignment", idx, include_vendors=False,
-        )
+        all_attendees = _meeting_roster(cycleId, "alignment", idx, False, attendee_repo, read_only)
         allow_external = False
     elif meeting_id.startswith(f"vprep-{cycleId}"):
-        all_attendees = list_meeting_attendees(
-            get_meeting_attendee_repo(), get_meeting_attendee_seed_repo(), attendee_repo,
-            cycleId, "vendor_prep", 1, include_vendors=True,
-        )
+        all_attendees = _meeting_roster(cycleId, "vendor_prep", 1, True, attendee_repo, read_only)
         allow_external = True
     else:
         all_attendees = attendee_repo.get_for_cycle(cycleId)
-        allow_external = True
+        # Only the QBR — and legacy callers that omit meeting_id — may include the
+        # vendor; every other id is unrecognised, so bar external recipients.
+        allow_external = meeting_id in ("", f"mtg-{cycleId}")
 
     # Alignment is internal-only regardless of roster contents; drop any vendor.
     candidates = [
@@ -371,7 +395,8 @@ def list_minutes_recipients(cycleId: str, meeting_id: str = ""):
     """Candidate recipients for a meeting's minutes, so the coordinator can pick who
     receives them. `external` flags vendor (external) stakeholders; `allow_external`
     is False for the Alignment call (internal-only) and True for Vendor Prep / SPR."""
-    candidates, allow_external = _resolve_minutes_candidates(cycleId, meeting_id)
+    # read_only: a GET must not seed the per-meeting roster.
+    candidates, allow_external = _resolve_minutes_candidates(cycleId, meeting_id, read_only=True)
     recipients = [
         {
             "attendee_id": a.get("attendee_id") or a.get("row_id"),
@@ -386,7 +411,9 @@ def list_minutes_recipients(cycleId: str, meeting_id: str = ""):
 
 
 class SendMinutesRequest(BaseModel):
-    run_id: str
+    # Optional: minutes restored from the persisted artifact after a refresh have no
+    # agent run behind them, and must still be sendable. Used for tracing only.
+    run_id: Optional[str] = None
     minutes: dict[str, Any]
     # Identifies WHICH meeting these minutes belong to, so the email goes to that
     # meeting's own edited roster. "align-{cycleId}-{index}" / "vprep-{cycleId}" use

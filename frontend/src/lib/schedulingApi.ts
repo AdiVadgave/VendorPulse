@@ -56,6 +56,14 @@ export async function completeAttendanceConfirmation(
   return res.cycle
 }
 
+/** Outcome of a workflow-state sync. `rejected` holds the server's detail when the
+ *  backend REFUSED the transition (e.g. the archive guard's 409) — distinct from the
+ *  request never reaching it, where the caller keeps its local state. */
+export interface WorkflowStateSyncResult {
+  cycle: GovernanceCycle | null
+  rejected: string | null
+}
+
 /**
  * Fast-forward the backend cycle's workflow_state to `target`.
  *
@@ -66,7 +74,7 @@ export async function completeAttendanceConfirmation(
 export async function setBackendWorkflowState(
   cycleId: string,
   target: string
-): Promise<GovernanceCycle | null> {
+): Promise<WorkflowStateSyncResult> {
   try {
     const res = await apiFetch<{ cycle: GovernanceCycle }>(
       `/api/cycles/${cycleId}/workflow-state`,
@@ -76,11 +84,17 @@ export async function setBackendWorkflowState(
         body: JSON.stringify({ target }),
       }
     )
-    return res.cycle ?? null
-  } catch {
-    // Backend offline or cycle not backend-persisted (e.g. mock) — local state
-    // remains the source of truth via localStorage.
-    return null
+    return { cycle: res.cycle ?? null, rejected: null }
+  } catch (err) {
+    // A TypeError means the request never reached the backend (offline, or the cycle
+    // isn't backend-persisted) — local state remains the source of truth via
+    // localStorage. Anything else is the server refusing the transition, so its detail
+    // must reach the caller instead of being swallowed.
+    if (err instanceof TypeError) return { cycle: null, rejected: null }
+    return {
+      cycle: null,
+      rejected: err instanceof Error ? err.message : 'The server rejected the workflow update.',
+    }
   }
 }
 

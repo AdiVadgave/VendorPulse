@@ -74,6 +74,10 @@ export default function ActionLog({ actions, showCycleRef = false, onStatusChang
 
   const openCount = actions.filter((a) => a.status === 'OPEN').length
   const inProgressCount = actions.filter((a) => a.status === 'IN_PROGRESS').length
+  // Deferred items are neither pending nor resolved — counted apart so they don't
+  // inflate the resolved tally.
+  const nextCycleCount = actions.filter((a) => a.status === 'NEXT_CYCLE').length
+  const resolvedCount = actions.length - openCount - inProgressCount - nextCycleCount
   const hasUnclosed = openCount + inProgressCount > 0
 
   // Bulk-resolve the active work only. Completed / Closed / Next-cycle items are
@@ -94,7 +98,7 @@ export default function ActionLog({ actions, showCycleRef = false, onStatusChang
           <div>
             <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Action Log</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {openCount} open · {inProgressCount} in progress · {actions.length - openCount - inProgressCount} resolved
+              {openCount} open · {inProgressCount} in progress · {resolvedCount} resolved · {nextCycleCount} next cycle
             </p>
           </div>
           <div className="flex items-center gap-2">

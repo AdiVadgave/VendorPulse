@@ -256,7 +256,12 @@ def reopen_scorecard_team(cycle_id: str, payload: ReopenTeamRequest):
 
     dispatched = cycle.get("scorecard_dispatched_to") or []
     remaining = [e for e in dispatched if (e or "").strip().lower() not in team_emails]
-    updated = cycle_repo.update_by_id("cycle_id", cycle_id, {"scorecard_dispatched_to": remaining})
+    changes: dict = {"scorecard_dispatched_to": remaining}
+    # Reopening the last dispatched team means nothing is dispatched any more — clear the
+    # marker too, otherwise save_scorecard_config stays locked on a 409 for good.
+    if not remaining:
+        changes["scorecard_dispatched_at"] = None
+    updated = cycle_repo.update_by_id("cycle_id", cycle_id, changes)
 
     # The frozen (admin-adjusted) snapshot is stale once a team's scores change.
     try:
@@ -299,11 +304,21 @@ def set_team_measures(cycle_id: str, payload: TeamMeasuresRequest):
 
     cfg = copy.deepcopy(_effective_config(cycle))
     selected = set(payload.measure_keys)
+    # The concrete set behind an "unrestricted" measure: the teams that can actually be
+    # asked a scorecard (key, non-vendor) — not every attendee, so no phantom teams.
+    reviewer_teams = {
+        _team_key(a) for a in attendees
+        if a.get("is_key") and a.get("type") != "Vendor" and _team_key(a)
+    }
     for cat in cfg.get("categories", []):
         for m in cat.get("measures", []):
             teams = m.get("teams")
             if not isinstance(teams, list):
-                continue  # unrestricted measure (everyone) — leave as-is
+                # Unrestricted = everyone, so this team is already asked it. Dropping the
+                # team needs an explicit list to drop from, else the edit is a silent no-op.
+                if m["key"] in selected:
+                    continue
+                teams = reviewer_teams
             s = set(teams)
             if m["key"] in selected:
                 s.add(team)

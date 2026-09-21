@@ -25,6 +25,13 @@ function pickMostAdvanced(
   return (localIdx >= backendIdx ? localState : backendState) ?? backendState
 }
 
+/** Result of an advance. `ok: false` means the backend refused the transition and the
+ *  optimistic local state has been rolled back — `error` is the server's reason. */
+export interface WorkflowAdvanceResult {
+  ok: boolean
+  error?: string
+}
+
 interface CycleStore {
   activeCycleId: string | null
   activeVendorId: string | null
@@ -41,7 +48,9 @@ interface CycleStore {
   setLastTab: (cycleId: string, tab: TabKey) => void
   getCycleById: (id: string) => GovernanceCycle | undefined
   getWorkflowState: (cycleId: string) => WorkflowState
-  advanceWorkflow: (cycleId: string, newState: WorkflowState) => void
+  /** Advances locally straight away; the returned promise resolves once the backend
+   *  has accepted (or refused, and the local advance has been undone). */
+  advanceWorkflow: (cycleId: string, newState: WorkflowState) => Promise<WorkflowAdvanceResult>
   /** Add a newly API-created cycle to the store */
   addCycle: (cycle: GovernanceCycle) => void
   /** Replace all cycles from backend list */
@@ -88,7 +97,10 @@ export const useCycleStore = create<CycleStore>()(
         return get().cycles.find((c) => c.cycle_id === cycleId)?.workflow_state ?? 'CYCLE_CREATED'
       },
 
-      advanceWorkflow: (cycleId, newState) => {
+      advanceWorkflow: async (cycleId, newState) => {
+        // Captured for the rollback below, before the optimistic update overwrites them.
+        const prevOverride = get().workflowStates[cycleId]
+        const prevCycleState = get().cycles.find((c) => c.cycle_id === cycleId)?.workflow_state
         let didAdvance = false
         let resolvedState: WorkflowState | undefined
         set((s) => {
@@ -107,11 +119,31 @@ export const useCycleStore = create<CycleStore>()(
             workflowStates: { ...s.workflowStates, [cycleId]: nextState },
           }
         })
-        // Sync to backend in the background so progress survives localStorage clears
-        // and cross-device use. Skip mock cycles — they don't exist server-side.
-        if (didAdvance && resolvedState && !getMockCycleById(cycleId)) {
-          void setBackendWorkflowState(cycleId, resolvedState)
-        }
+        // Sync to backend so progress survives localStorage clears and cross-device
+        // use. Skip mock cycles — they don't exist server-side.
+        const advancedTo = resolvedState
+        if (!didAdvance || !advancedTo || getMockCycleById(cycleId)) return { ok: true }
+
+        const { rejected } = await setBackendWorkflowState(cycleId, advancedTo)
+        if (!rejected) return { ok: true }
+
+        // The backend refused (e.g. the archive guard's 409). Undo the optimistic
+        // advance, otherwise the persisted copy pins a state the database never
+        // reached and pickMostAdvanced keeps it winning on every later fetch.
+        set((s) => {
+          if (s.workflowStates[cycleId] !== advancedTo) return s  // a later advance won
+          const nextStates = { ...s.workflowStates }
+          if (prevOverride) nextStates[cycleId] = prevOverride
+          else delete nextStates[cycleId]
+          const restored = prevOverride ?? prevCycleState
+          return {
+            cycles: restored
+              ? s.cycles.map((c) => (c.cycle_id === cycleId ? { ...c, workflow_state: restored } : c))
+              : s.cycles,
+            workflowStates: nextStates,
+          }
+        })
+        return { ok: false, error: rejected }
       },
 
       addCycle: (cycle) =>

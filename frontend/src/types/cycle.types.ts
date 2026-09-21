@@ -36,13 +36,3 @@ export interface GovernanceCycle {
   meeting_time_zone?: string | null
   meeting_duration_minutes?: number | null
 }
-
-export interface ActionItem {
-  action_id: string
-  cycle_id: string
-  source_module: 'MODULE_C' | 'MODULE_D' | 'MODULE_E'
-  description: string
-  owner: string
-  due_date: string
-  status: 'OPEN' | 'CLOSED' | 'IN_PROGRESS'
-}

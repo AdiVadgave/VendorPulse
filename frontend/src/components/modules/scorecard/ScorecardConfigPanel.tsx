@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { SlidersHorizontal, ChevronDown, ChevronRight, Save, RotateCcw, Loader2, CheckCircle2, AlertTriangle, Info, Lock, Users } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { ScorecardCatalogTheme, ScorecardConfig } from '@/types/scorecard.types'
@@ -51,10 +51,13 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Teams available to assign = distinct teams among internal (non-vendor) attendees.
+  // Teams available to assign = distinct teams among KEY internal (non-vendor)
+  // attendees. Only key internal stakeholders are ever sent a scorecard, so a team
+  // without one could never appear in the dispatched set — it would stay "open"
+  // (and editable) forever and be written into every measure's team list.
   const teams = useMemo(() => {
     const set = new Set<string>()
-    for (const a of attendees) if (a.type !== 'Vendor') set.add(teamOf(a))
+    for (const a of attendees) if (a.type !== 'Vendor' && a.is_key) set.add(teamOf(a))
     return [...set].sort((x, y) => x.localeCompare(y))
   }, [attendees])
 
@@ -82,6 +85,22 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
   const isTeamEditable = (t: string) => !dispatched || !sentTeams.has(t) || reopenedTeams.has(t)
   const isTeamSettled = (t: string) => dispatched && sentTeams.has(t) && !reopenedTeams.has(t)
   const editableTeams = useMemo(() => teams.filter(isTeamEditable), [teams, sentTeams, reopenedTeams, dispatched])
+
+  // The optimistic reopen flag only has to cover the parent's refetch window. Once a
+  // refreshed dispatch set shows a reopened team was sent again, drop the flag so its
+  // column locks again and it leaves editableTeams — saving it would 409 and abort.
+  const prevSentTeams = useRef(sentTeams)
+  useEffect(() => {
+    const prev = prevSentTeams.current
+    prevSentTeams.current = sentTeams
+    setReopenedTeams((cur) => {
+      if (cur.size === 0) return cur
+      // Keep a team while it is still unsent, or while it was already sent before this
+      // change (the refetch has not landed yet) — drop it on an unsent → sent flip.
+      const next = new Set([...cur].filter((t) => !sentTeams.has(t) || prev.has(t)))
+      return next.size === cur.size ? cur : next
+    })
+  }, [sentTeams])
 
   // Load the catalog + the cycle's current effective config.
   useEffect(() => {
@@ -206,6 +225,13 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selected, measureTeams, teams]
   )
+  // Open teams asked nothing — they drop out of the dispatch recipient list, so their
+  // reviewer would silently never be sent a scorecard.
+  const emptyEditableTeams = useMemo(
+    () => editableTeams.filter((t) => ![...selected].some((k) => teamsForMeasure(k).has(t))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editableTeams, selected, measureTeams, teams]
+  )
   // Pre-dispatch: normal full save (needs valid weights). Post-dispatch: save is
   // team-scoped — only the open/reopened teams' columns, so it's allowed as long as
   // there's at least one editable team.
@@ -217,15 +243,24 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
     try {
       if (locked) {
         // Post-dispatch: persist ONLY each open team's measure set (backend leaves
-        // every settled team, the measure list and the weights untouched).
+        // every settled team, the measure list and the weights untouched). One team
+        // failing (e.g. a 409 because it was sent meanwhile) must not drop the rest.
         let last: ScorecardConfig | null = null
+        const failed: string[] = []
+        let firstError = ''
         for (const t of editableTeams) {
           const keys = [...selected].filter((k) => teamsForMeasure(k).has(t))
-          const r = await setTeamMeasures(cycleId, t, keys)
-          last = r.config
+          try {
+            const r = await setTeamMeasures(cycleId, t, keys)
+            last = r.config
+          } catch (e) {
+            failed.push(t)
+            if (!firstError) firstError = e instanceof Error ? e.message : ''
+          }
         }
-        setSavedAt(new Date().toISOString())
         if (last) onSaved?.(last)
+        if (failed.length) setError(`Could not save ${failed.join(', ')}${firstError ? ` — ${firstError}` : ''}`)
+        else setSavedAt(new Date().toISOString())
         return
       }
       const w: Record<string, number> = {}
@@ -257,12 +292,22 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
     try {
       const r = await reopenScorecardTeam(cycleId, t)
       setReopenedTeams((prev) => new Set(prev).add(t))
-      // Reflect the returned config's team assignments locally.
-      const mt: Record<string, Set<string>> = {}
+      // Reflect the returned config for the reopened team ONLY — a wholesale rebuild
+      // would silently revert unsaved ticks made for the other open teams.
+      const fromServer: Record<string, Set<string>> = {}
       for (const theme of r.config.categories) {
-        for (const m of theme.measures) if (Array.isArray(m.teams)) mt[m.key] = new Set(m.teams)
+        for (const m of theme.measures) if (Array.isArray(m.teams)) fromServer[m.key] = new Set(m.teams)
       }
-      setMeasureTeams(mt)
+      setMeasureTeams((prev) => {
+        const next = { ...prev }
+        for (const [key, assigned] of Object.entries(fromServer)) {
+          const cur = new Set(prev[key] ?? teams)
+          if (assigned.has(t)) cur.add(t)
+          else cur.delete(t)
+          next[key] = cur
+        }
+        return next
+      })
       setSavedAt(null)
       onReopened?.()
     } catch (e) {
@@ -343,7 +388,7 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
               {teams.length === 0 && (
                 <div className="mb-3 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
                   <Users size={13} className="shrink-0" />
-                  Add internal stakeholders in the Attendees step to assign measures to teams.
+                  Mark internal stakeholders as “Key” in the Attendees step to assign measures to teams — only key stakeholders receive a scorecard.
                 </div>
               )}
 
@@ -503,10 +548,16 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
 
               {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1"><AlertTriangle size={12} />{error}</p>}
               {!hasSelection && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Select at least one measure.</p>}
-              {emptyTeamMeasures.length > 0 && !locked && (
+              {emptyTeamMeasures.length > 0 && (
                 <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
                   <AlertTriangle size={12} />
                   {emptyTeamMeasures.length} selected measure{emptyTeamMeasures.length !== 1 ? 's have' : ' has'} no team assigned — no one will be asked to score {emptyTeamMeasures.length !== 1 ? 'them' : 'it'}.
+                </p>
+              )}
+              {locked && emptyEditableTeams.length > 0 && (
+                <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <AlertTriangle size={12} />
+                  {emptyEditableTeams.join(', ')} {emptyEditableTeams.length !== 1 ? 'have' : 'has'} no measure ticked — no scorecard will be sent to {emptyEditableTeams.length !== 1 ? 'those teams' : 'that team'}.
                 </p>
               )}
 

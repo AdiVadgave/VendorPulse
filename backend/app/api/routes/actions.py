@@ -133,7 +133,11 @@ def _previous_cycle(cycle: dict, cycle_repo) -> dict | None:
         if c.get("cycle_id") != cycle.get("cycle_id")
         and _cycle_sort_key(c) < cur_key
     ]
-    siblings.sort(key=_cycle_sort_key, reverse=True)
+    # Duplicate cycles for one vendor/quarter/year are permitted, and (year, quarter)
+    # alone leaves them tied — stable sort would then pick the FIRST-created (often the
+    # abandoned) one. Tie-break on created_at so the newest duplicate wins; it is an
+    # ISO-8601 string, coerced here so a missing value sorts last instead of raising.
+    siblings.sort(key=lambda c: (*_cycle_sort_key(c), str(c.get("created_at") or "")), reverse=True)
     return siblings[0] if siblings else None
 
 

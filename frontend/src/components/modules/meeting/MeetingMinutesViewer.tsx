@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react'
-import { FileText, Sparkles, Copy, CheckCircle2, Send, Users, Pencil, Plus, Trash2, X, Check } from 'lucide-react'
+import { FileText, Sparkles, Copy, CheckCircle2, Send, Users, Pencil, Plus, Trash2, X, Check, RefreshCw, AlertTriangle } from 'lucide-react'
 import type { MeetingMinutes } from '@/types/meeting.types'
 import type { MeetingNote } from '@/types/meeting.types'
 import { generateMeetingMinutes, approveMinutes, sendMeetingMinutes, getMinutesRecipients } from '@/lib/meetingApi'
-import type { SendMinutesRecipient, MinutesRecipient } from '@/lib/meetingApi'
+import type { SendMinutesRecipient, MinutesRecipient, SendMinutesResult } from '@/lib/meetingApi'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import type { AgentStatus } from '@/types/agent.types'
+
+/** A recipient the mail provider rejected. The send endpoint answers 200 with a
+ *  populated `failed` list when only SOME recipients bounce (503 only if all do). */
+interface FailedRecipient {
+  name?: string
+  email: string
+  error?: string
+}
 
 interface Props {
   cycleId: string
@@ -37,14 +45,17 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
   const [isApproving, setIsApproving] = useState(false)
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
   const [sentRecipients, setSentRecipients] = useState<SendMinutesRecipient[]>([])
+  const [failedRecipients, setFailedRecipients] = useState<FailedRecipient[]>([])
   const [sendError, setSendError] = useState<string | null>(null)
   // Recipient selection: who receives the minutes. Fetched once the minutes are
   // approved. Internal stakeholders are pre-selected; external (vendor) recipients
   // are opt-in and only offered for Vendor Prep / SPR (not the Alignment call).
   const [recipients, setRecipients] = useState<MinutesRecipient[] | null>(null)
-  const [allowExternal, setAllowExternal] = useState(false)
+  // null until the backend has reported the policy — the banner must not assert one before then.
+  const [allowExternal, setAllowExternal] = useState<boolean | null>(null)
   const [recipientsError, setRecipientsError] = useState<string | null>(null)
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set())
+  const [recipientsReloadKey, setRecipientsReloadKey] = useState(0)
 
   // Hydrate persisted minutes when they arrive from the async load (after mount).
   // Only fills an empty viewer — never clobbers a freshly-generated set.
@@ -58,9 +69,15 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
   // Load the candidate recipients once the minutes are approved, so the coordinator
   // can pick who receives them. Internal stakeholders are pre-selected; external
   // (vendor) recipients start unchecked and must be chosen deliberately.
+  // Re-runs when the meeting identity changes or the coordinator hits Refresh, so an
+  // edited roster can't leave the picker showing people who are no longer invited.
   useEffect(() => {
-    if (!approved || recipients !== null) return
+    if (!approved) return
     let cancelled = false
+    setRecipients(null)
+    setAllowExternal(null)
+    setSelectedEmails(new Set())
+    setRecipientsError(null)
     ;(async () => {
       try {
         const meetingId = meetingIdProp ?? `mtg-${cycleId}`
@@ -74,7 +91,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
       }
     })()
     return () => { cancelled = true }
-  }, [approved, recipients, cycleId, meetingIdProp])
+  }, [approved, cycleId, meetingIdProp, recipientsReloadKey])
 
   function toggleRecipient(email: string) {
     setSelectedEmails((prev) => {
@@ -180,7 +197,17 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
   }
 
   async function handleSend() {
-    if (!minutes || !runId || selectedEmails.size === 0) return
+    // Never bail silently — the coordinator must see why the click did nothing.
+    if (!minutes) {
+      setSendError('Generate the minutes before sending them.')
+      setSendStatus('failed')
+      return
+    }
+    if (selectedEmails.size === 0) {
+      setSendError('Select at least one recipient.')
+      setSendStatus('failed')
+      return
+    }
     setSendStatus('sending')
     setSendError(null)
     try {
@@ -188,10 +215,13 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
       // back to mtg-… which the backend maps to the cycle attendee list. Only the
       // recipients the coordinator selected receive the minutes.
       const meetingId = meetingIdProp ?? `mtg-${cycleId}`
+      // Minutes restored from the persisted artifact carry no run id; run_id is
+      // optional on the send endpoint, so send without one instead of no-opping.
       const result = await sendMeetingMinutes(
-        cycleId, runId, minutes, vendorName, quarter, year, meetingId, Array.from(selectedEmails),
+        cycleId, runId as string, minutes, vendorName, quarter, year, meetingId, Array.from(selectedEmails),
       )
       setSentRecipients(result.sent_to)
+      setFailedRecipients((result as SendMinutesResult & { failed?: FailedRecipient[] }).failed ?? [])
       setSendStatus('sent')
     } catch (e) {
       setSendError(e instanceof Error ? e.message : 'Failed to send minutes')
@@ -459,12 +489,21 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
                 {/* Send to stakeholders — pick who receives the minutes */}
                 {sendStatus === 'idle' || sendStatus === 'failed' ? (
                   <div className="space-y-3 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
-                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                      Choose who receives these minutes.
-                      {allowExternal
-                        ? ' External (vendor) recipients are opt-in.'
-                        : ' Alignment minutes go to internal stakeholders only.'}
-                    </p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                        Choose who receives these minutes.
+                        {allowExternal === true && ' External (vendor) recipients are opt-in.'}
+                        {allowExternal === false && ' Alignment minutes go to internal stakeholders only.'}
+                      </p>
+                      <button
+                        onClick={() => setRecipientsReloadKey((k) => k + 1)}
+                        disabled={recipients === null && !recipientsError}
+                        title="Reload this meeting's roster"
+                        className="shrink-0 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <RefreshCw size={11} /> Refresh
+                      </button>
+                    </div>
 
                     {recipientsError ? (
                       <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
@@ -503,22 +542,45 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
                     <span className="text-sm text-emerald-700 dark:text-emerald-400">Sending minutes...</span>
                   </div>
                 ) : (
-                  <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-4 py-3 space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 font-medium">
-                      <CheckCircle2 size={15} />
-                      Sent to {sentRecipients.length} recipient{sentRecipients.length !== 1 ? 's' : ''}
+                  <div className="space-y-2">
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-4 py-3 space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+                        <CheckCircle2 size={15} />
+                        Sent to {sentRecipients.length} recipient{sentRecipients.length !== 1 ? 's' : ''}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {sentRecipients.map((r) => (
+                          <span
+                            key={r.email}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-xs rounded-full"
+                          >
+                            <Users size={10} />
+                            {r.name || r.email}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {sentRecipients.map((r) => (
-                        <span
-                          key={r.email}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-xs rounded-full"
-                        >
-                          <Users size={10} />
-                          {r.name || r.email}
-                        </span>
-                      ))}
-                    </div>
+                    {failedRecipients.length > 0 && (
+                      <div className="bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-3 space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-400 font-medium">
+                          <AlertTriangle size={15} />
+                          Not delivered to {failedRecipients.length} recipient{failedRecipients.length !== 1 ? 's' : ''}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {failedRecipients.map((r) => (
+                            <span
+                              key={r.email}
+                              title={r.error}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 text-xs rounded-full"
+                            >
+                              <Users size={10} />
+                              {r.name || r.email}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-xs text-red-600 dark:text-red-400">The service mailbox could not deliver to these addresses — follow up directly.</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

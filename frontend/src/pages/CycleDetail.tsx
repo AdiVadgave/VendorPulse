@@ -201,10 +201,11 @@ export default function CycleDetail() {
   const [apiSlots, setApiSlots] = useState<SlotProposal[] | null>(null)
 
   // --- Module B state ---
-  const [scorecardDispatched, setScorecardDispatched] = useState(() => {
-    if (!effectiveWorkflowState) return false
-    return WORKFLOW_STATES.indexOf(effectiveWorkflowState) >= WORKFLOW_STATES.indexOf('SCORECARD_REQUEST_SENT')
-  })
+  // Dispatch is tracked by the backend marker, never by the workflow state: the VMO
+  // reaches SCORECARD_REQUEST_SENT by clicking "Proceed to scorecard" *before*
+  // anything is sent, and locking the config that early makes Save take the per-team
+  // branch — silently dropping the measure set and the weights.
+  const [scorecardDispatched, setScorecardDispatched] = useState(() => !!cycle?.scorecard_dispatched_at)
   const [, setSubmissionsSimulated] = useState(false)
   const [compiledScores, setCompiledScores] = useState<CompiledCategoryScore[] | null>(null)
   const [compiledScorecard, setCompiledScorecard] = useState<CompiledScorecard | null>(null)
@@ -315,7 +316,10 @@ export default function CycleDetail() {
         } else if (!savedLastTab || idx < TAB_MIN_STATE_INDEX[savedLastTab]) {
           setActiveTab(getDefaultTabFromState(state))
         }
-        if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_REQUEST_SENT')) setScorecardDispatched(true)
+        // Set here (not only in the sync effect below) so the Scorecard tab's panels —
+        // which snapshot this flag when they mount — see it in the same render that
+        // clears the loading state.
+        setScorecardDispatched(!!backendCycle.scorecard_dispatched_at)
         if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_COLLECTION')) setSubmissionsSimulated(true)
         // Auto-fetch compiled scorecard if already compiled
         if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_COMPILED')) {
@@ -331,6 +335,13 @@ export default function CycleDetail() {
       .finally(() => setIsLoadingCycle(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleId])
+
+  // Keep the config lock on the authoritative marker: every dispatch, redo and
+  // per-team reopen refetches the cycle, so this re-syncs the optimistic flag set by
+  // those callbacks.
+  useEffect(() => {
+    setScorecardDispatched(!!cycle?.scorecard_dispatched_at)
+  }, [cycle?.scorecard_dispatched_at])
 
   // Load real attendees from backend for API-created (non-mock) cycles
   useEffect(() => {
@@ -864,7 +875,10 @@ export default function CycleDetail() {
             onEdit={handleActionEdit}
             onDelete={handleActionDelete}
             onAdd={handleAddAction}
-            onArchive={() => advanceWorkflow(cycle!.cycle_id, 'ARCHIVED')}
+            onArchive={async () => {
+              const res = await advanceWorkflow(cycle!.cycle_id, 'ARCHIVED')
+              return res.ok ? null : (res.error ?? 'Could not archive the cycle.')
+            }}
           />
         )}
       </div>
@@ -1913,10 +1927,13 @@ function ActionsTab({
   onEdit: (id: string, updates: ActionEdit) => void
   onDelete: (id: string) => void
   onAdd: (a: NewActionInput) => void
-  onArchive: () => void
+  /** Archives the cycle; resolves with the server's refusal message, or null on success. */
+  onArchive: () => Promise<string | null>
 }) {
   const [adding, setAdding] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
   // Still-active work: Open + In Progress. These block closing the cycle. Completed,
   // Closed and Next-cycle items do not (Next-cycle is deferred to the next cycle).
   const blockingCount = actions.filter((a) => a.status === 'OPEN' || a.status === 'IN_PROGRESS').length
@@ -1924,6 +1941,16 @@ function ActionsTab({
   // Archiving is only allowed once the final QBR meeting is done.
   const finalMeetingDone =
     WORKFLOW_STATES.indexOf(workflowState) >= WORKFLOW_STATES.indexOf('POST_MEETING_COMPLETE')
+
+  // The backend re-checks the open-action guard, so a local count of 0 is not enough:
+  // surface its refusal instead of leaving the UI showing an archive that never happened.
+  async function handleArchive() {
+    setArchiving(true)
+    setArchiveError(null)
+    const message = await onArchive()
+    setArchiving(false)
+    if (message) setArchiveError(message)
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -2014,15 +2041,22 @@ function ActionsTab({
                 </p>
               </div>
             </div>
+            {archiveError && (
+              <div className="flex items-start gap-2 mb-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+                <AlertTriangle size={14} className="text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-700 dark:text-red-300">{archiveError}</p>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <button
-                onClick={onArchive}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
+                onClick={handleArchive}
+                disabled={archiving}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Yes, archive cycle
+                {archiving ? 'Archiving…' : 'Yes, archive cycle'}
               </button>
               <button
-                onClick={() => setConfirmArchive(false)}
+                onClick={() => { setArchiveError(null); setConfirmArchive(false) }}
                 className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 text-sm font-medium rounded-lg transition-colors"
               >
                 Cancel

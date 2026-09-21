@@ -316,6 +316,10 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   const [showApproval, setShowApproval] = useState(false)
   const [dispatched, setDispatched] = useState(alreadyDispatched)
   const [dispatchResult, setDispatchResult] = useState<DispatchResponse | null>(null)
+  // Addresses confirmed sent in this session. The parent's refetch is async (and
+  // silently no-ops when the backend is unreachable), so without these the pending
+  // block would offer a re-send to reviewers who were just emailed.
+  const [sentEmails, setSentEmails] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [addingId, setAddingId] = useState<string | null>(null)
@@ -357,7 +361,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   // Only reviewers NOT already sent the scorecard are (re)sent — so after a per-team
   // reopen or a new team is added, the send goes ONLY to that team, never everyone.
   // Before the first dispatch, dispatchedEmails is empty → this equals `recipients`.
-  const dispatchedSet = new Set((dispatchedEmails ?? []).map((e) => (e || '').trim().toLowerCase()))
+  const dispatchedSet = new Set([...(dispatchedEmails ?? []), ...sentEmails].map((e) => (e || '').trim().toLowerCase()))
   const pendingRecipients = recipients.filter((a) => !dispatchedSet.has((a.email || '').trim().toLowerCase()))
 
   async function markKey(attendeeId: string) {
@@ -399,6 +403,14 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   }
 
   async function handleApprove(edited: { subject: string; body: string }) {
+    // Never post an empty recipient list: the backend would report 0 of 0 sent and the
+    // cycle would be marked dispatched without a single reviewer being emailed.
+    if (pendingRecipients.length === 0) {
+      setShowApproval(false)
+      setAgentStatus('idle')
+      setError('Nothing was sent — no reviewers are pending. If you just redid the scorecard, wait for the recipient list to refresh and try again.')
+      return
+    }
     setAgentStatus('running')
     setShowApproval(false)
     setError(null)
@@ -420,6 +432,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
         html_body_override: edited.body,
       })
       setDispatchResult(result)
+      setSentEmails((prev) => [...prev, ...result.results.filter((r) => r.status === 'sent').map((r) => r.email)])
       setAgentStatus('complete')
       setDispatched(true)
       onDispatched()
@@ -440,6 +453,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
       // Reopen the panel + config for a fresh send, flagged as a re-issue.
       setDispatched(false)
       setDispatchResult(null)
+      setSentEmails([])  // the redo cleared the dispatched set server-side
       setReissue(true)
       setAgentStatus('idle')
       onRedo?.()
@@ -560,16 +574,24 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
           </div>
         )}
         {!dispatched ? (
-          <button
-            onClick={handleGenerate}
-            disabled={agentStatus === 'running' || agentStatus === 'awaiting_approval' || recipients.length === 0}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            {agentStatus === 'running' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            {agentStatus === 'running'
-              ? 'Preparing dispatch…'
-              : `${reissue ? 'Re-send Corrected Scorecard' : 'Send Scorecard Link'} to ${recipients.length} Recipient${recipients.length !== 1 ? 's' : ''}`}
-          </button>
+          /* Label and enablement follow `pendingRecipients` — what is actually sent. */
+          <>
+            <button
+              onClick={handleGenerate}
+              disabled={agentStatus === 'running' || agentStatus === 'awaiting_approval' || pendingRecipients.length === 0}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              {agentStatus === 'running' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {agentStatus === 'running'
+                ? 'Preparing dispatch…'
+                : `${reissue ? 'Re-send Corrected Scorecard' : 'Send Scorecard Link'} to ${pendingRecipients.length} Recipient${pendingRecipients.length !== 1 ? 's' : ''}`}
+            </button>
+            {recipients.length > 0 && pendingRecipients.length === 0 && (
+              <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+                Waiting for the recipient list to refresh after the reopen — reload the page if this persists.
+              </p>
+            )}
+          </>
         ) : (
           <div className="space-y-2">
             <div className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-700 dark:text-emerald-400 text-sm font-medium">
@@ -638,7 +660,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
         title={reissue ? 'Review corrected scorecard email' : 'Review scorecard request email'}
         subject={dispatchDraft.subject}
         body={dispatchDraft.body}
-        recipients={recipients.map((a) => `${a.name} (${a.email})`)}
+        recipients={pendingRecipients.map((a) => `${a.name} (${a.email})`)}
         requiredTokens={['{{link}}']}
         note="{{name}} and {{link}} are replaced with each recipient's name and personal scorecard link. Sent from the Mobility Vendor Pulse service mailbox (Outlook)."
         sendLabel={reissue ? 'Re-send via Outlook' : 'Send via Outlook'}

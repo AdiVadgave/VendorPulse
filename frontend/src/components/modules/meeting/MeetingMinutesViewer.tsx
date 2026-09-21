@@ -218,7 +218,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
       // Minutes restored from the persisted artifact carry no run id; run_id is
       // optional on the send endpoint, so send without one instead of no-opping.
       const result = await sendMeetingMinutes(
-        cycleId, runId as string, minutes, vendorName, quarter, year, meetingId, Array.from(selectedEmails),
+        cycleId, runId, minutes, vendorName, quarter, year, meetingId, Array.from(selectedEmails),
       )
       setSentRecipients(result.sent_to)
       setFailedRecipients((result as SendMinutesResult & { failed?: FailedRecipient[] }).failed ?? [])

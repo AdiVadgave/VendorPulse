@@ -266,8 +266,13 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
       const w: Record<string, number> = {}
       for (const t of included) w[t.key] = weights[t.key] ?? 0
       // Persist an explicit team list for every selected measure ([] = nobody).
-      const mt: Record<string, string[]> = {}
-      for (const key of selected) mt[key] = Array.from(teamsForMeasure(key))
+      // With no key stakeholders yet there are no teams to assign, and writing []
+      // everywhere would mean "nobody is asked" — a state that survives marking people
+      // Key later and permanently empties the dispatch list. Omit instead, which leaves
+      // every measure unrestricted (= everyone).
+      const mt = teams.length === 0
+        ? undefined
+        : Object.fromEntries([...selected].map((key) => [key, Array.from(teamsForMeasure(key))]))
       const cfg = await saveScorecardConfig(cycleId, {
         selected_measure_keys: Array.from(selected),
         weights: w,

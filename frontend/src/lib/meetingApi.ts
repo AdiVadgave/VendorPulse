@@ -162,7 +162,8 @@ export interface SendMinutesRecipient {
 
 export interface SendMinutesResult {
   status: string
-  run_id: string
+  /** Null when the minutes were restored from the artifact (no agent run behind them). */
+  run_id: string | null
   sent_to: SendMinutesRecipient[]
   count: number
   message_id: string
@@ -197,7 +198,8 @@ export async function getMinutesRecipients(
 
 export async function sendMeetingMinutes(
   cycleId: string,
-  runId: string,
+  /** Null for minutes restored from the artifact — run_id is optional on the endpoint. */
+  runId: string | null,
   minutes: MeetingMinutes,
   vendorName: string,
   quarter: string,

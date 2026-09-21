@@ -358,6 +358,20 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   // Internal stakeholders that could be added as recipients (not yet key).
   const addable = attendees.filter((a) => a.type !== 'Vendor' && !a.is_key)
 
+  // Server truth wins once it lands: drop any locally-remembered address the refreshed
+  // prop no longer lists. Without this a per-team reopen (which removes that team from
+  // scorecard_dispatched_to) stays masked by `sentEmails`, permanently hiding the
+  // team-scoped resend. Keyed on CONTENTS, not array identity — the parent rebuilds the
+  // array each render — so it can't fire before the refetch and wipe the stop-gap.
+  const dispatchedKey = (dispatchedEmails ?? []).map((e) => (e || '').trim().toLowerCase()).sort().join('|')
+  useEffect(() => {
+    const propSet = new Set(dispatchedKey ? dispatchedKey.split('|') : [])
+    setSentEmails((prev) => {
+      const next = prev.filter((e) => propSet.has((e || '').trim().toLowerCase()))
+      return next.length === prev.length ? prev : next
+    })
+  }, [dispatchedKey])
+
   // Only reviewers NOT already sent the scorecard are (re)sent — so after a per-team
   // reopen or a new team is added, the send goes ONLY to that team, never everyone.
   // Before the first dispatch, dispatchedEmails is empty → this equals `recipients`.

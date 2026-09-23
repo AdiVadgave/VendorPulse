@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { SlidersHorizontal, ChevronDown, ChevronRight, Save, RotateCcw, Loader2, CheckCircle2, AlertTriangle, Info, Lock, Users } from 'lucide-react'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { cn } from '@/utils/cn'
 import type { ScorecardCatalogTheme, ScorecardConfig } from '@/types/scorecard.types'
 import type { CycleAttendee } from '@/types/scheduling.types'
@@ -67,6 +68,9 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
   // treated as editable immediately, without waiting for the parent to refetch.
   const [reopenedTeams, setReopenedTeams] = useState<Set<string>>(new Set())
   const [reopeningTeam, setReopeningTeam] = useState<string | null>(null)
+  // Reopen discards that team's submitted scores irreversibly, and its trigger sits in a
+  // dense column header next to a checkbox — confirm before acting on a stray click.
+  const [confirmReopen, setConfirmReopen] = useState<string | null>(null)
   const dispatchedSet = useMemo(
     () => new Set(dispatchedEmails.map((e) => (e || '').trim().toLowerCase())),
     [dispatchedEmails]
@@ -441,31 +445,42 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
                         const settled = isTeamSettled(t)
                         return (
                           <th key={t} className={cn('px-4 py-3 text-center whitespace-nowrap border-l border-slate-200 dark:border-slate-700', dispatched && editable && 'bg-emerald-50/60 dark:bg-emerald-900/10')}>
-                            <label className={cn('flex flex-col items-center gap-1.5', !editable || sel.length === 0 ? 'cursor-not-allowed' : 'cursor-pointer')} title={`Toggle ${t} for every selected measure`}>
+                            <label className={cn('flex flex-col items-center gap-1.5', !editable || sel.length === 0 ? 'cursor-not-allowed' : 'cursor-pointer')} title={settled ? `${t} has been sent the scorecard — reopen the team to change it` : `Toggle ${t} for every selected measure`}>
                               <span className="text-sm font-semibold flex items-center gap-1">
                                 {t}
                                 {dispatched && editable && <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">open</span>}
                               </span>
-                              <input
-                                type="checkbox"
-                                checked={on}
-                                ref={(el) => { if (el) el.indeterminate = some && !on }}
-                                disabled={!editable || sel.length === 0}
-                                onChange={() => toggleTeamColumn(t)}
-                                className={CB}
-                              />
+                              {/* A settled column shows a padlock, not a dead checkbox: the
+                                  disabled tick read as "unticked" and sat flush against the
+                                  Reopen button, so the two looked like one control. */}
+                              {settled ? (
+                                <span className="flex items-center gap-1 text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                                  <Lock size={11} /> sent
+                                </span>
+                              ) : (
+                                <input
+                                  type="checkbox"
+                                  checked={on}
+                                  ref={(el) => { if (el) el.indeterminate = some && !on }}
+                                  disabled={!editable || sel.length === 0}
+                                  onChange={() => toggleTeamColumn(t)}
+                                  className={CB}
+                                />
+                              )}
                             </label>
                             {settled && (
-                              <button
-                                type="button"
-                                onClick={() => handleReopenTeam(t)}
-                                disabled={reopeningTeam === t}
-                                title={`Reopen ${t} — discards their scores so they can re-submit, and lets you resend to ${t} only`}
-                                className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 dark:text-amber-400 hover:text-amber-800 disabled:opacity-50"
-                              >
-                                {reopeningTeam === t ? <Loader2 size={10} className="animate-spin" /> : <RotateCcw size={10} />}
-                                Reopen
-                              </button>
+                              <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmReopen(t)}
+                                  disabled={reopeningTeam !== null}
+                                  title={`Reopen ${t} — discards their submitted scores so they can re-submit, and lets you resend to ${t} only`}
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-amber-300 dark:border-amber-800 text-[10px] font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  {reopeningTeam === t ? <Loader2 size={10} className="animate-spin" /> : <RotateCcw size={10} />}
+                                  Reopen
+                                </button>
+                              </div>
                             )}
                           </th>
                         )
@@ -631,6 +646,41 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
           )}
         </div>
       )}
+
+      {/* Reopen is destructive and its trigger lives in a dense column header, so it is
+          always confirmed. Named explicitly ("Reopen IDTM") because the dialog is the
+          last chance to notice the wrong column was clicked. */}
+      <ConfirmDialog
+        open={confirmReopen !== null}
+        tone="danger"
+        title={`Reopen ${confirmReopen ?? ''}?`}
+        confirmLabel={`Yes, reopen ${confirmReopen ?? ''}`}
+        cancelLabel="Cancel"
+        busy={reopeningTeam !== null}
+        message={
+          <>
+            <p>
+              This <strong>permanently discards the scorecard {confirmReopen} has already
+              submitted</strong>. Their scores disappear from the consolidated scorecard and
+              cannot be recovered — they will have to fill it in again.
+            </p>
+            <p className="mt-2">
+              {confirmReopen}&apos;s column unlocks so you can change their measures, and the
+              dispatch step will then send the scorecard to <strong>{confirmReopen} only</strong>.
+              Every other team keeps its configuration and its submitted scores.
+            </p>
+          </>
+        }
+        onConfirm={() => {
+          const t = confirmReopen
+          if (!t || reopeningTeam !== null) return
+          // Stay open (and busy) until the server answers, so the dialog itself blocks a
+          // second click and the VMO sees the action is running. Any failure is surfaced
+          // by handleReopenTeam's own error state in the panel below.
+          void handleReopenTeam(t).finally(() => setConfirmReopen(null))
+        }}
+        onCancel={() => { if (reopeningTeam === null) setConfirmReopen(null) }}
+      />
     </div>
   )
 }

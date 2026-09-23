@@ -23,11 +23,26 @@ interface Props {
   alreadyDispatched?: boolean
   /** The configured scorecard structure for this cycle (falls back to default). */
   structure?: WeightedCategoryDef[]
+  /** Teams the config was authored against. A key reviewer outside this roster was
+   *  marked Key afterwards, so no measure can name them — they are asked everything
+   *  rather than being filtered out of the recipient list. */
+  configTeams?: string[]
   /** Reopen the scorecard config (unlock) after a redo so it can be reconfigured. */
   onRedo?: () => void
   /** Emails already sent the scorecard. After dispatch, only reviewers NOT here (new
    *  or reopened teams) are offered a (re)send — so a resend never re-emails everyone. */
   dispatchedEmails?: string[]
+  /** True while reviewers still hold a WITHDRAWN scorecard (raised by the parent on
+   *  redo). It lives in the parent because this panel unmounts on every Scorecard
+   *  sub-tab switch — as local state the "corrected scorecard" wording was lost the
+   *  first time the VMO looked at Comparison & Finalize after a redo. */
+  reissue?: boolean
+  /** Called once every holder of the withdrawn scorecard has been re-sent. */
+  onReissueHandled?: () => void
+  /** Non-null → the scorecard configuration is unavailable, so the team filter cannot
+   *  be trusted and sending is blocked. The rest of the panel (attendee controls, form
+   *  links, Redo, reminders) stays usable. */
+  dispatchBlockedReason?: string | null
 }
 
 interface ReminderTier {
@@ -42,6 +57,7 @@ interface ReminderStatus {
   pending: number
   pending_names: string[]
   tiers: ReminderTier[]
+  coordinator_email?: string | null
 }
 
 function toneFor(offset: number) {
@@ -59,6 +75,11 @@ function toneFor(offset: number) {
 function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
   const [deadline, setDeadline] = useState('')
   const [offsets, setOffsets] = useState<number[]>([5, 2, 0])
+  // Where the deadline-day (T-0) escalation goes. The backend has always accepted this,
+  // but nothing could set it — so the escalation fell through to "reviewers who are not
+  // late" (handing peers the late reviewers' names and addresses) or to the unattended
+  // service mailbox, which nobody reads.
+  const [coordinatorEmail, setCoordinatorEmail] = useState('')
   const [status, setStatus] = useState<ReminderStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -74,6 +95,7 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
       setStatus(s)
       setDeadline(s.deadline ?? '')
       setOffsets(s.offsets?.length ? s.offsets : [5, 2, 0])
+      setCoordinatorEmail(s.coordinator_email ?? '')
     } catch {
       /* leave defaults */
     } finally {
@@ -84,11 +106,15 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
 
   async function save() {
     if (!deadline) { setError('Pick a deadline date first.'); return }
+    const coord = coordinatorEmail.trim()
+    if (coord && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(coord)) {
+      setError('Enter a valid escalation email address, or leave it blank.'); return
+    }
     setSaving(true); setError(null); setMsg(null)
     try {
       const s = await apiFetch<ReminderStatus>(`/api/scorecard/reminders/${cycleId}`, {
         method: 'PUT',
-        body: JSON.stringify({ deadline, offsets, form_base_url: window.location.origin }),
+        body: JSON.stringify({ deadline, offsets, form_base_url: window.location.origin, coordinator_email: coord || null }),
       })
       setStatus(s)
       setMsg('Reminder schedule saved.')
@@ -126,8 +152,10 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
       )
       setMsg(
         r.pending === 0
-          ? 'Everyone has already submitted — no reminders sent.'
-          : `Reminder sent to ${r.sent} pending reviewer${r.sent === 1 ? '' : 's'}${r.failed ? `, ${r.failed} failed` : ''}.`,
+          // Not "everyone has already submitted": pre-dispatch, and right after a
+          // reopen, pending is 0 because nobody is currently AWAITING a scorecard.
+          ? 'No reviewer is currently awaiting a scorecard — no reminders sent.'
+          : `Reminder sent to ${r.sent} pending reviewer${r.sent === 1 ? '' : 's'}${r.failed ? `, ${r.failed} failed` : ''}${r.escalated ? `, ${r.escalated} escalated to the VMO Coordinator` : ''}.`,
       )
       setDraftOpen(false)
       load()
@@ -164,6 +192,16 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
                 className="px-2.5 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
+              <span className="flex items-center gap-1"><Bell size={12} /> Escalation email (T−0)</span>
+              <input
+                type="email"
+                value={coordinatorEmail}
+                onChange={(e) => setCoordinatorEmail(e.target.value)}
+                placeholder="vmo.coordinator@shell.com"
+                className="px-2.5 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[15rem]"
               />
             </label>
             <button
@@ -247,7 +285,7 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
             </p>
           )}
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
-            Reminders run automatically each day via the service mailbox. Escalation on the deadline day (T−0) alerts the VMO Coordinator.
+            Reminders run automatically each day via the service mailbox; the scheduled deadline-day tier (T−0) also alerts the VMO Coordinator. “Send reminder now” emails the pending reviewers only.
           </p>
         </>
       )}
@@ -309,7 +347,7 @@ function CategoriesDropdown({ structure }: { structure: WeightedCategoryDef[] })
   )
 }
 
-export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false, structure, onRedo, dispatchedEmails = [] }: Props) {
+export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false, structure, configTeams, onRedo, dispatchedEmails = [], reissue = false, onReissueHandled, dispatchBlockedReason = null }: Props) {
   const effectiveStructure = structure && structure.length > 0 ? structure : WEIGHTED_SCORECARD_STRUCTURE
   const totalMeasures = effectiveStructure.reduce((sum, c) => sum + c.measures.length, 0)
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(alreadyDispatched ? 'complete' : 'idle')
@@ -323,40 +361,51 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [addingId, setAddingId] = useState<string | null>(null)
-  // Set after a redo — the next send uses the formal "corrected scorecard" email.
-  const [reissue, setReissue] = useState(false)
+  // `reissue` (the formal "corrected scorecard" email) is a PROP, not local state:
+  // this panel unmounts on every Scorecard sub-tab switch, which used to discard it.
   const [redoing, setRedoing] = useState(false)
   const [confirmRedo, setConfirmRedo] = useState(false)
   const [dispatchDraft, setDispatchDraft] = useState<{ subject: string; body: string }>({ subject: '', body: '' })
 
-  // Teams the config assigns to ≥1 measure. A measure with a `teams` list is
-  // team-restricted; if ANY measure is restricted we only invite people whose
-  // team is assigned somewhere. If no measure carries a `teams` list (legacy /
-  // unrestricted config) everyone key + internal is invited, as before.
+  // Mirrors the backend's `_measure_asks_team` exactly — the reviewer's form and this
+  // recipient list MUST agree, or someone is emailed a scorecard with no measures on it
+  // (or, worse, is left out of a scorecard they are supposed to fill).
   const teamOf = (a: CycleAttendee) => a.shell_department || a.name
-  const assignedTeams = new Set<string>()
-  let hasTeamConfig = false
-  for (const cat of effectiveStructure) {
-    for (const m of cat.measures) {
-      if (Array.isArray(m.teams)) {
-        hasTeamConfig = true
-        m.teams.forEach((t) => assignedTeams.add(t))
-      }
-    }
+  const roster = new Set(configTeams ?? [])
+  const allMeasures = effectiveStructure.flatMap((cat) => cat.measures)
+  // Unrestricted measure => everyone; a restricted one => only the teams it names.
+  const strictAsks = (m: { teams?: string[] }, team: string) =>
+    !Array.isArray(m.teams) || m.teams.includes(team)
+  // A reviewer is invited when ANY measure asks their team. Testing measure-by-measure
+  // (rather than against a flattened union of every `teams` list) is what makes a MIXED
+  // config work: a team included only implicitly, via an unrestricted measure, is no
+  // longer dropped just because some OTHER measure carries an explicit `teams` list.
+  //
+  // The off-roster rescue is applied ONLY when the strict rule leaves the reviewer with
+  // nothing AND their team predates nothing in the config (they were marked Key after it
+  // was saved, so no measure could name them). Applying it per measure instead would
+  // override every deliberate restriction. Mirrors the backend's `_asks_predicate`.
+  const isAsked = (a: CycleAttendee) => {
+    const team = teamOf(a)
+    if (allMeasures.some((m) => strictAsks(m, team))) return true
+    return !!team && !roster.has(team) && allMeasures.length > 0
   }
 
-  // Recipients ARE the key internal stakeholders (one scorecard per team), further
-  // narrowed to teams the config actually asks something of.
+  // Recipients ARE the key internal stakeholders (one scorecard per team).
   // Anything not explicitly a Vendor counts as internal — robust to legacy/missing
   // `type` values so a key stakeholder never silently drops from the recipient list.
   const keyInternal = attendees.filter((a) => a.is_key && a.type !== 'Vendor')
-  const recipients = hasTeamConfig
-    ? keyInternal.filter((a) => assignedTeams.has(teamOf(a)))
-    : keyInternal
+  // The backend refuses a batch containing a DECLINED attendee (400, nothing sent), so
+  // they must be held out here rather than killing the send for everyone else.
+  const declinedKey = keyInternal.filter((a) => a.confirmation_status === 'DECLINED')
+  const eligible = keyInternal.filter((a) => a.confirmation_status !== 'DECLINED')
+  const recipients = eligible.filter(isAsked)
   // Key internal stakeholders excluded because their team isn't assigned any measure.
-  const excludedByTeam = hasTeamConfig ? keyInternal.filter((a) => !assignedTeams.has(teamOf(a))) : []
-  // Internal stakeholders that could be added as recipients (not yet key).
-  const addable = attendees.filter((a) => a.type !== 'Vendor' && !a.is_key)
+  const excludedByTeam = eligible.filter((a) => !isAsked(a))
+  // Internal stakeholders that could be added as recipients (not yet key). A DECLINED
+  // attendee is not offered: marking them Key would only park them in the declined
+  // callout below, because the send holds declined reviewers out.
+  const addable = attendees.filter((a) => a.type !== 'Vendor' && !a.is_key && a.confirmation_status !== 'DECLINED')
 
   // Server truth wins once it lands: drop any locally-remembered address the refreshed
   // prop no longer lists. Without this a per-team reopen (which removes that team from
@@ -372,24 +421,42 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
     })
   }, [dispatchedKey])
 
+  // `alreadyDispatched` can flip AFTER mount: reopening the last dispatched team empties
+  // scorecard_dispatched_to, which nulls scorecard_dispatched_at server-side and unlocks
+  // the config panel above. Follow the prop here too, or the two adjacent panels report
+  // opposite states for the same cycle. An in-flight send is never clobbered, and
+  // `reissue` is owned by the parent, so a redo keeps its corrected-scorecard notice.
+  useEffect(() => {
+    setDispatched(alreadyDispatched)
+    // Drop the stale "N of M emails sent" list, or it keeps reporting the reopened
+    // team's reviewers as sent directly above the now-enabled send button.
+    if (!alreadyDispatched) setDispatchResult(null)
+    setAgentStatus((s) => (s === 'running' || s === 'awaiting_approval' ? s : alreadyDispatched ? 'complete' : 'idle'))
+  }, [alreadyDispatched])
+
   // Only reviewers NOT already sent the scorecard are (re)sent — so after a per-team
   // reopen or a new team is added, the send goes ONLY to that team, never everyone.
   // Before the first dispatch, dispatchedEmails is empty → this equals `recipients`.
   const dispatchedSet = new Set([...(dispatchedEmails ?? []), ...sentEmails].map((e) => (e || '').trim().toLowerCase()))
   const pendingRecipients = recipients.filter((a) => !dispatchedSet.has((a.email || '').trim().toLowerCase()))
 
-  async function markKey(attendeeId: string) {
+  // `isKey` is a parameter so the declined-attendance callout can also REMOVE someone:
+  // once the meeting is scheduled, un-keying is the only way to clear a declined
+  // reviewer out of the recipient count.
+  async function markKey(attendeeId: string, isKey = true) {
     setAddingId(attendeeId)
     setError(null)
     try {
       await apiFetch(`/api/cycles/${cycleId}/attendees/${attendeeId}`, {
         method: 'PUT',
-        body: JSON.stringify({ is_key: true }),
+        body: JSON.stringify({ is_key: isKey }),
       })
       // Only reflect the change locally once the backend has persisted it.
-      onAttendeesChanged?.(attendees.map((a) => (a.attendee_id === attendeeId ? { ...a, is_key: true } : a)))
+      onAttendeesChanged?.(attendees.map((a) => (a.attendee_id === attendeeId ? { ...a, is_key: isKey } : a)))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not add that stakeholder as a recipient — please try again.')
+      setError(e instanceof Error ? e.message : isKey
+        ? 'Could not add that stakeholder as a recipient — please try again.'
+        : 'Could not remove that stakeholder as a reviewer — please try again.')
     } finally {
       setAddingId(null)
     }
@@ -406,6 +473,12 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   // Open the editable draft, seeded with the real server-side template.
   async function handleGenerate() {
     setError(null)
+    // Belt and braces behind the disabled buttons: never open the send draft while the
+    // configuration is missing — the recipient list would not be filtered by team.
+    if (dispatchBlockedReason) {
+      setError('The scorecard configuration could not be loaded, so dispatch is blocked. Retry the configuration above, then send.')
+      return
+    }
     try {
       const p = await getScorecardDispatchPreview(cycleId, reissue)
       setDispatchDraft({ subject: p.subject, body: p.html_body })
@@ -447,8 +520,30 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
       })
       setDispatchResult(result)
       setSentEmails((prev) => [...prev, ...result.results.filter((r) => r.status === 'sent').map((r) => r.email)])
+      // Nothing left the mailbox (service mailbox down / credential expired): the backend
+      // returns 200 but deliberately does NOT set scorecard_dispatched_at. Treating that
+      // as a dispatch would lock the config panel against a scorecard nobody received.
+      if (result.sent === 0) {
+        const firstError = result.results.find((r) => r.status === 'failed')?.error
+        setError(
+          `No scorecard emails could be sent${firstError ? ` — ${firstError}` : ''}. `
+          + 'The scorecard is still unsent — fix the mail connection and try again.',
+        )
+        setAgentStatus('idle')
+        return
+      }
       setAgentStatus('complete')
       setDispatched(true)
+      // The "corrected scorecard" notice belongs to the reviewers who hold the withdrawn
+      // one. Once every one of them has been re-sent, later per-team sends (a new or
+      // reopened team) are ordinary first-time requests again. `every`, not `sent > 0`:
+      // on a partial failure the un-emailed reviewers still hold the withdrawn scorecard,
+      // so the retry must keep the notice.
+      // The length check matters in the window between the redo and the parent's
+      // refetch: pendingRecipients is then a strict SUBSET of recipients, so a clean
+      // send to that subset would clear the notice while the rest of the list still
+      // holds the withdrawn scorecard and would be re-sent as a first-time request.
+      if (reissue && result.results.length === recipients.length && result.results.every((r) => r.status === 'sent')) onReissueHandled?.()
       onDispatched()
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : 'Failed to send emails')
@@ -468,8 +563,9 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
       setDispatched(false)
       setDispatchResult(null)
       setSentEmails([])  // the redo cleared the dispatched set server-side
-      setReissue(true)
       setAgentStatus('idle')
+      // The re-issue flag is raised by the parent inside onRedo (see the `reissue` prop),
+      // so it survives this panel unmounting on a sub-tab switch.
       onRedo?.()
       setConfirmRedo(false)
     } catch (exc) {
@@ -480,6 +576,17 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   }
 
   const inputCls = 'px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500'
+
+  // Colour the dispatch summary by outcome: "0 of 3 emails sent" (mailbox down) and a
+  // partial send must not be rendered in the green success box — nobody / not everybody
+  // actually received the scorecard.
+  const dispatchTone = !dispatchResult
+    ? null
+    : dispatchResult.sent === dispatchResult.total
+      ? { ok: true, box: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800', text: 'text-emerald-800 dark:text-emerald-300' }
+      : dispatchResult.sent === 0
+        ? { ok: false, box: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800', text: 'text-red-800 dark:text-red-300' }
+        : { ok: false, box: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800', text: 'text-amber-800 dark:text-amber-300' }
 
   return (
     <div className="space-y-4">
@@ -543,16 +650,53 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
             ))}
             {recipients.length === 0 && (
               <p className="text-xs text-amber-600 dark:text-amber-400 py-2">
-                {hasTeamConfig && keyInternal.length > 0
-                  ? 'No recipients — none of the key stakeholders’ teams are assigned to any measure. Assign teams in the scorecard config above.'
-                  : 'No key internal stakeholders yet. Mark attendees as “Key” in the attendee step, or add one above.'}
+                {/* Three distinct empty states — say which one it is, so the VMO knows
+                    whether to fix the config, the attendance, or the attendee list. */}
+                {eligible.length > 0
+                  ? 'No recipients — none of the key stakeholders’ teams are asked any measure. Assign teams in the scorecard config above.'
+                  : keyInternal.length > 0
+                    ? 'No recipients — every key internal stakeholder is marked “Not attending”.'
+                    : 'No key internal stakeholders yet. Mark attendees as “Key” in the attendee step, or add one above.'}
               </p>
             )}
           </div>
           {excludedByTeam.length > 0 && (
-            <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
-              {excludedByTeam.length} key stakeholder{excludedByTeam.length !== 1 ? 's' : ''} not shown — their team isn&apos;t assigned to any measure in the config.
-            </p>
+            <div className="mt-2 flex items-start gap-1.5 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-700 dark:text-amber-400">
+              <AlertTriangle size={13} className="mt-px shrink-0" />
+              <span>
+                <strong>{excludedByTeam.length} key stakeholder{excludedByTeam.length !== 1 ? 's' : ''} will NOT be sent a scorecard</strong>
+                {' '}({excludedByTeam.map((a) => `${a.name} (${teamOf(a)})`).join(', ')}) — the configuration asks their team no measures.
+                {' '}Open <strong>Configure Scorecard</strong> above and tick their team&apos;s column, then save.
+              </span>
+            </div>
+          )}
+          {declinedKey.length > 0 && (
+            /* Amber callout, not an 11px grey footnote: these people are absent from the
+               recipient list entirely, so this is their only signal. */
+            <div className="mt-2 flex items-start gap-1.5 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-700 dark:text-amber-400">
+              <AlertTriangle size={13} className="mt-px shrink-0" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <span className="block">
+                  <strong>{declinedKey.length} key stakeholder{declinedKey.length !== 1 ? 's' : ''} declined the meeting</strong>
+                  {' '}and {declinedKey.length !== 1 ? 'are' : 'is'} held out of the send — a batch naming a declined
+                  reviewer is rejected outright, so nobody would be emailed. Change their attendance
+                  response to include them, or remove them as a reviewer.
+                </span>
+                {declinedKey.map((a) => (
+                  <div key={a.attendee_id} className="flex items-center justify-between gap-2">
+                    <span className="truncate">{a.name} <span className="text-amber-600/70 dark:text-amber-400/70">{a.email}</span></span>
+                    <button
+                      onClick={() => void markKey(a.attendee_id, false)}
+                      disabled={addingId !== null}
+                      className="shrink-0 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-60"
+                      title="Stop treating this attendee as a scorecard reviewer"
+                    >
+                      Remove as reviewer
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
           <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
             Each recipient gets a unique in-app form link tied to their identity — with only the measures assigned to their team. Use <strong>Copy link</strong> to test without sending email.
@@ -565,22 +709,47 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
           </div>
         )}
 
-        {dispatchResult && (
-          <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
-            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 mb-2">
-              <CheckCircle2 size={14} />{dispatchResult.sent} of {dispatchResult.total} emails sent
+        {dispatchResult && dispatchTone && (
+          <div className={cn('mb-4 p-3 border rounded-lg', dispatchTone.box)}>
+            <p className={cn('text-sm font-medium flex items-center gap-1.5 mb-2', dispatchTone.text)}>
+              {dispatchTone.ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+              {dispatchResult.sent} of {dispatchResult.total} emails sent
             </p>
             <div className="space-y-1">
-              {dispatchResult.results.map((r) => (
-                <div key={r.email} className="flex items-center gap-2 text-xs">
-                  {r.status === 'sent' ? <CheckCircle2 size={11} className="text-emerald-600" /> : <AlertTriangle size={11} className="text-red-600" />}
-                  <span className="text-slate-600 dark:text-slate-400">{r.attendee} ({r.email}) — {r.status}</span>
+              {/* Keyed by index as well: nothing dedupes the posted recipients, so the
+                  same address twice (skipped + sent) would collide on `r.email` alone.
+                  `items-start` + `mt-0.5` keeps the icon on the first line of a wrapped
+                  error string instead of dragging it to the vertical middle. */}
+              {dispatchResult.results.map((r, i) => (
+                <div key={`${r.email}-${i}`} className="flex items-start gap-2 text-xs">
+                  {r.status === 'sent'
+                    ? <CheckCircle2 size={11} className="text-emerald-600 shrink-0 mt-0.5" />
+                    : <AlertTriangle size={11} className={cn('shrink-0 mt-0.5', r.status === 'skipped' ? 'text-amber-600' : 'text-red-600')} />}
+                  <span className="text-slate-600 dark:text-slate-400">
+                    {r.name || r.email} ({r.email}) — {r.status}
+                    {/* Without the reason a failed or skipped row is unactionable: the VMO
+                        cannot tell a declined attendee from a rejected mailbox. */}
+                    {r.status !== 'sent' && r.error ? `: ${r.error}` : ''}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
+        {dispatchBlockedReason && (
+          /* The panel stays mounted on a config fault so the attendee controls, the form
+             links and Redo survive it — only the two send entry points are gated. */
+          <div className="mb-3 flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-800 dark:text-red-300">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <span>
+              <strong>Sending is blocked until the scorecard configuration loads.</strong> Without it the
+              measure-to-team assignment is unknown, so the recipient list above is not filtered by team
+              and a send would email stakeholders the configuration excludes. Attendee changes, form
+              links, Redo and the reminder schedule all still work. ({dispatchBlockedReason})
+            </span>
+          </div>
+        )}
         {reissue && !dispatched && (
           <div className="mb-3 flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
             <RotateCcw size={14} className="mt-0.5 shrink-0" />
@@ -592,7 +761,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
           <>
             <button
               onClick={handleGenerate}
-              disabled={agentStatus === 'running' || agentStatus === 'awaiting_approval' || pendingRecipients.length === 0}
+              disabled={agentStatus === 'running' || agentStatus === 'awaiting_approval' || pendingRecipients.length === 0 || !!dispatchBlockedReason}
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
             >
               {agentStatus === 'running' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
@@ -621,7 +790,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
                 </p>
                 <button
                   onClick={handleGenerate}
-                  disabled={agentStatus === 'running' || agentStatus === 'awaiting_approval'}
+                  disabled={agentStatus === 'running' || agentStatus === 'awaiting_approval' || !!dispatchBlockedReason}
                   className="w-full flex items-center justify-center gap-2 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   {agentStatus === 'running' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}

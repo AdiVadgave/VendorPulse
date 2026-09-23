@@ -85,6 +85,14 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
   const isTeamEditable = (t: string) => !dispatched || !sentTeams.has(t) || reopenedTeams.has(t)
   const isTeamSettled = (t: string) => dispatched && sentTeams.has(t) && !reopenedTeams.has(t)
   const editableTeams = useMemo(() => teams.filter(isTeamEditable), [teams, sentTeams, reopenedTeams, dispatched])
+  // Columns to RENDER. A team that was already sent the scorecard keeps its column even
+  // if its key attendee has since been un-keyed (so it drops out of `teams`) — otherwise
+  // its Reopen button disappears and its submissions can never be discarded. Save logic
+  // still uses `teams`/`editableTeams`; this is presentation only.
+  const columnTeams = useMemo(
+    () => [...new Set([...teams, ...sentTeams])].sort((x, y) => x.localeCompare(y)),
+    [teams, sentTeams]
+  )
 
   // The optimistic reopen flag only has to cover the parent's refetch window. Once a
   // refreshed dispatch set shows a reopened team was sent again, drop the flag so its
@@ -167,6 +175,11 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
   }
 
   // Teams currently asked a measure: an explicit set, else all teams (default).
+  // Deliberately NOT unioning off-roster teams in here. That would tick a newcomer onto
+  // a measure the VMO scoped to one team, and the next save would persist it — silently
+  // widening a restriction. A newcomer asked nothing is instead surfaced by
+  // `emptyEditableTeams` (which blocks the save) and rescued server-side only when the
+  // strict rule would leave them with no measures at all.
   function teamsForMeasure(key: string): Set<string> {
     return measureTeams[key] ?? new Set(teams)
   }
@@ -211,13 +224,22 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
     () => catalog.filter((t) => t.measures.some((m) => selected.has(m.key))),
     [catalog, selected]
   )
-  const totalWeight = included.reduce((sum, t) => sum + (weights[t.key] ?? 0), 0)
+  // A theme whose SELECTED measures are all RAG is status-only: RAG is never averaged, so
+  // the server coerces its weight to 0 and excludes it from the 100% rule. The panel must
+  // apply the same rule — otherwise it shows a satisfied 100% that the server rejects with
+  // a 400 the VMO cannot reconcile with what is on screen.
+  const isScoredTheme = (t: ScorecardCatalogTheme) =>
+    t.measures.some((m) => selected.has(m.key) && m.measure_type !== 'rag')
+  const scoredThemes = useMemo(() => included.filter(isScoredTheme), [included, selected])
+  const statusOnlyThemes = useMemo(() => included.filter((t) => !isScoredTheme(t)), [included, selected])
+  const totalWeight = scoredThemes.reduce((sum, t) => sum + (weights[t.key] ?? 0), 0)
   const numericCount = useMemo(
     () => included.reduce((n, t) => n + t.measures.filter((m) => selected.has(m.key) && m.measure_type !== 'rag').length, 0),
     [included, selected]
   )
 
-  const weightOk = totalWeight === 100 && included.every((t) => (weights[t.key] ?? 0) > 0)
+  const weightOk =
+    scoredThemes.length > 0 && totalWeight === 100 && scoredThemes.every((t) => (weights[t.key] ?? 0) > 0)
   const hasSelection = selected.size > 0
   // Selected numeric/RAG measures that currently target no team → nobody is asked them.
   const emptyTeamMeasures = useMemo(
@@ -235,7 +257,9 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
   // Pre-dispatch: normal full save (needs valid weights). Post-dispatch: save is
   // team-scoped — only the open/reopened teams' columns, so it's allowed as long as
   // there's at least one editable team.
-  const canSave = hasSelection && !saving && !loading && (locked ? editableTeams.length > 0 : weightOk)
+  const canSave =
+    hasSelection && !saving && !loading &&
+    (locked ? editableTeams.length > 0 : weightOk && emptyEditableTeams.length === 0)
 
   async function handleSave() {
     setSaving(true)
@@ -264,7 +288,7 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
         return
       }
       const w: Record<string, number> = {}
-      for (const t of included) w[t.key] = weights[t.key] ?? 0
+      for (const t of included) w[t.key] = isScoredTheme(t) ? (weights[t.key] ?? 0) : 0
       // Persist an explicit team list for every selected measure ([] = nobody).
       // With no key stakeholders yet there are no teams to assign, and writing []
       // everywhere would mean "nobody is asked" — a state that survives marking people
@@ -277,6 +301,9 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
         selected_measure_keys: Array.from(selected),
         weights: w,
         measure_teams: mt,
+        // Record which teams these choices were made against, so a stakeholder marked
+        // Key later is recognisable as new rather than as deliberately excluded.
+        teams,
       })
       setConfigured(true)
       setSavedAt(new Date().toISOString())
@@ -406,7 +433,7 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
                       <th className="text-left px-4 py-3 text-sm font-semibold sticky left-0 z-10 bg-slate-100 dark:bg-slate-800 min-w-[16rem]">
                         Theme / Measure
                       </th>
-                      {teams.map((t) => {
+                      {columnTeams.map((t) => {
                         const sel = [...selected]
                         const on = sel.length > 0 && sel.every((k) => teamsForMeasure(k).has(t))
                         const some = sel.some((k) => teamsForMeasure(k).has(t))
@@ -455,7 +482,7 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
                         <Fragment key={theme.key}>
                           {/* Theme band: include-all toggle + per-theme weight */}
                           <tr className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
-                            <td colSpan={1 + teams.length} className="px-4 py-2.5">
+                            <td colSpan={1 + columnTeams.length} className="px-4 py-2.5">
                               <div className="flex items-center justify-between gap-3">
                                 <label className={cn('flex items-center gap-2.5', locked ? 'cursor-not-allowed' : 'cursor-pointer')}>
                                   <input
@@ -511,7 +538,7 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
                                 </td>
                                 {/* One checkbox per team — a team's column stays editable
                                     post-dispatch only while it's open (new or reopened). */}
-                                {teams.map((t) => {
+                                {columnTeams.map((t) => {
                                   const editable = isTeamEditable(t)
                                   return (
                                   <td key={t} className={cn('px-4 py-2.5 text-center border-l border-slate-100 dark:border-slate-800', dispatched && editable && 'bg-emerald-50/40 dark:bg-emerald-900/5')}>
@@ -549,6 +576,11 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
                   {totalWeight}%
                 </span>
                 {totalWeight !== 100 && <span className="text-red-500">(must be 100%)</span>}
+                {statusOnlyThemes.length > 0 && (
+                  <span className="text-slate-400 dark:text-slate-500">
+                    · {statusOnlyThemes.map((t) => t.label).join(', ')} {statusOnlyThemes.length !== 1 ? 'are' : 'is'} status-only (RAG), so {statusOnlyThemes.length !== 1 ? 'they carry' : 'it carries'} no weight
+                  </span>
+                )}
               </div>
 
               {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1"><AlertTriangle size={12} />{error}</p>}
@@ -559,7 +591,7 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
                   {emptyTeamMeasures.length} selected measure{emptyTeamMeasures.length !== 1 ? 's have' : ' has'} no team assigned — no one will be asked to score {emptyTeamMeasures.length !== 1 ? 'them' : 'it'}.
                 </p>
               )}
-              {locked && emptyEditableTeams.length > 0 && (
+              {emptyEditableTeams.length > 0 && (
                 <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
                   <AlertTriangle size={12} />
                   {emptyEditableTeams.join(', ')} {emptyEditableTeams.length !== 1 ? 'have' : 'has'} no measure ticked — no scorecard will be sent to {emptyEditableTeams.length !== 1 ? 'those teams' : 'that team'}.

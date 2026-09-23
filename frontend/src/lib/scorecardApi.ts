@@ -8,17 +8,23 @@ import { apiFetch, apiFetchBlob } from './api'
 // ── Types ───────────────────────────────────────────────────────────────────
 
 export interface DispatchResult {
-  attendee: string
+  /** Recipient's display name — the backend sends `name`, never `attendee`. */
+  name: string
   email: string
-  status: 'sent' | 'failed'
-  message_id: string | null
-  error: string | null
+  /** `skipped` = never attempted (declined attendance, or no longer a key reviewer). */
+  status: 'sent' | 'failed' | 'skipped'
+  /** Present only on the `sent` branch. */
+  message_id?: string | null
+  /** Why it failed, or why it was skipped. */
+  error?: string | null
 }
 
 export interface DispatchResponse {
   total: number
   sent: number
   failed: number
+  /** Recipients deliberately not attempted; their rows carry status `skipped`. */
+  skipped?: number
   results: DispatchResult[]
 }
 
@@ -64,6 +70,8 @@ export async function saveScorecardConfig(
     weights: Record<string, number>
     /** measure_key -> team names asked to score it ([] = nobody). */
     measure_teams?: Record<string, string[]>
+    /** The teams that existed when these choices were made (the roster). */
+    teams?: string[]
   }
 ): Promise<ScorecardConfig> {
   const res = await apiFetch<{ config: ScorecardConfig }>(`/api/scorecard/config/${cycleId}`, {
@@ -268,11 +276,21 @@ export interface FinalScorecard {
   updated_at?: string
 }
 
-export async function getFinalScorecard(cycleId: string): Promise<FinalScorecard | null> {
-  const res = await apiFetch<{ cycle_id: string; final: FinalScorecard | null }>(
+/** A saved snapshot plus whether a submission has landed since it was frozen. The
+ *  route deliberately never auto-deletes a stale snapshot (that would discard the
+ *  VMO's adjustments and note), so `stale` is the only signal the UI gets. */
+export interface FinalScorecardLoad {
+  final: FinalScorecard | null
+  /** True when a team submitted AFTER the snapshot was frozen, i.e. the adjustments
+   *  predate the latest scores. Absent on older backends => treated as false. */
+  stale: boolean
+}
+
+export async function getFinalScorecard(cycleId: string): Promise<FinalScorecardLoad> {
+  const res = await apiFetch<{ cycle_id: string; final: FinalScorecard | null; stale?: boolean }>(
     `/api/scorecard/final/${cycleId}`
   )
-  return res.final ?? null
+  return { final: res.final ?? null, stale: res.stale === true }
 }
 
 export async function saveFinalScorecard(

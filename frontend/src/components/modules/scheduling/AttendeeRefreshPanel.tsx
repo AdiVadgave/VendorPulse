@@ -723,15 +723,38 @@ export default function AttendeeRefreshPanel({
                     </td>
                     <td className="px-4 py-3">
                       {isInternal ? (
+                        // Show the UNSET state honestly — never fall back to a real
+                        // department for display. The scorecard derives a person's team
+                        // from `shell_department || name`, so rendering 'IDTM' over a
+                        // stored NULL showed the VMO a team that isn't in the database
+                        // while the scorecard keyed that person off their personal name
+                        // (their column/chip never matched the "IDTM" team). The empty
+                        // value also un-sticks the fix: with value '' the select differs
+                        // from every real option, so picking IDTM fires onChange and
+                        // persists — it previously matched and fired nothing.
                         <select
-                          value={a.shell_department ?? 'IDTM'}
+                          value={a.shell_department ?? ''}
                           onChange={(e) =>
                             handleUpdateAttendee(a, {
                               shell_department: e.target.value as ShellDepartment,
                             })
                           }
-                          className="px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          title={
+                            a.shell_department
+                              ? undefined
+                              : 'No department set — this person is treated as their own team in the scorecard'
+                          }
+                          className={cn(
+                            'px-2 py-1 text-xs border rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500',
+                            a.shell_department
+                              ? 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                              : 'border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
+                          )}
                         >
+                          {/* Only rendered while unset, and disabled, so '' can never be saved. */}
+                          {!a.shell_department && (
+                            <option value="" disabled>— not set —</option>
+                          )}
                           {SHELL_DEPARTMENTS.map((d) => (
                             <option key={d} value={d}>{d}</option>
                           ))}

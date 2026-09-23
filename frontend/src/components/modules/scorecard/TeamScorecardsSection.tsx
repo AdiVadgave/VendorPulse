@@ -15,6 +15,13 @@ function scoreColor(v: number | null): string {
   return 'text-red-600 dark:text-red-400'
 }
 
+/** Pill/heading label. `label` first: there is one entry per SUBMITTING REVIEWER, not
+ *  per team, so two people in the same department would otherwise render two
+ *  indistinguishable pills. `team` stays the fallback for cached payloads. */
+function teamLabel(t: WeightedScorecard['teams'][number]): string {
+  return t.label || t.team || t.name || t.email
+}
+
 export default function TeamScorecardsSection({ data }: Props) {
   const [open, setOpen] = useState(false)
   const [activeId, setActiveId] = useState<string>(data.teams[0]?.attendee_id ?? '')
@@ -35,6 +42,9 @@ export default function TeamScorecardsSection({ data }: Props) {
         measure_type: m.measure_type,
         score: m.team_scores[team.attendee_id] ?? null,
         rag: m.team_rag?.[team.attendee_id] ?? null,
+        // 'not_asked' = never put in front of this reviewer's team. Distinct from a
+        // deliberate N/A, and it must not read as an unanswered measure.
+        notAsked: m.team_status?.[team.attendee_id] === 'not_asked',
         comment: m.comments[team.attendee_id] ?? '',
       }))
       const provided = measures.map((m) => m.score).filter((s): s is number => s != null)
@@ -63,7 +73,9 @@ export default function TeamScorecardsSection({ data }: Props) {
           </span>
           <Users size={14} className="text-slate-400" />
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Individual Team Scorecards</span>
-          <span className="text-xs text-slate-400">· {data.teams.length} team{data.teams.length !== 1 ? 's' : ''}</span>
+          {/* One scorecard per submitting REVIEWER, not per team — two people can share
+              a department, so a team count here was wrong. */}
+          <span className="text-xs text-slate-400">· {data.teams.length} reviewer{data.teams.length !== 1 ? 's' : ''}</span>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
@@ -90,7 +102,7 @@ export default function TeamScorecardsSection({ data }: Props) {
             )}
             title={t.email}
           >
-            {t.team || t.name || t.email}
+            {teamLabel(t)}
           </button>
         ))}
       </div>
@@ -130,9 +142,11 @@ export default function TeamScorecardsSection({ data }: Props) {
                     <td className="px-3 py-2.5 text-slate-700 dark:text-slate-300 whitespace-nowrap align-top">{m.label}</td>
                     <td className="px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400 align-top">{m.description}</td>
                     <td className={cn('text-center px-3 py-2.5 font-semibold whitespace-nowrap align-top', m.measure_type === 'rag' ? '' : scoreColor(m.score))}>
-                      {m.measure_type === 'rag'
-                        ? <RagChip value={m.rag} />
-                        : (m.score != null ? `${m.score}/5` : 'N/A')}
+                      {m.notAsked
+                        ? <span className="text-slate-300 dark:text-slate-600 font-normal" title="Not assigned to this team">·</span>
+                        : m.measure_type === 'rag'
+                          ? <RagChip value={m.rag} />
+                          : (m.score != null ? `${m.score}/5` : 'N/A')}
                     </td>
                     {mi === 0 && (
                       <td rowSpan={cat.measures.length} className={cn('text-center px-3 py-2.5 font-semibold align-top whitespace-nowrap', scoreColor(cat.avg))}>

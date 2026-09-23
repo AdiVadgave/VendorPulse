@@ -293,6 +293,9 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
         [
             "CREATE INDEX IF NOT EXISTS subs_cycle ON scorecard_submissions (cycle_id)",
             "CREATE INDEX IF NOT EXISTS subs_attendee ON scorecard_submissions (attendee_id)",
+            # The UNIQUE (cycle_id, attendee_id) index is NOT here: it cannot be created
+            # unconditionally on a live table that may already hold duplicates. It is
+            # applied self-healingly in _ADDITIVE_CONSTRAINTS below.
         ],
     ),
     "scorecard_final": (
@@ -546,6 +549,40 @@ _ADDITIVE_CONSTRAINTS: list[str] = [
           FOREIGN KEY (attendee_id) REFERENCES attendees (attendee_id)
           ON DELETE CASCADE NOT VALID;
       END IF;
+    END $$;
+    """,
+    # UNIQUE (cycle_id, attendee_id) on scorecard_submissions — one submission per
+    # reviewer per cycle. The route guard is a check-then-insert that straddles the AI
+    # redaction call, so only the database can actually enforce this.
+    #
+    # A unique INDEX cannot be NOT VALID, so it would refuse to build on a table that
+    # already holds duplicates — and a failing statement here would abort ensure_schema
+    # and with it the app boot. Hence SELF-HEALING and belt-and-braces:
+    #   * to_regclass guards make it a no-op once the index exists (and on a database
+    #     where the table has not been created yet),
+    #   * duplicates are collapsed first, keeping the HIGHEST seq — the most recent
+    #     submission, which is the row the application has always treated as current,
+    #   * rows with a NULL attendee_id are left alone (they cannot collide: NULLs are
+    #     distinct to a unique index, and `s.attendee_id = t.attendee_id` never matches),
+    #   * the whole block runs as one subtransaction with an exception handler, so a
+    #     failure rolls the de-dup back and is reported as a server WARNING rather than
+    #     taking the application down. The guard is then simply absent and behaviour is
+    #     exactly what it is today — never a broken startup.
+    """
+    DO $$
+    BEGIN
+      IF to_regclass('public.scorecard_submissions') IS NOT NULL
+         AND to_regclass('public.subs_cycle_attendee_uq') IS NULL THEN
+        DELETE FROM scorecard_submissions s
+          USING scorecard_submissions t
+          WHERE s.cycle_id = t.cycle_id
+            AND s.attendee_id = t.attendee_id
+            AND s.seq < t.seq;
+        CREATE UNIQUE INDEX subs_cycle_attendee_uq
+          ON scorecard_submissions (cycle_id, attendee_id);
+      END IF;
+    EXCEPTION WHEN others THEN
+      RAISE WARNING 'subs_cycle_attendee_uq not created (duplicate submissions are still possible): %', SQLERRM;
     END $$;
     """,
 ]

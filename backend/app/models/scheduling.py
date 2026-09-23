@@ -221,7 +221,15 @@ class ScorecardConfigUpdate(BaseModel):
     weights: dict[str, int] = Field(default_factory=dict, description="theme_key -> weight (included themes must sum to 100)")
     # measure_key -> team names asked to score it. Empty list for a selected
     # measure means nobody is asked it. Omitted entirely => no team restriction.
-    measure_teams: dict[str, list[str]] = Field(default_factory=dict)
+    # MUST default to None, not {}: an omitted key with a {} default is
+    # indistinguishable from "restrict everything to nobody", which stamps
+    # `teams: []` on every measure and permanently empties the recipient list.
+    measure_teams: Optional[dict[str, list[str]]] = None
+    # The roster of teams this config was authored against. A key reviewer whose
+    # team is NOT in this list joined after the config was written, so they are
+    # treated as unrestricted (asked everything) rather than silently dropped.
+    # Omitted => legacy config, every current team counts as unknown.
+    teams: Optional[list[str]] = None
 
 
 class CycleCreate(BaseModel):

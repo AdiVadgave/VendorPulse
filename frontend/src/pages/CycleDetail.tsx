@@ -771,7 +771,12 @@ export default function CycleDetail() {
           <ScorecardTab
             cycle={cycle}
             dispatched={scorecardDispatched}
-            onDispatched={() => { setScorecardDispatched(true); void refetchCycle() }}
+            /* No optimistic setScorecardDispatched(true): the authoritative
+               scorecard_dispatched_at marker drives the lock (see the note at the
+               state declaration), and the backend deliberately leaves it unset when
+               every email failed — the optimistic flag locked the config against a
+               scorecard nobody received. */
+            onDispatched={() => { void refetchCycle() }}
             onScorecardRedo={() => setScorecardDispatched(false)}
             onReopened={refetchCycle}
             compiledScorecard={compiledScorecard}
@@ -1388,12 +1393,23 @@ function ScorecardTab({
   const [autoFetched, setAutoFetched] = useState(false)
   // Bumped on redo to force the submission tracker to refetch (submissions cleared).
   const [redoNonce, setRedoNonce] = useState(0)
+  // Config-load state: dispatch is blocked until the real config is in hand.
+  const [configError, setConfigError] = useState<string | null>(null)
+  const [configLoaded, setConfigLoaded] = useState(false)
+  const [configNonce, setConfigNonce] = useState(0)  // bumped by Retry
+  // Held HERE rather than inside ScorecardDispatchPanel: that panel is rendered only
+  // while subTab === 'collection', so it unmounts the moment the VMO opens Comparison
+  // & Finalize and a local flag silently lost the "corrected scorecard" wording.
+  // ScorecardTab stays mounted across the sub-tabs. (Still not durable across a page
+  // reload — that needs a server-side marker; see needs_other_file.)
+  const [reissue, setReissue] = useState(false)
 
   // Redo: unlock the config, reset the finalize view, and remount the tracker.
   const handleRedo = useCallback(() => {
     onScorecardRedo()
     setWeighted(null)
     setRedoNonce((n) => n + 1)
+    setReissue(true)  // the next send goes out as a formal corrected scorecard
     onReopened?.()  // refetch the cycle so the cleared dispatched-set is reflected
   }, [onScorecardRedo, onReopened])
 
@@ -1403,12 +1419,30 @@ function ScorecardTab({
     } catch { /* backend may not be ready */ }
   }, [cycleId])
 
-  // Load the per-SPR scorecard configuration (measures + weights).
+  // A per-team reopen deletes that team's submissions AND the frozen final snapshot
+  // server-side, so the tracker and the consolidated view are both stale. Not
+  // handleRedo: that calls onScorecardRedo(), which would unlock every other team's
+  // config even though only one team was reopened.
+  const handleTeamReopened = useCallback(() => {
+    setWeighted(null)           // unmounts the finalize table until fresh data lands
+    setRedoNonce((n) => n + 1)  // remounts the tracker → restarts its poll
+    onReopened?.()              // refetch the cycle (the dispatched-set changed)
+    void refreshWeighted()
+  }, [onReopened, refreshWeighted])
+
+  // Load the per-SPR scorecard configuration (measures + weights). A failure must be
+  // surfaced, never swallowed: with no config the dispatch panel falls back to the
+  // hardcoded default structure, which carries no team restrictions at all — so the
+  // scorecard would go to EVERY key stakeholder, including deliberately excluded ones.
   useEffect(() => {
     let mounted = true
-    getScorecardConfig(cycleId).then((c) => { if (mounted) setConfig(c) }).catch(() => {})
+    setConfigLoaded(false)
+    getScorecardConfig(cycleId)
+      .then((c) => { if (mounted) { setConfig(c); setConfigError(null) } })
+      .catch((e) => { if (mounted) setConfigError(e instanceof Error ? e.message : 'Could not load the scorecard configuration') })
+      .finally(() => { if (mounted) setConfigLoaded(true) })
     return () => { mounted = false }
-  }, [cycleId])
+  }, [cycleId, configNonce])
 
   // Refresh the weighted (new) scorecard, auto-advance once every key team has
   // submitted, and keep the legacy 2-column compiled in sync for Alignment.
@@ -1455,24 +1489,64 @@ function ScorecardTab({
           <ScorecardConfigPanel
             cycleId={cycleId}
             dispatched={dispatched}
-            onSaved={setConfig}
+            onSaved={(c) => { setConfig(c); setConfigError(null) }}
             attendees={attendees}
             dispatchedEmails={cycle.scorecard_dispatched_to ?? []}
-            onReopened={onReopened}
+            onReopened={handleTeamReopened}
           />
-          <ScorecardDispatchPanel
-            vendorName={cycle.vendor_name}
-            cycleId={cycleId}
-            quarter={cycle.quarter}
-            year={cycle.year}
-            attendees={attendees}
-            onDispatched={onDispatched}
-            onRedo={handleRedo}
-            onAttendeesChanged={onAttendeesChanged}
-            alreadyDispatched={dispatched}
-            dispatchedEmails={cycle.scorecard_dispatched_to ?? []}
-            structure={config?.categories}
-          />
+          {configError && (
+            /* Banner + Retry above the panel, which stays MOUNTED with dispatch gated
+               (dispatchBlockedReason). Withholding the whole panel also took away the
+               attendee controls and the Redo escape hatch for the duration of a
+               transient config fault; only the send must be blocked, because the
+               default structure carries no team filter and the recipient list would
+               silently widen to every key stakeholder. */
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-5 flex items-start justify-between gap-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={16} className="text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+                    Scorecard configuration could not be loaded
+                  </p>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+                    Dispatch is blocked until it loads — sending now would use the default
+                    themes and email every key stakeholder, ignoring your team assignments.
+                    Attendee changes, form links and Redo below still work.
+                    ({configError})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setConfigNonce((n) => n + 1)}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors shrink-0"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {configLoaded ? (
+            <ScorecardDispatchPanel
+              vendorName={cycle.vendor_name}
+              cycleId={cycleId}
+              quarter={cycle.quarter}
+              year={cycle.year}
+              attendees={attendees}
+              onDispatched={onDispatched}
+              onRedo={handleRedo}
+              onAttendeesChanged={onAttendeesChanged}
+              alreadyDispatched={dispatched}
+              dispatchedEmails={cycle.scorecard_dispatched_to ?? []}
+              structure={config?.categories}
+              configTeams={config?.teams}
+              reissue={reissue}
+              onReissueHandled={() => setReissue(false)}
+              dispatchBlockedReason={configError}
+            />
+          ) : (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-4 text-sm text-slate-500 dark:text-slate-400">
+              Loading scorecard configuration…
+            </div>
+          )}
           <SubmissionTracker
             key={`tracker-${redoNonce}`}
             cycleId={cycleId}
@@ -1481,6 +1555,7 @@ function ScorecardTab({
             year={cycle.year}
             attendees={attendees}
             onSubmissionsUpdated={handleSubmissionsUpdated}
+            onDispatched={onDispatched}
           />
         </>
       )}

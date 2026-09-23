@@ -33,10 +33,29 @@ const SCORE_LABELS: Record<number, string> = {
   5: 'Significantly proactive or value-add with tangible business benefits',
 }
 
+// The redaction model has to echo every comment back, so an unbounded comment is what
+// pushes a full scorecard past the model's output budget. Bound it at source, visibly.
+const COMMENT_MAX_LENGTH = 1500
+
+// Shape of the sessionStorage draft (the skipped Sets are stored as arrays).
+type ScorecardDraft = {
+  scores?: Record<string, number>
+  rag?: Record<string, string>
+  comments?: Record<string, string>
+  skippedThemes?: string[]
+  skippedMeasures?: string[]
+}
+
 export default function ScorecardForm() {
   const [params] = useSearchParams()
   const cycleId = params.get('cycle') ?? ''
   const attendeeId = params.get('attendee') ?? ''
+  // In-progress answers are drafted per reviewer link, so a refresh or an accidental
+  // close does not destroy fifteen minutes of work. sessionStorage rather than
+  // localStorage: comments are free text that may still hold names/PII (redaction
+  // happens server-side on submit) and a Shell laptop is often shared — this survives
+  // F5 and back/forward, which are the losses people actually hit, and dies with the tab.
+  const draftKey = `vp-scorecard-draft:${cycleId}:${attendeeId}`
 
   const [meta, setMeta] = useState<ScorecardFormMeta | null>(null)
   const [loading, setLoading] = useState(true)
@@ -47,6 +66,9 @@ export default function ScorecardForm() {
   const [comments, setComments] = useState<Record<string, string>>({})
   const [skippedThemes, setSkippedThemes] = useState<Set<string>>(new Set())
   const [skippedMeasures, setSkippedMeasures] = useState<Set<string>>(new Set())
+  // Armed only once any stored draft has been read back, so the save effect below can
+  // never overwrite a draft with the empty state of the first render.
+  const [hydrated, setHydrated] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -62,6 +84,12 @@ export default function ScorecardForm() {
 
   const structure = meta?.structure ?? WEIGHTED_SCORECARD_STRUCTURE
   const respondent = meta?.respondent ?? null
+  // The backend serves each reviewer only the measures their team is asked to score, so
+  // an empty structure means "this team is asked nothing" — not "no config". The `??`
+  // above does NOT fall back here, because [] is not nullish; without this flag the page
+  // renders zero themes, `missing` is empty and the reviewer is invited to submit a
+  // blank scorecard that the tracker would then count as a real response.
+  const noMeasures = !!respondent && structure.length === 0
 
   useEffect(() => {
     if (!cycleId || !attendeeId) {
@@ -76,8 +104,31 @@ export default function ScorecardForm() {
           setLoadError('This scorecard link does not match a known reviewer for this cycle.')
           return
         }
+        // Nothing assigned to this team: there is no form to draft, submit or compare
+        // against, so skip the remaining fetches and let the render explain why. This
+        // returns BEFORE checkAlreadySubmitted, so `alreadySubmitted` is never set for a
+        // no-measures reviewer and the "Nothing to score yet" panel below always wins —
+        // including when a hollow submission for them already exists in the DB. That is
+        // deliberate: an honest explanation beats "Already submitted", and either way
+        // there is nothing they could fill in.
+        if (m.structure.length === 0) return
         const done = await checkAlreadySubmitted(cycleId, attendeeId)
         if (done) setAlreadySubmitted(true)
+        else {
+          // Restore the draft BEFORE arming the save effect, never after.
+          try {
+            const raw = sessionStorage.getItem(draftKey)
+            if (raw) {
+              const d = JSON.parse(raw) as ScorecardDraft
+              setScores(d.scores ?? {})
+              setRag(d.rag ?? {})
+              setComments(d.comments ?? {})
+              setSkippedThemes(new Set(d.skippedThemes ?? []))
+              setSkippedMeasures(new Set(d.skippedMeasures ?? []))
+            }
+          } catch { /* storage blocked or draft corrupt — start from an empty form */ }
+          setHydrated(true)
+        }
         // Load other teams' submitted scorecards (visible to the reviewer).
         try { setWeighted(await getWeightedScorecard(cycleId)) } catch { /* none yet */ }
         // Load the previous cycle's consolidated scorecard for the "previous" view.
@@ -87,7 +138,7 @@ export default function ScorecardForm() {
       })
       .catch((e) => setLoadError(e instanceof Error ? e.message : 'Could not load the scorecard'))
       .finally(() => setLoading(false))
-  }, [cycleId, attendeeId])
+  }, [cycleId, attendeeId, draftKey])
 
   // Auto-close the tab shortly after a successful submission.
   useEffect(() => {
@@ -97,6 +148,45 @@ export default function ScorecardForm() {
     }, 2500)
     return () => clearTimeout(t)
   }, [submitted])
+
+  function clearDraft() {
+    try { sessionStorage.removeItem(draftKey) } catch { /* storage blocked — nothing to clear */ }
+  }
+
+  // Persist the in-progress answers on every change. Best-effort: a managed browser can
+  // block site data, and a failed draft must never break the form itself.
+  useEffect(() => {
+    if (!hydrated || submitted || alreadySubmitted) return
+    try {
+      sessionStorage.setItem(draftKey, JSON.stringify({
+        scores,
+        rag,
+        comments,
+        skippedThemes: Array.from(skippedThemes),
+        skippedMeasures: Array.from(skippedMeasures),
+      } satisfies ScorecardDraft))
+    } catch { /* quota or blocked storage — drafting is best-effort */ }
+  }, [hydrated, submitted, alreadySubmitted, draftKey, scores, rag, comments, skippedThemes, skippedMeasures])
+
+  // Challenge an accidental refresh/close while there is unsaved work. The `submitted`
+  // guard is load-bearing: the auto-close above would otherwise trip this dialog and
+  // turn a clean "Thank you" into a scary prompt.
+  useEffect(() => {
+    if (submitted || alreadySubmitted) return
+    const handler = (e: BeforeUnloadEvent) => {
+      const dirty = Object.keys(scores).length > 0 || Object.keys(rag).length > 0
+        || Object.values(comments).some((c) => c.trim().length > 0)
+        // Marking themes/measures N/A is a complete contribution in its own right (that
+        // reviewer's `missing` is empty and Submit is enabled), so it has to count as
+        // unsaved work or they get no prompt at all on an accidental refresh.
+        || skippedThemes.size > 0 || skippedMeasures.size > 0
+      if (!dirty) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [submitted, alreadySubmitted, scores, rag, comments, skippedThemes, skippedMeasures])
 
   function toggleTheme(catKey: string, measureKeys: string[]) {
     setSkippedThemes((prev) => {
@@ -139,7 +229,9 @@ export default function ScorecardForm() {
     return miss
   }, [structure, skippedThemes, skippedMeasures, scores, rag, comments])
 
-  const canSubmit = !!respondent && missing.length === 0 && !submitting
+  // `!noMeasures` is belt-and-braces: the render below already refuses to draw the form
+  // in that state, but an enabled Submit over zero measures must never be reachable.
+  const canSubmit = !!respondent && !noMeasures && missing.length === 0 && !submitting
 
   async function handleSubmit() {
     if (!respondent) return
@@ -168,10 +260,12 @@ export default function ScorecardForm() {
         skipped_measures: Array.from(skippedMeasures),
         skipped_themes: Array.from(skippedThemes),
       })
+      clearDraft()
       setSubmitted(true)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to submit the scorecard'
-      if (/already been submitted|already submitted/i.test(msg)) setAlreadySubmitted(true)
+      // Clear on the duplicate-submission path too, or a stale draft outlives the form.
+      if (/already been submitted|already submitted/i.test(msg)) { clearDraft(); setAlreadySubmitted(true) }
       else setError(msg)
     } finally {
       setSubmitting(false)
@@ -206,6 +300,24 @@ export default function ScorecardForm() {
           <p className="text-sm text-slate-600 dark:text-slate-400">
             {respondent?.name ? `${respondent.name}'s ` : 'A '}scorecard for this cycle has already been submitted.
             Each reviewer can submit only once. You can close this tab.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Asked nothing: say so honestly, rather than rendering an empty form whose footer
+  // would read "All set — ready to submit" over a scorecard with no answers in it.
+  if (noMeasures) {
+    return (
+      <div className="min-h-screen flex items-center justify-center dark bg-slate-950 p-6">
+        <div className="max-w-md text-center space-y-3">
+          <ClipboardList className="mx-auto text-slate-400" size={40} />
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Nothing to score yet</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            No scorecard measures are assigned to {respondent?.team ? <strong>{respondent.team}</strong> : 'your team'} for
+            this cycle, so there is nothing for you to fill in. Please contact the VMO coordinator if you were expecting
+            to review {meta?.vendor_name ? <strong>{meta.vendor_name}</strong> : 'this vendor'}.
           </p>
         </div>
       </div>
@@ -387,13 +499,25 @@ export default function ScorecardForm() {
                                 </span>
                               </div>
                             )}
-                            <textarea
-                              value={comments[m.key] ?? ''}
-                              onChange={(e) => setComments((c) => ({ ...c, [m.key]: e.target.value }))}
-                              rows={2}
-                              placeholder="Comment (required)"
-                              className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
+                            <div>
+                              <textarea
+                                value={comments[m.key] ?? ''}
+                                onChange={(e) => setComments((c) => ({ ...c, [m.key]: e.target.value }))}
+                                rows={2}
+                                maxLength={COMMENT_MAX_LENGTH}
+                                placeholder="Comment (required)"
+                                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              />
+                              {/* The cap truncates a long paste silently, so always show where it bites. */}
+                              <p className={cn(
+                                'mt-0.5 text-right text-[10px]',
+                                (comments[m.key] ?? '').length >= COMMENT_MAX_LENGTH
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-slate-400'
+                              )}>
+                                {(comments[m.key] ?? '').length}/{COMMENT_MAX_LENGTH}
+                              </p>
+                            </div>
                           </>
                         )}
                       </div>

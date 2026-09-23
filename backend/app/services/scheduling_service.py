@@ -282,12 +282,42 @@ class SchedulingService:
         # scorecard on the next load. Done before the idempotent gate below so that
         # re-confirming an already-advanced cycle still cleans up any stragglers.
         declined = [a for a in attendees if a.get("confirmation_status") == "DECLINED"]
-        for a in declined:
-            self._attendees.delete_by_id("attendee_id", a["attendee_id"])
+        # …but NEVER delete someone who has already filled in the scorecard. Declining
+        # the MEETING is not retracting a SCORECARD, and scorecard_submissions has an
+        # ON DELETE CASCADE FK onto attendees (db/schema.py), so deleting the attendee
+        # row would silently destroy their scores/RAG/comments with no audit trail and
+        # no undo — every theme average would quietly recompute from fewer reviewers.
+        # Keeping the row is safe: is_scorecard_recipient() excludes DECLINED, so they
+        # are never re-invited, re-mailed or reminded.
+        # Local import: app.dependencies imports this module, so importing it at module
+        # scope would be circular.
+        from app.dependencies import get_scorecard_submission_repo
+
+        # Only `declined` is vetted against this set, and this endpoint is re-hit on
+        # every load of an already-advanced cycle, so skip the round-trip to Azure PG
+        # entirely in the common case where nobody declined.
+        submitted_ids: set = set()
         if declined:
+            submitted_ids = {
+                s.get("attendee_id")
+                for s in get_scorecard_submission_repo().get_for_cycle(cycle_id)
+            }
+        dropped = 0
+        for a in declined:
+            if a.get("attendee_id") in submitted_ids:
+                logger.warning(
+                    "complete_attendance_confirmation: keeping 'Not attending' attendee %s "
+                    "in cycle %s — they already submitted a scorecard (deleting would "
+                    "cascade-delete it)",
+                    sanitize_for_log(a.get("attendee_id")), sanitize_for_log(cycle_id),
+                )
+                continue
+            self._attendees.delete_by_id("attendee_id", a["attendee_id"])
+            dropped += 1
+        if dropped:
             logger.info(
                 "complete_attendance_confirmation: dropped %d 'Not attending' attendee(s) from cycle %s",
-                len(declined), sanitize_for_log(cycle_id),
+                dropped, sanitize_for_log(cycle_id),
             )
         remaining = [a for a in attendees if a.get("confirmation_status") != "DECLINED"]
 

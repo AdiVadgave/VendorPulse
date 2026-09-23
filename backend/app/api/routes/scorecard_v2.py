@@ -54,7 +54,7 @@ from app.utils.pii_redaction import (
     redact_scorecard_comments,
     redact_scorecard_comments_with_ai,
 )
-from app.utils.scorecard_recipients import is_scorecard_recipient
+from app.utils.scorecard_recipients import is_key_internal_reviewer, is_scorecard_recipient
 from app.utils.scorecard_structure import (
     SCORECARD_CATALOG,
     WEIGHTED_SCORECARD_STRUCTURE,
@@ -64,6 +64,9 @@ from app.utils.scorecard_structure import (
 
 _RAG_VALUES = {"red", "amber", "green"}
 _RAG_ORDER = {"red": 0, "amber": 1, "green": 2}
+# Server-side bound on a submitted comment. Deliberately well above the form's own
+# 1500-char textarea cap, so a reviewer typing in the UI can never be hard-failed here.
+_COMMENT_MAX_CHARS = 4000
 
 
 def _effective_config(cycle: dict) -> dict:
@@ -72,6 +75,57 @@ def _effective_config(cycle: dict) -> dict:
     if cfg.get("categories"):
         return cfg
     return default_scorecard_config()
+
+
+def _known_teams(cfg: dict) -> set[str]:
+    """The teams the config was authored against (see ``teams_roster``).
+
+    Empty for a legacy config written before the roster existed — every team then
+    counts as unknown, which is the safe direction: a reviewer may be asked a
+    measure needlessly, but is never silently left out of the scorecard."""
+    roster = cfg.get("teams")
+    return {t for t in roster if t} if isinstance(roster, list) else set()
+
+
+def _measure_asks_team_strict(measure: dict, team: str) -> bool:
+    """The plain rule: a measure with no ``teams`` list is unrestricted (everyone);
+    one with a ``teams`` list is asked only of the teams it names."""
+    teams = measure.get("teams")
+    if not isinstance(teams, list):
+        return True
+    return team in teams
+
+
+def _measure_asks_team(measure: dict, team: str, known: set[str], *, rescue: bool = False) -> bool:
+    """Whether ``team`` is asked to score ``measure`` — the single rule the reviewer's
+    form, the dispatch recipient list and the compiler must agree on.
+
+    ``rescue`` is the off-roster fallback and is computed by ``_asks_predicate``, never
+    guessed per measure: it applies ONLY when the strict rule would leave this team
+    asked nothing at all AND the team is absent from the config's roster (i.e. it was
+    marked Key after the config was saved, so no measure could possibly name it).
+
+    Applying the fallback per measure instead would override every deliberate
+    restriction — a measure the VMO scoped to one team would leak to every newcomer."""
+    if rescue:
+        return True
+    return _measure_asks_team_strict(measure, team)
+
+
+def _asks_predicate(cfg: dict, team: Optional[str]):
+    """Return ``fn(measure) -> bool`` for whether ``team`` is asked that measure.
+
+    Resolves the off-roster rescue once, against the whole config, so the decision is
+    consistent across every measure: a brand-new reviewer must never be silently asked
+    nothing, but an established team's explicit exclusions are always honoured."""
+    if team is None:
+        return lambda m: True
+    cats = cfg.get("categories", [])
+    asked_anything = any(
+        _measure_asks_team_strict(m, team) for c in cats for m in c.get("measures", [])
+    )
+    rescue = not asked_anything and team not in _known_teams(cfg)
+    return lambda m: _measure_asks_team(m, team, set(), rescue=rescue)
 
 
 def _rag_consensus(values: list[str]) -> Optional[str]:
@@ -183,18 +237,61 @@ def save_scorecard_config(cycle_id: str, payload: ScorecardConfigUpdate):
             status_code=409,
             detail="The scorecard has already been dispatched — its configuration is locked and can no longer be changed.",
         )
+    # The dispatch marker alone is NOT a sufficient lock. Reopening the last dispatched
+    # team clears scorecard_dispatched_at, and a reviewer can also submit via a copied
+    # link before any dispatch — in both cases stored answers exist against the current
+    # measure set, and rewriting it here would silently re-scope scores that were already
+    # given. A stored submission is the authoritative signal.
+    if _submissions_repo().get_for_cycle(cycle_id):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Scorecards have already been submitted for this cycle — reopen the teams "
+                "concerned (or redo the scorecard) before changing the configuration."
+            ),
+        )
 
-    cfg = build_config_from_selection(payload.selected_measure_keys, payload.weights, payload.measure_teams)
+    cfg = build_config_from_selection(
+        payload.selected_measure_keys, payload.weights, payload.measure_teams, payload.teams
+    )
     if not cfg["categories"]:
         raise HTTPException(status_code=400, detail="Select at least one measure to include in the scorecard.")
 
-    total = sum(c["weight"] for c in cfg["categories"])
-    if total != 100:
+    # RAG measures are collected and displayed but never averaged, so a theme whose
+    # selected measures are ALL RAG can never produce a category average — its weight
+    # would silently drop out of the overall denominator and the VMO would read a
+    # "100%" score that is really weighted over less. A pure-status theme is a
+    # legitimate choice, so carry it at zero weight and leave it out of the 100% rule
+    # rather than refusing to save it. Coerced server-side: the server is authoritative
+    # here, exactly as it is for labels and measure types.
+    def _is_scored_theme(c: dict) -> bool:
+        return any(m.get("measure_type", "numeric") != "rag" for m in c["measures"])
+
+    for c in cfg["categories"]:
+        if not _is_scored_theme(c):
+            c["weight"] = 0
+    scored = [c for c in cfg["categories"] if _is_scored_theme(c)]
+    if not scored:
         raise HTTPException(
             status_code=400,
-            detail=f"Theme weights must sum to 100 (got {total}). Adjust the per-theme weights.",
+            detail="Select at least one scored (non-RAG) measure — RAG measures are status only and do not produce a score.",
         )
-    if any(c["weight"] <= 0 for c in cfg["categories"]):
+    total = sum(c["weight"] for c in scored)
+    if total != 100:
+        # Name the status-only themes in the message. Otherwise a panel that still
+        # counts them towards 100 reports a total the VMO cannot reconcile with the
+        # one the server rejected, and there is nothing on screen explaining the gap.
+        status_only = [c["label"] for c in cfg["categories"] if not _is_scored_theme(c)]
+        hint = (
+            f" {', '.join(status_only)} contains only RAG (status-only) measures, so it carries"
+            " no weight — share its percentage across the scored themes."
+            if status_only else " Adjust the per-theme weights."
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Theme weights must sum to 100 (got {total}).{hint}",
+        )
+    if any(c["weight"] <= 0 for c in scored):
         raise HTTPException(status_code=400, detail="Each included theme must have a weight greater than 0.")
 
     # Preserve any configured reminder schedule (stored alongside the measures config).
@@ -225,6 +322,13 @@ def _team_key(attendee: dict) -> str:
     return (attendee.get("shell_department") or attendee.get("name") or "").strip()
 
 
+def _respondent_team(attendee: dict) -> str:
+    """The team a respondent is filtered by — deliberately the SAME derivation on
+    read (form-meta) and write (submit), so the form can never render a measure
+    that the submit then rejects as out of scope."""
+    return _team_key(attendee)
+
+
 @router.post("/config/{cycle_id}/reopen-team")
 def reopen_scorecard_team(cycle_id: str, payload: ReopenTeamRequest):
     """Reopen the scorecard for a SINGLE team — e.g. a newly added feedback provider,
@@ -240,7 +344,7 @@ def reopen_scorecard_team(cycle_id: str, payload: ReopenTeamRequest):
     if not team:
         raise HTTPException(status_code=400, detail="A team is required.")
 
-    attendees = [a for a in get_attendee_repo().find_all() if a.get("cycle_id") == cycle_id]
+    attendees = get_attendee_repo().get_for_cycle(cycle_id)
     team_ids = {a.get("attendee_id") for a in attendees if _team_key(a) == team}
     team_emails = {
         (a.get("email") or "").strip().lower()
@@ -254,20 +358,26 @@ def reopen_scorecard_team(cycle_id: str, payload: ReopenTeamRequest):
             repo.delete_by_id("submission_id", s.get("submission_id"))
             cleared += 1
 
-    dispatched = cycle.get("scorecard_dispatched_to") or []
-    remaining = [e for e in dispatched if (e or "").strip().lower() not in team_emails]
-    changes: dict = {"scorecard_dispatched_to": remaining}
-    # Reopening the last dispatched team means nothing is dispatched any more — clear the
-    # marker too, otherwise save_scorecard_config stays locked on a 409 for good.
-    if not remaining:
-        changes["scorecard_dispatched_at"] = None
-    updated = cycle_repo.update_by_id("cycle_id", cycle_id, changes)
+    # Subtract this team's reviewers in ONE statement over the row's own column. The pool
+    # is autocommit, so the previous read-modify-write here could erase an address that a
+    # concurrent dispatch had just recorded — leaving that reviewer holding a live form
+    # link while their team read as "open". Emptying the set also clears
+    # scorecard_dispatched_at inside the same statement (otherwise save_scorecard_config
+    # stays 409-locked for good), so the two halves can never be split by a racing writer.
+    updated = cycle_repo.unmark_scorecard_dispatched(cycle_id, sorted(team_emails))
 
     # The frozen (admin-adjusted) snapshot is stale once a team's scores change.
+    # Best-effort: the reopen itself has already committed (the pool is autocommit),
+    # so never fail the request here. A missing snapshot is NOT an error —
+    # delete_for_cycle returns False for that — so anything caught here is a real
+    # DB fault and must be logged rather than swallowed.
     try:
         _final_repo().delete_for_cycle(cycle_id)
-    except Exception:  # noqa: BLE001 — snapshot may not exist
-        pass
+    except Exception as exc:  # noqa: BLE001 — best-effort cleanup
+        logger.warning(
+            "reopen_scorecard_team: could not drop the final snapshot for cycle=%s: %s",
+            sanitize_for_log(cycle_id), exc,
+        )
 
     logger.info("reopen_scorecard_team — cycle=%s team=%s cleared=%d", sanitize_for_log(cycle_id), sanitize_for_log(team), cleared)
     return {"cycle_id": cycle_id, "team": team, "submissions_cleared": cleared,
@@ -290,7 +400,7 @@ def set_team_measures(cycle_id: str, payload: TeamMeasuresRequest):
     if not team:
         raise HTTPException(status_code=400, detail="A team is required.")
 
-    attendees = [a for a in get_attendee_repo().find_all() if a.get("cycle_id") == cycle_id]
+    attendees = get_attendee_repo().get_for_cycle(cycle_id)
     team_emails = {
         (a.get("email") or "").strip().lower()
         for a in attendees if _team_key(a) == team and a.get("email")
@@ -301,15 +411,34 @@ def set_team_measures(cycle_id: str, payload: TeamMeasuresRequest):
             status_code=409,
             detail=f"The scorecard has already been sent to {team} — reopen the team before changing its measures.",
         )
+    # The email-based guard above misses a team whose recipient address was edited at
+    # dispatch (or corrected afterwards) — it never appears in scorecard_dispatched_to,
+    # so the team looks permanently "open". Narrowing its measures then leaves already
+    # stored scores for measures the config no longer asks, still averaged into the
+    # consolidated figures. A stored submission is the authoritative signal.
+    team_ids = {a.get("attendee_id") for a in attendees if _team_key(a) == team}
+    if any(s.get("attendee_id") in team_ids for s in _submissions_repo().get_for_cycle(cycle_id)):
+        raise HTTPException(
+            status_code=409,
+            detail=f"{team} has already submitted — reopen the team before changing its measures.",
+        )
 
     cfg = copy.deepcopy(_effective_config(cycle))
+    # _effective_config falls back to the DEFAULT structure when the stored config has no
+    # categories, which silently drops a reminder schedule saved before the scorecard was
+    # configured (reminder_service stores it under the same JSONB key). Carry it across,
+    # exactly as save_scorecard_config does.
+    _existing = cycle.get("scorecard_config") or {}
+    if _existing.get("reminders") and not cfg.get("reminders"):
+        cfg["reminders"] = copy.deepcopy(_existing["reminders"])
     selected = set(payload.measure_keys)
     # The concrete set behind an "unrestricted" measure: the teams that can actually be
     # asked a scorecard (key, non-vendor) — not every attendee, so no phantom teams.
     reviewer_teams = {
         _team_key(a) for a in attendees
-        if a.get("is_key") and a.get("type") != "Vendor" and _team_key(a)
+        if is_key_internal_reviewer(a) and _team_key(a)
     }
+    known = _known_teams(cfg)
     for cat in cfg.get("categories", []):
         for m in cat.get("measures", []):
             teams = m.get("teams")
@@ -323,8 +452,16 @@ def set_team_measures(cycle_id: str, payload: TeamMeasuresRequest):
             if m["key"] in selected:
                 s.add(team)
             else:
+                # An off-roster team is implicitly asked every measure, so an explicit
+                # deselection only sticks once the team is on the roster (below) — the
+                # discard alone would be undone by _measure_asks_team's unknown-team rule.
                 s.discard(team)
             m["teams"] = sorted(s)
+    # Enrol ONLY the team just edited: from here on its assignments are deliberate, so
+    # leaving it out of a measure means "not asked" rather than "joined after the config
+    # was saved". Other off-roster teams must stay off-roster — enrolling them here would
+    # freeze them as "asked nothing" without the VMO ever having configured them.
+    cfg["teams"] = sorted(known | {team})
     cfg["configured"] = True
     now = datetime.now(timezone.utc).isoformat()
     updated = cycle_repo.update_by_id("cycle_id", cycle_id, {"scorecard_config": cfg, "updated_at": now})
@@ -332,22 +469,18 @@ def set_team_measures(cycle_id: str, payload: TeamMeasuresRequest):
     return {"cycle_id": cycle_id, "team": team, "config": cfg, "cycle": updated}
 
 
-def _filter_structure_for_team(categories: list[dict], team: str | None) -> list[dict]:
-    """Return only the measures a given team is asked to score. A measure with
-    no ``teams`` list is unrestricted (everyone). A measure with a ``teams`` list
-    is kept only when the respondent's team is in it. Themes left with no
-    measures are dropped. With no team (team is None) nothing is filtered."""
+def _filter_structure_for_team(
+    categories: list[dict], team: str | None, cfg: dict | None = None
+) -> list[dict]:
+    """Return only the measures a given team is asked to score, per
+    ``_asks_predicate``. Themes left with no measures are dropped. With no
+    team (team is None) nothing is filtered."""
     if team is None:
         return categories
+    asks = _asks_predicate(cfg if cfg is not None else {"categories": categories}, team)
     out: list[dict] = []
     for cat in categories:
-        kept = []
-        for m in cat.get("measures", []):
-            teams = m.get("teams")
-            if not isinstance(teams, list):   # unrestricted → everyone
-                kept.append(m)
-            elif team in teams:
-                kept.append(m)
+        kept = [m for m in cat.get("measures", []) if asks(m)]
         if kept:
             out.append({**cat, "measures": kept})
     return out
@@ -363,7 +496,7 @@ def get_form_meta(cycle_id: str, attendee: str = ""):
     respondent_team: str | None = None
     att = get_attendee_repo().find_by_id("attendee_id", attendee) if attendee else None
     if att and att.get("cycle_id") == cycle_id:
-        respondent_team = att.get("shell_department") or att.get("name", "")
+        respondent_team = _respondent_team(att)
         respondent = {
             "attendee_id": att.get("attendee_id"),
             "name": att.get("name", ""),
@@ -389,7 +522,8 @@ def get_form_meta(cycle_id: str, attendee: str = ""):
         )
 
     # Show each respondent only the measures assigned to their team.
-    structure = _filter_structure_for_team(_effective_config(cycle)["categories"], respondent_team)
+    _cfg = _effective_config(cycle)
+    structure = _filter_structure_for_team(_cfg["categories"], respondent_team, _cfg)
 
     # The vendor's most recent prior cycle that has consolidated scores, so reviewers
     # can consult the previous scorecard (all teams) while filling this one in.
@@ -435,6 +569,34 @@ def submit_scorecard(payload: ScorecardSubmission):
     if att is None:
         raise HTTPException(status_code=404, detail="Attendee not found in this cycle")
 
+    # The form renders only the measures this respondent's team is asked (form-meta
+    # filters with exactly this call). Re-check on WRITE: the VMO can narrow a team's
+    # measures while a reviewer has the form open, and _compile_weighted reads a stored
+    # score for every configured measure with no team check — so an out-of-scope score
+    # would otherwise move the measure, category and weighted overall with nothing to
+    # flag it. Reject rather than drop: a reload regenerates the form from the identical
+    # filter, whereas a silent drop plus the one-submission-per-attendee guard below
+    # would record the reviewer as "submitted" with a gutted scorecard.
+    _cfg = _effective_config(cycle)
+    allowed = {
+        m["key"]
+        for cat in _filter_structure_for_team(
+            _cfg["categories"], _respondent_team(att), _cfg
+        )
+        for m in cat.get("measures", [])
+    }
+    if not allowed:
+        raise HTTPException(
+            status_code=409,
+            detail="Your team has not been assigned any scorecard measures. Please contact the VMO coordinator.",
+        )
+    stale = (set(payload.scores) | set(payload.rag_scores) | set(payload.comments)) - allowed
+    if stale:
+        raise HTTPException(
+            status_code=409,
+            detail="This form is out of date — the measures for your team have changed. Please reload the page and submit again.",
+        )
+
     # Validate provided numeric scores are 1..5.
     for mkey, val in payload.scores.items():
         if not isinstance(val, int) or not (1 <= val <= 5):
@@ -443,6 +605,14 @@ def submit_scorecard(payload: ScorecardSubmission):
     for mkey, val in payload.rag_scores.items():
         if val not in _RAG_VALUES:
             raise HTTPException(status_code=400, detail=f"RAG status for '{mkey}' must be red, amber or green")
+    # Bound the comment text. The textarea already caps at 1500 chars, so this can only
+    # fire on a hand-rolled payload — it keeps the row and the AI redaction call bounded.
+    for mkey, text in payload.comments.items():
+        if len(text or "") > _COMMENT_MAX_CHARS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"The comment for '{mkey}' is too long (max {_COMMENT_MAX_CHARS} characters).",
+            )
 
     now = datetime.now(timezone.utc).isoformat()
     repo = _submissions_repo()
@@ -470,8 +640,20 @@ def submit_scorecard(payload: ScorecardSubmission):
             payload.comments,
             get_llm_service(),
         )
-    except (CommentRedactionError, RuntimeError) as exc:
-        logger.error("scorecard submit blocked because AI comment redaction failed: %s", exc)
+    except Exception as exc:  # noqa: BLE001 — deliberately broad; see below
+        # The Azure OpenAI SDK raises APIConnectionError / RateLimitError /
+        # AuthenticationError, which derive from OpenAIError -> Exception and NOT from
+        # RuntimeError, and main.py registers no global handler — so an outage or a 429
+        # escaped as a bare 500 with a stack trace instead of the honest "nothing was
+        # saved" 503 below. Nothing is swallowed: the fault is logged with its
+        # traceback and the submission is still refused. The kind is logged too, so an
+        # infrastructure incident is distinguishable from the redactor refusing a
+        # comment it could not clean.
+        kind = "redaction refused" if isinstance(exc, CommentRedactionError) else type(exc).__name__
+        logger.error(
+            "scorecard submit blocked because AI comment redaction failed (%s): %s",
+            kind, exc, exc_info=True,
+        )
         raise HTTPException(
             status_code=503,
             detail="Scorecard comments could not be redacted. No submission was saved; please try again.",
@@ -493,7 +675,15 @@ def submit_scorecard(payload: ScorecardSubmission):
         "skipped_themes": payload.skipped_themes,
         "submitted_at": now,
     }
-    repo.insert(record)
+    # The check-then-insert above straddles the AI redaction call — seconds of wall
+    # clock on an autocommit pool — so two tabs (or a double click) could both pass it
+    # and write two silently double-counted columns. ON CONFLICT DO NOTHING makes the
+    # database the arbiter, so the loser is reported as the duplicate it is.
+    if not repo.insert_if_absent(record):
+        raise HTTPException(
+            status_code=409,
+            detail="A scorecard has already been submitted for this reviewer in this cycle.",
+        )
 
     # Advance workflow SCORECARD_REQUEST_SENT -> SCORECARD_COLLECTION on first submission.
     try:
@@ -522,8 +712,21 @@ def submitted_check(cycle_id: str, attendee: str = ""):
 def get_team_submissions(cycle_id: str):
     """Tracker of key internal-stakeholder teams and whether each has submitted."""
     attendee_repo = get_attendee_repo()
-    attendees = [a for a in attendee_repo.find_all() if a.get("cycle_id") == cycle_id]
-    key_internal = [a for a in attendees if is_scorecard_recipient(a)]
+    attendees = attendee_repo.get_for_cycle(cycle_id)
+    # The SAME population _compile_weighted scores over, not the send-eligible subset:
+    # declining a MEETING invite is a separate act from owing a scorecard. Excluding
+    # declined reviewers here hid people whose submitted scores were nonetheless a
+    # column in the consolidated scorecard — and hid the only UI route to delete or
+    # re-request that submission.
+    key_internal = [a for a in attendees if is_key_internal_reviewer(a)]
+
+    # A team the config asks nothing of can never submit — POST /submit 409s it — so
+    # it must not be chased and must not be counted as pending. Counting it would hold
+    # `pending` above zero for ever, and CycleDetail's `pending === 0` auto-advance
+    # gate would never fire: a false "incomplete" that becomes a permanent stall.
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    _cfg = _effective_config(cycle) if cycle else default_scorecard_config()
+    _cfg_cats = _cfg.get("categories") or []
 
     submissions = _submissions_repo().get_for_cycle(cycle_id)
     # Submissions are keyed by the stable attendee_id — no fragile email matching.
@@ -540,16 +743,113 @@ def get_team_submissions(cycle_id: str):
             "team": att.get("shell_department") or att.get("name"),
             "submitted": sub is not None,
             "submitted_at": sub.get("submitted_at") if sub else None,
+            # Listed, but flagged: dispatch refuses to email them, so the UI must not
+            # offer "Request fill" on this row.
+            "declined": att.get("confirmation_status") == "DECLINED",
+            # Whether the scorecard asks this team anything at all — the same
+            # `_measure_asks_team` roster contract the form and the dispatch use, so an
+            # off-roster reviewer (implicitly asked everything) stays assigned.
+            "assigned": bool(_filter_structure_for_team(_cfg_cats, _team_key(att), _cfg)),
         })
 
     submitted = sum(1 for t in tracker if t["submitted"])
+    # A declined — or unassigned — reviewer who has NOT submitted is listed but not
+    # chased: counting them would hold `pending` above zero for ever and the cycle would
+    # never reach "all responses collected". Anyone who DID submit counts in both
+    # regardless, so the tracker always agrees with the consolidated scorecard (which
+    # scores every submission it finds, including a legacy one from a team the config
+    # has since stopped asking). `submitted + pending == total` is preserved by
+    # construction — the progress bar and the all-collected badge both rely on it.
+    total = sum(1 for t in tracker if t["submitted"] or (t["assigned"] and not t["declined"]))
     return {
         "cycle_id": cycle_id,
-        "total": len(tracker),
+        "total": total,
         "submitted": submitted,
-        "pending": len(tracker) - submitted,
+        "pending": total - submitted,
         "tracker": tracker,
     }
+
+
+def _recompute_final_aggregates(final: dict) -> None:
+    """Recompute the snapshot's stored aggregates, in place, from its own cells.
+
+    Exactly the rule `_compile_weighted` and the Finalize grid use: a measure
+    averages its non-null numeric cells, a theme averages its measures' averages,
+    and the overall is the weight-weighted mean of the theme averages (RAG measures
+    carry no score and are excluded throughout). A cell stored as an explicit null is
+    a deliberate "not applicable" and simply does not contribute.
+
+    Needed whenever cells are removed: otherwise `overall_score`, `average` and
+    `category_average` keep counting a reviewer whose column is gone, and every
+    consumer of the stored figure — the export's "Overall (adjusted)" above all —
+    prints a number that cannot be reconciled with the cells beside it."""
+    num = 0.0
+    den = 0.0
+    for cat in final.get("categories") or []:
+        if not isinstance(cat, dict):
+            continue
+        measure_avgs: list[float] = []
+        for m in cat.get("measures") or []:
+            if not isinstance(m, dict):
+                continue
+            if m.get("measure_type") == "rag":
+                m["average"] = None
+                continue
+            vals = [
+                v for v in ((m.get("team_scores") or {}).values())
+                # bool is an int subclass — exclude it, a True cell is not a score of 1.
+                if isinstance(v, (int, float)) and not isinstance(v, bool)
+            ]
+            avg = round(sum(vals) / len(vals), 2) if vals else None
+            m["average"] = avg
+            if avg is not None:
+                measure_avgs.append(avg)
+        cat_avg = round(sum(measure_avgs) / len(measure_avgs), 2) if measure_avgs else None
+        cat["category_average"] = cat_avg
+        weight = cat.get("weight")
+        if cat_avg is not None and isinstance(weight, (int, float)) and not isinstance(weight, bool):
+            num += cat_avg * weight
+            den += weight
+    final["overall_score"] = round(num / den, 2) if den else None
+
+
+def strip_attendee_from_final(cycle_id: str, attendee_id: str) -> None:
+    """Remove one attendee's column from the frozen (admin-adjusted) snapshot.
+
+    The Finalize grid seeds itself with the snapshot laid OVER the consolidated
+    figures, so a reviewer who is gone from the consolidation but still present in
+    the snapshot keeps feeding every measure/category/overall average from a cell
+    the grid no longer renders — invisible and uncorrectable short of a full Reset.
+
+    Pruning just this attendee (rather than dropping the whole snapshot, as
+    reopen-team and redo do) keeps every OTHER team's manual adjustment intact.
+    Best-effort by design: a malformed or absent snapshot must never block the
+    delete that has already committed."""
+    try:
+        fin = _final_repo().get_for_cycle(cycle_id)
+        if not fin:
+            return
+        touched = False
+        for cat in fin.get("categories") or []:
+            for m in cat.get("measures") or []:
+                for field in ("team_scores", "team_rag", "comments"):
+                    d = m.get(field)
+                    if isinstance(d, dict) and attendee_id in d:
+                        d.pop(attendee_id, None)
+                        touched = True
+        if touched:
+            # Pruning the cells is only half the job — the stored aggregates were
+            # computed WITH this reviewer. Re-derive them from what is left, or the
+            # export's "Overall (adjusted)" still includes a deleted submission.
+            # `computed_at` is deliberately NOT refreshed: this is a repair of the
+            # existing freeze, not a new one, so the staleness check stays honest.
+            _recompute_final_aggregates(fin)
+            _final_repo().upsert(cycle_id, fin)
+    except Exception as exc:  # noqa: BLE001 — best-effort; never block the caller
+        logger.warning(
+            "strip_attendee_from_final: could not prune attendee=%s from the snapshot for cycle=%s: %s",
+            sanitize_for_log(attendee_id), sanitize_for_log(cycle_id), exc,
+        )
 
 
 @router.delete("/submission/{cycle_id}/{attendee_id}")
@@ -564,6 +864,9 @@ def delete_submission(cycle_id: str, attendee_id: str):
     removed = repo.delete_for_cycle_attendee(cycle_id, attendee_id)
     if not removed:
         raise HTTPException(status_code=404, detail="No submission found for this attendee")
+    # Their column is gone from the consolidation — strip it from the frozen snapshot
+    # too, or it keeps scoring in the Finalize view with no cell to clear it from.
+    strip_attendee_from_final(cycle_id, attendee_id)
     logger.info("SCORECARD: deleted %d submission(s) for attendee=%s cycle=%s", removed, sanitize_for_log(attendee_id), sanitize_for_log(cycle_id))
     return {"deleted": True, "attendee_id": attendee_id, "count": removed}
 
@@ -576,11 +879,8 @@ def _compile_weighted(cycle_id: str) -> dict:
     config = _effective_config(cycle) if cycle else default_scorecard_config()
 
     attendee_repo = get_attendee_repo()
-    attendees = [a for a in attendee_repo.find_all() if a.get("cycle_id") == cycle_id]
-    key_internal = [
-        a for a in attendees
-        if a.get("is_key") and a.get("type") != "Vendor"
-    ]
+    attendees = attendee_repo.get_for_cycle(cycle_id)
+    key_internal = [a for a in attendees if is_key_internal_reviewer(a)]
 
     all_submissions = _submissions_repo().get_for_cycle(cycle_id)
     subs_by_attendee = {s.get("attendee_id"): s for s in all_submissions if s.get("attendee_id")}
@@ -591,19 +891,43 @@ def _compile_weighted(cycle_id: str) -> dict:
     # Column label is the TEAM (Shell department). When an attendee has no
     # department set we show "Unassigned" rather than leaking their personal name
     # as if it were a team (set the Dept in the Attendees step to show the real team).
+    _raw_labels = [a.get("shell_department") or "Unassigned" for a in submitting]
+
+    def _column_label(i: int, a: dict) -> str:
+        """There is one column per SUBMITTING REVIEWER, not per team, so two people
+        in the same department (or two with none, both "Unassigned") would otherwise
+        produce two indistinguishable headers — in the table, the team selector and
+        the exported workbook alike. Qualify only the ambiguous ones, so a personal
+        name is never shown where the team name already identifies the column."""
+        lbl = _raw_labels[i]
+        if _raw_labels.count(lbl) == 1:
+            return lbl
+        who = a.get("name") or (a.get("email") or "")
+        return f"{lbl} — {who}".strip(" —")
+
     teams = [
         {
             "attendee_id": a.get("attendee_id"),
             "email": (a.get("email") or "").lower(),
             "name": a.get("name", ""),
-            "team": a.get("shell_department") or "Unassigned",
+            "team": _raw_labels[i],
+            # Config identity — the same string `measures[].teams` and the dispatch
+            # panel use, so a column can be mapped back to the restriction (or the
+            # reopen/lock unit) that produced it. NOT a display label.
+            "team_key": _team_key(a),
+            "label": _column_label(i, a),
         }
-        for a in submitting
+        for i, a in enumerate(submitting)
     ]
 
     categories = []
     weighted_num = 0.0
     weighted_den = 0.0
+    # One predicate per submitting reviewer, resolved ONCE against the whole config so
+    # the off-roster rescue is decided consistently for all of that reviewer's measures
+    # (see `_asks_predicate`). Recomputing it per measure would let a measure the VMO
+    # scoped to one team leak to every newly-added reviewer.
+    _asks = {a.get("attendee_id"): _asks_predicate(config, _team_key(a)) for a in submitting}
 
     for cat in config["categories"]:
         measures_out = []
@@ -614,11 +938,33 @@ def _compile_weighted(cycle_id: str) -> dict:
             team_scores: dict[str, Optional[int]] = {}
             team_rag: dict[str, Optional[str]] = {}
             comments: dict[str, str] = {}
+            # Why a cell is blank matters, and today all three reasons collapse to null:
+            # never on this team's form, explicitly marked N/A, or simply unanswered.
+            # The UIs then assert the wrong one as fact. Report it instead of guessing.
+            team_status: dict[str, str] = {}
             provided: list[int] = []
             rag_values: list[str] = []
             for a in submitting:
                 aid = a.get("attendee_id")
                 s = subs_by_attendee[aid]
+                if not _asks[aid](m):
+                    # TERMINAL. The cell renders as "never assigned" and the export
+                    # prints it blank, so the score behind it must not reach the
+                    # average — otherwise the Overall the VMO signs off cannot be
+                    # reproduced from the cells on screen. A stored score can outlive
+                    # its assignment (the VMO narrows a measure, or corrects a
+                    # reviewer's department, after they submitted), so this is
+                    # reachable on real data, not just in theory. The comment is
+                    # dropped for the same reason: it would appear under a measure
+                    # that reviewer's team was never shown.
+                    team_status[aid] = "not_asked"
+                    team_scores[aid] = None
+                    team_rag[aid] = None
+                    continue
+                if mkey in (s.get("skipped_measures") or []) or cat["key"] in (s.get("skipped_themes") or []):
+                    team_status[aid] = "na"
+                else:
+                    team_status[aid] = "scored"
                 if measure_type == "rag":
                     rag = (s.get("rag_scores") or {}).get(mkey)
                     if rag in _RAG_VALUES:
@@ -650,6 +996,7 @@ def _compile_weighted(cycle_id: str) -> dict:
                 "measure_type": measure_type,
                 "team_scores": team_scores,
                 "team_rag": team_rag,
+                "team_status": team_status,
                 "rag_consensus": _rag_consensus(rag_values) if measure_type == "rag" else None,
                 "average": avg,
                 "comments": comments,
@@ -698,6 +1045,23 @@ def _cycle_sort_key(cycle: dict) -> tuple[int, int]:
     return (year, _QUARTER_NUM.get(cycle.get("quarter", ""), 0))
 
 
+def _has_key_submissions(cycle_id: str) -> bool:
+    """Whether a cycle holds at least one submission from a still-key internal
+    reviewer — exactly the population `_compile_weighted` counts, but without
+    compiling. A cycle can hold submission rows whose attendees were later un-keyed,
+    retyped to Vendor or deleted, and those compile to an empty scorecard, so a bare
+    "has any submission row" test would point reviewers at a blank previous cycle."""
+    key_ids = {
+        a.get("attendee_id")
+        for a in get_attendee_repo().get_for_cycle(cycle_id)
+        if is_key_internal_reviewer(a)
+    }
+    return any(
+        s.get("attendee_id") in key_ids
+        for s in _submissions_repo().get_for_cycle(cycle_id)
+    )
+
+
 def find_previous_cycle_id(cycle_id: str) -> Optional[str]:
     """The most recent prior cycle for the SAME vendor (by year, then quarter),
     strictly before this cycle and carrying at least one scorecard submission.
@@ -706,16 +1070,23 @@ def find_previous_cycle_id(cycle_id: str) -> Optional[str]:
     if not cycle:
         return None
     cur_key = _cycle_sort_key(cycle)
+    # Index-backed when we have a vendor. cycles.vendor_id is nullable and
+    # `WHERE vendor_id = NULL` matches nothing, so a legacy vendor-less cycle must
+    # keep the full scan or it would lose its previous-scorecard link entirely.
+    vendor_id = cycle.get("vendor_id")
+    pool = get_cycle_repo().get_by_vendor(vendor_id) if vendor_id else get_cycle_repo().find_all()
     siblings = [
-        c for c in get_cycle_repo().find_all()
-        if c.get("vendor_id") == cycle.get("vendor_id")
+        c for c in pool
+        if c.get("vendor_id") == vendor_id
         and c.get("cycle_id") != cycle_id
         and _cycle_sort_key(c) < cur_key
     ]
     siblings.sort(key=_cycle_sort_key, reverse=True)
     for c in siblings:
         # Only use a prior cycle that actually has consolidated data to compare against.
-        if _compile_weighted(c["cycle_id"]).get("submitted_count"):
+        # This runs on /form-meta — the page every reviewer opens from their email — so
+        # it must not fully compile each candidate cycle just to answer yes/no.
+        if _has_key_submissions(c["cycle_id"]):
             return c["cycle_id"]
     return None
 
@@ -868,8 +1239,11 @@ def _collect_comments(weighted: dict) -> tuple[list[dict], int]:
     comment so the summary can compare what a team SAID against what it SCORED. Teams
     that submitted no comment for the measure are surfaced separately (`teams_no_feedback`)
     so the summary can note "No feedback from <team>" instead of inventing a view."""
+    # `label` disambiguates two reviewers who share a department — otherwise the LLM is
+    # handed several contradictory comment sets all labelled with the same team name and
+    # narrates them as that many separate teams agreeing.
     team_name = {
-        t["attendee_id"]: (t.get("team") or t.get("name") or t.get("email") or "Team")
+        t["attendee_id"]: (t.get("label") or t.get("team") or t.get("name") or t.get("email") or "Team")
         for t in weighted.get("teams", [])
     }
     measures: list[dict] = []
@@ -893,11 +1267,14 @@ def _collect_comments(weighted: dict) -> tuple[list[dict], int]:
             ]
             if entries:
                 commented_aids = {aid for aid, txt in comments.items() if (txt or "").strip()}
-                teams_no_feedback = [
+                # dict.fromkeys de-duplicates while preserving order: labels can repeat
+                # when a department has several reviewers, and listing one team twice
+                # reads to the LLM as two teams that both stayed silent.
+                teams_no_feedback = list(dict.fromkeys(
                     team_name.get(aid, aid)
                     for aid in team_name
                     if aid not in commented_aids and _score_of(aid) is not None
-                ]
+                ))
                 measures.append({
                     "measure_key": m["key"],
                     "theme": cat["label"],
@@ -1015,8 +1392,19 @@ def _xl_col(n: int) -> str:
     return s
 
 
+# Control characters are not representable in XML 1.0 at all — not even escaped — so a
+# single stray one (reviewers paste from Word/Outlook, which carry ,  and friends)
+# makes Excel refuse to open the whole workbook with "unreadable content". Strip them,
+# keeping the three whitespace characters XML does allow.
+_XL_ILLEGAL = {c: None for c in range(0x20) if c not in (0x09, 0x0A, 0x0D)}
+_XL_ILLEGAL.update({c: None for c in range(0x7F, 0xA0)})
+
+
 def _xl_esc(v: str) -> str:
-    return v.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return (
+        v.translate(_XL_ILLEGAL)
+        .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    )
 
 
 def _xl_cell(ref: str, value, style: Optional[int] = None) -> str:
@@ -1148,7 +1536,9 @@ def _scorecard_workbook(cycle_id: str) -> bytes:
     summaries, _llm_used, _collected, _total = _compute_summaries(weighted)
     teams = weighted.get("teams", [])
     team_ids = [t.get("attendee_id") for t in teams]
-    team_labels = [(t.get("team") or t.get("name") or t.get("email") or "Team") for t in teams]
+    # `label` first: the workbook is the one surface with no tooltip, so two reviewers
+    # from the same department must not produce two identical score/comment columns.
+    team_labels = [(t.get("label") or t.get("team") or t.get("name") or t.get("email") or "Team") for t in teams]
     n_teams = len(teams)
 
     def score_cell(m: dict, aid: str):
@@ -1167,7 +1557,8 @@ def _scorecard_workbook(cycle_id: str) -> bytes:
     def cat_avg_cell(cat: dict):
         return cat.get("category_average") if cat.get("category_average") is not None else ""
 
-    base_widths = [22, 30, *([14] * n_teams), 11, 11, 11]
+    # 20, not 14: a disambiguated label ("IDTM — A. Reviewer") needs the extra room.
+    base_widths = [22, 30, *([20] * n_teams), 11, 11, 11]
 
     # Sheet 1 — scorecard + team-wise comments.
     rows1 = [["Theme", "Measure", *team_labels, "Avg", "Cat Avg", "Weight %",
@@ -1212,7 +1603,123 @@ def _scorecard_workbook(cycle_id: str) -> bytes:
         "wrap_cols": {summary_col},
     }
 
-    return _build_xlsx([sheet1, sheet2])
+    sheets = [sheet1, sheet2]
+
+    # Sheet 3 — the admin-adjusted (final) snapshot, when one has been saved.
+    # Without it the VMO signs off adjusted numbers on screen and then exports the
+    # UN-adjusted ones as the official scorecard. Appended rather than merged: sheets
+    # 1 and 2 stay the untouched, auditable record of what was actually submitted.
+    # Wholly best-effort — `scorecard_final.categories` is unvalidated client JSON and
+    # must never be able to break the export of the other two sheets.
+    try:
+        final = _final_repo().get_for_cycle(cycle_id)
+    except Exception as exc:  # noqa: BLE001 — the snapshot is optional
+        logger.warning("scorecard export: could not read the final snapshot for cycle=%s: %s",
+                       sanitize_for_log(cycle_id), exc)
+        final = None
+    if final:
+        try:
+            adj = {
+                (cat or {}).get("key"): {
+                    (m or {}).get("key"): m for m in ((cat or {}).get("measures") or [])
+                }
+                for cat in (final.get("categories") or [])
+            }
+            frozen_at = final.get("computed_at") or final.get("updated_at") or ""
+            later = [
+                s for s in _submissions_repo().get_for_cycle(cycle_id)
+                if frozen_at and (s.get("submitted_at") or "") > frozen_at
+            ]
+
+            def adj_cell(cat: dict, m: dict, aid: str):
+                """The adjusted value, falling back to what was submitted — a team the
+                snapshot never captured renders its consolidated score, not a blank.
+
+                Keyed on key PRESENCE, not on non-null, matching the grid's own rule:
+                a cell the VMO deliberately blanked is persisted as an explicit null
+                ("not applicable") and was already excluded from the stored
+                "Overall (adjusted)" below. A non-null test silently restored the
+                submitted score for exactly those cells, so the sheet could not be
+                reconciled with its own overall."""
+                if m.get("measure_type") == "rag":
+                    # The grid never adjusts a status: it copies `team_rag` verbatim and
+                    # stores an all-null `team_scores` row for a RAG measure, so the
+                    # presence rule would blank every status cell here.
+                    return score_cell(m, aid)
+                am = (adj.get(cat.get("key")) or {}).get(m.get("key"))
+                ts = (am or {}).get("team_scores") or {}
+                if aid in ts:
+                    v = ts[aid]
+                    return v if v is not None else ""
+                return score_cell(m, aid)
+
+            # The metadata rows stay ABOVE the column header (so _xl_sheet's bold
+            # row-1 style lands on "STALE …" rather than on "Theme"). Deliberate: a
+            # staleness warning buried under the data is worse than an unbolded header,
+            # and _xl_sheet must not be restructured for one sheet's cosmetics.
+            rows3: list[list] = []
+            if later:
+                rows3.append([f"STALE — {len(later)} submission(s) arrived after this snapshot was saved"])
+            rows3.append(["Adjusted snapshot saved", frozen_at])
+            rows3.append(["Adjustment note", final.get("note") or ""])
+            rows3.append([])
+            rows3.append(["Theme", "Measure", *team_labels, "Weight %"])
+            for cat in weighted["categories"]:
+                for m in cat["measures"]:
+                    rows3.append([
+                        cat["label"], m["label"],
+                        *[adj_cell(cat, m, aid) for aid in team_ids],
+                        cat.get("weight"),
+                    ])
+            # Recompute the total FROM THE CELLS THIS SHEET ACTUALLY PRINTS, rather than
+            # echoing the stored one. `adj_cell` falls back to the live consolidated score
+            # for any reviewer the snapshot never captured (deleted then re-submitted,
+            # un-keyed then re-keyed), so the printed grid can legitimately contain people
+            # the stored overall was never computed over — and the sheet then cannot be
+            # reconciled with its own total. This mirrors FinalizeScorecardTable, which
+            # already recomputes from the same merged matrix rather than trusting the
+            # stored figure.
+            merged_cats = []
+            fallback_aids: set[str] = set()
+            for cat in weighted["categories"]:
+                mm = []
+                for m in cat["measures"]:
+                    ts: dict = {}
+                    if m.get("measure_type") != "rag":
+                        for aid in team_ids:
+                            am = (adj.get(cat.get("key")) or {}).get(m.get("key"))
+                            stored = (am or {}).get("team_scores") or {}
+                            if aid not in stored:
+                                fallback_aids.add(aid)
+                            v = adj_cell(cat, m, aid)
+                            ts[aid] = v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+                    mm.append({"key": m.get("key"), "measure_type": m.get("measure_type"), "team_scores": ts})
+                merged_cats.append({"key": cat.get("key"), "weight": cat.get("weight"), "measures": mm})
+            merged = {"categories": merged_cats}
+            _recompute_final_aggregates(merged)
+
+            rows3.append([])
+            rows3.append(["Overall (adjusted)", "", *([""] * n_teams),
+                          merged.get("overall_score")])
+            if fallback_aids:
+                # Name them: without this the un-key/re-key case is invisible, because the
+                # STALE banner only fires when a submission postdates the freeze.
+                _lbl = {t.get("attendee_id"): (t.get("label") or t.get("team") or "") for t in teams}
+                rows3.append([
+                    "Note",
+                    "Not in the saved snapshot — submitted scores shown: "
+                    + ", ".join(sorted(_lbl.get(a, a) for a in fallback_aids)),
+                ])
+            sheets.append({
+                "name": "Final (Adjusted)",
+                "rows": rows3,
+                "col_widths": [22, 30, *([20] * n_teams), 11],
+            })
+        except Exception as exc:  # noqa: BLE001 — never lose the whole export to a bad snapshot
+            logger.warning("scorecard export: skipped the adjusted sheet for cycle=%s: %s",
+                           sanitize_for_log(cycle_id), exc)
+
+    return _build_xlsx(sheets)
 
 
 @router.get("/export/{cycle_id}")
@@ -1302,15 +1809,47 @@ def dispatch_inapp(payload: InAppDispatchRequest):
     if cycle is None:
         raise HTTPException(status_code=404, detail=f"Cycle '{payload.cycle_id}' not found")
 
-    declined = []
+    # A recipient we may not email is SKIPPED, not fatal. Rejecting the whole batch
+    # meant one reviewer who declined attendance blocked the scorecard reaching
+    # everyone else — with no way to tell from this screen who was at fault, and no
+    # recovery but un-keying them in a step that is locked by now.
+    # `is_scorecard_recipient` is the single send-eligibility rule (see
+    # app/utils/scorecard_recipients.py). An attendee_id that resolves to nothing is
+    # left sendable, exactly as before — that is a link problem, not an eligibility one.
+    # The roster contract, read once: `_measure_asks_team` (via _filter_structure_for_team)
+    # is THE rule for "is this team asked anything", so an off-roster reviewer — implicitly
+    # asked everything — is never skipped here.
+    _cfg = _effective_config(cycle)
+    _cfg_cats = _cfg.get("categories") or []
+
+    sendable: list[InAppDispatchRecipient] = []
+    skipped: list[dict] = []
     for recipient in payload.recipients:
         attendee = _get_cycle_attendee(payload.cycle_id, recipient.attendee_id)
-        if attendee and attendee.get("confirmation_status") == "DECLINED":
-            declined.append(recipient.attendee_id)
-    if declined:
+        if attendee is not None and not is_scorecard_recipient(attendee):
+            reason = (
+                "Declined attendance"
+                if attendee.get("confirmation_status") == "DECLINED"
+                else "No longer a key internal reviewer"
+            )
+            skipped.append({"name": recipient.name, "email": recipient.email,
+                            "status": "skipped", "error": reason, "message_id": None})
+            continue
+        # Defence in depth: a team assigned no measure would open a form with nothing
+        # on it and be refused by /submit. Skip it — never hard-fail the batch, which
+        # would stop the scorecard reaching everyone else.
+        if attendee is not None and not _filter_structure_for_team(
+            _cfg_cats, _team_key(attendee), _cfg
+        ):
+            skipped.append({"name": recipient.name, "email": recipient.email,
+                            "status": "skipped", "message_id": None,
+                            "error": "No scorecard measures are assigned to this team"})
+            continue
+        sendable.append(recipient)
+    if not sendable:
         raise HTTPException(
             status_code=400,
-            detail="Scorecard requests cannot be sent to attendees who declined attendance.",
+            detail="None of the selected recipients can be sent a scorecard (they have declined attendance or are no longer key reviewers).",
         )
 
     # An edited body MUST keep the {{link}} token, otherwise recipients get an email
@@ -1322,9 +1861,10 @@ def dispatch_inapp(payload: InAppDispatchRequest):
         )
 
     base = payload.form_base_url.rstrip("/")
-    results = []
+    # Seeded with the skips so the UI can name who was left out, and why.
+    results: list[dict] = list(skipped)
     sent = 0
-    for r in payload.recipients:
+    for r in sendable:
         email = r.email.strip()
         if not email or not r.attendee_id:
             continue
@@ -1358,10 +1898,14 @@ def dispatch_inapp(payload: InAppDispatchRequest):
                 html_body=html_body,
                 text_body=text_body,
             )
-            results.append({"name": r.name, "email": email, "status": "sent", "message_id": res.get("id")})
+            # Every row carries the same keys whatever its status, so the panel can read
+            # one shape instead of probing for the fields a given outcome happens to set.
+            results.append({"name": r.name, "email": email, "status": "sent",
+                            "message_id": res.get("id"), "error": None})
             sent += 1
         except MailSendError as exc:
-            results.append({"name": r.name, "email": email, "status": "failed", "error": str(exc)})
+            results.append({"name": r.name, "email": email, "status": "failed",
+                            "error": str(exc), "message_id": None})
 
     if sent > 0:
         now = datetime.now(timezone.utc).isoformat()
@@ -1373,7 +1917,10 @@ def dispatch_inapp(payload: InAppDispatchRequest):
         except Exception as exc:
             logger.warning("dispatch-inapp: workflow advance failed: %s", exc)
 
-    return {"total": len(payload.recipients), "sent": sent, "failed": len(payload.recipients) - sent, "results": results}
+    # A skip is not a failure — counting it as one would paint the send red when it
+    # did everything that could be done.
+    return {"total": len(payload.recipients), "sent": sent, "skipped": len(skipped),
+            "failed": len(sendable) - sent, "results": results}
 
 
 @router.get("/dispatch-preview/{cycle_id}")
@@ -1427,12 +1974,19 @@ def redo_scorecard(cycle_id: str):
         )
 
     cleared = _submissions_repo().delete_by_field("cycle_id", cycle_id)
+    updated = cycle_repo.clear_scorecard_dispatch(cycle_id)
     # Drop the frozen (admin-adjusted) snapshot too — it is stale once submissions reset.
+    # Done AFTER the dispatch marker is cleared: a fault here must not leave submissions
+    # purged with scorecard_dispatched_at still set, which would keep the config locked
+    # on a 409. A missing snapshot is not an error (delete_for_cycle returns False), so
+    # anything caught here is a real DB fault — log it rather than swallow it.
     try:
         _final_repo().delete_for_cycle(cycle_id)
-    except Exception:  # noqa: BLE001 — snapshot may not exist; never block the redo
-        pass
-    updated = cycle_repo.clear_scorecard_dispatch(cycle_id)
+    except Exception as exc:  # noqa: BLE001 — best-effort; never block the redo
+        logger.warning(
+            "redo_scorecard: could not drop the final snapshot for cycle=%s: %s",
+            sanitize_for_log(cycle_id), exc,
+        )
     logger.info("redo_scorecard — cycle=%s discarded %d submissions, dispatch reopened", sanitize_for_log(cycle_id), cleared)
     return {"cycle_id": cycle_id, "reopened": True, "submissions_cleared": cleared, "cycle": updated}
 
@@ -1444,6 +1998,11 @@ class ReminderSettingsUpdate(BaseModel):
     deadline: Optional[str] = Field(default=None, description="ISO date (YYYY-MM-DD) reviewers must submit by")
     offsets: list[int] = Field(default_factory=lambda: [5, 2, 0], description="Days before the deadline to remind")
     form_base_url: Optional[str] = Field(default=None, description="Frontend origin used to build the form link")
+    # Where the T-0 escalation goes. Without this field `reminder_service._coordinators`
+    # could never see a configured address, so its first (and only targeted) branch was
+    # dead code and every escalation fell through to "reviewers who are not late" or the
+    # service mailbox. `save_settings` leaves a stored value alone when this is omitted.
+    coordinator_email: Optional[str] = Field(default=None, description="Where the final (T-0) escalation is sent")
 
 
 class ReminderSendNowRequest(BaseModel):
@@ -1481,6 +2040,9 @@ def _reminder_status(cycle: dict) -> dict:
         "deadline": s.get("deadline"),
         "offsets": s.get("offsets"),
         "form_base_url": s.get("form_base_url"),
+        # Echoed back so the settings form can show what is stored — otherwise the VMO
+        # has no way to tell whether an escalation address was ever saved.
+        "coordinator_email": s.get("coordinator_email"),
         "pending": len(pending),
         "pending_names": [p["name"] for p in pending],
         "tiers": tiers,
@@ -1504,6 +2066,7 @@ def put_reminders(cycle_id: str, payload: ReminderSettingsUpdate):
     try:
         reminder_service.save_settings(
             cycle_id, deadline=payload.deadline, offsets=payload.offsets, form_base_url=payload.form_base_url,
+            coordinator_email=payload.coordinator_email,
         )
     except ValueError as exc:
         logger.warning("reminder settings update failed for cycle=%s: %s", sanitize_for_log(cycle_id), exc)
@@ -1517,6 +2080,15 @@ def send_reminders_now(cycle_id: str, payload: ReminderSendNowRequest = Body(def
     cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
     if cycle is None:
         raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+    # Nobody can be late for a form they were never sent, so `pending_respondents`
+    # returns [] until the scorecard is dispatched. Without this guard the button
+    # "succeeds" with pending == 0 and the panel reports the flatly wrong
+    # "Everyone has already submitted".
+    if not cycle.get("scorecard_dispatched_at"):
+        raise HTTPException(
+            status_code=409,
+            detail="The scorecard has not been dispatched yet — send it before reminding reviewers.",
+        )
     if payload and payload.html_body_override and "{{link}}" not in payload.html_body_override:
         raise HTTPException(
             status_code=400,
@@ -1578,7 +2150,20 @@ def reminder_preview(cycle_id: str):
 @router.get("/final/{cycle_id}")
 def get_final_scorecard(cycle_id: str):
     rec = _final_repo().get_for_cycle(cycle_id)
-    return {"cycle_id": cycle_id, "final": rec}
+    # The snapshot is a deliberate point-in-time freeze, so it is never auto-deleted —
+    # that would silently discard the VMO's adjustments and their note. Flag it instead,
+    # so the UI can offer the existing Reset rather than quietly overlaying an outdated
+    # number on top of scores that have since changed.
+    stale = False
+    if rec:
+        # computed_at is a later, additive column: legacy rows only carry updated_at.
+        frozen = rec.get("computed_at") or rec.get("updated_at")
+        if frozen:
+            stale = any(
+                (s.get("submitted_at") or "") > frozen
+                for s in _submissions_repo().get_for_cycle(cycle_id)
+            )
+    return {"cycle_id": cycle_id, "final": rec, "stale": stale}
 
 
 @router.post("/final/{cycle_id}")
@@ -1588,10 +2173,19 @@ def save_final_scorecard(cycle_id: str, payload: dict = Body(...)):
     This is an explicit point-in-time snapshot — `computed_at` records when it was
     frozen. The live consolidated view (`_compile_weighted`) remains the source of
     truth and always recomputes from submissions; this snapshot can go stale by design."""
+    # The write is a FULL row replace and the table keeps no history, so a payload
+    # missing `categories` would blank the whole snapshot — and its note and overall —
+    # with nothing to recover from. Every legitimate save sends the matrix, so require
+    # it rather than defaulting to an empty one.
+    if not isinstance(payload.get("categories"), list):
+        raise HTTPException(
+            status_code=400,
+            detail="A final scorecard must include its `categories` — a partial save would erase the saved snapshot.",
+        )
     now = datetime.now(timezone.utc).isoformat()
     record = {
         "cycle_id": cycle_id,
-        "categories": payload.get("categories", []),
+        "categories": payload["categories"],
         "overall_score": payload.get("overall_score"),
         "note": payload.get("note", ""),
         "computed_at": now,

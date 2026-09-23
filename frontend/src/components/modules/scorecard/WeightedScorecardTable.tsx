@@ -37,6 +37,14 @@ function BulletList({ text }: { text: string }) {
   )
 }
 
+/** Column/attribution label. `label` first: there is one column per SUBMITTING
+ *  REVIEWER, not per team, so two people in the same department would otherwise render
+ *  two identical headers. The backend qualifies only the ambiguous ones ("IDTM — Alice");
+ *  `team` stays the fallback for cached payloads that predate the field. */
+function teamLabel(t: WeightedScorecard['teams'][number]): string {
+  return t.label || t.team || t.name || t.email
+}
+
 export default function WeightedScorecardTable({ data, summaries, summaryLoading, summaryLlmUsed, onRegenerateSummary }: Props) {
   const [open, setOpen] = useState(false)
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({})
@@ -57,7 +65,6 @@ export default function WeightedScorecardTable({ data, summaries, summaryLoading
   }
   const teams = data.teams
   const showSummary = summaries !== undefined
-  const extraCols = showSummary ? 1 : 0
 
   if (data.submitted_count === 0) {
     return (
@@ -82,7 +89,9 @@ export default function WeightedScorecardTable({ data, summaries, summaryLoading
           </span>
           <Lock size={13} className="text-slate-400" />
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Consolidated Scorecard</span>
-          <span className="text-xs text-slate-400">· {teams.length} team{teams.length !== 1 ? 's' : ''} submitted · read-only</span>
+          {/* One column per submitting REVIEWER — two people can share a department, so
+              calling this a team count overstated how many teams had responded. */}
+          <span className="text-xs text-slate-400">· {teams.length} reviewer{teams.length !== 1 ? 's' : ''} submitted · read-only</span>
         </div>
         <div className="flex items-center gap-3">
           {open && showSummary && (
@@ -156,7 +165,7 @@ export default function WeightedScorecardTable({ data, summaries, summaryLoading
               )}
               {teams.map((t) => (
                 <th key={t.attendee_id} className="text-center px-4 py-3 font-medium whitespace-nowrap min-w-[6rem]" title={t.email}>
-                  {t.team || t.name || t.email}
+                  {teamLabel(t)}
                 </th>
               ))}
               <th className="text-center px-4 py-3 font-medium bg-emerald-50/60 dark:bg-emerald-900/10">Avg</th>
@@ -164,8 +173,17 @@ export default function WeightedScorecardTable({ data, summaries, summaryLoading
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {data.categories.map((cat) => (
-              cat.measures.map((m, mi) => {
+            {data.categories.map((cat) => {
+              // An expanded comment row is a physical <tr> of this category, so the
+              // Theme / Wt% rowspans have to count it as well — a rowspan of
+              // cat.measures.length leaves the trailing measure rows outside the span
+              // and every cell on them shifts one column left. Keep this predicate
+              // byte-identical to the comment-row render guard below.
+              const commentRows = showSummary
+                ? 0
+                : cat.measures.filter((mm) => openComments[mm.key] && Object.keys(mm.comments).length > 0).length
+              const catRowSpan = cat.measures.length + commentRows
+              return cat.measures.map((m, mi) => {
                 const commentEntries = Object.entries(m.comments)
                 const isOpen = openComments[m.key]
                 return (
@@ -173,7 +191,7 @@ export default function WeightedScorecardTable({ data, summaries, summaryLoading
                     <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                       {mi === 0 ? (
                         <td
-                          rowSpan={cat.measures.length}
+                          rowSpan={catRowSpan}
                           className="align-top px-4 py-3.5 font-semibold text-slate-800 dark:text-slate-200 border-r border-slate-100 dark:border-slate-800 sticky left-0 bg-white dark:bg-slate-900"
                         >
                           <div>{cat.label}</div>
@@ -207,7 +225,7 @@ export default function WeightedScorecardTable({ data, summaries, summaryLoading
                           ) : (
                             (() => {
                               const entries = teams
-                                .map((t) => ({ label: t.team || t.name || t.email, text: m.comments[t.attendee_id] }))
+                                .map((t) => ({ label: teamLabel(t), text: m.comments[t.attendee_id] }))
                                 .filter((e) => (e.text || '').trim())
                               return entries.length > 0 ? (
                                 <ul className="space-y-1.5">
@@ -225,11 +243,18 @@ export default function WeightedScorecardTable({ data, summaries, summaryLoading
                       {teams.map((t) => {
                         const isRag = m.measure_type === 'rag'
                         const v = m.team_scores[t.attendee_id]
+                        // A dash reads as "asked and marked not applicable". `not_asked`
+                        // means the config never put this measure in front of that
+                        // reviewer's team, which is not a gap in their answer — show it
+                        // differently so the VMO does not chase a non-existent omission.
+                        const notAsked = m.team_status?.[t.attendee_id] === 'not_asked'
                         return (
                           <td key={t.attendee_id} className="text-center px-4 py-3.5 text-slate-600 dark:text-slate-400">
-                            {isRag
-                              ? <RagDot value={m.team_rag?.[t.attendee_id]} />
-                              : (v == null ? <span className="text-slate-300 dark:text-slate-600">—</span> : v)}
+                            {notAsked
+                              ? <span className="text-slate-300 dark:text-slate-600" title="Not assigned to this team">·</span>
+                              : isRag
+                                ? <RagDot value={m.team_rag?.[t.attendee_id]} />
+                                : (v == null ? <span className="text-slate-300 dark:text-slate-600">—</span> : v)}
                           </td>
                         )
                       })}
@@ -239,20 +264,20 @@ export default function WeightedScorecardTable({ data, summaries, summaryLoading
                           : (m.average != null ? m.average.toFixed(1) : '—')}
                       </td>
                       {mi === 0 ? (
-                        <td rowSpan={cat.measures.length} className="text-center px-4 py-3.5 text-slate-500 dark:text-slate-400 align-middle">
+                        <td rowSpan={catRowSpan} className="text-center px-4 py-3.5 text-slate-500 dark:text-slate-400 align-middle">
                           {cat.weight}%
                         </td>
                       ) : null}
                     </tr>
                     {!showSummary && isOpen && commentEntries.length > 0 && (
                       <tr className="bg-slate-50/70 dark:bg-slate-800/30">
-                        <td colSpan={teams.length + 3 + extraCols} className="px-4 py-3">
+                        <td colSpan={teams.length + 2} className="px-4 py-3">
                           <div className="space-y-1">
                             {commentEntries.map(([aid, text]) => {
                               const t = teams.find((x) => x.attendee_id === aid)
                               return (
                                 <p key={aid} className="text-xs text-slate-600 dark:text-slate-400">
-                                  <span className="font-semibold text-slate-700 dark:text-slate-300">{t?.team || t?.name || aid}:</span> {text}
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300">{t ? teamLabel(t) : aid}:</span> {text}
                                 </p>
                               )
                             })}
@@ -263,12 +288,12 @@ export default function WeightedScorecardTable({ data, summaries, summaryLoading
                   </Fragment>
                 )
               })
-            ))}
+            })}
           </tbody>
         </table>
       </div>
       <div className="px-3 py-1.5 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
-        Blank (—) = team marked this measure as not applicable. RAG measures are colour-coded status only and do not affect the score. Overall = weighted average of theme averages.
+        Blank (—) = team marked this measure as not applicable. A dot (·) = the measure was never assigned to that team. RAG measures are colour-coded status only and do not affect the score. Overall = weighted average of theme averages.
       </div>
       </>}
     </div>

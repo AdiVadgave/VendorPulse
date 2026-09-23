@@ -1,11 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { CheckCircle2, Clock, RefreshCw, Loader2, ChevronDown, ChevronRight, Send, Trash2, Link2, Check, AlertTriangle } from 'lucide-react'
+import { CheckCircle2, Clock, RefreshCw, Loader2, ChevronDown, ChevronRight, Send, Trash2, Link2, Check, AlertTriangle, UserX } from 'lucide-react'
 import { format } from 'date-fns'
 import type { TeamSubmissionsData, TeamSubmissionEntry } from '@/types/scorecard.types'
 import type { CycleAttendee } from '@/types/scheduling.types'
 import { cn } from '@/utils/cn'
 import { POLLING_INTERVALS } from '@/utils/constants'
 import { getTeamSubmissions, dispatchInAppScorecard, deleteScorecardSubmission, buildScorecardLink } from '@/lib/scorecardApi'
+
+/** The tracker population now includes reviewers who declined the MEETING invite (they
+ *  can still own — or already have — a scorecard), and the backend flags each row with
+ *  `declined`. It is optional here on purpose: the shared type in scorecard.types.ts is
+ *  owned elsewhere, so the field is read defensively and simply degrades to "attending"
+ *  until it lands there. */
+type TrackerEntry = TeamSubmissionEntry & { declined?: boolean }
 
 interface Props {
   cycleId: string
@@ -15,9 +22,13 @@ interface Props {
   /** Full attendee list — used to resolve the delivery email address for a resend. */
   attendees: CycleAttendee[]
   onSubmissionsUpdated?: ((data: TeamSubmissionsData) => void) | (() => void) | (() => Promise<void>)
+  /** A per-attendee "Request fill" hits the same cycle-wide dispatch endpoint, so it
+   *  marks the whole cycle dispatched server-side. Let the parent resync (refetch the
+   *  cycle) or the config panel stays unlocked and every later save 409s. */
+  onDispatched?: () => void
 }
 
-export default function SubmissionTracker({ cycleId, vendorName, quarter, year, attendees, onSubmissionsUpdated }: Props) {
+export default function SubmissionTracker({ cycleId, vendorName, quarter, year, attendees, onSubmissionsUpdated, onDispatched }: Props) {
   const [open, setOpen] = useState(false)
   const [tracker, setTracker] = useState<TeamSubmissionsData | null>(null)
   const [isPolling, setIsPolling] = useState(false)
@@ -30,6 +41,10 @@ export default function SubmissionTracker({ cycleId, vendorName, quarter, year, 
   const [rowError, setRowError] = useState<string | null>(null)
   const callbackRef = useRef(onSubmissionsUpdated)
   callbackRef.current = onSubmissionsUpdated
+  // Mirrored in a ref (like callbackRef) so an inline parent arrow does not
+  // re-create requestFill on every render.
+  const dispatchedRef = useRef(onDispatched)
+  dispatchedRef.current = onDispatched
 
   const doPoll = useCallback(async () => {
     try {
@@ -64,7 +79,7 @@ export default function SubmissionTracker({ cycleId, vendorName, quarter, year, 
     setRowError(null)
     try {
       const att = attendees.find((a) => a.attendee_id === entry.attendee_id)
-      await dispatchInAppScorecard({
+      const res = await dispatchInAppScorecard({
         cycle_id: cycleId,
         vendor_name: vendorName,
         quarter,
@@ -77,8 +92,17 @@ export default function SubmissionTracker({ cycleId, vendorName, quarter, year, 
           team: entry.team,
         }],
       })
+      // A mail-provider rejection comes back 200 with {sent: 0} — it does not throw,
+      // so without this the row would flash a green "Sent" for an email nobody got.
+      if (res.sent < 1) {
+        setRowError(res.results[0]?.error || 'Email was not sent — check the service mailbox config, or use Copy link.')
+        return
+      }
       setSentId(entry.attendee_id)
       setTimeout(() => setSentId((s) => (s === entry.attendee_id ? null : s)), 2000)
+      // The cycle is now dispatched server-side; tell the parent so the config lock
+      // and the per-team dispatched set catch up with the DB.
+      dispatchedRef.current?.()
     } catch (e) {
       setRowError(e instanceof Error ? e.message : 'Failed to send — check the service mailbox config, or use Copy link.')
     } finally {
@@ -195,7 +219,7 @@ export default function SubmissionTracker({ cycleId, vendorName, quarter, year, 
             No key internal-stakeholder attendees yet. Add them in the attendee step, then dispatch the scorecard.
           </div>
         )}
-        {entries.map((entry: TeamSubmissionEntry) => (
+        {entries.map((entry: TrackerEntry) => (
           <div key={entry.attendee_id} className="px-5 py-3.5 flex items-center gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
@@ -218,25 +242,44 @@ export default function SubmissionTracker({ cycleId, vendorName, quarter, year, 
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
                   <CheckCircle2 size={13} /> Submitted
                 </span>
+              ) : entry.declined ? (
+                /* Declined the meeting invite: still listed (their row is the only way to
+                   delete or inspect a submission of theirs), but not chased. The backend
+                   leaves them out of `total`/`pending`, so this row is not "overdue". */
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                  <UserX size={13} /> Not attending
+                </span>
+              ) : entry.assigned === false ? (
+                /* The configuration asks this reviewer's team no measures, so their form
+                   would be empty and dispatch refuses to send it. The backend leaves them
+                   out of `total`/`pending` for the same reason — showing amber "Pending"
+                   here would make the VMO chase someone the system will not email. */
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400" title="No measures are assigned to this team — configure the scorecard to include them">
+                  <AlertTriangle size={13} /> Not asked
+                </span>
               ) : (
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
                   <Clock size={13} /> Pending
                 </span>
               )}
 
-              {/* Ask this attendee to (re)fill the scorecard. */}
+              {/* Ask this attendee to (re)fill the scorecard. Not offered to a declined
+                  reviewer: dispatch refuses to mail them, so the send would come back as a
+                  skipped row. Copy link stays — chasing them by hand is still legitimate. */}
               {!entry.submitted && (
                 <>
-                  <button
-                    onClick={() => requestFill(entry)}
-                    disabled={busyId === entry.attendee_id}
-                    title="Email this attendee the scorecard form link (Outlook)"
-                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 disabled:opacity-50"
-                  >
-                    {busyId === entry.attendee_id ? <Loader2 size={12} className="animate-spin" />
-                      : sentId === entry.attendee_id ? <Check size={12} className="text-emerald-500" /> : <Send size={12} />}
-                    {sentId === entry.attendee_id ? 'Sent' : 'Request fill'}
-                  </button>
+                  {!entry.declined && entry.assigned !== false && (
+                    <button
+                      onClick={() => requestFill(entry)}
+                      disabled={busyId === entry.attendee_id}
+                      title="Email this attendee the scorecard form link (Outlook)"
+                      className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 disabled:opacity-50"
+                    >
+                      {busyId === entry.attendee_id ? <Loader2 size={12} className="animate-spin" />
+                        : sentId === entry.attendee_id ? <Check size={12} className="text-emerald-500" /> : <Send size={12} />}
+                      {sentId === entry.attendee_id ? 'Sent' : 'Request fill'}
+                    </button>
+                  )}
                   <button
                     onClick={() => copyLink(entry.attendee_id)}
                     title="Copy the form link (test without email)"

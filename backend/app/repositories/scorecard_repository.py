@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from app.db.pool import get_pool
 from app.repositories.base_repository import BaseRepository
 
 
@@ -30,6 +31,36 @@ class ScorecardSubmissionRepository(BaseRepository):
 
     def get_for_cycle(self, cycle_id: str) -> list[dict]:
         return self.find_by_field("cycle_id", cycle_id)
+
+    def insert_if_absent(self, record: dict) -> bool:
+        """Insert unless this (cycle_id, attendee_id) already has a row.
+
+        Returns True when the row was written, False when one was already there.
+
+        The route's check-then-insert straddles the AI redaction call — seconds of
+        wall clock on an autocommit pool — so two tabs, or a double click, could both
+        pass it and write two columns that are then silently double-counted in every
+        average. This makes the DATABASE the arbiter, backed by the
+        UNIQUE (cycle_id, attendee_id) index `subs_cycle_attendee_uq` (see
+        app/db/schema.py).
+
+        The conflict target is deliberately left off: `ON CONFLICT DO NOTHING` with no
+        target needs no particular index to exist, so on a database where the
+        self-healing index migration could not run this degrades to exactly today's
+        behaviour instead of failing every submission. The only unique constraints on
+        this table are the uuid primary key, the BIGSERIAL `seq` and that index, so
+        nothing else can be absorbed here."""
+        cols = [c for c in self.columns if c in record]
+        values = [self._adapt(c, record[c]) for c in cols]
+        collist = ", ".join(f'"{c}"' for c in cols)
+        placeholders = ", ".join(["%s"] * len(cols))
+        with get_pool().connection() as conn:
+            cur = conn.execute(
+                f'INSERT INTO "{self.table}" ({collist}) VALUES ({placeholders}) '
+                "ON CONFLICT DO NOTHING",
+                values,
+            )
+            return cur.rowcount > 0
 
     def get_by_cycle_and_attendee(self, cycle_id: str, attendee_id: str) -> Optional[dict]:
         return next(

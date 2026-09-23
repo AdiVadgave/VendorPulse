@@ -286,6 +286,10 @@ export interface ScorecardConfigTheme {
 export interface ScorecardConfig {
   categories: ScorecardConfigTheme[]
   configured: boolean
+  /** Teams this config was authored against. A key reviewer whose team is NOT
+   *  listed joined afterwards, so they are asked every measure rather than
+   *  being silently dropped. Absent on legacy configs => every team is new. */
+  teams?: string[]
 }
 
 export interface ScorecardSubmissionPayload {
@@ -303,6 +307,13 @@ export interface WeightedTeamColumn {
   email: string
   name: string
   team: string
+  /** Display header. There is one column per SUBMITTING REVIEWER, not per team, so
+   *  the backend qualifies an ambiguous department ("IDTM — Alice" / "IDTM — Bob").
+   *  Optional: cached payloads predate it — render `label || team || name || email`. */
+  label?: string
+  /** Config identity: the same string `measures[].teams` / the roster use, so a column
+   *  maps back to the restriction that produced it. NOT for display. */
+  team_key?: string
 }
 
 export interface WeightedMeasureRow {
@@ -311,6 +322,10 @@ export interface WeightedMeasureRow {
   description: string
   measure_type?: ScorecardMeasureType
   team_scores: Record<string, number | null>
+  /** Per-attendee reason a cell is blank: `not_asked` = the config never asked that
+   *  reviewer's team this measure (so it is not a missing answer), `na` = asked and
+   *  deliberately skipped, `scored` = answered. Absent on cached payloads. */
+  team_status?: Record<string, 'not_asked' | 'na' | 'scored'>
   team_rag?: Record<string, string | null>
   rag_consensus?: string | null
   average: number | null
@@ -361,6 +376,13 @@ export interface TeamSubmissionEntry {
   team: string
   submitted: boolean
   submitted_at: string | null
+  /** Declined the MEETING invite: dispatch refuses to email them, so the UI must not
+   *  offer "Request fill" on this row. Absent on cached payloads. */
+  declined?: boolean
+  /** False when the config asks this reviewer's team no measures — their form link
+   *  dead-ends, so they are neither chased nor counted as pending. Absent on cached
+   *  payloads (and not yet emitted by GET /team-submissions — see needs_other_file). */
+  assigned?: boolean
 }
 
 export interface TeamSubmissionsData {

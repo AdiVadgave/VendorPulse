@@ -14,8 +14,12 @@ Settings + idempotency are stored inside the cycle's `scorecard_config` JSONB
         "deadline": "2026-08-15",       # ISO date, coordinator-chosen
         "offsets": [5, 2, 0],           # editable days-before-deadline
         "form_base_url": "http://…",    # frontend origin for the form link
+        "coordinator_email": "vmo@…",   # where the T-0 escalation goes (optional)
         "sent": ["5", "2"],             # offsets already dispatched (per deadline)
     }
+
+That column also holds the measures, weights and the `teams` roster, so every write
+from here goes through `_write_reminders` — see the caveat documented there.
 """
 from __future__ import annotations
 
@@ -24,6 +28,7 @@ from datetime import date, datetime, timezone
 from html import escape as _html_escape
 from typing import Optional
 
+from app.config import settings
 from app.dependencies import (
     get_attendee_repo,
     get_cycle_repo,
@@ -32,12 +37,27 @@ from app.dependencies import (
 from app.core.workflow_engine import WORKFLOW_STATES
 from app.services.email_templates import build_reminder_email, build_escalation_email
 from app.services.mail_provider import get_mail_provider, MailSendError
+from app.utils.scorecard_recipients import is_scorecard_recipient
 
 logger = logging.getLogger(__name__)
 
-# Cycles are only reminded while they are collecting scorecards.
-_ACTIVE_STATES = {"SCORECARD_REQUEST_SENT", "SCORECARD_COLLECTION"}
+# Reminders follow the DISPATCH marker, not the workflow state. The cycle reaches
+# SCORECARD_REQUEST_SENT the moment the coordinator clicks "Proceed to scorecard" —
+# before any scorecard mail exists — so keying off the state chased reviewers about
+# a scorecard nobody had sent them. Conversely a team reopened after the tracker
+# auto-advanced the cycle to SCORECARD_COMPILED still has to be chased, so the state
+# is used only as a ceiling.
+_MAX_STATE_IDX = WORKFLOW_STATES.index("SCORECARD_COMPILED")
 DEFAULT_OFFSETS = [5, 2, 0]
+
+
+def _is_collecting(cycle: dict) -> bool:
+    """Whether a cycle is inside the window where reminders make sense."""
+    if not cycle.get("scorecard_dispatched_at"):
+        return False
+    ws = cycle.get("workflow_state") or ""
+    idx = WORKFLOW_STATES.index(ws) if ws in WORKFLOW_STATES else -1
+    return idx <= _MAX_STATE_IDX
 
 
 def _tone_label(days_left: int) -> str:
@@ -54,8 +74,33 @@ def get_settings(cycle: dict) -> dict:
     reminders.setdefault("deadline", None)
     reminders.setdefault("offsets", DEFAULT_OFFSETS)
     reminders.setdefault("form_base_url", None)
+    reminders.setdefault("coordinator_email", None)
     reminders.setdefault("sent", [])
     return reminders
+
+
+def _write_reminders(cycle_repo, cycle_id: str, cycle: dict, reminders: dict) -> None:
+    """Persist ONLY ``scorecard_config -> reminders``.
+
+    The reminder settings share the `scorecard_config` JSONB with the categories,
+    measures, weights and the `teams` roster. Writing the whole column back from a
+    snapshot read a moment earlier silently reverts any interleaved measure/team
+    save (a lost update — both requests return 200), which is how a team can vanish
+    from every measure's `teams` list and stop being asked for a scorecard.
+
+    So prefer a server-side single-key merge when the repository exposes one
+    (``set_scorecard_reminders(cycle_id, reminders)``, a thin wrapper over
+    ``jsonb_set``) and fall back to the historical read-modify-write otherwise, so
+    this module never needs raw SQL of its own. CycleRepository now implements it;
+    the probe stays so a repository that does not (tests, a future store) still works.
+    """
+    targeted = getattr(cycle_repo, "set_scorecard_reminders", None)
+    if callable(targeted):
+        targeted(cycle_id, reminders)
+        return
+    cfg = dict(cycle.get("scorecard_config") or {})
+    cfg["reminders"] = reminders
+    cycle_repo.update_by_id("cycle_id", cycle_id, {"scorecard_config": cfg})
 
 
 def save_settings(
@@ -64,13 +109,13 @@ def save_settings(
     deadline: Optional[str],
     offsets: list[int],
     form_base_url: Optional[str] = None,
+    coordinator_email: Optional[str] = None,
 ) -> dict:
     cycle_repo = get_cycle_repo()
     cycle = cycle_repo.get_by_cycle_id(cycle_id)
     if cycle is None:
         raise ValueError(f"Cycle '{cycle_id}' not found")
-    cfg = dict(cycle.get("scorecard_config") or {})
-    reminders = dict(cfg.get("reminders") or {})
+    reminders = dict((cycle.get("scorecard_config") or {}).get("reminders") or {})
     # Changing the deadline resets which offsets have been sent.
     if reminders.get("deadline") != deadline:
         reminders["sent"] = []
@@ -78,8 +123,11 @@ def save_settings(
     reminders["offsets"] = sorted({int(o) for o in offsets}, reverse=True)
     if form_base_url:
         reminders["form_base_url"] = form_base_url.rstrip("/")
-    cfg["reminders"] = reminders
-    cycle_repo.update_by_id("cycle_id", cycle_id, {"scorecard_config": cfg})
+    # Only touched when a value is actually supplied: "send reminder now" re-saves
+    # deadline/offsets just to persist the form base URL and must not blank this.
+    if coordinator_email is not None:
+        reminders["coordinator_email"] = coordinator_email.strip().lower() or None
+    _write_reminders(cycle_repo, cycle_id, cycle, reminders)
     return reminders
 
 
@@ -88,38 +136,78 @@ def _mark_sent(cycle_id: str, offset: int) -> None:
     cycle = cycle_repo.get_by_cycle_id(cycle_id)
     if cycle is None:
         return
-    cfg = dict(cycle.get("scorecard_config") or {})
-    reminders = dict(cfg.get("reminders") or {})
+    reminders = dict((cycle.get("scorecard_config") or {}).get("reminders") or {})
     sent = list(reminders.get("sent") or [])
     if str(offset) not in sent:
         sent.append(str(offset))
     reminders["sent"] = sent
-    cfg["reminders"] = reminders
-    cycle_repo.update_by_id("cycle_id", cycle_id, {"scorecard_config": cfg})
+    _write_reminders(cycle_repo, cycle_id, cycle, reminders)
 
 
 def pending_respondents(cycle_id: str) -> list[dict]:
-    """Key internal (non-vendor) reviewers who have not yet submitted a scorecard."""
-    attendees = [a for a in get_attendee_repo().find_all() if a.get("cycle_id") == cycle_id]
-    key_internal = [a for a in attendees if a.get("is_key") and a.get("type") != "Vendor"]
+    """Reviewers who were actually SENT a scorecard and have not yet submitted one.
+
+    Uses the shared `is_scorecard_recipient` rule rather than re-deriving it, so the
+    reminder engine can never chase somebody `/dispatch-inapp` refuses to mail (an
+    attendee who declined attendance) — that divergence had the submission tracker
+    reporting "all responses collected" while this list kept nagging the same person.
+
+    It also chases only addresses recorded in `scorecard_dispatched_to`: you cannot
+    ask for a submission from a reviewer who was never sent a link (nothing
+    dispatched yet, or their team was just reopened for editing)."""
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id) or {}
+    if not cycle.get("scorecard_dispatched_at"):
+        return []  # nothing has been sent yet, so nobody can be late
+    dispatched = {(e or "").strip().lower() for e in (cycle.get("scorecard_dispatched_to") or []) if e}
+    attendees = get_attendee_repo().get_for_cycle(cycle_id)
+    key_internal = [a for a in attendees if is_scorecard_recipient(a)]
     submissions = get_scorecard_submission_repo().get_for_cycle(cycle_id)
     submitted_ids = {s.get("attendee_id") for s in submissions if s.get("attendee_id")}
-    return [
-        {"attendee_id": a.get("attendee_id"), "name": a.get("name", ""), "email": (a.get("email") or "").strip()}
-        for a in key_internal
-        if a.get("attendee_id") not in submitted_ids and (a.get("email") or "").strip()
-    ]
+    out: list[dict] = []
+    for a in key_internal:
+        email = (a.get("email") or "").strip()
+        if not email or a.get("attendee_id") in submitted_ids:
+            continue
+        # An empty set means a legacy cycle dispatched before the recipient list was
+        # recorded — fall back to the old behaviour rather than muting its reminders.
+        if dispatched and email.lower() not in dispatched:
+            continue
+        out.append({"attendee_id": a.get("attendee_id"), "name": a.get("name", ""), "email": email})
+    return out
 
 
-def _coordinators(cycle_id: str) -> list[dict]:
-    """Escalation recipients. Stakeholder roles were removed, so there is no
-    role-tagged coordinator any more — escalate to the key internal reviewers."""
-    attendees = [a for a in get_attendee_repo().find_all() if a.get("cycle_id") == cycle_id]
-    return [
+def _coordinators(cycle: dict, pending_ids: set) -> list[dict]:
+    """Escalation recipients for the T-0 blast, in order of preference.
+
+    Stakeholder roles were removed, so there is no role-tagged coordinator any more.
+    This used to return *every* key internal reviewer, i.e. a superset of `pending` —
+    so each late reviewer got an escalation addressed to them listing themselves as
+    delinquent, and every reviewer was handed the names and email addresses of all
+    the others. Instead: the coordinator address configured on the reminder settings;
+    else the key reviewers who are NOT themselves late (nobody is escalated about
+    themselves); else the service mailbox, so a blown deadline is never silent."""
+    configured = (get_settings(cycle).get("coordinator_email") or "").strip()
+    if configured:
+        return [{"name": "VMO Coordinator", "email": configured}]
+    cycle_id = cycle.get("cycle_id")
+    attendees = get_attendee_repo().get_for_cycle(cycle_id)
+    others = [
         {"name": a.get("name", ""), "email": (a.get("email") or "").strip()}
         for a in attendees
-        if a.get("is_key") and a.get("type") != "Vendor" and (a.get("email") or "").strip()
+        if is_scorecard_recipient(a)
+        and a.get("attendee_id") not in pending_ids
+        and (a.get("email") or "").strip()
     ]
+    if others:
+        return others
+    # Commonest case while nobody has submitted yet: pending == every reviewer, so
+    # both branches above are empty. Fall back to the service mailbox rather than let
+    # the escalation silently evaporate exactly when it matters most.
+    fallback = (settings.graph_mail_sender or "").strip()
+    if fallback:
+        return [{"name": "VMO Coordinator", "email": fallback}]
+    logger.error("T-0 escalation for cycle=%s has no recipient — configure a coordinator email", cycle_id)
+    return []
 
 
 def _form_link(base_url: Optional[str], cycle_id: str, attendee_id: str) -> str:
@@ -142,6 +230,7 @@ def send_tier(
     *,
     base_url: Optional[str],
     days_left: int,
+    escalate: bool = True,
     subject_override: Optional[str] = None,
     html_override: Optional[str] = None,
     text_override: Optional[str] = None,
@@ -150,7 +239,9 @@ def send_tier(
 
     When ``html_override`` is set (coordinator edited the draft) it is sent to the
     reviewers verbatim, substituting {{name}}/{{link}} per recipient. The T-0
-    escalation to coordinators always uses its own template."""
+    escalation to coordinators always uses its own template; `escalate=False`
+    suppresses it, because a manual send is not a scheduled tier and must not
+    re-broadcast the escalation on every click."""
     cycle_id = cycle.get("cycle_id")
     vendor = cycle.get("vendor_name", "")
     quarter = cycle.get("quarter", "")
@@ -184,8 +275,8 @@ def send_tier(
             logger.warning("reminder send failed cycle=%s to=%s: %s", cycle_id, p["email"], exc)
 
     escalated = 0
-    if days_left <= 0 and pending:
-        for c in _coordinators(cycle_id):
+    if escalate and days_left <= 0 and pending:
+        for c in _coordinators(cycle, {p["attendee_id"] for p in pending}):
             esc = build_escalation_email(
                 coordinator_name=c["name"], vendor_name=vendor, quarter=quarter, year=year,
                 deadline=deadline, pending=pending,
@@ -235,13 +326,19 @@ def send_now(
 
     Uses days-left from the deadline (if set) for the copy; does not consume a
     scheduled offset, so the automated T-5/T-2/T-0 still fire independently. An
-    edited draft (html_override) is sent verbatim with per-recipient tokens."""
+    edited draft (html_override) is sent verbatim with per-recipient tokens.
+
+    Never escalates: the draft the coordinator approves is the reminder only, and
+    this button is unthrottled, so once the deadline had passed every click fired
+    another full escalation blast the UI never reported. The scheduled T-0 tier
+    still escalates, exactly once per deadline, via `_mark_sent`."""
     settings_ = get_settings(cycle)
     deadline = _parse_deadline(settings_.get("deadline"))
     today = datetime.now(timezone.utc).date()
     days_left = (deadline - today).days if deadline else 5
     return send_tier(
         cycle, days_left, base_url=base_url or settings_.get("form_base_url"), days_left=days_left,
+        escalate=False,
         subject_override=subject_override, html_override=html_override, text_override=text_override,
     )
 
@@ -249,7 +346,7 @@ def send_now(
 def run_all_due(today: Optional[date] = None) -> dict:
     """Scheduler entry point — evaluate every actively-collecting cycle."""
     today = today or datetime.now(timezone.utc).date()
-    cycles = [c for c in get_cycle_repo().find_all() if c.get("workflow_state") in _ACTIVE_STATES]
+    cycles = [c for c in get_cycle_repo().find_all() if _is_collecting(c)]
     fired = []
     for cycle in cycles:
         try:

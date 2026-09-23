@@ -167,6 +167,39 @@ def create_cycle(
         cfg = c.get("scorecard_config") or {}
         if cfg.get("configured") and cfg.get("categories"):
             inherited_config = copy.deepcopy(cfg)
+            # Carry over the measures and weights, never the team assignments: the new
+            # cycle has its own attendees, so last quarter's `teams:[...]` arrays name
+            # teams that may not exist here and would filter every reviewer out of the
+            # dispatch. Dropping them (and the roster) restores "unrestricted = everyone"
+            # until the VMO assigns teams for this cycle.
+            inherited_config.pop("teams", None)
+            for _cat in inherited_config.get("categories", []):
+                for _m in _cat.get("measures", []):
+                    _m.pop("teams", None)
+            # The reminder block lives in this same JSONB (reminder_service stores
+            # deadline/offsets/form_base_url/coordinator_email/sent under "reminders").
+            # The deadline and its "already sent" list are strictly per-cycle: inheriting
+            # them means the new cycle is born with a date in the past, so run_due's
+            # `today == fire_day` never matches (no automated reminder ever fires) and a
+            # manual "send now" computes days_left < 0 and mails a red FINAL REMINDER plus
+            # the T-0 escalation. Drop exactly those two and inherit the rest —
+            # get_settings setdefaults deadline=None / sent=[] for us.
+            #
+            # Deny-list, NOT a keep-list: an allow-list silently discards every reminder
+            # key added afterwards. It already discarded `coordinator_email`, the T-0
+            # escalation address that reminder_service._coordinators reads — without it
+            # the escalation falls through to every key reviewer who is not themselves
+            # late, i.e. it hands each reviewer the names and addresses of the delinquent
+            # ones, which is the behaviour that branch was written to stop.
+            _rem = inherited_config.get("reminders")
+            if isinstance(_rem, dict):
+                _rem = {k: v for k, v in _rem.items() if k not in ("deadline", "sent")}
+                if _rem:
+                    inherited_config["reminders"] = _rem
+                else:
+                    inherited_config.pop("reminders", None)
+            else:
+                inherited_config.pop("reminders", None)
             logger.info(
                 "create_cycle: inheriting scorecard config from cycle_id=%s for vendor_id=%s",
                 sanitize_for_log(c.get("cycle_id")), sanitize_for_log(vendor_id),
@@ -462,8 +495,14 @@ def remove_attendee(
         raise HTTPException(status_code=404, detail="Attendee not found")
     # Cascade: drop any scorecard submission this attendee filed so it can't dangle
     # (their column/score is removed from the consolidation on next compile).
-    from app.api.routes.scorecard_v2 import _submissions_repo
+    from app.api.routes.scorecard_v2 import _submissions_repo, strip_attendee_from_final
     _submissions_repo().delete_by_field("attendee_id", attendeeId)
+    # …and out of the frozen Finalize snapshot, which keeps its OWN copy of every
+    # reviewer's cells. Left behind, the deleted reviewer keeps feeding every
+    # measure/category/overall average from a cell the grid no longer renders — a ghost
+    # column, uncorrectable short of a full Reset. Self-guarding and best-effort: it
+    # logs its own failures and must never undo the delete that already committed.
+    strip_attendee_from_final(cycleId, attendeeId)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -233,6 +233,7 @@ def build_config_from_selection(
     selected_measure_keys: list[str],
     weights: dict[str, int],
     measure_teams: dict[str, list[str]] | None = None,
+    teams_roster: list[str] | None = None,
 ) -> dict:
     """Resolve a VMO selection (measure keys + per-theme weights) against the
     catalog into an authoritative config. Labels/descriptions/types always come
@@ -241,7 +242,13 @@ def build_config_from_selection(
     ``measure_teams`` (measure_key -> team names) optionally restricts which
     teams are asked each measure; pass it to stamp a ``teams`` list on every
     included measure (empty list = nobody). Omit it to leave measures
-    unrestricted (everyone answers, the legacy behaviour)."""
+    unrestricted (everyone answers, the legacy behaviour).
+
+    ``teams_roster`` records WHICH teams existed when the VMO made those
+    choices. Without it, "this team is in no measure's list" is ambiguous — it
+    means both "deliberately asked nothing" and "marked Key after the config was
+    saved". The roster disambiguates: a team outside it is new, so it is treated
+    as unrestricted instead of being silently dropped from the dispatch."""
     selected = set(selected_measure_keys)
     categories = []
     for theme in SCORECARD_CATALOG:
@@ -259,7 +266,10 @@ def build_config_from_selection(
             "weight": weight,
             "measures": measures,
         })
-    return {"categories": categories, "configured": True}
+    cfg: dict = {"categories": categories, "configured": True}
+    if teams_roster is not None:
+        cfg["teams"] = sorted({t for t in teams_roster if t})
+    return cfg
 
 
 # Backwards-compatible export: the DEFAULT weighted structure (themes/measures/

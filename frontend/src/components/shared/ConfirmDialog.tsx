@@ -15,6 +15,9 @@ interface Props {
   tone?: Tone
   /** Show a spinner on the confirm button and block interaction while an async action runs. */
   busy?: boolean
+  /** Block confirming while the dialog's own content is incomplete (e.g. nothing chosen).
+   *  Distinct from `busy`: no spinner, and Cancel/Escape stay available. */
+  confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -32,6 +35,7 @@ export default function ConfirmDialog({
   cancelLabel = 'Cancel',
   tone = 'default',
   busy = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: Props) {
@@ -96,7 +100,7 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={busy}
+            disabled={busy || confirmDisabled}
             className={cn(
               'flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-70',
               danger ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'

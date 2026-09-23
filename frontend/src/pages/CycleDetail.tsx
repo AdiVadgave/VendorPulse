@@ -1397,6 +1397,12 @@ function ScorecardTab({
   const [configError, setConfigError] = useState<string | null>(null)
   const [configLoaded, setConfigLoaded] = useState(false)
   const [configNonce, setConfigNonce] = useState(0)  // bumped by Retry
+  // Teams reopened in this session, and the two navigation signals the Reopen dialog
+  // drives: expand Configure Scorecard ("yes, change the config"), or scroll to the
+  // dispatch step ready to re-send ("no, just send it again").
+  const [reopenedTeams, setReopenedTeams] = useState<string[]>([])
+  const [configOpenSignal, setConfigOpenSignal] = useState(0)
+  const dispatchRef = useRef<HTMLDivElement | null>(null)
   // Held HERE rather than inside ScorecardDispatchPanel: that panel is rendered only
   // while subTab === 'collection', so it unmounts the moment the VMO opens Comparison
   // & Finalize and a local flag silently lost the "corrected scorecard" wording.
@@ -1423,11 +1429,22 @@ function ScorecardTab({
   // server-side, so the tracker and the consolidated view are both stale. Not
   // handleRedo: that calls onScorecardRedo(), which would unlock every other team's
   // config even though only one team was reopened.
-  const handleTeamReopened = useCallback(() => {
+  // Called after a reopen of ANY scope from the dispatch panel's Reopen dialog.
+  // `teams` is empty for a full redo (which onRedo already handles).
+  const handleScorecardReopened = useCallback((teams: string[], openConfig: boolean) => {
     setWeighted(null)           // unmounts the finalize table until fresh data lands
     setRedoNonce((n) => n + 1)  // remounts the tracker → restarts its poll
     onReopened?.()              // refetch the cycle (the dispatched-set changed)
     void refreshWeighted()
+    // Keep the reopened teams unlocked in the config matrix straight away; the cycle
+    // refetch that would prove it is async and can fail.
+    if (teams.length) setReopenedTeams((prev) => [...new Set([...prev, ...teams])])
+    if (openConfig) {
+      setConfigOpenSignal((n) => n + 1)   // ScorecardConfigPanel expands + scrolls
+    } else {
+      // Straight to sending: the reopened reviewers are already back in the pending list.
+      requestAnimationFrame(() => dispatchRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    }
   }, [onReopened, refreshWeighted])
 
   // Load the per-SPR scorecard configuration (measures + weights). A failure must be
@@ -1492,7 +1509,8 @@ function ScorecardTab({
             onSaved={(c) => { setConfig(c); setConfigError(null) }}
             attendees={attendees}
             dispatchedEmails={cycle.scorecard_dispatched_to ?? []}
-            onReopened={handleTeamReopened}
+            reopenedTeams={reopenedTeams}
+            openSignal={configOpenSignal}
           />
           {configError && (
             /* Banner + Retry above the panel, which stays MOUNTED with dispatch gated
@@ -1524,6 +1542,9 @@ function ScorecardTab({
               </button>
             </div>
           )}
+          {/* Scroll target for "No, the configuration is fine" in the Reopen dialog: the
+              reopened reviewers are already back in the pending list just below. */}
+          <div ref={dispatchRef} className="scroll-mt-4">
           {configLoaded ? (
             <ScorecardDispatchPanel
               vendorName={cycle.vendor_name}
@@ -1541,12 +1562,14 @@ function ScorecardTab({
               reissue={reissue}
               onReissueHandled={() => setReissue(false)}
               dispatchBlockedReason={configError}
+              onReopened={handleScorecardReopened}
             />
           ) : (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-4 text-sm text-slate-500 dark:text-slate-400">
               Loading scorecard configuration…
             </div>
           )}
+          </div>
           <SubmissionTracker
             key={`tracker-${redoNonce}`}
             cycleId={cycleId}

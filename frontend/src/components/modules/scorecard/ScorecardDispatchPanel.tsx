@@ -6,7 +6,7 @@ import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import type { AgentStatus } from '@/types/agent.types'
 import { WEIGHTED_SCORECARD_STRUCTURE } from '@/types/scorecard.types'
 import type { WeightedCategoryDef } from '@/types/scorecard.types'
-import { dispatchInAppScorecard, buildScorecardLink, redoScorecard, getScorecardDispatchPreview } from '@/lib/scorecardApi'
+import { dispatchInAppScorecard, buildScorecardLink, redoScorecard, reopenScorecardTeam, getScorecardDispatchPreview } from '@/lib/scorecardApi'
 import type { DispatchResponse } from '@/lib/scorecardApi'
 import type { CycleAttendee } from '@/types/scheduling.types'
 import { apiFetch } from '@/lib/api'
@@ -27,8 +27,12 @@ interface Props {
    *  marked Key afterwards, so no measure can name them — they are asked everything
    *  rather than being filtered out of the recipient list. */
   configTeams?: string[]
-  /** Reopen the scorecard config (unlock) after a redo so it can be reconfigured. */
+  /** Reopen the scorecard config (unlock) after a FULL redo so it can be reconfigured. */
   onRedo?: () => void
+  /** Fired after a reopen of any scope. `teams` is empty for a full redo (everyone).
+   *  `openConfig` is the VMO's answer to "change the configuration first?" — the parent
+   *  either expands the Configure Scorecard panel or scrolls to the dispatch step. */
+  onReopened?: (teams: string[], openConfig: boolean) => void
   /** Emails already sent the scorecard. After dispatch, only reviewers NOT here (new
    *  or reopened teams) are offered a (re)send — so a resend never re-emails everyone. */
   dispatchedEmails?: string[]
@@ -365,6 +369,13 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   // this panel unmounts on every Scorecard sub-tab switch, which used to discard it.
   const [redoing, setRedoing] = useState(false)
   const [confirmRedo, setConfirmRedo] = useState(false)
+  // Reopen dialog: scope (everyone vs named teams) and whether to edit the config first.
+  // Both the full redo and the per-team reopen now start here — the per-team buttons used
+  // to live in the config panel's column headers, where they sat against a checkbox and
+  // were easy to hit by accident.
+  const [reopenScope, setReopenScope] = useState<'all' | 'teams'>('all')
+  const [reopenTeams, setReopenTeams] = useState<Set<string>>(new Set())
+  const [reopenEditConfig, setReopenEditConfig] = useState(true)
   const [dispatchDraft, setDispatchDraft] = useState<{ subject: string; body: string }>({ subject: '', body: '' })
 
   // Mirrors the backend's `_measure_asks_team` exactly — the reviewer's form and this
@@ -439,6 +450,14 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   // Before the first dispatch, dispatchedEmails is empty → this equals `recipients`.
   const dispatchedSet = new Set([...(dispatchedEmails ?? []), ...sentEmails].map((e) => (e || '').trim().toLowerCase()))
   const pendingRecipients = recipients.filter((a) => !dispatchedSet.has((a.email || '').trim().toLowerCase()))
+  // Teams with at least one reviewer already sent the scorecard — the only ones there is
+  // anything to reopen. A team still pending is already open; offering it would be a no-op.
+  const settledTeams = [...new Set(
+    keyInternal
+      .filter((a) => dispatchedSet.has((a.email || '').trim().toLowerCase()))
+      .map((a) => teamOf(a))
+      .filter(Boolean)
+  )].sort((x, y) => x.localeCompare(y))
 
   // `isKey` is a parameter so the declined-attendance callout can also REMOVE someone:
   // once the meeting is scheduled, un-keying is the only way to clear a declined
@@ -554,19 +573,55 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   // Redo: discard collected submissions + reopen the config so the scorecard can
   // be corrected and re-sent. Only the freshly-collected scorecard then counts.
   // Confirmed via the in-app ConfirmDialog (see `confirmRedo`).
-  async function runRedo() {
+  async function runReopen() {
+    const scopedTeams = reopenScope === 'teams' ? [...reopenTeams] : []
+    if (reopenScope === 'teams' && scopedTeams.length === 0) return
     setRedoing(true)
     setError(null)
     try {
-      await redoScorecard(cycleId)
-      // Reopen the panel + config for a fresh send, flagged as a re-issue.
-      setDispatched(false)
-      setDispatchResult(null)
-      setSentEmails([])  // the redo cleared the dispatched set server-side
-      setAgentStatus('idle')
-      // The re-issue flag is raised by the parent inside onRedo (see the `reissue` prop),
-      // so it survives this panel unmounting on a sub-tab switch.
-      onRedo?.()
+      if (reopenScope === 'all') {
+        await redoScorecard(cycleId)
+        setDispatched(false)
+        setDispatchResult(null)
+        setSentEmails([])  // the redo cleared the dispatched set server-side
+        setAgentStatus('idle')
+        // The re-issue flag is raised by the parent inside onRedo (see the `reissue`
+        // prop), so it survives this panel unmounting on a sub-tab switch.
+        onRedo?.()
+      } else {
+        // One call per team. Keep going if one fails: a partial reopen is recoverable
+        // (retry the rest), but aborting midway would leave the VMO unsure which teams
+        // were actually discarded.
+        const failed: string[] = []
+        const done: string[] = []
+        for (const t of scopedTeams) {
+          try {
+            await reopenScorecardTeam(cycleId, t)
+            done.push(t)
+          } catch {
+            failed.push(t)
+          }
+        }
+        if (done.length) {
+          // Drop the locally-remembered addresses for the teams that reopened, so their
+          // reviewers reappear as pending without waiting for the parent's refetch.
+          const reopenedEmails = new Set(
+            keyInternal
+              .filter((a) => done.includes(teamOf(a)))
+              .map((a) => (a.email || '').trim().toLowerCase())
+          )
+          setSentEmails((prev) => prev.filter((e) => !reopenedEmails.has((e || '').trim().toLowerCase())))
+          setDispatchResult(null)
+        }
+        if (failed.length) {
+          setError(`Could not reopen ${failed.join(', ')}. The other teams were reopened — retry these.`)
+          if (!done.length) return   // nothing changed; leave the dialog open to retry
+        }
+        onReopened?.(done, reopenEditConfig)
+        setConfirmRedo(false)
+        return
+      }
+      onReopened?.([], reopenEditConfig)
       setConfirmRedo(false)
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : 'Failed to reopen the scorecard')
@@ -798,10 +853,13 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
                 </button>
               </div>
             )}
-            {/* Redo — mistake on the scorecard? Reopen config + re-send. */}
+            {/* The single entry point for redoing a scorecard, at any scope. The per-team
+                "Reopen" links used to sit in the Configure Scorecard column headers, flush
+                against each column's checkbox — easy to hit by accident, and split the same
+                decision across two panels. Scope is now chosen inside the dialog. */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between px-1">
               <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                Something wrong with the scorecard? Reopen the configuration and send a corrected one.
+                Something wrong with the scorecard? Reopen it for everyone, or for individual teams, and send a corrected one.
               </p>
               <button
                 onClick={() => { setError(null); setConfirmRedo(true) }}
@@ -809,7 +867,7 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
                 className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-60 shrink-0"
               >
                 {redoing ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
-                Redo scorecard
+                Reopen scorecard
               </button>
             </div>
           </div>
@@ -822,18 +880,82 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
       <ConfirmDialog
         open={confirmRedo}
         tone="danger"
-        title="Redo the scorecard?"
-        confirmLabel="Yes, redo scorecard"
+        title="Reopen the scorecard"
+        confirmLabel={
+          reopenScope === 'all'
+            ? 'Reopen for all teams'
+            : reopenTeams.size === 0
+              ? 'Select a team'
+              : `Reopen ${[...reopenTeams].join(', ')}`
+        }
         cancelLabel="Cancel"
         busy={redoing}
-        onConfirm={runRedo}
-        onCancel={() => setConfirmRedo(false)}
+        confirmDisabled={reopenScope === 'teams' && reopenTeams.size === 0}
+        onConfirm={runReopen}
+        onCancel={() => { if (!redoing) setConfirmRedo(false) }}
         message={
-          <>
-            This will discard <strong>all scorecard submissions</strong> collected so far and reopen the
-            configuration so you can correct it and send again. Reviewers will receive a formal notice to
-            disregard the previous scorecard and complete the corrected one.
-          </>
+          <div className="space-y-4">
+            <div>
+              <p className="font-medium text-slate-700 dark:text-slate-200 mb-1.5">Who should redo the scorecard?</p>
+              <label className="flex items-start gap-2 py-1 cursor-pointer">
+                <input type="radio" name="reopen-scope" className="mt-0.5 accent-[#dd1d21]"
+                  checked={reopenScope === 'all'} onChange={() => setReopenScope('all')} disabled={redoing} />
+                <span>
+                  <strong>All teams.</strong> Discards <strong>every</strong> submission collected so far.
+                  Reviewers get a formal notice to disregard the previous scorecard.
+                </span>
+              </label>
+              <label className={cn('flex items-start gap-2 py-1', settledTeams.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer')}>
+                <input type="radio" name="reopen-scope" className="mt-0.5 accent-[#dd1d21]"
+                  checked={reopenScope === 'teams'} onChange={() => setReopenScope('teams')}
+                  disabled={redoing || settledTeams.length === 0} />
+                <span>
+                  <strong>Selected teams only.</strong> Discards just those teams' submissions; every other
+                  team keeps its scores and its configuration.
+                  {settledTeams.length === 0 && <em className="block text-xs mt-0.5">No team has been sent the scorecard yet.</em>}
+                </span>
+              </label>
+              {reopenScope === 'teams' && settledTeams.length > 0 && (
+                <div className="mt-2 ml-6 space-y-1 border-l-2 border-slate-200 dark:border-slate-700 pl-3">
+                  {settledTeams.map((t) => (
+                    <label key={t} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="accent-[#dd1d21]"
+                        checked={reopenTeams.has(t)}
+                        disabled={redoing}
+                        onChange={() => setReopenTeams((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(t)) next.delete(t)
+                          else next.add(t)
+                          return next
+                        })}
+                      />
+                      {t}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
+              <p className="font-medium text-slate-700 dark:text-slate-200 mb-1.5">Change the scorecard configuration first?</p>
+              <label className="flex items-start gap-2 py-1 cursor-pointer">
+                <input type="radio" name="reopen-cfg" className="mt-0.5 accent-[#dd1d21]"
+                  checked={reopenEditConfig} onChange={() => setReopenEditConfig(true)} disabled={redoing} />
+                <span><strong>Yes</strong> — open Configure Scorecard so I can change which measures they are asked.</span>
+              </label>
+              <label className="flex items-start gap-2 py-1 cursor-pointer">
+                <input type="radio" name="reopen-cfg" className="mt-0.5 accent-[#dd1d21]"
+                  checked={!reopenEditConfig} onChange={() => setReopenEditConfig(false)} disabled={redoing} />
+                <span><strong>No</strong> — the configuration is fine, take me straight to sending it again.</span>
+              </label>
+            </div>
+
+            <p className="text-xs text-red-600 dark:text-red-400">
+              Discarded scores cannot be recovered — those reviewers must fill the scorecard in again.
+            </p>
+          </div>
         }
       />
 

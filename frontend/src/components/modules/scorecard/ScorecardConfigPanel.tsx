@@ -1,10 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { SlidersHorizontal, ChevronDown, ChevronRight, Save, RotateCcw, Loader2, CheckCircle2, AlertTriangle, Info, Lock, Users } from 'lucide-react'
-import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { cn } from '@/utils/cn'
 import type { ScorecardCatalogTheme, ScorecardConfig } from '@/types/scorecard.types'
 import type { CycleAttendee } from '@/types/scheduling.types'
-import { getScorecardCatalog, getScorecardConfig, saveScorecardConfig, reopenScorecardTeam, setTeamMeasures } from '@/lib/scorecardApi'
+import { getScorecardCatalog, getScorecardConfig, saveScorecardConfig, setTeamMeasures } from '@/lib/scorecardApi'
 
 interface Props {
   cycleId: string
@@ -18,8 +17,12 @@ interface Props {
   /** Emails the scorecard has already been sent to. A team with NO reviewer here is
    *  still "open" (new or reopened) — its column stays editable even after dispatch. */
   dispatchedEmails?: string[]
-  /** Fired after a team is reopened, so the parent can refresh the cycle (dispatch set). */
-  onReopened?: () => void
+  /** Teams reopened in this session, from the dispatch panel's Reopen dialog. Their
+   *  columns unlock immediately rather than waiting for the parent's cycle refetch. */
+  reopenedTeams?: string[]
+  /** Bumped by the parent to expand this panel and scroll it into view — used when the
+   *  VMO answers "yes, change the configuration" in that dialog. */
+  openSignal?: number
 }
 
 /** A team is identified the same way the backend derives a submission's team. */
@@ -36,7 +39,7 @@ const CB_LG = 'w-5 h-5 rounded border-slate-300 accent-[#dd1d21] focus:ring-2 fo
  * this SPR's scorecard and set the per-theme weightage. Fully catalog-driven —
  * no hardcoded structure. RAG measures are tagged and carry no weight.
  */
-export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = false, attendees = [], dispatchedEmails = [], onReopened }: Props) {
+export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = false, attendees = [], dispatchedEmails = [], reopenedTeams = [], openSignal = 0 }: Props) {
   const [open, setOpen] = useState(false)
   const [catalog, setCatalog] = useState<ScorecardCatalogTheme[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -66,11 +69,7 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
   // Its column is locked (they're filling the sent config); other teams (new, or
   // reopened) stay editable even after dispatch. Teams reopened in this session are
   // treated as editable immediately, without waiting for the parent to refetch.
-  const [reopenedTeams, setReopenedTeams] = useState<Set<string>>(new Set())
-  const [reopeningTeam, setReopeningTeam] = useState<string | null>(null)
-  // Reopen discards that team's submitted scores irreversibly, and its trigger sits in a
-  // dense column header next to a checkbox — confirm before acting on a stray click.
-  const [confirmReopen, setConfirmReopen] = useState<string | null>(null)
+  const reopenedSet = useMemo(() => new Set(reopenedTeams), [reopenedTeams])
   const dispatchedSet = useMemo(
     () => new Set(dispatchedEmails.map((e) => (e || '').trim().toLowerCase())),
     [dispatchedEmails]
@@ -86,9 +85,9 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
   }, [attendees, dispatchedSet])
   // Editable pre-dispatch (everything), or post-dispatch for teams not yet sent /
   // freshly reopened.
-  const isTeamEditable = (t: string) => !dispatched || !sentTeams.has(t) || reopenedTeams.has(t)
-  const isTeamSettled = (t: string) => dispatched && sentTeams.has(t) && !reopenedTeams.has(t)
-  const editableTeams = useMemo(() => teams.filter(isTeamEditable), [teams, sentTeams, reopenedTeams, dispatched])
+  const isTeamEditable = (t: string) => !dispatched || !sentTeams.has(t) || reopenedSet.has(t)
+  const isTeamSettled = (t: string) => dispatched && sentTeams.has(t) && !reopenedSet.has(t)
+  const editableTeams = useMemo(() => teams.filter(isTeamEditable), [teams, sentTeams, reopenedSet, dispatched])
   // Columns to RENDER. A team that was already sent the scorecard keeps its column even
   // if its key attendee has since been un-keyed (so it drops out of `teams`) — otherwise
   // its Reopen button disappears and its submissions can never be discarded. Save logic
@@ -98,21 +97,15 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
     [teams, sentTeams]
   )
 
-  // The optimistic reopen flag only has to cover the parent's refetch window. Once a
-  // refreshed dispatch set shows a reopened team was sent again, drop the flag so its
-  // column locks again and it leaves editableTeams — saving it would 409 and abort.
-  const prevSentTeams = useRef(sentTeams)
+  // Expand and scroll into view when the VMO chose "yes, change the configuration" in the
+  // dispatch panel's Reopen dialog. Skips the initial render (openSignal starts at 0) so
+  // the panel still opens collapsed normally.
+  const panelRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
-    const prev = prevSentTeams.current
-    prevSentTeams.current = sentTeams
-    setReopenedTeams((cur) => {
-      if (cur.size === 0) return cur
-      // Keep a team while it is still unsent, or while it was already sent before this
-      // change (the refetch has not landed yet) — drop it on an unsent → sent flip.
-      const next = new Set([...cur].filter((t) => !sentTeams.has(t) || prev.has(t)))
-      return next.size === cur.size ? cur : next
-    })
-  }, [sentTeams])
+    if (!openSignal) return
+    setOpen(true)
+    panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [openSignal])
 
   // Load the catalog + the cycle's current effective config.
   useEffect(() => {
@@ -320,39 +313,6 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
     }
   }
 
-  // Reopen a single settled team: discards its submissions + removes it from the
-  // dispatched set (server-side) so its column unlocks and it can be re-sent alone.
-  async function handleReopenTeam(t: string) {
-    setError(null)
-    setReopeningTeam(t)
-    try {
-      const r = await reopenScorecardTeam(cycleId, t)
-      setReopenedTeams((prev) => new Set(prev).add(t))
-      // Reflect the returned config for the reopened team ONLY — a wholesale rebuild
-      // would silently revert unsaved ticks made for the other open teams.
-      const fromServer: Record<string, Set<string>> = {}
-      for (const theme of r.config.categories) {
-        for (const m of theme.measures) if (Array.isArray(m.teams)) fromServer[m.key] = new Set(m.teams)
-      }
-      setMeasureTeams((prev) => {
-        const next = { ...prev }
-        for (const [key, assigned] of Object.entries(fromServer)) {
-          const cur = new Set(prev[key] ?? teams)
-          if (assigned.has(t)) cur.add(t)
-          else cur.delete(t)
-          next[key] = cur
-        }
-        return next
-      })
-      setSavedAt(null)
-      onReopened?.()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to reopen the team')
-    } finally {
-      setReopeningTeam(null)
-    }
-  }
-
   function resetToCurrent() {
     // Re-load from the server (discards unsaved edits).
     setLoading(true)
@@ -378,7 +338,7 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+    <div ref={panelRef} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl scroll-mt-4">
       <button
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between gap-3 px-5 py-3.5"
@@ -468,20 +428,7 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
                                 />
                               )}
                             </label>
-                            {settled && (
-                              <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmReopen(t)}
-                                  disabled={reopeningTeam !== null}
-                                  title={`Reopen ${t} — discards their submitted scores so they can re-submit, and lets you resend to ${t} only`}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-amber-300 dark:border-amber-800 text-[10px] font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                  {reopeningTeam === t ? <Loader2 size={10} className="animate-spin" /> : <RotateCcw size={10} />}
-                                  Reopen
-                                </button>
-                              </div>
-                            )}
+
                           </th>
                         )
                       })}
@@ -647,40 +594,6 @@ export default function ScorecardConfigPanel({ cycleId, onSaved, dispatched = fa
         </div>
       )}
 
-      {/* Reopen is destructive and its trigger lives in a dense column header, so it is
-          always confirmed. Named explicitly ("Reopen IDTM") because the dialog is the
-          last chance to notice the wrong column was clicked. */}
-      <ConfirmDialog
-        open={confirmReopen !== null}
-        tone="danger"
-        title={`Reopen ${confirmReopen ?? ''}?`}
-        confirmLabel={`Yes, reopen ${confirmReopen ?? ''}`}
-        cancelLabel="Cancel"
-        busy={reopeningTeam !== null}
-        message={
-          <>
-            <p>
-              This <strong>permanently discards the scorecard {confirmReopen} has already
-              submitted</strong>. Their scores disappear from the consolidated scorecard and
-              cannot be recovered — they will have to fill it in again.
-            </p>
-            <p className="mt-2">
-              {confirmReopen}&apos;s column unlocks so you can change their measures, and the
-              dispatch step will then send the scorecard to <strong>{confirmReopen} only</strong>.
-              Every other team keeps its configuration and its submitted scores.
-            </p>
-          </>
-        }
-        onConfirm={() => {
-          const t = confirmReopen
-          if (!t || reopeningTeam !== null) return
-          // Stay open (and busy) until the server answers, so the dialog itself blocks a
-          // second click and the VMO sees the action is running. Any failure is surfaced
-          // by handleReopenTeam's own error state in the panel below.
-          void handleReopenTeam(t).finally(() => setConfirmReopen(null))
-        }}
-        onCancel={() => { if (reopeningTeam === null) setConfirmReopen(null) }}
-      />
     </div>
   )
 }

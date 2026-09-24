@@ -55,16 +55,36 @@ def sanitize_for_log(value):
     return str(value).translate(_CRLF)
 
 
+def _sanitize_arg(value):
+    """CR/LF-strip a single log ARG while PRESERVING its type.
+
+    Only ``str`` can carry a newline into the log, so nothing else needs touching —
+    and nothing else may be touched: ``sanitize_for_log`` stringifies via ``str(value)``,
+    which turns an int 200 into "200" and then ``"status=%d" % ("200",)`` raises
+    ``TypeError: %d format: a real number is required, not str`` while the record is
+    being rendered. That kills the whole log line (both the console and the rotating
+    file handler), so every request was being logged as a "--- Logging error ---"
+    traceback instead of a line. Containers keep their type too, recursively."""
+    if isinstance(value, str):
+        return value.translate(_CRLF)
+    if isinstance(value, tuple):
+        return tuple(_sanitize_arg(v) for v in value)
+    if isinstance(value, list):
+        return [_sanitize_arg(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _sanitize_arg(v) for k, v in value.items()}
+    return value
+
+
 class _LogSanitizer(logging.Filter):
     """Strip CR/LF from the log message and any string args."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.msg, str):
             record.msg = sanitize_for_log(record.msg)
-        if isinstance(record.args, tuple):
-            record.args = sanitize_for_log(record.args)
-        elif isinstance(record.args, dict):
-            record.args = sanitize_for_log(record.args)
+        # Type-preserving: see _sanitize_arg. Never use sanitize_for_log on args.
+        if isinstance(record.args, (tuple, dict)):
+            record.args = _sanitize_arg(record.args)
         return True
 
 

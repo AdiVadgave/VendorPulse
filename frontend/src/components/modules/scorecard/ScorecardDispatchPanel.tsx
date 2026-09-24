@@ -351,7 +351,7 @@ function CategoriesDropdown({ structure }: { structure: WeightedCategoryDef[] })
   )
 }
 
-export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false, structure, configTeams, onRedo, dispatchedEmails = [], reissue = false, onReissueHandled, dispatchBlockedReason = null }: Props) {
+export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, year, attendees, onDispatched, onAttendeesChanged, alreadyDispatched = false, structure, configTeams, onRedo, onReopened, dispatchedEmails = [], reissue = false, onReissueHandled, dispatchBlockedReason = null }: Props) {
   const effectiveStructure = structure && structure.length > 0 ? structure : WEIGHTED_SCORECARD_STRUCTURE
   const totalMeasures = effectiveStructure.reduce((sum, c) => sum + c.measures.length, 0)
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(alreadyDispatched ? 'complete' : 'idle')

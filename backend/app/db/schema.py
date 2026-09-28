@@ -157,6 +157,10 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             outreach_message_id    TEXT,
             outreach_conversation_id TEXT,
             outreach_sent_at       TEXT,
+            -- NULL/TRUE = attends the SPR (every pre-existing row, so behaviour is
+            -- unchanged). FALSE = a scorecard-only reviewer: they fill the scorecard and
+            -- join Internal Alignment, but are left out of the SPR invite.
+            attends_spr            BOOLEAN,
             seq                    BIGSERIAL UNIQUE NOT NULL
         )
         """,
@@ -416,6 +420,9 @@ _ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
         ("outreach_message_id", "TEXT"),
         ("outreach_conversation_id", "TEXT"),
         ("outreach_sent_at", "TEXT"),
+        # NULL on every existing row, which reads as "attends" — so adding this cannot
+        # change who is invited to an in-flight cycle.
+        ("attends_spr", "BOOLEAN"),
     ],
     "cycles": [
         ("meeting_time_zone", "TEXT"),

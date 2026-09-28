@@ -221,6 +221,9 @@ class SchedulingService:
                 "organisation": a.organisation,
                 "type": getattr(a, "type", "Internal Stakeholder") or "Internal Stakeholder",
                 "is_key": a.is_key,
+                # Only a scorecard reviewer can be "scorecard only"; anyone else always
+                # attends, so their flag is forced True regardless of what was posted.
+                "attends_spr": bool(getattr(a, "attends_spr", True)) if a.is_key else True,
                 "attendance_requirement": getattr(a, "attendance_requirement", "Required") or "Required",
                 "lt_status": getattr(a, "lt_status", "Non-LT") or "Non-LT",
                 "shell_department": getattr(a, "shell_department", None),

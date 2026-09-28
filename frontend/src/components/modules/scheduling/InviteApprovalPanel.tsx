@@ -15,6 +15,7 @@ import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import { apiFetch } from '@/lib/api'
 import { sprInviteBody, sprTitle } from '@/lib/standardText'
 import { createMeetingEvent, isSchedulingAvailable } from '@/lib/graphScheduling'
+import { attendsSpr } from '@/types/scheduling.types'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
 
@@ -91,6 +92,11 @@ export default function InviteApprovalPanel({
   }
 
   // The default invite subject + HTML body (the coordinator can edit before sending).
+  // Who actually gets the SPR invite. A scorecard-only reviewer is deliberately left
+  // out: they provide feedback and join Internal Alignment, but do not attend the SPR.
+  const sprAttendees = attendees.filter(attendsSpr)
+  const excludedCount = attendees.length - sprAttendees.length
+
   // Approved standard text (see src/lib/standardText.ts). The when/where block is
   // per-meeting detail, so it is appended between the approved copy and the sign-off
   // rather than replacing any of it.
@@ -128,7 +134,7 @@ export default function InviteApprovalPanel({
       // 1. Create the Teams meeting + send invites AS the signed-in coordinator
       //    (delegated Graph — no backend token) with the reviewed subject/body.
       //    2. Persist to the backend.
-      const created = await createMeetingEvent({ slot, attendees, subject: draft.subject, bodyText: draft.body })
+      const created = await createMeetingEvent({ slot, attendees: sprAttendees, subject: draft.subject, bodyText: draft.body })
 
       await apiFetch(`/api/cycles/${cycleId}/scheduling/manual-meeting`, {
         method: 'POST',
@@ -229,14 +235,21 @@ export default function InviteApprovalPanel({
                 Recipients
               </p>
               <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                {attendees.length} attendees
+                {sprAttendees.length} attendees
               </p>
             </div>
           </div>
 
+          {excludedCount > 0 && (
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+              {excludedCount} scorecard-only reviewer{excludedCount !== 1 ? 's are' : ' is'} not
+              invited to the SPR. They still complete the scorecard and join Internal Alignment.
+            </p>
+          )}
+
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
             <div className="flex flex-wrap gap-1">
-              {attendees.map((a) => (
+              {sprAttendees.map((a) => (
                 <span
                   key={a.attendee_id}
                   className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded text-xs"
@@ -265,11 +278,11 @@ export default function InviteApprovalPanel({
               <div className="flex gap-3">
                 <span className="text-slate-500 dark:text-slate-400 w-14 shrink-0">To:</span>
                 <span className="text-slate-700 dark:text-slate-300">
-                  {attendees
+                  {sprAttendees
                     .slice(0, 3)
                     .map((a) => a.email)
                     .join(', ')}
-                  {attendees.length > 3 && ` and ${attendees.length - 3} more`}
+                  {sprAttendees.length > 3 && ` and ${sprAttendees.length - 3} more`}
                 </span>
               </div>
               <div className="flex gap-3">
@@ -329,7 +342,7 @@ export default function InviteApprovalPanel({
           <p className="text-sm text-slate-600 dark:text-slate-400">
             By approving, this invite will be sent to{' '}
             <strong className="text-slate-800 dark:text-slate-200">
-              {attendees.length} attendees
+              {sprAttendees.length} attendees
             </strong>{' '}
             via <strong className="text-slate-800 dark:text-slate-200">Microsoft Teams</strong>.
             RSVPs will be tracked automatically.
@@ -390,7 +403,7 @@ export default function InviteApprovalPanel({
         title="Review meeting invite"
         subject={defaultSubject}
         body={defaultBody}
-        recipients={attendees.filter((a) => a.email).map((a) => `${a.name} (${a.email})`)}
+        recipients={sprAttendees.filter((a) => a.email).map((a) => `${a.name} (${a.email})`)}
         sendLabel="Send invite"
         busy={isProcessing}
         onSend={doSend}

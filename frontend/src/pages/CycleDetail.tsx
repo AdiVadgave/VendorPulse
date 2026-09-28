@@ -94,6 +94,7 @@ import { cn } from '@/utils/cn'
 import type { TabKey, WorkflowState } from '@/utils/constants'
 import { WORKFLOW_STATES, TAB_KEYS, TAB_LABELS, TAB_MIN_STATE_INDEX, ACTION_ORIGIN, getDefaultTabFromState } from '@/utils/constants'
 import { useCycleStore } from '@/store/useCycleStore'
+import { attendsSpr } from '@/types/scheduling.types'
 import type { SchedulingPhase, CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 // scorecard types imported via CompiledCategoryScore and CompiledScorecard above
 import type { ExtractedAction, AlignmentInsight } from '@/types/alignment.types'
@@ -1119,6 +1120,14 @@ function SchedulingTab({
 }) {
   const currentPhaseIndex = PHASE_ORDER.indexOf(schedulingPhase)
 
+  // Everyone who actually attends the SPR. A scorecard-only reviewer is excluded from
+  // every SPR-facing step — the invite, the RSVP tracker, the attendance confirmation
+  // and the free/busy slot search (their calendar must not constrain a meeting they are
+  // not in). They keep their row in the attendee TABLE below, which is where the
+  // "scorecard only" choice is made and unmade — hiding them there would make it
+  // irreversible. They still get the scorecard and still join Internal Alignment.
+  const sprAttendees = attendees.filter(attendsSpr)
+
   // Inline "add attendee" panel on the Confirmation page — lets the coordinator add
   // (and invite) attendees to an already-scheduled meeting without navigating back.
   const [showAddAttendee, setShowAddAttendee] = useState(false)
@@ -1203,7 +1212,7 @@ function SchedulingTab({
       {schedulingPhase === 'attendance_confirmation' && (
         <AttendanceConfirmationPanel
           cycleId={cycle.cycle_id}
-          attendees={attendees}
+          attendees={sprAttendees}
           onAttendeesChanged={onAttendeesUpdated}
           onConfirmationComplete={async (confirmed) => {
             onAttendeesUpdated(confirmed)
@@ -1232,7 +1241,7 @@ function SchedulingTab({
           {/* Delegated Graph: find free slots across the attendees' calendars. */}
           <FindSlotsControl
             cycleId={cycle.cycle_id}
-            attendees={attendees}
+            attendees={sprAttendees}
             onSlotsFound={(found) => {
               onSlotsReceived(found)
               onPhaseChange('slot_ranking')
@@ -1324,7 +1333,7 @@ function SchedulingTab({
         selectedSlot ? (
           <ConfirmationTracker
             cycleId={cycle.cycle_id}
-            attendees={attendees}
+            attendees={sprAttendees}
             slot={selectedSlot}
             timeZoneOverride={selectedSlotTimeZone}
             meetingUrl={meetingUrl}

@@ -39,6 +39,10 @@ export interface CycleAttendee {
   organisation: string
   type: AttendeeType
   is_key: boolean
+  /** Only meaningful for a scorecard reviewer (is_key). false = "scorecard only": they
+   *  fill the scorecard and join Internal Alignment, but are NOT invited to the SPR.
+   *  undefined on every pre-existing record, which reads as "attends". */
+  attends_spr?: boolean
   // Invitee classification
   attendance_requirement?: AttendanceRequirement
   lt_status?: LTStatus
@@ -85,3 +89,16 @@ export type SchedulingPhase =
   | 'invite_approval'
   | 'schedule_meeting'
   | 'confirmation_tracking'
+
+/**
+ * Does this person actually attend the SPR meeting?
+ *
+ * The single test for "should they be on the SPR invite". A scorecard-only reviewer
+ * (is_key with attends_spr === false) is excluded here but still receives the scorecard
+ * and still joins Internal Alignment, which invites every internal stakeholder.
+ * Absent/undefined means yes, so every record written before this flag existed — and
+ * every ordinary attendee — is unaffected.
+ */
+export function attendsSpr(a: Pick<CycleAttendee, 'attends_spr'>): boolean {
+  return a.attends_spr !== false
+}

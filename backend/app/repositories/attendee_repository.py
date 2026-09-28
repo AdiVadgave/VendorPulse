@@ -28,6 +28,7 @@ class AttendeeRepository(BaseRepository):
         "invite_status", "availability_submitted", "user_id", "replaced_by",
         "replaced_by_email", "replacement_note", "confirmation_status", "confirmation_note",
         "outreach_message_id", "outreach_conversation_id", "outreach_sent_at",
+        "attends_spr",
     )
 
     def __init__(self, person_repo: PersonRepository, data_dir=None) -> None:

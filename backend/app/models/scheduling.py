@@ -41,6 +41,10 @@ class CycleAttendeeCreate(BaseModel):
     organisation: str
     type: AttendeeType = Field(default="Internal Stakeholder", description="Internal Stakeholder or Vendor")
     is_key: bool = False
+    # Only meaningful for a scorecard reviewer (is_key). False = "scorecard only": they
+    # fill the scorecard and join Internal Alignment, but are left out of the SPR invite.
+    # Defaults to True so an ordinary attendee is unaffected.
+    attends_spr: bool = True
     # Invitee classification
     attendance_requirement: AttendanceRequirement = Field(
         default="Required", description="Required or Optional attendee"
@@ -66,6 +70,7 @@ class CycleAttendeeUpdate(BaseModel):
     confirmation_status: Optional[AttendanceConfirmationStatus] = None
     confirmation_note: Optional[str] = None
     is_key: Optional[bool] = None
+    attends_spr: Optional[bool] = None
     type: Optional[AttendeeType] = None
     # Invitee classification
     attendance_requirement: Optional[AttendanceRequirement] = None
@@ -85,6 +90,8 @@ class CycleAttendee(BaseModel):
     organisation: str
     type: AttendeeType = "Internal Stakeholder"
     is_key: bool = False
+    # See CycleAttendeeCreate — False means a scorecard-only reviewer.
+    attends_spr: bool = True
     # Invitee classification
     attendance_requirement: AttendanceRequirement = "Required"
     lt_status: LTStatus = "Non-LT"

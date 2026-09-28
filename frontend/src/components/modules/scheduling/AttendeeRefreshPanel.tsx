@@ -46,6 +46,8 @@ export interface NewAttendeeInput {
   organisation: string
   type: string
   is_key: boolean
+  /** Reviewers only. false = "scorecard only" — excluded from the SPR invite. */
+  attends_spr?: boolean
   attendance_requirement: string
   lt_status: string
   shell_department: string | null
@@ -76,6 +78,9 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
   const [selected, setSelected] = useState<PeopleSearchResult | null>(null)
   const [attendeeType, setAttendeeType] = useState<'Internal Stakeholder' | 'Vendor'>('Internal Stakeholder')
   const [isKey, setIsKey] = useState(false)
+  // Reviewers only: does this person also attend the SPR meeting? Defaults to yes, which
+  // is how every attendee behaved before the flag existed.
+  const [attendsSprFlag, setAttendsSprFlag] = useState(true)
   const [attendanceRequirement, setAttendanceRequirement] = useState<AttendanceRequirement>('Required')
   const [ltStatus, setLtStatus] = useState<LTStatus>('Non-LT')
   const [shellDepartment, setShellDepartment] = useState<ShellDepartment>('IDTM')
@@ -209,6 +214,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
       organisation: selected.organisation,
       type: attendeeType,
       is_key: isKey,
+      attends_spr: isKey ? attendsSprFlag : true,
       attendance_requirement: attendanceRequirement,
       lt_status: ltStatus,
       shell_department: attendeeType === 'Internal Stakeholder' ? shellDepartment : null,
@@ -249,6 +255,7 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
         organisation: selected.organisation,
         type: attendeeType,
         is_key: isKey,
+        attends_spr: isKey ? attendsSprFlag : true,
         attendance_requirement: attendanceRequirement,
         lt_status: ltStatus,
         shell_department: attendeeType === 'Internal Stakeholder' ? shellDepartment : null,
@@ -436,6 +443,23 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
             </label>
           </div>
           )}
+          {/* Who attends the SPR and who only gives feedback are different lists. A
+              reviewer marked "scorecard only" is left out of the SPR invite but still
+              completes the scorecard and still joins Internal Alignment. Shown only once
+              they are a reviewer — it is meaningless for a plain attendee. */}
+          {!hideKey && attendeeType !== 'Vendor' && isKey && (
+          <div className="space-y-1">
+            <label className="text-xs text-slate-600 dark:text-slate-400">Attends the SPR?</label>
+            <select
+              value={attendsSprFlag ? 'yes' : 'no'}
+              onChange={(e) => setAttendsSprFlag(e.target.value === 'yes')}
+              className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-red-400/50"
+            >
+              <option value="yes">Yes — invite to the SPR</option>
+              <option value="no">No — scorecard only</option>
+            </select>
+          </div>
+          )}
 
           {/* Invitee classification */}
           <div className="space-y-1">
@@ -523,7 +547,7 @@ export default function AttendeeRefreshPanel({
 
   async function handleUpdateAttendee(
     attendee: CycleAttendee,
-    patch: Partial<Pick<CycleAttendee, 'type' | 'is_key' | 'attendance_requirement' | 'lt_status' | 'shell_department'>>
+    patch: Partial<Pick<CycleAttendee, 'type' | 'is_key' | 'attends_spr' | 'attendance_requirement' | 'lt_status' | 'shell_department'>>
   ) {
     try {
       const updated = await apiFetch<{ attendee: CycleAttendee }>(
@@ -781,6 +805,26 @@ export default function AttendeeRefreshPanel({
                         </select>
                       ) : (
                         <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
+                      )}
+                      {/* Same choice as the add form, so a reviewer can be switched to
+                          scorecard-only (or back) after they have been added. */}
+                      {isInternal && a.is_key && (
+                        <select
+                          value={a.attends_spr === false ? 'no' : 'yes'}
+                          onChange={(e) => handleUpdateAttendee(a, { attends_spr: e.target.value === 'yes' })}
+                          title={a.attends_spr === false
+                            ? 'Scorecard only — not invited to the SPR'
+                            : 'Also attends the SPR'}
+                          className={cn(
+                            'mt-1 px-2 py-1 text-[11px] border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500',
+                            a.attends_spr === false
+                              ? 'border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                          )}
+                        >
+                          <option value="yes">Attends SPR</option>
+                          <option value="no">Scorecard only</option>
+                        </select>
                       )}
                     </td>
                     <td className="px-4 py-3">

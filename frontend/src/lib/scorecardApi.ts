@@ -307,3 +307,20 @@ export async function saveFinalScorecard(
 export async function resetFinalScorecard(cycleId: string): Promise<void> {
   await apiFetch(`/api/scorecard/final/${cycleId}`, { method: 'DELETE' })
 }
+
+/**
+ * Download the consolidated scorecard as a one-slide, editable .pptx laid out to the
+ * Shell SPR scorecard template — native text boxes and a real table, so it can be
+ * restyled after pasting into the SPR deck rather than dropped in as a picture.
+ */
+export async function downloadScorecardPptx(cycleId: string): Promise<void> {
+  const { blob, filename } = await apiFetchBlob(`/api/scorecard/export-pptx/${cycleId}`)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || `SPR_Scorecard_${cycleId}.pptx`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}

@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react'
 import { MessageSquare, ChevronDown, ChevronRight, Lock, Sparkles, RefreshCw, Loader2, Download } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import type { WeightedScorecard } from '@/types/scorecard.types'
-import { downloadScorecardExcel } from '@/lib/scorecardApi'
+import { downloadScorecardExcel, downloadScorecardPptx } from '@/lib/scorecardApi'
 import { RagDot, RagChip } from './rag'
 
 interface Props {
@@ -50,7 +50,20 @@ export default function WeightedScorecardTable({ data, summaries, summaryLoading
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({})
   const [commentMode, setCommentMode] = useState<'summary' | 'comments'>('summary')
   const [exporting, setExporting] = useState(false)
+  const [exportingPptx, setExportingPptx] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+
+  async function handleExportPptx() {
+    setExportingPptx(true)
+    setExportError(null)
+    try {
+      await downloadScorecardPptx(data.cycle_id)
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'PowerPoint download failed')
+    } finally {
+      setExportingPptx(false)
+    }
+  }
 
   async function handleExport() {
     setExporting(true)
@@ -104,6 +117,15 @@ export default function WeightedScorecardTable({ data, summaries, summaryLoading
               >
                 {exporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
                 {exporting ? 'Preparing…' : 'Excel'}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); void handleExportPptx() }}
+                disabled={exportingPptx}
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 disabled:opacity-60"
+                title="Download as an editable PowerPoint slide, laid out to the SPR scorecard template — paste straight into the deck"
+              >
+                {exportingPptx ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                {exportingPptx ? 'Preparing…' : 'PowerPoint'}
               </button>
               {commentMode === 'summary' && onRegenerateSummary && (
                 <button

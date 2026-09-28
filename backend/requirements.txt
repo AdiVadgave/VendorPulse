@@ -14,5 +14,6 @@ msal>=1.31.0
 cryptography>=50.0.0       # PYSEC-2026-3552 fixed in 50.0.0
 pyjwt>=2.10.1              # HS256/JWK confusion (GHSA-75c5-xw7c-p5pm) fixed in 2.10.1
 apscheduler>=3.10.0
+python-pptx>=1.0.2         # editable PPTX scorecard export (app/services/scorecard_pptx.py)
 openai>=1.50.0
 truststore>=0.10.0

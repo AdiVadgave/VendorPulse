@@ -1723,6 +1723,51 @@ def _scorecard_workbook(cycle_id: str) -> bytes:
     return _build_xlsx(sheets)
 
 
+@router.get("/export-pptx/{cycle_id}")
+def export_scorecard_pptx(cycle_id: str):
+    """Download the consolidated scorecard as a one-slide, fully editable .pptx.
+
+    Laid out to the Shell SPR scorecard template so it can be dropped straight into the
+    SPR deck. Native text boxes and a real PowerPoint table — not a picture — so the deck
+    team can restyle and annotate it afterwards.
+
+    python-pptx is imported lazily: the Excel export and every other scorecard route must
+    keep working on an environment where the optional dependency was not installed."""
+    cycle = get_cycle_repo().get_by_cycle_id(cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail=f"Cycle '{cycle_id}' not found")
+
+    try:
+        from app.services.scorecard_pptx import build_scorecard_pptx
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="PowerPoint export is unavailable on this server — python-pptx is not installed.",
+        )
+
+    weighted = _compile_weighted(cycle_id)
+    # The template shows a trend against the vendor's previous cycle. Compiled with the
+    # same function as the current one so the two are always derived identically; None on
+    # a first cycle, which simply drops the arrows.
+    previous = None
+    prev_id = find_previous_cycle_id(cycle_id)
+    if prev_id:
+        try:
+            previous = _compile_weighted(prev_id)
+        except Exception as exc:  # noqa: BLE001 — a bad prior cycle must not block the export
+            logger.warning("export-pptx: could not compile previous cycle %s: %s",
+                           sanitize_for_log(prev_id), exc)
+
+    data = build_scorecard_pptx(weighted=weighted, cycle=cycle, previous=previous)
+    vendor = (cycle.get("vendor_name") or "vendor").replace(" ", "_")
+    fname = f"SPR_Scorecard_{vendor}_{cycle.get('quarter', '')}_{cycle.get('year', '')}.pptx"
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/export/{cycle_id}")
 def export_scorecard(cycle_id: str):
     """Download the consolidated scorecard as a two-sheet Excel workbook."""

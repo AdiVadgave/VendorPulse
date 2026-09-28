@@ -19,12 +19,13 @@ import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import { getEventAttendeeResponses, isSchedulingAvailable, type RsvpResponse } from '@/lib/graphScheduling'
+import type { TimeZoneId } from '@/lib/timeZone'
 
 interface ConfirmationTrackerProps {
   cycleId: string
   attendees: CycleAttendee[]
   slot: SlotProposal
-  timeZoneOverride?: 'IST' | 'UTC' | 'GMT'
+  timeZoneOverride?: TimeZoneId
   onProceed?: () => void
   /** Go back and change the manually-set meeting date/time. */
   onReschedule?: () => void

@@ -18,6 +18,7 @@ import { createMeetingEvent, isSchedulingAvailable } from '@/lib/graphScheduling
 import { attendsSpr } from '@/types/scheduling.types'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
+import type { TimeZoneId } from '@/lib/timeZone'
 
 interface InviteApprovalPanelProps {
   cycleId: string
@@ -26,7 +27,7 @@ interface InviteApprovalPanelProps {
   vendorName: string
   quarter: string
   year: number
-  timeZoneOverride?: 'IST' | 'UTC' | 'GMT'
+  timeZoneOverride?: TimeZoneId
   onInviteSent: (teamsMeetingUrl: string | null, eventId: string | null) => void
   onBack?: () => void
   isLocked?: boolean

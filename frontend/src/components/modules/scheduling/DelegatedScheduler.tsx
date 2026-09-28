@@ -19,8 +19,9 @@ import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import { createMeetingEvent, updateMeetingTime, findEventIdByJoinUrl, wallClockToUtcIso } from '@/lib/graphScheduling'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
+import type { TimeZoneId } from '@/lib/timeZone'
 
-type TZ = 'IST' | 'UTC' | 'GMT'
+type TZ = TimeZoneId
 
 interface Props {
   cycleId: string

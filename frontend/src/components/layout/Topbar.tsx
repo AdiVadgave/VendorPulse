@@ -2,6 +2,7 @@ import { Bell, Sun, Moon, Menu, LogOut } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { useUIStore } from '@/store/useUIStore'
 import { useCurrentUser, logout } from '@/lib/auth/currentUser'
+import TimeZonePicker from './TimeZonePicker'
 import { useCycleStore } from '@/store/useCycleStore'
 
 function PageTitle() {
@@ -97,6 +98,9 @@ export default function Topbar() {
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
+        {/* The member's default timezone — applies to every cycle they schedule. */}
+        <TimeZonePicker />
+
         {/* Theme toggle — Shell ⇄ Dark. The icon shows the theme you'll switch TO. */}
         <button
           onClick={toggleTheme}

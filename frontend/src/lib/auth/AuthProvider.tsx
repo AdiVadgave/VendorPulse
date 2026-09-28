@@ -14,6 +14,7 @@ import {
 import { MsalProvider, useMsal, useIsAuthenticated } from '@azure/msal-react'
 import { setAuthTokenGetter } from '@/lib/api'
 import { setCurrentUser, setLogoutHandler } from './currentUser'
+import { loadDefaultTimeZone } from '@/lib/timeZone'
 import { setGraphTokenGetter } from './graphPeople'
 import { setCalendarTokenGetter } from '@/lib/graphScheduling'
 import { msalConfig, loginRequest, ssoConfigured } from './msalConfig'
@@ -47,6 +48,9 @@ function useRegisterTokenGetter(account: AccountInfo | null): boolean {
     // no Graph call needed.
     setCurrentUser({ name: account.name, email: account.username })
     setLogoutHandler(() => instance.logoutRedirect({ account }))
+    // Pull this member's saved default timezone. Fire-and-forget: it falls back to the
+    // browser zone on any failure, and scheduling must never wait on a preference.
+    void loadDefaultTimeZone(account.username)
 
     // Graph access token for people-search (directory lookups). Separate from the
     // ID token: it targets Graph and carries the User.ReadBasic.All scope.

@@ -13,6 +13,7 @@
  * getter is null and these functions throw a clear error (scheduling needs a login).
  */
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
+import { getDefaultTimeZone, hourInZone, wallClockToUtc, type TimeZoneId } from '@/lib/timeZone'
 
 const GRAPH = 'https://graph.microsoft.com/v1.0'
 
@@ -31,13 +32,12 @@ export function isSchedulingAvailable(): boolean {
 // UTC/GMT +00:00. A datetime-local input yields a bare wall-clock with NO offset, so
 // `new Date(wallClock)` would parse it in the BROWSER's zone (wrong when the chosen
 // zone differs). Convert the wall-clock + chosen zone to a real UTC instant.
-const ZONE_OFFSET: Record<'IST' | 'UTC' | 'GMT', string> = { IST: '+05:30', UTC: '+00:00', GMT: '+00:00' }
-
-export function wallClockToUtcIso(wallClock: string, tz: 'IST' | 'UTC' | 'GMT'): string {
-  if (!wallClock) return wallClock
-  const withSeconds = wallClock.length === 16 ? `${wallClock}:00` : wallClock // add :SS if datetime-local omitted it
-  const d = new Date(`${withSeconds}${ZONE_OFFSET[tz]}`)
-  return Number.isNaN(d.getTime()) ? wallClock : d.toISOString()
+export function wallClockToUtcIso(wallClock: string, tz: TimeZoneId): string {
+  // Delegates to wallClockToUtc, which resolves the zone's offset at that instant via
+  // Intl. The fixed {IST,UTC,GMT} offset table this replaced could not express a zone
+  // that observes DST, and the picker now offers ~400 zones that do.
+  const d = wallClockToUtc(wallClock, tz)
+  return d ? d.toISOString() : wallClock
 }
 
 async function token(): Promise<string> {
@@ -100,13 +100,17 @@ function recencyScore(d: Date, now: number): number {
   return Math.max(40, 100 - days * 4)
 }
 
-// Time-of-day preference in IST (the team's primary zone). This also breaks ties
-// between slots that are otherwise identical (same people free, same day) — e.g.
-// a 10:00 slot outranks a 12:30 lunch slot — so the ranking never collapses to one
-// flat score. Slots are UTC instants; convert to an IST wall-clock hour first.
+// Time-of-day preference, scored in the VMO member's OWN timezone rather than a
+// hardcoded one. This also breaks ties between slots that are otherwise identical (same
+// people free, same day) — a 10:00 slot outranks a 12:30 lunch slot — so the ranking
+// never collapses to one flat score.
+//
+// This used to add a fixed +330 minutes (IST) to the UTC instant. For any team outside
+// India that ranked the wrong slots top: 10:00 IST is 04:30 in London, so a UK cycle was
+// offered 4am slots as its best candidates — everyone is "free" at 4am, so nothing else
+// in the score pushed them down.
 function timeOfDayScore(d: Date): number {
-  const istMinutes = (d.getUTCHours() * 60 + d.getUTCMinutes() + 330) % 1440
-  const h = istMinutes / 60
+  const h = hourInZone(d, getDefaultTimeZone())
   if (h >= 9 && h < 12) return 100    // prime late-morning
   if (h >= 14 && h < 16) return 90    // mid-afternoon
   if (h >= 16 && h < 17.5) return 78  // late afternoon

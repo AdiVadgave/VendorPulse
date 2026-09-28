@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Clock, CalendarPlus } from 'lucide-react'
+import type { TimeZoneId } from '@/lib/timeZone'
+import TimeZoneSelect from '@/components/shared/TimeZoneSelect'
 
-type TimeZoneView = 'IST' | 'UTC' | 'GMT'
+type TimeZoneView = TimeZoneId
 
 interface ManualTimeCardProps {
   /** Called with the chosen local ISO start, timezone, and duration (minutes). */
@@ -52,15 +54,11 @@ export default function ManualTimeCard({
         </div>
         <div className="space-y-1">
           <label className="block text-xs text-slate-600 dark:text-slate-400">Timezone</label>
-          <select
+          <TimeZoneSelect
             value={timeZone}
-            onChange={(e) => setTimeZone(e.target.value as TimeZoneView)}
+            onChange={setTimeZone}
             className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="IST">IST</option>
-            <option value="UTC">UTC</option>
-            <option value="GMT">GMT</option>
-          </select>
+          />
         </div>
         <div className="space-y-1">
           <label className="block text-xs text-slate-600 dark:text-slate-400">Duration</label>

@@ -6,6 +6,7 @@ import { addAttendeesToEvent, createMeetingEvent, findEventIdByJoinUrl, isSchedu
 import { SearchAddAttendeeForm } from './AttendeeRefreshPanel'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
+import type { TimeZoneId } from '@/lib/timeZone'
 
 interface Props {
   cycleId: string
@@ -20,7 +21,7 @@ interface Props {
   vendorName: string
   quarter: string
   year: number
-  timeZone: 'IST' | 'UTC' | 'GMT'
+  timeZone: TimeZoneId
   /** Called after a successful invite so the parent can refresh the stored event id / join link. */
   onUpdated: (eventId: string | null, meetingUrl: string | null) => void
   /** Close the add-attendee section. */

@@ -95,6 +95,7 @@ import type { TabKey, WorkflowState } from '@/utils/constants'
 import { WORKFLOW_STATES, TAB_KEYS, TAB_LABELS, TAB_MIN_STATE_INDEX, ACTION_ORIGIN, getDefaultTabFromState } from '@/utils/constants'
 import { useCycleStore } from '@/store/useCycleStore'
 import { attendsSpr } from '@/types/scheduling.types'
+import { getDefaultTimeZone, toTimeZoneId, type TimeZoneId } from '@/lib/timeZone'
 import type { SchedulingPhase, CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 // scorecard types imported via CompiledCategoryScore and CompiledScorecard above
 import type { ExtractedAction, AlignmentInsight } from '@/types/alignment.types'
@@ -197,7 +198,9 @@ export default function CycleDetail() {
     isMockCycle ? MOCK_ATTENDEES_INITIAL : []
   )
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
-  const [selectedSlotTimeZone, setSelectedSlotTimeZone] = useState<'IST' | 'UTC' | 'GMT'>('IST')
+  // Starts on the member's own default (top bar) rather than a hardcoded IST; the cycle
+  // can still be switched to any other zone, and that choice is stored on the cycle.
+  const [selectedSlotTimeZone, setSelectedSlotTimeZone] = useState<TimeZoneId>(getDefaultTimeZone())
   // Null means "no slot search has been run yet". An empty array means "searched, but found none".
   const [apiSlots, setApiSlots] = useState<SlotProposal[] | null>(null)
 
@@ -288,7 +291,7 @@ export default function CycleDetail() {
         // Rehydrate the manually-scheduled meeting slot so the Confirmation view
         // survives a page refresh (selectedSlot is otherwise in-session only).
         if (idx >= WORKFLOW_STATES.indexOf('MEETING_SCHEDULED') && backendCycle.teams_meeting_scheduled_at) {
-          const tz = (backendCycle.meeting_time_zone as 'IST' | 'UTC' | 'GMT') ?? 'IST'
+          const tz = toTimeZoneId(backendCycle.meeting_time_zone)
           const restored: SlotProposal = {
             slot_id: `manual-${cycleId}`,
             cycle_id: cycleId,
@@ -1098,12 +1101,12 @@ function SchedulingTab({
   attendees: CycleAttendee[]
   slots: SlotProposal[]
   selectedSlot: SlotProposal | null
-  selectedSlotTimeZone: 'IST' | 'UTC' | 'GMT'
+  selectedSlotTimeZone: TimeZoneId
   onPhaseChange: (p: SchedulingPhase) => void
   onAttendeesUpdated: (a: CycleAttendee[]) => void
   onSlotsReceived: (slots: SlotProposal[]) => void
   onSlotSelected: (id: string | null) => void
-  onSlotTimeZoneSelected: (tz: 'IST' | 'UTC' | 'GMT') => void
+  onSlotTimeZoneSelected: (tz: TimeZoneId) => void
   isMockCycle: boolean
   onScorecardProceed: () => void
   onTeamsMeetingUrlCaptured: (url: string | null) => void
@@ -1142,7 +1145,7 @@ function SchedulingTab({
   // Schedule at a coordinator-chosen time (shared by the Attendees page and the
   // Slot Ranking panel). Builds a synthetic slot and jumps to Invite Approval,
   // where the Teams meeting is actually created via delegated Graph.
-  function scheduleManual(startISO: string, tz: 'IST' | 'UTC' | 'GMT', dur: number) {
+  function scheduleManual(startISO: string, tz: TimeZoneId, dur: number) {
     const manual: SlotProposal = {
       slot_id: 'manual-slot',
       cycle_id: cycle.cycle_id,

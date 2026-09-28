@@ -14,6 +14,12 @@ class UserService:
         self._repo = repo
         self._availability = availability_repo
 
+    @property
+    def repo(self) -> UserRepository:
+        """Read access to the user store for callers that need a lookup the service does
+        not wrap (the preferences routes resolve a member by email)."""
+        return self._repo
+
     def list_users(self, query: Optional[str] = None) -> list[dict]:
         if query:
             return self._repo.search(query)

@@ -6,8 +6,10 @@ import ManualTimeCard from './ManualTimeCard'
 import type { SlotProposal } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
 import { SCHEDULING_CONFIG } from '@/config/scheduling.config'
+import { useDefaultTimeZone, type TimeZoneId } from '@/lib/timeZone'
+import TimeZoneSelect from '@/components/shared/TimeZoneSelect'
 
-type TimeZoneView = 'IST' | 'UTC' | 'GMT'
+type TimeZoneView = TimeZoneId
 
 interface SlotRankingPanelProps {
   slots: SlotProposal[]
@@ -29,7 +31,9 @@ export default function SlotRankingPanel({
   const PAGE_SIZE = SCHEDULING_CONFIG.PAGE_SIZE
 
   const [agentStatus] = useState<AgentStatus>('complete')
-  const [timeZoneView, setTimeZoneView] = useState<TimeZoneView>('IST')
+  // Starts on the member's default (top bar) instead of a hardcoded IST.
+  const memberZone = useDefaultTimeZone()
+  const [timeZoneView, setTimeZoneView] = useState<TimeZoneView>(memberZone)
   const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE)
 
   // Approve is a local selection — the actual Teams meeting is created on Send
@@ -63,15 +67,11 @@ export default function SlotRankingPanel({
             Need to change attendees before approving a slot? Go back and edit the list.
           </div>
           <div className="flex items-center gap-2">
-            <select
+            <TimeZoneSelect
               value={timeZoneView}
-              onChange={(e) => setTimeZoneView(e.target.value as TimeZoneView)}
-              className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="IST">IST</option>
-              <option value="UTC">UTC</option>
-              <option value="GMT">GMT</option>
-            </select>
+              onChange={setTimeZoneView}
+              className="px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[13rem]"
+            />
             <button
               type="button"
               onClick={onBackToAttendees}

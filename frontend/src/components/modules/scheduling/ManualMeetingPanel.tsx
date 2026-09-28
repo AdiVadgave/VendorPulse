@@ -9,8 +9,10 @@ import { getVendorPrepMeeting } from '@/lib/vendorPrepApi'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
 import { updateMeetingTime, createMeetingEvent, findEventIdByJoinUrl, isSchedulingAvailable, wallClockToUtcIso } from '@/lib/graphScheduling'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
+import { getDefaultTimeZone, type TimeZoneId } from '@/lib/timeZone'
+import TimeZoneSelect from '@/components/shared/TimeZoneSelect'
 
-type TimeZoneView = 'IST' | 'UTC' | 'GMT'
+type TimeZoneView = TimeZoneId
 
 interface Props {
   cycleId: string
@@ -61,7 +63,8 @@ export default function ManualMeetingPanel({
 }: Props) {
   const [startLocal, setStartLocal] = useState('')      // from <input type="datetime-local">
   const [durationMinutes, setDurationMinutes] = useState(60)
-  const [timeZone, setTimeZone] = useState<TimeZoneView>('IST')
+  // Starts on the member's default; this cycle can still be switched.
+  const [timeZone, setTimeZone] = useState<TimeZoneView>(getDefaultTimeZone())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [draftOpen, setDraftOpen] = useState(false)
@@ -215,15 +218,11 @@ export default function ManualMeetingPanel({
           </label>
           <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
             Timezone
-            <select
+            <TimeZoneSelect
               value={timeZone}
-              onChange={(e) => setTimeZone(e.target.value as TimeZoneView)}
-              className="px-2.5 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="IST">IST</option>
-              <option value="UTC">UTC</option>
-              <option value="GMT">GMT</option>
-            </select>
+              onChange={setTimeZone}
+              className="px-2.5 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[14rem]"
+            />
           </label>
         </div>
 

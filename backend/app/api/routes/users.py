@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.dependencies import get_meeting_participant_repo, get_meeting_repo, get_user_service
@@ -47,6 +48,49 @@ def create_user(payload: UserCreate, svc: UserService = Depends(get_user_service
     except ValueError:
         raise HTTPException(status_code=409, detail="Unable to create user")
     return {"user": user, "message": "User created successfully"}
+
+
+class UserPreferences(BaseModel):
+    """Per-member scheduling preferences. Keyed by the signed-in member's email (the SSO
+    identity the frontend has), not by user_id, which the browser never sees."""
+
+    default_time_zone: Optional[str] = Field(
+        default=None,
+        description='IANA timezone id, e.g. "Asia/Kolkata". Null = never chosen.',
+    )
+
+
+# NOTE: these two MUST stay above "/{userId}" — FastAPI matches in declaration order and
+# would otherwise read "preferences" as a user id and 404.
+@router.get("/preferences/{email}")
+def get_user_preferences(email: str, svc: UserService = Depends(get_user_service)):
+    """The member's saved preferences. Unknown member => nulls, never a 404: a first-time
+    signer-in has no row yet and must not see an error on every page load."""
+    user = svc.repo.get_by_email(email)
+    return {"default_time_zone": (user or {}).get("default_time_zone")}
+
+
+@router.put("/preferences/{email}")
+def set_user_preferences(
+    email: str,
+    payload: UserPreferences,
+    svc: UserService = Depends(get_user_service),
+):
+    """Save the member's default timezone. Applies to every cycle they schedule; a cycle
+    can still override it."""
+    addr = (email or "").strip()
+    if not addr:
+        raise HTTPException(status_code=400, detail="An email is required.")
+    user = svc.repo.get_by_email(addr)
+    if user is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No directory record for {addr} — preferences cannot be saved yet.",
+        )
+    updated = svc.repo.update_by_id(
+        "user_id", user["user_id"], {"default_time_zone": payload.default_time_zone}
+    )
+    return {"default_time_zone": (updated or {}).get("default_time_zone")}
 
 
 @router.get("/{userId}")

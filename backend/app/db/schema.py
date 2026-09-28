@@ -87,6 +87,10 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             role         TEXT,
             organisation TEXT,
             avatar       TEXT,
+            -- IANA id (e.g. "Asia/Kolkata"). The member's default for every cycle they
+            -- schedule; a cycle can still override it. NULL = never chosen, so the UI
+            -- falls back to their browser zone.
+            default_time_zone TEXT,
             created_at   TEXT,
             seq          BIGSERIAL UNIQUE NOT NULL
         )
@@ -423,6 +427,9 @@ _ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
         # NULL on every existing row, which reads as "attends" — so adding this cannot
         # change who is invited to an in-flight cycle.
         ("attends_spr", "BOOLEAN"),
+    ],
+    "users": [
+        ("default_time_zone", "TEXT"),
     ],
     "cycles": [
         ("meeting_time_zone", "TEXT"),

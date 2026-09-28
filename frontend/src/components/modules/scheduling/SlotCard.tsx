@@ -2,13 +2,14 @@ import { CheckCircle2, XCircle, Users, Trophy, CalendarCheck, Clock, Key, Star }
 import { cn } from '@/utils/cn'
 import type { SlotProposal } from '@/types/scheduling.types'
 import { SCHEDULING_CONFIG } from '@/config/scheduling.config'
+import { toTimeZoneId, type TimeZoneId } from '@/lib/timeZone'
 
 interface SlotCardProps {
   slot: SlotProposal
   rank: number
   onApprove: (slotId: string) => void
   isProcessing?: boolean
-  timeZoneView?: 'IST' | 'UTC' | 'GMT'
+  timeZoneView?: TimeZoneId
   /** Show the "Reviewers X/Y free" coverage chip. Hidden for the main SPR session,
    *  where scorecard-reviewer status is not relevant to who should attend. */
   showReviewers?: boolean
@@ -73,13 +74,9 @@ export default function SlotCard({
   const durationMs = durationMinutes * 60 * 1000
   const endObj = new Date(dateObj.getTime() + durationMs)
 
-  const timeZoneMap: Record<'IST' | 'UTC' | 'GMT', string> = {
-    IST: 'Asia/Kolkata',
-    UTC: 'UTC',
-    GMT: 'Europe/London',
-  }
-
-  const zone = timeZoneMap[timeZoneView]
+  // timeZoneView is already an IANA id; toTimeZoneId only maps the three legacy labels
+  // ("IST"/"UTC"/"GMT") that cycles scheduled before the full list still carry.
+  const zone = toTimeZoneId(timeZoneView)
 
   function formatDateInZone(date: Date): string {
     return date.toLocaleDateString('en-GB', {

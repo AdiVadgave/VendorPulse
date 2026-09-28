@@ -36,6 +36,7 @@ from app.repositories.user_repository import UserRepository
 from app.services.availability_service import AvailabilityService
 from app.services.meeting_service import MeetingService
 from app.services.graph_service import GraphService
+from app.services.standard_text import spr_title
 from app.services.slot_ranking_service import SlotRankingService
 
 
@@ -384,7 +385,7 @@ class SchedulingService:
         quarter = cycle.get("quarter") or ""
         year = cycle.get("year") or ""
 
-        subject = f"Attendance Confirmation — {vendor_name} {quarter} {year}".strip()
+        subject = spr_title(vendor_name, quarter, year, "Attendance Confirmation")
         body = (
             "Hello,\n\n"
             "Please confirm whether you are still part of the team for the upcoming governance cycle.\n"

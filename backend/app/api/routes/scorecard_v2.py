@@ -54,6 +54,7 @@ from app.utils.pii_redaction import (
     redact_scorecard_comments,
     redact_scorecard_comments_with_ai,
 )
+from app.services.standard_text import spr_title
 from app.utils.scorecard_recipients import is_key_internal_reviewer, is_scorecard_recipient
 from app.utils.scorecard_structure import (
     SCORECARD_CATALOG,
@@ -1872,7 +1873,7 @@ def dispatch_inapp(payload: InAppDispatchRequest):
         if payload.html_body_override:
             # Coordinator edited the draft — send it verbatim, substituting the
             # per-recipient tokens {{name}} (HTML-escaped) and {{link}}.
-            default_subject = f"{payload.vendor_name} — QBR Scorecard Input Request ({payload.quarter} {payload.year})"
+            default_subject = spr_title(payload.vendor_name, payload.quarter, payload.year, "Scorecard")
             safe_name = html_escape(r.name)
             subject = _clean_subject((payload.subject_override or default_subject).replace("{{name}}", r.name))
             html_body = payload.html_body_override.replace("{{name}}", safe_name).replace("{{link}}", link)

@@ -3,6 +3,7 @@ import { CalendarClock, Loader2, AlertCircle, Users, ArrowRight } from 'lucide-r
 import { cn } from '@/utils/cn'
 import type { CycleAttendee } from '@/types/scheduling.types'
 import { scheduleManualMeeting } from '@/lib/schedulingApi'
+import { sprInviteBody, sprTitle } from '@/lib/standardText'
 import { listAlignmentMeetings } from '@/lib/alignmentApi'
 import { getVendorPrepMeeting } from '@/lib/vendorPrepApi'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
@@ -86,13 +87,16 @@ export default function ManualMeetingPanel({
 
   // Default subject/body for the updated invite (the coordinator can edit before sending).
   const prettyTime = startLocal ? `${startLocal.replace('T', ' ')} ${timeZone}` : ''
-  const defaultSubject = `EGB/QBR Meeting — Updated Time — ${vendorName} ${quarter} ${year}`
-  const defaultBody =
-    `<p>Dear Team,</p>` +
-    `<p>The <strong>EGB/QBR governance review</strong> for <strong>${vendorName} — ${quarter} ${year}</strong> has been rescheduled.</p>` +
-    (prettyTime ? `<p>🕙 <strong>New time:</strong> ${prettyTime}</p>` : '') +
-    `<p>The updated invitation will appear in your calendar. Please accept or decline via Microsoft Teams.</p>` +
-    `<p>— Mobility Vendor Pulse</p>`
+  // Approved standard text (see src/lib/standardText.ts). "Updated Time" stays in the
+  // subject so a rescheduled invite is distinguishable in a crowded inbox.
+  const defaultSubject = `${sprTitle(vendorName, quarter, year)} (Updated Time)`
+  const defaultBody = sprInviteBody(
+    'Team',
+    vendorName,
+    quarter,
+    year,
+    `<p style="font-size:14px;line-height:1.6;margin:0 0 16px 0;">This meeting has been <strong>rescheduled</strong>.${prettyTime ? `<br/><strong>New time:</strong> ${prettyTime}` : ''}<br/>The updated invitation will appear in your calendar.</p>`,
+  )
 
   // "Reschedule" opens the draft editor first; the calendar event is only updated
   // once the coordinator confirms (with any edits) in the dialog.

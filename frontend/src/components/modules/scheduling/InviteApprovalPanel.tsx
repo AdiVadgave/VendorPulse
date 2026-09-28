@@ -13,6 +13,7 @@ import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import { apiFetch } from '@/lib/api'
+import { sprInviteBody, sprTitle } from '@/lib/standardText'
 import { createMeetingEvent, isSchedulingAvailable } from '@/lib/graphScheduling'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
 import type { AgentStatus } from '@/types/agent.types'
@@ -90,20 +91,20 @@ export default function InviteApprovalPanel({
   }
 
   // The default invite subject + HTML body (the coordinator can edit before sending).
-  const defaultSubject = `EGB/QBR Meeting Invitation — ${vendorName} ${quarter} ${year}`
-  const defaultBody =
-    `<p>Dear Team,</p>` +
-    `<p>You are invited to the <strong>EGB/QBR governance review</strong> for ` +
-    `<strong>${vendorName} — ${quarter} ${year}</strong>.</p>` +
-    `<p>📅 <strong>Date:</strong> ${formatDateInZone(dateObj)}<br/>` +
-    `🕙 <strong>Time:</strong> ${formatTimeInZone(dateObj)} – ${formatTimeInZone(endTime)} ${displayZone}<br/>` +
-    `📍 <strong>Location:</strong> Microsoft Teams</p>` +
-    `<p><strong>Agenda</strong></p>` +
-    `<ol><li>${quarter} Performance Review &amp; Scorecard Discussion</li>` +
-    `<li>Key Issues, Concerns and Pushback Responses</li>` +
-    `<li>Commitments and Action Items Review</li>` +
-    `<li>Forward Planning &amp; AOB</li></ol>` +
-    `<p>Please accept or decline via Microsoft Teams.</p><p>— Mobility Vendor Pulse</p>`
+  // Approved standard text (see src/lib/standardText.ts). The when/where block is
+  // per-meeting detail, so it is appended between the approved copy and the sign-off
+  // rather than replacing any of it.
+  const defaultSubject = sprTitle(vendorName, quarter, year)
+  const defaultBody = sprInviteBody(
+    'Team',
+    vendorName,
+    quarter,
+    year,
+    `<p style="font-size:14px;line-height:1.6;margin:0 0 16px 0;">` +
+      `<strong>Date:</strong> ${formatDateInZone(dateObj)}<br/>` +
+      `<strong>Time:</strong> ${formatTimeInZone(dateObj)} – ${formatTimeInZone(endTime)} ${displayZone}<br/>` +
+      `<strong>Location:</strong> Microsoft Teams</p>`,
+  )
 
   // "Approve & Send" opens the draft editor first; the invite is only created
   // when the coordinator confirms in the dialog (with any edits they made).
@@ -273,8 +274,10 @@ export default function InviteApprovalPanel({
               </div>
               <div className="flex gap-3">
                 <span className="text-slate-500 dark:text-slate-400 w-14 shrink-0">Subject:</span>
+                {/* Read from the same builder as the draft, so the preview can never
+                    drift from the subject that is actually sent. */}
                 <span className="text-slate-700 dark:text-slate-300 font-medium">
-                  EGB/QBR Meeting Invitation — {vendorName} {quarter} {year}
+                  {defaultSubject}
                 </span>
               </div>
             </div>

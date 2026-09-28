@@ -33,6 +33,7 @@ from app.dependencies import (
 from app.models.common import AgentResponse
 from app.models.vendor_prep import GenerateBriefRequest, HandlePushbackRequest
 from app.services.graph_service import GraphService
+from app.services.standard_text import spr_title, vendor_prep_invite_body
 from app.services.meeting_attendee_service import (
     add_meeting_attendee,
     list_meeting_attendees,
@@ -390,7 +391,9 @@ def schedule_vendor_prep_meeting_manual(
     vendor_name = cycle.get("vendor_name", "TBD")
     quarter = cycle.get("quarter", "")
     year = cycle.get("year", "")
-    subject = f"Vendor Prep Call — {vendor_name} ({quarter} {year})".strip()
+    # Approved title/body — see app/services/standard_text.py.
+    subject = spr_title(vendor_name, quarter, year, "Prep Call")
+    invite_body = vendor_prep_invite_body("Colleague", vendor_name, quarter, year)
     meeting_url = (payload.meeting_url or "").strip() or None
 
     # The Vendor Prep call must start after every Internal Alignment call and before
@@ -418,7 +421,7 @@ def schedule_vendor_prep_meeting_manual(
         meeting_record = {
             "meeting_id": event_id,
             "title": subject,
-            "description": f"Vendor prep call for cycle {cycleId}",
+            "description": invite_body,
             "agenda": "1. Vendor brief review\n2. Anticipated pushback & responses\n3. Roles for the vendor call\n4. Action items",
             "organizer_id": organiser,
             "time_slot": {

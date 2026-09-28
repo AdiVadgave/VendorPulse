@@ -28,6 +28,7 @@ from app.services.meeting_attendee_service import (
 )
 from app.models.common import AgentResponse
 from app.services.graph_service import GraphService
+from app.services.standard_text import alignment_invite_body, spr_title
 from app.utils.prompts import ALIGNMENT_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -183,8 +184,10 @@ def schedule_alignment_meeting_manual(
     quarter = cycle.get("quarter", "")
     year = cycle.get("year", "")
     meeting_index = max(1, int(payload.meeting_index or 1))
-    suffix = f" #{meeting_index}" if meeting_index > 1 else ""
-    subject = f"Internal Alignment{suffix} — {vendor_name} ({quarter} {year})"
+    # Approved title/body — see app/services/standard_text.py. Session 1 carries the extra
+    # "submit your scores before this meeting" line; later sessions do not.
+    subject = spr_title(vendor_name, quarter, year, f"Internal Alignment {meeting_index}")
+    invite_body = alignment_invite_body("Colleague", vendor_name, quarter, year, meeting_index)
     meeting_url = (payload.meeting_url or "").strip() or None
 
     # The alignment call must start before the Vendor Prep call and the SPR meeting.
@@ -216,7 +219,7 @@ def schedule_alignment_meeting_manual(
         meeting_record = {
             "meeting_id": event_id,
             "title": subject,
-            "description": f"Internal alignment meeting for cycle {cycleId}",
+            "description": invite_body,
             "agenda": "1. Score comparison review\n2. Alignment flags discussion\n3. Face-off model roles\n4. Action items",
             "organizer_id": organiser,
             "time_slot": {

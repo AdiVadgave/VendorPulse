@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { UserPlus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
+import { sprInviteBody, sprTitle } from '@/lib/standardText'
 import { addAttendeesToEvent, createMeetingEvent, findEventIdByJoinUrl, isSchedulingAvailable } from '@/lib/graphScheduling'
 import { SearchAddAttendeeForm } from './AttendeeRefreshPanel'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
@@ -54,12 +55,16 @@ export default function AddAttendeesToMeetingPanel({
   const [draftOpen, setDraftOpen] = useState(false)
 
   // Default invite text (editable in the draft dialog before sending).
-  const defaultSubject = `EGB/QBR Meeting Invitation — ${vendorName} ${quarter} ${year}`
-  const defaultBody =
-    `<p>Dear Team,</p>` +
-    `<p>You have been added to the <strong>EGB/QBR governance review</strong> for ` +
-    `<strong>${vendorName} — ${quarter} ${year}</strong>.</p>` +
-    `<p>Please accept or decline via Microsoft Teams.</p><p>— Mobility Vendor Pulse</p>`
+  // Approved standard text (see src/lib/standardText.ts), with a line noting this is a
+  // late addition to an already-scheduled review.
+  const defaultSubject = sprTitle(vendorName, quarter, year)
+  const defaultBody = sprInviteBody(
+    'Team',
+    vendorName,
+    quarter,
+    year,
+    `<p style="font-size:14px;line-height:1.6;margin:0 0 16px 0;">You have been added to this review. Please accept or decline via Microsoft Teams.</p>`,
+  )
 
   function handleAdded(added: CycleAttendee) {
     onAttendeesChanged([...attendees, added])

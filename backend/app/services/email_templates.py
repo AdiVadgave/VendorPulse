@@ -8,6 +8,13 @@ which sends via Microsoft Graph (the service mailbox).
 """
 from __future__ import annotations
 
+from app.services.standard_text import (
+    as_html,
+    scorecard_request_body,
+    split_body,
+    spr_title,
+)
+
 
 def build_minutes_email(
     *,
@@ -18,7 +25,7 @@ def build_minutes_email(
     minutes: dict,
 ) -> dict[str, str]:
     """Generate a professional meeting minutes email (subject + HTML body + text body)."""
-    subject = f"Meeting Minutes — {vendor_name} {quarter} {year} EGB/QBR"
+    subject = spr_title(vendor_name, quarter, year, "Meeting Minutes")
 
     meeting_date = minutes.get("meeting_date", "")
     executive_summary = minutes.get("executive_summary", "")
@@ -76,7 +83,7 @@ def build_minutes_email(
 """
 
     text_lines = [
-        f"Meeting Minutes — {vendor_name} {quarter} {year} EGB/QBR",
+        spr_title(vendor_name, quarter, year, "Meeting Minutes"),
         f"Date: {meeting_date}" if meeting_date else "",
         "",
     ]
@@ -119,11 +126,9 @@ def build_scorecard_email(
     previously issued scorecard has been withdrawn and a corrected one must be
     completed (used by the 'redo scorecard' flow).
     """
-    subject = (
-        f"{vendor_name} — Corrected QBR Scorecard, Action Required ({quarter} {year})"
-        if reissue
-        else f"{vendor_name} — QBR Scorecard Input Request ({quarter} {year})"
-    )
+    # The approved title. A re-issue keeps the same title — the withdrawal notice in
+    # the body is what tells the reviewer which request supersedes which.
+    subject = spr_title(vendor_name, quarter, year, "Scorecard")
 
     # Formal correction notice shown at the top when re-issuing.
     reissue_notice = (
@@ -140,6 +145,14 @@ def build_scorecard_email(
         else ""
     )
 
+    # The approved wording, split so the form button and the two notices can sit between
+    # the body and the sign-off without any of it being restated here. Never reword these
+    # sentences at this call site — standard_text.py is the signed-off source.
+    _approved = scorecard_request_body(attendee_name, vendor_name, quarter, year)
+    _intro_paras, _signoff = split_body(_approved)
+    intro_html = as_html("\n\n".join(_intro_paras))
+    signoff_html = as_html(_signoff)
+
     html_body = f"""\
 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
   <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 24px 32px; border-radius: 12px 12px 0 0;">
@@ -147,33 +160,14 @@ def build_scorecard_email(
   </div>
 
   <div style="background: #ffffff; border: 1px solid #e2e8f0; border-top: none; padding: 32px; border-radius: 0 0 12px 12px;">
-    <p style="font-size: 15px; line-height: 1.6;">Dear <strong>{attendee_name}</strong>,</p>
 {reissue_notice}
-    <p style="font-size: 15px; line-height: 1.6;">
-      You have been identified as a key reviewer for the <strong>{vendor_name}</strong>
-      QBR governance cycle (<strong>{quarter} {year}</strong>).
-    </p>
-
-    <p style="font-size: 15px; line-height: 1.6;">
-      Please complete your scorecard input by rating each parameter on a <strong>1–5 scale</strong>
-      (1 = Poor, 5 = Excellent).
-    </p>
-
-    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
-      <p style="font-size: 13px; color: #64748b; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Scorecard Categories</p>
-      <ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 2;">
-        <li><strong>Risk &amp; Compliance</strong> — Release/Patch Mgmt, Security, Audit</li>
-        <li><strong>Performance</strong> — Delivery Timeliness, Quality, SLA, Resource Capability</li>
-        <li><strong>Commercial</strong> — Pricing, Contract Compliance, Cost Control, Billing</li>
-        <li><strong>Relationship</strong> — Communication, Engagement, Responsiveness</li>
-      </ul>
-    </div>
+{intro_html}
 
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
       <p style="font-size: 13px; color: #64748b; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">How to Complete</p>
       <ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.9;">
         <li>The link below is <strong>personal to you</strong> — please don't forward it. Each reviewer submits once.</li>
-        <li>Score every parameter on the <strong>1–5 scale</strong> and add a short comment where it helps explain a rating.</li>
+        <li>Score every parameter and add a short comment where it helps explain a rating.</li>
         <li>Base your input on <strong>objective evidence</strong> from this cycle (delivery, SLAs, incidents, commercials) rather than impressions.</li>
         <li>Set the link aside and complete it in one sitting — the form is submitted when you press <strong>Submit</strong>.</li>
       </ul>
@@ -194,10 +188,7 @@ def build_scorecard_email(
       </a>
     </div>
 
-    <p style="font-size: 13px; color: #94a3b8; margin-top: 24px; line-height: 1.5;">
-      If you have questions, reply to this email or contact your VMO Coordinator.<br>
-      Thank you for your timely input.
-    </p>
+    {signoff_html}
 
     <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
     <p style="font-size: 11px; color: #94a3b8; text-align: center;">
@@ -207,31 +198,24 @@ def build_scorecard_email(
 </div>
 """
 
+    _reissue_txt = (
+        "Please disregard the scorecard previously issued for this cycle. An error was "
+        "identified in the earlier request and that version has been withdrawn. Kindly "
+        "complete this corrected scorecard using the link below.\n\n"
+        if reissue
+        else ""
+    )
     text_body = (
-        f"Dear {attendee_name},\n\n"
-        + (
-            "Please disregard the scorecard previously issued for this cycle. An error was "
-            "identified in the earlier request and that version has been withdrawn. Kindly "
-            "complete this corrected scorecard using the link below.\n\n"
-            if reissue
-            else ""
-        )
-        + f"You have been selected as a key reviewer for the {vendor_name} "
-        f"QBR governance cycle ({quarter} {year}).\n\n"
-        f"Please complete your scorecard at: {form_url}\n\n"
-        f"Categories: Risk & Compliance, Performance, Commercial, Relationship\n"
-        f"Scale: 1 (Poor) to 5 (Excellent)\n\n"
-        "HOW TO COMPLETE:\n"
-        "- The link is personal to you — please don't forward it. Each reviewer submits once.\n"
-        "- Score every parameter on the 1-5 scale and add a short comment where it helps.\n"
-        "- Base your input on objective evidence from this cycle, not impressions.\n"
-        "- Complete it in one sitting — the form is submitted when you press Submit.\n\n"
+        f"{_intro_paras[0]}\n\n"
+        + _reissue_txt
+        + "\n\n".join(_intro_paras[1:])
+        + f"\n\nOpen your scorecard form: {form_url}\n\n"
+        "The link is personal to you — please don't forward it. Each reviewer submits once.\n\n"
         "PERSONAL DATA — PLEASE DO NOT SHARE:\n"
         "Do not enter any personal or personally identifiable information in your scores or "
         "comments (no individual names, contact details, or other personal data). Keep feedback "
-        "factual and focused on the vendor's performance. Personal data is not required to assess "
-        "the vendor and should not be shared here.\n\n"
-        f"Thank you,\nVendorPulse"
+        "factual and focused on the vendor's performance.\n\n"
+        f"{_signoff}"
     )
     return {"subject": subject, "html_body": html_body, "text_body": text_body}
 
@@ -254,9 +238,11 @@ def build_reminder_email(
         "is due <strong>today</strong>" if days_left <= 0
         else f"is due in <strong>{days_left} day{'s' if days_left != 1 else ''}</strong> (by {deadline})"
     )
+    # Approved title, prefixed with the urgency so it is still scannable in an inbox.
     subject = (
-        f"{'FINAL REMINDER' if urgent else 'Reminder'} — {vendor_name} QBR Scorecard "
-        f"{'due today' if urgent else f'due {deadline}'} ({quarter} {year})"
+        f"{'FINAL REMINDER' if urgent else 'Reminder'}: "
+        + spr_title(vendor_name, quarter, year, "Scorecard")
+        + f" — {'due today' if urgent else f'due {deadline}'}"
     )
     html_body = f"""\
 <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
@@ -301,7 +287,11 @@ def build_escalation_email(
     pending: list[dict],
 ) -> dict[str, str]:
     """Deadline-day escalation to the VMO Coordinator listing who is still outstanding."""
-    subject = f"[Escalation] {vendor_name} QBR scorecards outstanding — deadline {deadline}"
+    subject = (
+        "[Escalation] "
+        + spr_title(vendor_name, quarter, year, "Scorecard")
+        + f" — outstanding, deadline {deadline}"
+    )
     rows = "".join(
         f'<tr><td style="padding:6px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;">{p.get("name","")}</td>'
         f'<td style="padding:6px 12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#64748b;">{p.get("email","")}</td></tr>'

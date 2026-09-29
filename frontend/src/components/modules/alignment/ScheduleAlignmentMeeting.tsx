@@ -6,15 +6,8 @@ import DelegatedScheduler from '@/components/modules/scheduling/DelegatedSchedul
 import SendAddedInvitePanel from '@/components/modules/scheduling/SendAddedInvitePanel'
 import MeetingReferenceBanner from '@/components/modules/scheduling/MeetingReferenceBanner'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
+import { alignmentInviteBody, sprTitle } from '@/lib/standardText'
 import type { CycleAttendee } from '@/types/scheduling.types'
-
-const ALIGNMENT_BODY_HTML =
-  '<p>Internal alignment meeting to reconcile scores and agree our position before the vendor call.</p>' +
-  '<p><strong>Agenda</strong></p>' +
-  '<ol><li>Review the consolidated internal scores and low-scoring measures</li>' +
-  '<li>Reconcile cross-team divergence into one agreed internal position</li>' +
-  '<li>Confirm the points and evidence to raise with the vendor</li>' +
-  '<li>Capture action items and assign owners</li></ol>'
 
 export interface AlignmentMeetingResult {
   teamsUrl: string | null
@@ -28,6 +21,10 @@ export interface AlignmentMeetingResult {
 
 interface Props {
   cycleId: string
+  /** Needed for the approved invite title/body (see src/lib/standardText.ts). */
+  vendorName: string
+  quarter: string
+  year: number
   meetingResult: AlignmentMeetingResult | null
   onMeetingScheduled: (result: AlignmentMeetingResult) => void
   /** Which alignment meeting (1-based) — a cycle may have several. */
@@ -38,7 +35,12 @@ interface Props {
   qbrTimeZone?: string | null
 }
 
-export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMeetingScheduled, meetingIndex = 1, qbrMeetingDate, qbrTimeZone }: Props) {
+export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter, year, meetingResult, onMeetingScheduled, meetingIndex = 1, qbrMeetingDate, qbrTimeZone }: Props) {
+  // The Shell-approved invite. Byte-identical to the backend builder (verified), and the
+  // 'Colleague' salutation matches it too: one calendar invite serves the whole group, so
+  // there is no per-person name to substitute.
+  const inviteSubject = sprTitle(vendorName, quarter, year, `Internal Alignment ${meetingIndex}`)
+  const inviteBody = alignmentInviteBody('Colleague', vendorName, quarter, year, meetingIndex)
   const [error, setError] = useState<string | null>(null)
 
   // Internal attendees state
@@ -362,8 +364,8 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
             <SendAddedInvitePanel
               attendees={internalAttendees}
               meetingUrl={meetingResult.teamsUrl}
-              subject="Mobility Vendor Pulse — Internal Alignment Meeting"
-              body={ALIGNMENT_BODY_HTML}
+              subject={inviteSubject}
+              body={inviteBody}
               onSent={() => setInvitedBaseline(new Set(internalAttendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))}
             />
           )}
@@ -378,8 +380,8 @@ export default function ScheduleAlignmentMeeting({ cycleId, meetingResult, onMee
             defaultDuration={30}
             qbrMeetingDate={qbrMeetingDate}
             existingMeetingUrl={rescheduling ? (meetingResult?.teamsUrl ?? null) : null}
-            subject="Mobility Vendor Pulse — Internal Alignment Meeting"
-            bodyHtml={ALIGNMENT_BODY_HTML}
+            subject={inviteSubject}
+            bodyHtml={inviteBody}
             onCancel={rescheduling ? () => setRescheduling(false) : undefined}
             onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl, attendeeCount }) => {
               if (selectedInternalAttendees.length === 0) { setError('Tick at least one attendee to invite.'); return }

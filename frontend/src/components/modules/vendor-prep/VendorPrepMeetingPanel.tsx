@@ -12,13 +12,8 @@ import DelegatedScheduler from '@/components/modules/scheduling/DelegatedSchedul
 import MeetingReferenceBanner, { type ReferenceDate } from '@/components/modules/scheduling/MeetingReferenceBanner'
 import { listAlignmentMeetings, type AlignmentMeeting } from '@/lib/alignmentApi'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
+import { sprTitle, vendorPrepInviteBody } from '@/lib/standardText'
 
-const VENDOR_PREP_BODY_HTML =
-  '<p>Vendor prep call — align the internal team with the vendor ahead of the governance meeting.</p>' +
-  '<p><strong>Agenda</strong></p>' +
-  '<ol><li>Walk through the agreed internal position and key issues</li>' +
-  '<li>Confirm the points, data and pushback responses to raise</li>' +
-  '<li>Agree logistics and owners for the governance meeting</li></ol>'
 import TranscriptInput from '@/components/modules/meeting/TranscriptInput'
 import MeetingMinutesViewer from '@/components/modules/meeting/MeetingMinutesViewer'
 import { getMeetingArtifact } from '@/lib/meetingApi'
@@ -66,6 +61,11 @@ interface MeetingResult {
 export default function VendorPrepMeetingPanel({
   cycleId, vendorName, quarter, year, onActionsExtracted, alreadyExtracted, qbrMeetingDate, qbrTimeZone, pushbackSlot,
 }: Props) {
+  // The Shell-approved Prep Call invite. Byte-identical to the backend builder (verified);
+  // 'Colleague' matches it because one calendar invite serves the whole group.
+  const inviteSubject = sprTitle(vendorName, quarter, year, 'Prep Call')
+  const inviteBody = vendorPrepInviteBody('Colleague', vendorName, quarter, year)
+
   const [attendees, setAttendees] = useState<CycleAttendee[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [meetingResult, setMeetingResult] = useState<MeetingResult | null>(null)
@@ -394,8 +394,8 @@ export default function VendorPrepMeetingPanel({
                 <SendAddedInvitePanel
                   attendees={attendees}
                   meetingUrl={meetingResult.teamsUrl}
-                  subject="Mobility Vendor Pulse — Vendor Prep Meeting"
-                  body={VENDOR_PREP_BODY_HTML}
+                  subject={inviteSubject}
+                  body={inviteBody}
                   onSent={() => setInvitedBaseline(new Set(attendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))}
                 />
               )}
@@ -496,8 +496,8 @@ export default function VendorPrepMeetingPanel({
                 beforeLabel="the SPR meeting"
                 afterLabel="the Internal Alignment call"
                 existingMeetingUrl={rescheduling ? (meetingResult?.teamsUrl ?? null) : null}
-                subject="Mobility Vendor Pulse — Vendor Prep Meeting"
-                bodyHtml={VENDOR_PREP_BODY_HTML}
+                subject={inviteSubject}
+                bodyHtml={inviteBody}
                 onCancel={rescheduling ? () => setRescheduling(false) : undefined}
                 onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl }) => {
                   if (selectedEmails.length === 0) { setError('Select at least one attendee to invite.'); return }

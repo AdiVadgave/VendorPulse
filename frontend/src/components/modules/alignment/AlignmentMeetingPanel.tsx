@@ -75,6 +75,9 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
       <ScheduleAlignmentMeeting
         cycleId={cycleId}
         meetingIndex={index}
+        vendorName={vendorName}
+        quarter={quarter}
+        year={year}
         meetingResult={meetingResult}
         onMeetingScheduled={(result) => { setMeetingResult(result); onScheduled?.() }}
         qbrMeetingDate={qbrMeetingDate}

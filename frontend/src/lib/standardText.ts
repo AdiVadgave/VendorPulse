@@ -74,3 +74,68 @@ export function sprInviteBody(
     p(SIGN_SCHEDULING)
   )
 }
+
+const ORGANISER_NOTE =
+  'Any additional details relevant to this call will be shared by the meeting ' +
+  'organiser through a separate email.'
+
+/**
+ * Approved Internal Alignment invite body. Mirrors
+ * `app/services/standard_text.py:alignment_invite_body` sentence for sentence.
+ *
+ * Session 1 carries the extra IMPORTANT line asking reviewers to submit their scores
+ * before the meeting; later sessions do not, because by then the scorecard has been
+ * collected. The `session === 1` test must match the backend's `n == 1` branch.
+ */
+export function alignmentInviteBody(
+  attendeeName: string,
+  vendorName: string,
+  quarter: string,
+  year: number | string,
+  session = 1,
+  extraHtml = '',
+): string {
+  const [from, to] = cyclePeriod(quarter, year)
+  const n = Math.max(1, Math.trunc(Number(session) || 1))
+  return (
+    p(`Dear ${attendeeName},`) +
+    p(
+      `You are invited to the Internal Alignment Session ${n} for the Shell/${vendorName} ` +
+      `SPR covering the ${from} - ${to} period.`,
+    ) +
+    p(ORGANISER_NOTE) +
+    (n === 1
+      ? p(
+          'IMPORTANT: Kindly submit your scores and comments before this meeting by using ' +
+          'the link previously shared, even if you cannot attend.',
+        )
+      : '') +
+    (extraHtml || '') +
+    p(SIGN_SCHEDULING)
+  )
+}
+
+/**
+ * Approved Vendor Prep ("Prep Call") invite body. Mirrors
+ * `app/services/standard_text.py:vendor_prep_invite_body`.
+ */
+export function vendorPrepInviteBody(
+  attendeeName: string,
+  vendorName: string,
+  quarter: string,
+  year: number | string,
+  extraHtml = '',
+): string {
+  const [from, to] = cyclePeriod(quarter, year)
+  return (
+    p(`Dear ${attendeeName},`) +
+    p(
+      `You are invited to the Prep Call for the Shell/${vendorName} SPR covering the ` +
+      `${from} - ${to} period.`,
+    ) +
+    p('The main objective of this session is to present and discuss the SPR scorecard.') +
+    p(ORGANISER_NOTE) +
+    (extraHtml || '') +
+    p(SIGN_SCHEDULING)
+  )
+}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Clock, CalendarPlus } from 'lucide-react'
-import type { TimeZoneId } from '@/lib/timeZone'
+import { useDefaultTimeZone, type TimeZoneId } from '@/lib/timeZone'
 import TimeZoneSelect from '@/components/shared/TimeZoneSelect'
 
 type TimeZoneView = TimeZoneId
@@ -9,6 +9,8 @@ interface ManualTimeCardProps {
   /** Called with the chosen local ISO start, timezone, and duration (minutes). */
   onSchedule: (startLocalISO: string, timeZone: TimeZoneView, durationMinutes: number) => void
   defaultDuration?: number
+  /** Omitted (e.g. the alignment/vendor-prep scheduler) => the member's own default,
+   *  never a hardcoded zone. */
   defaultTimeZone?: TimeZoneView
 }
 
@@ -21,11 +23,13 @@ interface ManualTimeCardProps {
 export default function ManualTimeCard({
   onSchedule,
   defaultDuration = 60,
-  defaultTimeZone = 'IST',
+  defaultTimeZone,
 }: ManualTimeCardProps) {
+  const memberZone = useDefaultTimeZone()
+  const initialZone = defaultTimeZone ?? memberZone
   const [manualDateTime, setManualDateTime] = useState('')
   const [manualDuration, setManualDuration] = useState<number>(defaultDuration)
-  const [timeZone, setTimeZone] = useState<TimeZoneView>(defaultTimeZone)
+  const [timeZone, setTimeZone] = useState<TimeZoneView>(initialZone)
 
   function handleSchedule() {
     if (!manualDateTime) return

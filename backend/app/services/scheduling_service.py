@@ -171,6 +171,9 @@ class SchedulingService:
                 # look like an internal key stakeholder.
                 "type": old.get("type"),
                 "is_key": old.get("is_key"),
+                # Carry the scorecard-only flag too, or a reviewer deliberately kept off
+                # the SPR reverts to a full attendee the moment the next cycle is seeded.
+                "attends_spr": old.get("attends_spr"),
                 "attendance_requirement": old.get("attendance_requirement"),
                 "lt_status": old.get("lt_status"),
                 "shell_department": old.get("shell_department"),
@@ -262,6 +265,13 @@ class SchedulingService:
         self, attendee_id: str, payload: CycleAttendeeUpdate
     ) -> Optional[dict]:
         updates = payload.model_dump(exclude_none=True)
+        # attends_spr is only meaningful for a scorecard reviewer. Un-keying someone, or
+        # switching them to Vendor, would otherwise strand attends_spr=False on a plain
+        # attendee — who would then be silently dropped from the SPR invite with no
+        # control anywhere in the UI to put them back (the toggle only renders for a
+        # reviewer). Force it back to True whenever they stop being one.
+        if updates.get("is_key") is False or updates.get("type") == "Vendor":
+            updates["attends_spr"] = True
         return self._attendees.update_by_id("attendee_id", attendee_id, updates)
 
     def remove_attendee(self, attendee_id: str) -> bool:

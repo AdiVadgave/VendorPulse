@@ -213,6 +213,23 @@ def build_scorecard_pptx(
     shape = slide.shapes.add_table(rows, len(_HEADERS), Inches(0.40), table_top,
                                    Inches(sum(_COL_W)), table_h)
     table = shape.table
+
+    # Type scale, chosen from the row count.
+    #
+    # A table's declared height is a MINIMUM: PowerPoint grows every row until its text
+    # fits, so a fixed 5.2in box with 30 rows does not compress — it renders past the
+    # footer and off the slide. python-pptx cannot show this (it reports the requested
+    # height back), so it has to be prevented here rather than detected afterwards.
+    # Shrinking the body type and setting an explicit per-row height keeps the rendered
+    # table inside AVAILABLE_H for the row counts a real scorecard produces.
+    body_pt, label_pt, score_pt = (7.5, 9.0, 11.0)
+    if rows > 14:
+        body_pt, label_pt, score_pt = (6.5, 8.0, 10.0)
+    if rows > 22:
+        body_pt, label_pt, score_pt = (5.5, 7.0, 9.0)
+    row_h = Emu(int(table_h / max(rows, 1)))
+    for r_ in table.rows:
+        r_.height = row_h
     table.first_row = True
     for i, w in enumerate(_COL_W):
         table.columns[i].width = Inches(w)
@@ -230,7 +247,7 @@ def build_scorecard_pptx(
     for c, label in enumerate(_HEADERS):
         cell = cell_tf(0, c)
         cell.fill.fore_color.rgb = BAND
-        _run(cell.text_frame.paragraphs[0], label, size=9, bold=True, color=MUTED)
+        _run(cell.text_frame.paragraphs[0], label, size=label_pt, bold=True, color=MUTED)
 
     r = 1
     for cat in categories:
@@ -243,8 +260,8 @@ def build_scorecard_pptx(
             is_rag = m.get("measure_type") == "rag"
             avg = m.get("average")
 
-            _run(cell_tf(r, 1).text_frame.paragraphs[0], m.get("label", ""), size=9, bold=True)
-            _run(cell_tf(r, 2).text_frame.paragraphs[0], m.get("description", "") or "", size=7.5, color=MUTED)
+            _run(cell_tf(r, 1).text_frame.paragraphs[0], m.get("label", ""), size=label_pt, bold=True)
+            _run(cell_tf(r, 2).text_frame.paragraphs[0], m.get("description", "") or "", size=body_pt, color=MUTED)
 
             # SCORE — a RAG measure has no number; the cell carries the status colour.
             sc = cell_tf(r, 3)
@@ -259,7 +276,7 @@ def build_scorecard_pptx(
                 else:
                     _run(sp, "—", size=9, color=MUTED)
             else:
-                _run(sp, _fmt_score(avg), size=11, bold=True)
+                _run(sp, _fmt_score(avg), size=score_pt, bold=True)
                 t = _trend(avg, prev_measures.get(m.get("key")))
                 if t:
                     _run(sp, "  " + t[0], size=10, bold=True, color=t[1])
@@ -269,7 +286,7 @@ def build_scorecard_pptx(
                     pp.alignment = PP_ALIGN.CENTER
                     _run(pp, f"Previous: {_fmt_avg(pv)}", size=6.5, color=MUTED)
 
-            _run(cell_tf(r, 6).text_frame.paragraphs[0], _measure_comment(m), size=7.5)
+            _run(cell_tf(r, 6).text_frame.paragraphs[0], _measure_comment(m), size=body_pt)
             # Cells that get merged still need their fill/margins set first.
             cell_tf(r, 0)
             cell_tf(r, 4)

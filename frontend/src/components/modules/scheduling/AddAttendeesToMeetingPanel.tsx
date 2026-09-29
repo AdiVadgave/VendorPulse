@@ -7,6 +7,7 @@ import { SearchAddAttendeeForm } from './AttendeeRefreshPanel'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import type { TimeZoneId } from '@/lib/timeZone'
+import { attendsSpr } from '@/types/scheduling.types'
 
 interface Props {
   cycleId: string
@@ -56,6 +57,10 @@ export default function AddAttendeesToMeetingPanel({
   const [draftOpen, setDraftOpen] = useState(false)
 
   // Default invite text (editable in the draft dialog before sending).
+  // Only people who actually attend the SPR. A scorecard-only reviewer must never be
+  // pushed onto the Teams event — they provide feedback and join Internal Alignment.
+  const sprAttendees = attendees.filter(attendsSpr)
+
   // Approved standard text (see src/lib/standardText.ts), with a line noting this is a
   // late addition to an already-scheduled review.
   const defaultSubject = sprTitle(vendorName, quarter, year)
@@ -100,7 +105,7 @@ export default function AddAttendeesToMeetingPanel({
         // Existing event → PATCH the attendee list (+ the edited text only if changed).
         await addAttendeesToEvent({
           eventId: targetEventId,
-          attendees,
+          attendees: sprAttendees,
           ...(edited ? { subject: draft.subject, bodyHtml: draft.body } : {}),
         })
         setStatus('done')

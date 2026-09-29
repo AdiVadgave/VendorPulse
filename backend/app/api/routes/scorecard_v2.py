@@ -1723,6 +1723,21 @@ def _scorecard_workbook(cycle_id: str) -> bytes:
     return _build_xlsx(sheets)
 
 
+def _content_disposition(filename: str) -> str:
+    """A safe Content-Disposition for a download whose name contains user data.
+
+    HTTP headers are latin-1; a vendor named in Cyrillic, Greek or CJK raises
+    UnicodeEncodeError when Starlette encodes the response, turning the download into a
+    500. A quote or newline in the name could also break out of the header. So: an ASCII
+    fallback with everything unsafe stripped, plus an RFC 5987 ``filename*`` carrying the
+    real UTF-8 name for every browser released this decade."""
+    from urllib.parse import quote
+    unsafe = {'"', chr(92)}  # quote and backslash would break out of the header
+    ascii_name = "".join(c for c in filename if 32 <= ord(c) < 127 and c not in unsafe)
+    ascii_name = ascii_name.strip() or "scorecard"
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
+
+
 @router.get("/export-pptx/{cycle_id}")
 def export_scorecard_pptx(cycle_id: str):
     """Download the consolidated scorecard as a one-slide, fully editable .pptx.
@@ -1764,7 +1779,7 @@ def export_scorecard_pptx(cycle_id: str):
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+        headers={"Content-Disposition": _content_disposition(fname)},
     )
 
 
@@ -1781,7 +1796,7 @@ def export_scorecard(cycle_id: str):
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+        headers={"Content-Disposition": _content_disposition(fname)},
     )
 
 

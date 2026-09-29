@@ -14,6 +14,7 @@ import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import DraftReviewDialog from '@/components/shared/DraftReviewDialog'
 import { apiFetch } from '@/lib/api'
 import { sprInviteBody, sprTitle } from '@/lib/standardText'
+import { toTimeZoneId } from '@/lib/timeZone'
 import { createMeetingEvent, isSchedulingAvailable } from '@/lib/graphScheduling'
 import { attendsSpr } from '@/types/scheduling.types'
 import type { SlotProposal, CycleAttendee } from '@/types/scheduling.types'
@@ -54,24 +55,16 @@ export default function InviteApprovalPanel({
   const dateObj = new Date(slot.proposed_time)
   const durationMinutes = Number((slot as unknown as { duration_minutes?: number }).duration_minutes ?? 60)
   const endTime = new Date(dateObj.getTime() + durationMinutes * 60 * 1000)
-  const slotTimeZone = timeZoneOverride ?? slot.proposed_time_zone ?? 'UTC'
-
-  function toDisplayZone(zone: string): string {
-    const normalized = zone.toUpperCase()
-    if (normalized === 'IST' || normalized.includes('INDIA')) return 'IST'
-    if (normalized === 'GMT' || normalized.includes('GMT')) return 'GMT'
-    return 'UTC'
-  }
-
-  function toIanaZone(zone: string): string {
-    const normalized = zone.toUpperCase()
-    if (normalized === 'IST' || normalized.includes('INDIA')) return 'Asia/Kolkata'
-    if (normalized === 'GMT' || normalized.includes('GMT')) return 'Europe/London'
-    return 'UTC'
-  }
-
-  const displayZone = toDisplayZone(slotTimeZone)
-  const ianaZone = toIanaZone(slotTimeZone)
+  // One zone, used for display, for the invite body and for what is persisted. The
+  // local toDisplayZone/toIanaZone pair this replaces collapsed anything that was not
+  // IST or GMT to UTC — so once the picker offered the full IANA list, choosing
+  // Europe/Amsterdam emailed a UTC wall-clock to every attendee and stored "UTC" as the
+  // cycle's timezone, which then mis-rendered every later screen.
+  // No `?? 'UTC'` tail: toTimeZoneId already falls back to the member's default, and a
+  // cycle with no stored zone must not silently become UTC.
+  const zone = toTimeZoneId(timeZoneOverride ?? slot.proposed_time_zone)
+  const displayZone = zone
+  const ianaZone = zone
 
   function formatDateInZone(date: Date): string {
     return date.toLocaleDateString('en-US', {

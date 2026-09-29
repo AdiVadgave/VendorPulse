@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CalendarClock, Loader2, AlertCircle, Users, ArrowRight } from 'lucide-react'
 import { cn } from '@/utils/cn'
-import type { CycleAttendee } from '@/types/scheduling.types'
+import { attendsSpr, type CycleAttendee } from '@/types/scheduling.types'
 import { scheduleManualMeeting } from '@/lib/schedulingApi'
 import { sprInviteBody, sprTitle } from '@/lib/standardText'
 import { listAlignmentMeetings } from '@/lib/alignmentApi'
@@ -63,6 +63,10 @@ export default function ManualMeetingPanel({
 }: Props) {
   const [startLocal, setStartLocal] = useState('')      // from <input type="datetime-local">
   const [durationMinutes, setDurationMinutes] = useState(60)
+  // Only people who actually attend the SPR. A scorecard-only reviewer must never be
+  // pushed onto the Teams event — they provide feedback and join Internal Alignment.
+  const sprAttendees = attendees.filter(attendsSpr)
+
   // Starts on the member's default; this cycle can still be switched.
   const [timeZone, setTimeZone] = useState<TimeZoneView>(getDefaultTimeZone())
   const [saving, setSaving] = useState(false)
@@ -151,7 +155,7 @@ export default function ManualMeetingPanel({
             proposed_time_zone: timeZone,
             duration_minutes: durationMinutes,
           } as unknown as Parameters<typeof createMeetingEvent>[0]['slot'],
-          attendees,
+          attendees: sprAttendees,
           subject: draft.subject,
           bodyText: draft.body,
         })
@@ -228,7 +232,7 @@ export default function ManualMeetingPanel({
 
         <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
           <Users size={13} className="text-slate-400" />
-          {attendees.length} attendee{attendees.length === 1 ? '' : 's'} will be re-notified
+          {sprAttendees.length} attendee{sprAttendees.length === 1 ? '' : 's'} will be re-notified
         </div>
 
         {error && (
@@ -258,7 +262,7 @@ export default function ManualMeetingPanel({
         title="Review updated invite"
         subject={defaultSubject}
         body={defaultBody}
-        recipients={attendees.filter((a) => a.email).map((a) => `${a.name} (${a.email})`)}
+        recipients={sprAttendees.filter((a) => a.email).map((a) => `${a.name} (${a.email})`)}
         sendLabel="Update & send"
         busy={saving}
         onSend={doSave}

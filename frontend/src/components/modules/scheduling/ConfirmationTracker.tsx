@@ -19,7 +19,7 @@ import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
 import type { CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import { getEventAttendeeResponses, isSchedulingAvailable, type RsvpResponse } from '@/lib/graphScheduling'
-import type { TimeZoneId } from '@/lib/timeZone'
+import { toTimeZoneId, type TimeZoneId } from '@/lib/timeZone'
 
 interface ConfirmationTrackerProps {
   cycleId: string
@@ -122,16 +122,13 @@ export default function ConfirmationTracker({
   const dateObj = new Date(slot.proposed_time)
   const durationMin = slot.duration_minutes ?? 60
 
-  const slotTimeZone = timeZoneOverride ?? slot.proposed_time_zone ?? 'UTC'
-  const displayZone = slotTimeZone.toUpperCase().includes('IST') ? 'IST'
-    : slotTimeZone.toUpperCase().includes('GMT') ? 'GMT'
-      : 'UTC'
-
-  const ianaZone = displayZone === 'IST'
-    ? 'Asia/Kolkata'
-    : displayZone === 'GMT'
-      ? 'Etc/GMT'
-      : 'UTC'
+  // Same single-zone rule as the invite panel. The substring test this replaces sent
+  // every zone except IST/GMT to UTC, so the "Meeting Scheduled" banner showed the wrong
+  // hour for any other zone — and it mapped GMT to Etc/GMT, which does not observe BST,
+  // so a summer London meeting was an hour out even in the case it did handle.
+  const zone = toTimeZoneId(timeZoneOverride ?? slot.proposed_time_zone)
+  const displayZone = zone
+  const ianaZone = zone
 
   const displayDate = dateObj.toLocaleDateString('en-US', {
     weekday: 'long',

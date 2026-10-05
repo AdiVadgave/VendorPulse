@@ -121,7 +121,7 @@ class Settings(BaseSettings):
 
     # Mail — all outbound mail (scorecard links & meeting minutes) sends via
     # Microsoft Graph using the service mailbox. Gmail has been removed.
-    # Kept for compatibility; Graph is the only channel. See docs/MAIL_OUTLOOK_MIGRATION.md.
+    # Kept for compatibility; Graph is the only channel. See docs/MAIL_SEND_IMPLEMENTATION.md.
     mail_provider: str = "graph"
     # Service-account mailbox (UPN) to send AS (app-only Mail.Send).
     graph_mail_sender: str = ""

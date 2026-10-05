@@ -11,29 +11,6 @@ export interface ScoreDelta {
   significant: boolean // delta >= 1
 }
 
-/* ── Parameter-level Stakeholder vs Vendor comparison ──────── */
-
-export interface ParameterComparison {
-  parameter_key: string
-  parameter_label: string
-  category: ScorecardCategoryKey
-  category_label: string
-  stakeholder_score: number
-  vendor_score: number
-  difference: number          // stakeholder - vendor (absolute)
-  high_variance: boolean      // difference > 1
-  low_score: boolean          // either score < 3
-}
-
-export interface CategoryComparison {
-  category: ScorecardCategoryKey
-  category_label: string
-  stakeholder_avg: number
-  vendor_avg: number
-  difference: number
-  parameters: ParameterComparison[]
-}
-
 /* ── AI-generated alignment insight ────────────────────────── */
 
 export interface AlignmentInsight {

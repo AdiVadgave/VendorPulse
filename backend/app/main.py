@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import actions, alignment, analytics, meeting_agent, meetings, pushback, scheduling, scorecard, scorecard_v2, users, vendor_prep, vendors
+from app.api.routes import actions, alignment, analytics, meeting_agent, meetings, pushback, scheduling, scorecard_v2, users, vendor_prep, vendors
 from app.config import settings
 from app.core.auth import get_current_user
 from app.core.logging_config import setup_logging
@@ -114,7 +114,6 @@ _auth = [Depends(get_current_user)]
 app.include_router(users.router, dependencies=_auth)
 app.include_router(meetings.router, dependencies=_auth)
 app.include_router(scheduling.router, dependencies=_auth)
-app.include_router(scorecard.router, dependencies=_auth)
 app.include_router(scorecard_v2.router, dependencies=_auth)
 app.include_router(vendors.router, dependencies=_auth)
 app.include_router(alignment.router, dependencies=_auth)

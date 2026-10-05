@@ -30,13 +30,6 @@ export interface DispatchResponse {
 
 // ── API calls ───────────────────────────────────────────────────────────────
 
-/** Get compiled scorecard (Internal vs Vendor 2-column) for a cycle */
-export async function getCompiledScorecard(
-  cycleId: string
-): Promise<import('@/types/scorecard.types').CompiledScorecard> {
-  return apiFetch(`/api/scorecard/compiled/${cycleId}`)
-}
-
 // ── Weighted scorecard (v2 / in-app form) ────────────────────────────────────
 
 import type {

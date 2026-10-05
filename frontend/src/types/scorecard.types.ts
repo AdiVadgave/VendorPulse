@@ -128,59 +128,6 @@ export interface ScorecardEntry {
   submitted_at: string | null
 }
 
-/* ── Compiled Results ───────────────────────────────────────── */
-
-export interface ParameterScore {
-  parameter_key: string
-  parameter_label: string
-  scores: { stakeholder_id: string; stakeholder_name: string; score: number; is_outlier: boolean }[]
-  average: number
-}
-
-export interface CompiledCategoryScore {
-  category: ScorecardCategoryKey
-  category_label: string
-  parameters: ParameterScore[]
-  category_average: number
-}
-
-/* ── 2-Column Compiled Scorecard (Internal vs Vendor) ──────── */
-
-export interface IndividualScore {
-  name: string
-  score: number
-}
-
-export interface CompiledParameter {
-  parameter_key: string
-  parameter_label: string
-  internal_avg: number | null
-  vendor_avg: number | null
-  internal_count: number
-  vendor_count: number
-  internal_scores?: IndividualScore[]
-  vendor_scores?: IndividualScore[]
-}
-
-export interface CompiledCategory {
-  category: ScorecardCategoryKey
-  category_label: string
-  internal_avg: number | null
-  vendor_avg: number | null
-  parameters: CompiledParameter[]
-}
-
-export interface CompiledScorecard {
-  cycle_id: string
-  internal_respondents: number
-  vendor_respondents: number
-  overall_internal_avg: number | null
-  overall_vendor_avg: number | null
-  categories: CompiledCategory[]
-  comments: Record<string, { internal: string[]; vendor: string[] }>
-  key_recommendations: string[]
-}
-
 /* ══════════════════════════════════════════════════════════════
  * Weighted scorecard (v2 / production format) — in-app form
  * ══════════════════════════════════════════════════════════════ */

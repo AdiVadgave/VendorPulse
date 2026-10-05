@@ -157,7 +157,7 @@ def seed() -> None:
                 aid = f"att_{uuid.uuid4().hex}"
                 arepo.insert({
                     "attendee_id": aid, "cycle_id": cid, "stakeholder_id": f"s_{uuid.uuid4().hex}",
-                    "name": person, "email": p["email"], "gmail": p["email"], "role": p["role"],
+                    "name": person, "email": p["email"], "role": p["role"],
                     "organisation": "Shell", "type": "Internal Stakeholder", "is_key": True,
                     "shell_department": p["dept"], "attendance_requirement": "Required",
                     "lt_status": "Non-LT", "invite_status": "ACCEPTED",

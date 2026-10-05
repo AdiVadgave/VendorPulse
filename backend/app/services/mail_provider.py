@@ -8,7 +8,7 @@ This is the single send seam:
     get_mail_provider().send_html_email(to_email=..., subject=..., html_body=...)
 
 Gmail has been removed — all outbound mail goes through the functional mailbox
-(`GRAPH_MAIL_SENDER`). See docs/MAIL_OUTLOOK_MIGRATION.md.
+(`GRAPH_MAIL_SENDER`). See docs/MAIL_SEND_IMPLEMENTATION.md.
 """
 from __future__ import annotations
 

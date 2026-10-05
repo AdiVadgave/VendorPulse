@@ -27,18 +27,11 @@ import {
   MOCK_SLOT_PROPOSALS,
 } from '@/mock/scheduling.mock'
 import { completeAttendanceConfirmation, fetchAttendeesSeeded, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
-import { getCompiledScorecard, getWeightedScorecard, getScorecardConfig, getScorecardBriefing } from '@/lib/scorecardApi'
+import { getWeightedScorecard, getScorecardConfig, getScorecardBriefing } from '@/lib/scorecardApi'
 import type { ScorecardBriefing } from '@/lib/scorecardApi'
-import { compiledScorecardToLegacy } from '@/mock/scorecard.mock'
-import type { CompiledCategoryScore, CompiledScorecard, WeightedScorecard, TeamSubmissionsData, ScorecardConfig } from '@/types/scorecard.types'
+import type { WeightedScorecard, TeamSubmissionsData, ScorecardConfig } from '@/types/scorecard.types'
 import {
   MOCK_FACE_OFF,
-  buildCategoryComparisons,
-  generateAlignmentInsights,
-  buildAlignmentFlags,
-  generateWhatChangedBullets,
-  buildComparisonsFromScorecard,
-  buildFlagsFromScorecard,
   buildFlagsFromWeighted,
   buildInsightsFromWeighted,
   buildWhatChangedFromWeighted,
@@ -97,7 +90,6 @@ import { useCycleStore } from '@/store/useCycleStore'
 import { attendsSpr } from '@/types/scheduling.types'
 import { getDefaultTimeZone, toTimeZoneId, type TimeZoneId } from '@/lib/timeZone'
 import type { SchedulingPhase, CycleAttendee, SlotProposal } from '@/types/scheduling.types'
-// scorecard types imported via CompiledCategoryScore and CompiledScorecard above
 import type { ExtractedAction, AlignmentInsight } from '@/types/alignment.types'
 import { getAlignmentInsights, listAlignmentMeetings, deleteAlignmentMeeting } from '@/lib/alignmentApi'
 import {
@@ -211,18 +203,6 @@ export default function CycleDetail() {
   // branch — silently dropping the measure set and the weights.
   const [scorecardDispatched, setScorecardDispatched] = useState(() => !!cycle?.scorecard_dispatched_at)
   const [, setSubmissionsSimulated] = useState(false)
-  const [compiledScores, setCompiledScores] = useState<CompiledCategoryScore[] | null>(null)
-  const [compiledScorecard, setCompiledScorecard] = useState<CompiledScorecard | null>(null)
-
-  const handleCompiledFetched = useCallback((cs: CompiledScorecard) => {
-    setCompiledScorecard(cs)
-    const legacy = compiledScorecardToLegacy(cs)
-    setCompiledScores(legacy)
-    if (cs.internal_respondents > 0 && cs.vendor_respondents > 0) {
-      setSubmissionsSimulated(true)
-      advanceWorkflow(cycle!.cycle_id, 'SCORECARD_COMPILED')
-    }
-  }, [advanceWorkflow, cycle])
 
   // --- Shared action queue (Modules C–E) ---
   // ONE persistent queue carried across every meeting in the flow
@@ -325,15 +305,6 @@ export default function CycleDetail() {
         // clears the loading state.
         setScorecardDispatched(!!backendCycle.scorecard_dispatched_at)
         if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_COLLECTION')) setSubmissionsSimulated(true)
-        // Auto-fetch compiled scorecard if already compiled
-        if (idx >= WORKFLOW_STATES.indexOf('SCORECARD_COMPILED')) {
-          getCompiledScorecard(cycleId).then((cs) => {
-            if (cs && (cs.internal_respondents > 0 || cs.vendor_respondents > 0)) {
-              setCompiledScorecard(cs)
-              setCompiledScores(compiledScorecardToLegacy(cs))
-            }
-          }).catch(() => {/* ignore */})
-        }
       })
       .catch(() => {/* backend offline — fall through to "not found" state */})
       .finally(() => setIsLoadingCycle(false))
@@ -535,7 +506,7 @@ export default function CycleDetail() {
   // pending), and scheduling never marks a step done.
   const progressSteps = [
     { label: 'Scheduling', done: !!cycle.teams_meeting_scheduled_at },
-    { label: 'Scorecard', done: !!compiledScorecard },
+    { label: 'Scorecard', done: currentStateIndex >= WORKFLOW_STATES.indexOf('SCORECARD_COMPILED') },
     { label: 'Alignment', done: alignmentParsed },
     { label: 'Vendor Prep', done: vendorPrepParsed },
     { label: 'Meeting', done: meetingNotes.length > 0 },
@@ -783,8 +754,6 @@ export default function CycleDetail() {
             onDispatched={() => { void refetchCycle() }}
             onScorecardRedo={() => setScorecardDispatched(false)}
             onReopened={refetchCycle}
-            compiledScorecard={compiledScorecard}
-            onCompiledFetched={handleCompiledFetched}
             cycleId={cycle.cycle_id}
             attendees={schedulingAttendees}
             onAttendeesChanged={setSchedulingAttendees}
@@ -802,8 +771,6 @@ export default function CycleDetail() {
             cycleId={cycle.cycle_id}
             cycle={cycle}
             actions={actions}
-            compiledScores={compiledScores}
-            compiledScorecard={compiledScorecard}
             onActionsExtracted={(extracted, origin) => {
               addActionsToQueue(extracted, origin)
               // Module C: advance to INTERNAL_ALIGNMENT when actions are extracted
@@ -1393,7 +1360,7 @@ function SchedulingTab({
 
 /* ── Scorecard Tab ────────────────────────────────────────── */
 function ScorecardTab({
-  cycle, dispatched, onDispatched, onScorecardRedo, onReopened, onCompiledFetched, cycleId, attendees, onAttendeesChanged,
+  cycle, dispatched, onDispatched, onScorecardRedo, onReopened, cycleId, attendees, onAttendeesChanged,
   onScorecardCompiled, onProceedToAlignment,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
@@ -1403,8 +1370,6 @@ function ScorecardTab({
   onScorecardRedo: () => void
   /** Refetch the cycle after a per-team reopen (dispatched-set changed). */
   onReopened?: () => void
-  compiledScorecard: CompiledScorecard | null
-  onCompiledFetched: (cs: CompiledScorecard) => void
   cycleId: string
   attendees: CycleAttendee[]
   onAttendeesChanged: (a: CycleAttendee[]) => void
@@ -1487,17 +1452,14 @@ function ScorecardTab({
     return () => { mounted = false }
   }, [cycleId, configNonce])
 
-  // Refresh the weighted (new) scorecard, auto-advance once every key team has
-  // submitted, and keep the legacy 2-column compiled in sync for Alignment.
+  // Refresh the weighted (new) scorecard and auto-advance once every key team has
+  // submitted. This also used to sync the legacy 2-column compiled scorecard, which
+  // read the removed Google-Forms endpoint and had returned nothing for a long time.
   const handleSubmissionsUpdated = useCallback(async (data?: TeamSubmissionsData) => {
     void refreshWeighted()
     // All key internal-stakeholder teams submitted → compile & unlock Alignment.
     if (data && data.total > 0 && data.pending === 0) onScorecardCompiled()
-    try {
-      const cs = await getCompiledScorecard(cycleId)
-      if (cs.internal_respondents > 0 || cs.vendor_respondents > 0) onCompiledFetched(cs)
-    } catch { /* ignore */ }
-  }, [cycleId, onCompiledFetched, refreshWeighted, onScorecardCompiled])
+  }, [refreshWeighted, onScorecardCompiled])
 
   useEffect(() => { void refreshWeighted() }, [refreshWeighted])
   useEffect(() => {
@@ -1654,14 +1616,12 @@ function ScorecardTab({
 
 /* ── Alignment Tab ────────────────────────────────────────── */
 function AlignmentTab({
-  cycleId, cycle, actions, onActionsExtracted, compiledScores, compiledScorecard, onAlignmentScheduled,
+  cycleId, cycle, actions, onActionsExtracted, onAlignmentScheduled,
 }: {
   cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   actions: (ExtractedAction & { origin?: string | null })[]
   onActionsExtracted: (a: ExtractedAction[], origin?: string) => void
-  compiledScores: CompiledCategoryScore[] | null
-  compiledScorecard?: CompiledScorecard | null
   /** Called when any alignment meeting is scheduled — unlocks Vendor Prep early. */
   onAlignmentScheduled: () => void
 }) {
@@ -1736,22 +1696,11 @@ function AlignmentTab({
   }, [loadAlignment])
   const hasWeighted = !!weighted && weighted.teams.length > 0
 
-  // Legacy 2-column comparison (kept only as a fallback for mock cycles).
-  const comparisons = compiledScorecard
-    ? buildComparisonsFromScorecard(compiledScorecard)
-    : compiledScores
-      ? buildCategoryComparisons(compiledScores)
-      : []
-
-  const legacyFlags = compiledScorecard
-    ? buildFlagsFromScorecard(compiledScorecard)
-    : compiledScores
-      ? buildAlignmentFlags(compiledScores)
-      : []
-
-  const flags = hasWeighted
-    ? buildFlagsFromWeighted(weighted!)
-    : legacyFlags
+  // Flags come from the weighted (v2) scorecard. The legacy 2-column fallback that
+  // stood here read the Google-Forms compiled endpoint; that endpoint has been removed
+  // because scorecard collection moved in-app, and it had been returning an empty
+  // result on every cycle since — so the fallback never produced anything.
+  const flags = hasWeighted ? buildFlagsFromWeighted(weighted!) : []
 
   // Prefer the backend insights (runtime from consolidated data, LLM-narrated when
   // enabled); fall back to the deterministic client builder, then legacy mock.
@@ -1759,16 +1708,14 @@ function AlignmentTab({
     ? serverInsights
     : hasWeighted
       ? buildInsightsFromWeighted(weighted!)
-      : generateAlignmentInsights(comparisons, [])
+      : []
 
   const STATIC_BULLETS = [
     'Review the consolidated internal scorecard above and agree the position on any low-scoring or divergent measures before the vendor meeting.',
   ]
   const whatChangedBullets = hasWeighted
     ? buildWhatChangedFromWeighted(weighted!)
-    : comparisons.length > 0
-      ? generateWhatChangedBullets(comparisons, flags)
-      : STATIC_BULLETS
+    : STATIC_BULLETS
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">

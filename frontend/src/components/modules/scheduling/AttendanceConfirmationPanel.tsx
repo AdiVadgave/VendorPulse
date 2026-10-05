@@ -29,6 +29,10 @@ export default function AttendanceConfirmationPanel({
 }: AttendanceConfirmationPanelProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [isProceeding, setIsProceeding] = useState(false)
+  // Proceeding can be REFUSED by the backend (409 when someone is still pending). That
+  // used to reject into nothing: the spinner stopped, the phase never advanced, and the
+  // button looked simply dead. Show why.
+  const [error, setError] = useState<string | null>(null)
 
   const withStatus = attendees.map((a) => ({
     ...a,
@@ -56,10 +60,13 @@ export default function AttendanceConfirmationPanel({
 
   async function handleProceed() {
     setIsProceeding(true)
+    setError(null)
     // Carry forward everyone except those marked "Not attending".
     const finalAttendees = withStatus.filter((a) => a.confirmation_status !== 'DECLINED')
     try {
       await Promise.resolve(onConfirmationComplete(finalAttendees))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not continue — please try again.')
     } finally {
       setIsProceeding(false)
     }
@@ -76,8 +83,9 @@ export default function AttendanceConfirmationPanel({
           <div>
             <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Attendance Confirmation</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Mark whether each attendee from the last cycle is still attending. Anyone set to
-              &ldquo;Not attending&rdquo; is dropped when you continue.
+              Mark whether each attendee from the last cycle is still involved. Anyone set to
+              &ldquo;Not attending&rdquo; is dropped when you continue. Scorecard-only reviewers are
+              listed too — they are not invited to the SPR, but they still score the vendor.
             </p>
           </div>
         </div>
@@ -118,6 +126,14 @@ export default function AttendanceConfirmationPanel({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm text-slate-800 dark:text-slate-200">{a.name}</span>
                       <span className="text-xs text-slate-400 dark:text-slate-500">{a.organisation}</span>
+                      {a.attends_spr === false && (
+                        <span
+                          className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1 py-0.5 rounded font-semibold"
+                          title="Scorecard-only reviewer — they score and join Internal Alignment, but are not invited to the SPR"
+                        >
+                          SCORECARD ONLY
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{a.email}</p>
                   </div>
@@ -167,6 +183,11 @@ export default function AttendanceConfirmationPanel({
               <span className="flex items-center gap-1"><CheckCircle2 size={11} className="text-emerald-500" />{confirmedCount} confirmed</span>
               <span className="flex items-center gap-1"><UserX size={11} className="text-red-500" />{declinedCount} not attending</span>
             </div>
+            {error && (
+              <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1 order-last w-full">
+                <UserX size={12} className="shrink-0" /> {error}
+              </p>
+            )}
             <button
               onClick={handleProceed}
               disabled={isProceeding}

@@ -349,7 +349,17 @@ class SchedulingService:
             if (a.get("confirmation_status") in (None, "PENDING"))
         ]
         if pending:
-            raise ValueError(f"{len(pending)} attendee(s) still pending confirmation")
+            # NAME them. A bare count is useless when the pending person is not visible
+            # in the list the coordinator is looking at — which is exactly how a pending
+            # scorecard-only reviewer used to deadlock this step.
+            who = ", ".join(
+                (a.get("name") or a.get("email") or a.get("attendee_id") or "?")
+                for a in pending[:5]
+            )
+            more = f" (+{len(pending) - 5} more)" if len(pending) > 5 else ""
+            raise ValueError(
+                f"{len(pending)} attendee(s) still pending confirmation: {who}{more}"
+            )
 
         now = datetime.now(timezone.utc).isoformat()
         if workflow_engine.can_transition(cycle.get("workflow_state", ""), "ATTENDEE_REFRESH_SENT"):

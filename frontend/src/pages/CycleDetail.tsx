@@ -1182,24 +1182,18 @@ function SchedulingTab({
       {schedulingPhase === 'attendance_confirmation' && (
         <AttendanceConfirmationPanel
           cycleId={cycle.cycle_id}
-          attendees={sprAttendees}
-          /* The panel is GIVEN the SPR-only subset but returns a WHOLE-LIST replacement,
-             so both callbacks have to merge its result back over the full roster. Passing
-             its output straight through erased every scorecard-only reviewer from state:
-             they vanished from the attendee table (making "scorecard only" impossible to
-             un-set), from the scorecard dispatch and from the submission tracker — the
-             exact inverse of the feature. */
-          onAttendeesChanged={(updated) =>
-            onAttendeesUpdated(attendees.map((a) => updated.find((u) => u.attendee_id === a.attendee_id) ?? a))}
+          /* The WHOLE roster, not the SPR subset. "Is this person still part of the
+             cycle?" applies to a scorecard-only reviewer too — they still score, and they
+             still join Internal Alignment. Showing only SPR attendees hid them from the
+             list while the backend gate kept counting them, so one pending scorecard-only
+             reviewer made Proceed fail with a 409 the coordinator could neither see nor
+             clear. Calendar lookup and SPR RSVP still use sprAttendees below — those are
+             genuinely SPR-only. */
+          attendees={attendees}
+          onAttendeesChanged={onAttendeesUpdated}
           onConfirmationComplete={async (confirmed) => {
-            // Anyone the panel dropped was declined and is genuinely being removed — but
-            // only from the SPR subset it was shown. Reviewers it never saw are kept.
-            const seen = new Set(sprAttendees.map((a) => a.attendee_id))
-            const byId = new Map(confirmed.map((c) => [c.attendee_id, c]))
-            onAttendeesUpdated([
-              ...attendees.filter((a) => !seen.has(a.attendee_id)),
-              ...confirmed,
-            ].map((a) => byId.get(a.attendee_id) ?? a))
+            // `confirmed` is the full roster minus anyone marked "Not attending".
+            onAttendeesUpdated(confirmed)
 
             // Persist the confirmation on the backend: this also DROPS anyone marked
             // "Not attending" so the removal sticks. Fire whenever there were

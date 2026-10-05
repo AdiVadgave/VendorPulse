@@ -182,6 +182,17 @@ def build_scorecard_email(
       </p>
     </div>
 
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+      <p style="font-size: 13px; color: #64748b; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Response Guidance</p>
+      <ol style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.8; color: #334155;">
+        <li>Include only business points, themes, or action areas.</li>
+        <li>Exclude names, initials, departments, titles, and any other direct or indirect personal references.</li>
+        <li>Submit within 3 business days, or forward to your delegate immediately.</li>
+        <li>When providing comments, do not include personal names or identifying information; keep all responses objective, role-based, and compliant with EU AI Act requirements.</li>
+        <li>If this isn&#39;t meant for you, reply promptly to flag it for redirection.</li>
+      </ol>
+    </div>
+
     <div style="text-align: center; margin: 28px 0;">
       <a href="{form_url}" style="display: inline-block; background: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-size: 15px; font-weight: 600; letter-spacing: 0.3px;">
         Open Scorecard Form
@@ -215,6 +226,14 @@ def build_scorecard_email(
         "Do not enter any personal or personally identifiable information in your scores or "
         "comments (no individual names, contact details, or other personal data). Keep feedback "
         "factual and focused on the vendor's performance.\n\n"
+        "Response Guidance:\n"
+        "1. Include only business points, themes, or action areas.\n"
+        "2. Exclude names, initials, departments, titles, and any other direct or indirect "
+        "personal references.\n"
+        "3. Submit within 3 business days, or forward to your delegate immediately.\n"
+        "4. When providing comments, do not include personal names or identifying information; "
+        "keep all responses objective, role-based, and compliant with EU AI Act requirements.\n"
+        "5. If this isn't meant for you, reply promptly to flag it for redirection.\n\n"
         f"{_signoff}"
     )
     return {"subject": subject, "html_body": html_body, "text_body": text_body}

@@ -640,6 +640,7 @@ def submit_scorecard(payload: ScorecardSubmission):
         ai_redacted_comments = redact_scorecard_comments_with_ai(
             payload.comments,
             get_llm_service(),
+            known_names,
         )
     except Exception as exc:  # noqa: BLE001 — deliberately broad; see below
         # The Azure OpenAI SDK raises APIConnectionError / RateLimitError /

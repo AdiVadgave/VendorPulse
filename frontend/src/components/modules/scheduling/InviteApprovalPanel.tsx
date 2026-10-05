@@ -216,8 +216,11 @@ export default function InviteApprovalPanel({
             <MapPin size={15} className="text-indigo-500 mt-0.5 shrink-0" />
             <div>
               <p className="text-xs text-slate-500 dark:text-slate-400">Location</p>
+              {/* "Conference Room B" was hardcoded demo text. Nothing books a room —
+                  the meeting is Teams-only — and the invite body says so, so the sidebar
+                  was sending people to look for a room that does not exist. */}
               <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                Conference Room B / Teams
+                Microsoft Teams
               </p>
             </div>
           </div>
@@ -289,43 +292,16 @@ export default function InviteApprovalPanel({
               </div>
             </div>
 
-            <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-              <p>Dear Team,</p>
-              <p>
-                You are invited to the{' '}
-                <strong>EGB/QBR governance review</strong> for{' '}
-                <strong>
-                  {vendorName} — {quarter} {year}
-                </strong>
-                .
-              </p>
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 rounded-lg p-3 space-y-1 text-xs">
-                <p>
-                  📅 <strong>Date:</strong>{' '}
-                  {formatDateInZone(dateObj)}
-                </p>
-                <p>
-                  🕙 <strong>Time:</strong> {formatTimeInZone(dateObj)} –{' '}
-                  {formatTimeInZone(endTime)} {displayZone}
-                </p>
-                <p>📍 <strong>Location:</strong> Conference Room B / Microsoft Teams</p>
-              </div>
-              <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                Agenda:
-              </p>
-              <ol className="list-decimal list-inside space-y-0.5 text-xs text-slate-600 dark:text-slate-400">
-                <li>{quarter} Performance Review &amp; Scorecard Discussion</li>
-                <li>Key Issues, Concerns and Pushback Responses</li>
-                <li>Commitments and Action Items Review</li>
-                <li>Forward Planning &amp; AOB</li>
-              </ol>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Please accept or decline this invitation via Microsoft Teams at your earliest convenience.
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                — Mobility Vendor Pulse Scheduling Agent
-              </p>
-            </div>
+            {/* The SAME html the draft dialog shows and the invite actually sends. This
+                was a hand-written copy of the old wording, so the inline preview and the
+                "Review meeting invite" modal disagreed — the preview still showed an
+                EGB/QBR heading and a four-point agenda that no longer go out. Rendering
+                defaultBody makes drift impossible. Values interpolated into it are
+                escaped by standardText's `esc`. */}
+            <div
+              className="text-sm text-slate-700 dark:text-slate-300 [&_p]:mb-2"
+              dangerouslySetInnerHTML={{ __html: defaultBody }}
+            />
           </div>
         </div>
       </div>

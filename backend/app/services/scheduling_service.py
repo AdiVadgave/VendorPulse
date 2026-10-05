@@ -36,7 +36,7 @@ from app.repositories.user_repository import UserRepository
 from app.services.availability_service import AvailabilityService
 from app.services.meeting_service import MeetingService
 from app.services.graph_service import GraphService
-from app.services.standard_text import spr_title
+from app.services.standard_text import spr_invite_body, spr_title
 from app.services.slot_ranking_service import SlotRankingService
 
 
@@ -705,6 +705,13 @@ class SchedulingService:
         approved_at = datetime.now(timezone.utc).isoformat()
         updated_slot = self._slots.approve(slot_id, approved_by, approved_at, time_zone=time_zone)
 
+        # approve_slot only receives cycle_id, so read the cycle for the vendor/quarter/
+        # year that the approved title and body need.
+        _cyc = self._cycles.get_by_cycle_id(cycle_id) or {}
+        _vendor = _cyc.get("vendor_name", "")
+        _quarter = _cyc.get("quarter", "")
+        _year = _cyc.get("year", "")
+
         # Build draft invite details
         proposed_dt = slot.get("proposed_time", "")
         invite_draft = {
@@ -712,13 +719,12 @@ class SchedulingService:
             "proposed_time": proposed_dt,
             "attending": slot.get("attending", []),
             "conflicts": slot.get("conflicts", []),
-            "draft_subject": f"VendorPulse Governance Meeting — {proposed_dt[:10]}",
-            "draft_body": (
-                f"You are invited to a governance meeting scheduled for "
-                f"{proposed_dt[:10]} at {proposed_dt[11:16]}.\n\n"
-                f"Attendees: {', '.join(slot.get('attending', []))}.\n\n"
-                f"Please confirm your attendance."
-            ),
+            # The Shell-approved wording, not a local variant. Nothing in the UI reads
+            # this today (the browser builds the invite itself), but a second wording
+            # living here is exactly how the inline preview and the review modal came
+            # to disagree.
+            "draft_subject": spr_title(_vendor, _quarter, _year),
+            "draft_body": spr_invite_body("Team", _vendor, _quarter, _year),
         }
 
         warnings: list[str] = []

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { CalendarPlus, Users, CheckCircle2, ExternalLink, X, UserPlus, Trash2, Link2Off, CalendarClock, CalendarCheck } from 'lucide-react'
 import { scheduleAlignmentMeetingManual, getAlignmentMeeting, getAlignmentAttendees, addAlignmentAttendee, removeAlignmentAttendee, resetAlignmentAttendees } from '@/lib/alignmentApi'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
@@ -13,6 +13,9 @@ export interface AlignmentMeetingResult {
   teamsUrl: string | null
   webLink: string | null
   attendeeCount: number
+  /** Who the invite actually went to. Absent on an older record — the UI then falls
+   *  back to the roster, which is what it always did. */
+  invitedEmails?: string[]
   /** UTC ISO instant of the scheduled start — used to display date/time. */
   startISO?: string | null
   timeZone?: string | null
@@ -63,6 +66,11 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
   // State persistence check
   const [persistenceChecked, setPersistenceChecked] = useState(false)
 
+  // Who the server says the invite went to. Mirrored in a ref because `fetchAttendees`
+  // runs outside render and must not blanket-tick everyone once this is known: the two
+  // loads race, and when the roster landed second it overwrote the invited set.
+  const invitedRef = useRef<Set<string> | null>(null)
+
   // Fetch internal attendees on mount
   const fetchAttendees = useCallback(async () => {
     setAttendeesLoading(true)
@@ -71,8 +79,12 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
       // Exclude anyone marked "Not attending" in attendance confirmation (DECLINED).
       const active = res.attendees.filter((a) => a.confirmation_status !== 'DECLINED')
       setInternalAttendees(active)
-      // Tick everyone by default — the coordinator unticks anyone who shouldn't be invited.
-      setSelected(new Set(active.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
+      const emails = active.map((a) => (a.email || '').toLowerCase()).filter(Boolean)
+      // Before the invite: tick everyone — the coordinator unticks anyone who shouldn't
+      // be invited. After it: tick only who actually received it, so a refetch (a reload,
+      // or adding someone afterwards) can't quietly redraw the record as "everyone".
+      const invited = invitedRef.current
+      setSelected(new Set(invited ? emails.filter((e) => invited.has(e)) : emails))
     } catch {
       // Fallback: attendees endpoint may not be available
     } finally {
@@ -96,6 +108,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
             teamsUrl: res.meeting.teams_meeting_url,
             webLink: res.meeting.web_link,
             attendeeCount: res.meeting.attendee_count,
+            invitedEmails: res.meeting.attendee_emails,
             startISO: res.meeting.start_time,
             timeZone: res.meeting.time_zone,
             durationMinutes: res.meeting.duration_minutes,
@@ -115,11 +128,30 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
     fetchAttendees()
   }, [fetchAttendees])
 
+  // Once the invite is out, the ticks must show WHO RECEIVED IT, not a fresh default.
+  // fetchAttendees ticks everyone, so after a reload a meeting sent to 4 of 5 people
+  // still rendered "5/5" above a confirmation that said 5 — or 4 — invited. Re-seed
+  // from the server's invited list whenever it is known.
+  const invitedKey = (meetingResult?.invitedEmails ?? []).join('|')
+  useEffect(() => {
+    if (!invitedKey) return
+    const invited = new Set(invitedKey.split('|').map((e) => e.toLowerCase()).filter(Boolean))
+    invitedRef.current = invited
+    setSelected(invited)
+  }, [invitedKey])
+
   // Once a meeting is scheduled and the roster has loaded, snapshot the current
   // invitees as the baseline. Anyone added afterward is a "pending" invitee.
   useEffect(() => {
     if (invitedBaseline !== null) return
     if (!meetingResult) return
+    // Prefer who the server says was invited. The old fallback assumed the whole roster,
+    // so anyone deliberately left off the invite looked already-invited and was never
+    // offered one by "Send invite to added attendees".
+    if (meetingResult.invitedEmails?.length) {
+      setInvitedBaseline(new Set(meetingResult.invitedEmails.map((e) => (e || '').toLowerCase()).filter(Boolean)))
+      return
+    }
     if (internalAttendees.length === 0) return
     setInvitedBaseline(new Set(internalAttendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
   }, [meetingResult, internalAttendees, invitedBaseline])
@@ -156,6 +188,12 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
   }
 
   // Only the ticked internal stakeholders are searched for availability + invited.
+  // Once the invite is out, the tick boxes describe what WAS sent — they are no longer
+  // an input. Leaving them editable let the coordinator untick someone after the fact,
+  // which changed the on-screen count but did nothing to the Teams meeting, so the
+  // header read "4/4" while the confirmation underneath still said 5 were invited.
+  const inviteSent = Boolean(meetingResult) && !rescheduling
+
   const selectedInternalAttendees = internalAttendees.filter(
     (a) => !!a.email && selected.has((a.email || '').toLowerCase())
   )
@@ -202,7 +240,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Invitees ({selectedInternalAttendees.length}/{internalAttendees.length})
               </span>
-              {selectableEmails.length > 0 && (
+              {selectableEmails.length > 0 && !inviteSent && (
                 <button
                   type="button"
                   onClick={toggleAll}
@@ -231,10 +269,14 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
                     <input
                       type="checkbox"
                       checked={selected.has((a.email || '').toLowerCase())}
-                      disabled={!a.email}
+                      disabled={!a.email || inviteSent}
                       onChange={() => toggle(a.email || '')}
-                      className="accent-violet-600"
-                      title={a.email ? 'Include in the invite' : 'No email — cannot invite'}
+                      className="accent-violet-600 disabled:opacity-60"
+                      title={
+                        inviteSent
+                          ? 'The invite has been sent — reschedule to change who attends'
+                          : a.email ? 'Include in the invite' : 'No email — cannot invite'
+                      }
                     />
                     <div className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-[10px] font-semibold text-violet-600 dark:text-violet-400">
                       {a.name.charAt(0).toUpperCase()}
@@ -251,7 +293,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
                   </div>
                   <button
                     onClick={() => handleRemoveAttendee(a.attendee_id)}
-                    disabled={removeLoading === a.attendee_id}
+                    disabled={removeLoading === a.attendee_id || inviteSent}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-500 disabled:opacity-30"
                     title="Remove attendee"
                   >
@@ -266,7 +308,9 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
 
           {/* Vendor exclusion note */}
           <p className="text-[10px] text-slate-400 mt-2 italic">
-            Untick anyone who should not be invited. Only internal stakeholders are included — vendor attendees are excluded from alignment meetings.
+            {inviteSent
+                ? 'The invite has been sent, so this list is now a record of who received it. Add someone and use "Send invite to added attendees", or Reschedule to change the time.'
+                : 'Untick anyone who should not be invited. Only internal stakeholders are included — vendor attendees are excluded from alignment meetings.'}
           </p>
 
           {/* Add attendee — search the people directory (same as vendor prep). */}
@@ -348,6 +392,9 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
                   try {
                     await resetAlignmentAttendees(cycleId, meetingIndex)
                     setInvitedBaseline(null)
+                    // Re-picking means the previous invited set no longer constrains the
+                    // ticks — drop it so the restored roster comes back fully ticked.
+                    invitedRef.current = null
                     await fetchAttendees()
                   } catch (e) {
                     setError(e instanceof Error ? e.message : 'Failed to reload attendees')
@@ -366,7 +413,18 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
               meetingUrl={meetingResult.teamsUrl}
               subject={inviteSubject}
               body={inviteBody}
-              onSent={() => setInvitedBaseline(new Set(internalAttendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))}
+              onSent={() => {
+                // Everyone on the roster is now on the invite. Push that through the
+                // ticks AND the headline count, or the panel would keep reporting the
+                // original figure next to a list that has grown.
+                const invited = new Set(internalAttendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean))
+                setInvitedBaseline(invited)
+                invitedRef.current = invited
+                setSelected(invited)
+                if (meetingResult) {
+                  onMeetingScheduled({ ...meetingResult, attendeeCount: invited.size, invitedEmails: [...invited] })
+                }
+              }}
             />
           )}
           </>
@@ -382,7 +440,13 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
             existingMeetingUrl={rescheduling ? (meetingResult?.teamsUrl ?? null) : null}
             subject={inviteSubject}
             bodyHtml={inviteBody}
-            onCancel={rescheduling ? () => setRescheduling(false) : undefined}
+            onCancel={rescheduling ? () => {
+              // Backing out of a reschedule: the original invite still stands, so put the
+              // ticks back to who received it rather than leaving the reset roster ticked.
+              const invited = new Set((meetingResult?.invitedEmails ?? []).map((e) => (e || '').toLowerCase()).filter(Boolean))
+              if (invited.size) { invitedRef.current = invited; setSelected(invited) }
+              setRescheduling(false)
+            } : undefined}
             onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl, attendeeCount }) => {
               if (selectedInternalAttendees.length === 0) { setError('Tick at least one attendee to invite.'); return }
               await scheduleAlignmentMeetingManual(cycleId, {
@@ -398,9 +462,15 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
               }
               // The invited set is now the baseline — only people added AFTER this
               // become "pending" and surface the "Send invite to added attendees" button.
-              setInvitedBaseline(new Set(selectedInternalAttendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
+              const invited = new Set(selectedInternalAttendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean))
+              setInvitedBaseline(invited)
+              // Set before the refetch below, which would otherwise re-tick everyone.
+              invitedRef.current = invited
               onMeetingScheduled({
                 teamsUrl, webLink: null, attendeeCount,
+                // Record who it went to now, so the locked list is right immediately —
+                // not only after the next reload refetches it from the server.
+                invitedEmails: selectedInternalAttendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean),
                 startISO: startTime, timeZone, durationMinutes,
               })
               setRescheduling(false)

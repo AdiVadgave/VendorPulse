@@ -109,6 +109,8 @@ export interface AlignmentMeeting {
   teams_meeting_url: string | null
   web_link: string | null
   attendee_count: number
+  /** Who was actually invited (organiser + participants), so the UI never has to guess. */
+  attendee_emails?: string[]
   status: string
   time_slot: { date: string; start_time: string; end_time: string } | null
   /** UTC ISO instant of the scheduled start (for display). */

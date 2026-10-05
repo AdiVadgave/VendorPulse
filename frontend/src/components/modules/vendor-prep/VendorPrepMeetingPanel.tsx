@@ -43,6 +43,8 @@ interface MeetingResult {
   teamsUrl: string | null
   webLink: string | null
   attendeeCount: number
+  /** Who the invite actually went to (organiser + participants). */
+  invitedEmails?: string[]
   /** UTC ISO instant of the scheduled start — used to display date/time. */
   startISO?: string | null
   timeZone?: string | null
@@ -143,6 +145,7 @@ export default function VendorPrepMeetingPanel({
             teamsUrl: res.meeting.teams_meeting_url,
             webLink: res.meeting.web_link,
             attendeeCount: res.meeting.attendee_count,
+            invitedEmails: res.meeting.attendee_emails,
             startISO: res.meeting.start_time,
             timeZone: res.meeting.time_zone,
             durationMinutes: res.meeting.duration_minutes,
@@ -172,6 +175,13 @@ export default function VendorPrepMeetingPanel({
   useEffect(() => {
     if (invitedBaseline !== null) return
     if (!meetingResult) return
+    // Prefer who the server says was invited. The fallback assumes the whole roster, so
+    // anyone left off the invite (or restored by a reschedule that was then cancelled)
+    // looked already-invited and was never offered one by "Send invite to added attendees".
+    if (meetingResult.invitedEmails?.length) {
+      setInvitedBaseline(new Set(meetingResult.invitedEmails.map((e) => (e || '').toLowerCase()).filter(Boolean)))
+      return
+    }
     if (attendees.length === 0) return
     setInvitedBaseline(new Set(attendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
   }, [meetingResult, attendees, invitedBaseline])
@@ -274,6 +284,10 @@ export default function VendorPrepMeetingPanel({
   }
 
   const showScheduler = !meetingResult || rescheduling
+  // Unlike the alignment panel, the tick list here is only rendered while the scheduler
+  // is up — once the meeting exists the roster below is read-only, so there is nothing
+  // to lock. What WAS still live after sending is the per-row remove button.
+  const inviteSent = Boolean(meetingResult) && !rescheduling
 
   return (
     <div className="space-y-5">
@@ -377,7 +391,7 @@ export default function VendorPrepMeetingPanel({
                           </div>
                           <button
                             onClick={() => handleRemoveAttendee(a.attendee_id)}
-                            disabled={removeLoading === a.attendee_id}
+                            disabled={removeLoading === a.attendee_id || inviteSent}
                             className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-500 disabled:opacity-30 shrink-0 ml-2"
                             title="Remove attendee"
                           >
@@ -396,7 +410,14 @@ export default function VendorPrepMeetingPanel({
                   meetingUrl={meetingResult.teamsUrl}
                   subject={inviteSubject}
                   body={inviteBody}
-                  onSent={() => setInvitedBaseline(new Set(attendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))}
+                  onSent={() => {
+                    // Everyone on the roster is now on the invite — move the headline
+                    // count with it, or it keeps reporting the original figure next to
+                    // a roster that has grown.
+                    const invited = [...new Set(attendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean))]
+                    setInvitedBaseline(new Set(invited))
+                    setMeetingResult((prev) => prev && { ...prev, attendeeCount: invited.length, invitedEmails: invited })
+                  }}
                 />
               )}
             </div>
@@ -517,6 +538,7 @@ export default function VendorPrepMeetingPanel({
                   setInvitedBaseline(new Set(selectedAttendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean)))
                   setMeetingResult({
                     teamsUrl: res.teams_meeting_url, webLink: res.web_link, attendeeCount: res.attendee_count,
+                    invitedEmails: res.attendee_emails,
                     startISO: startTime, timeZone, durationMinutes,
                   })
                   setRescheduling(false)

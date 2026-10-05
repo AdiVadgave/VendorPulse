@@ -40,6 +40,7 @@ from app.services.meeting_attendee_service import (
     remove_meeting_attendee,
     reset_meeting_attendees,
 )
+from app.utils.meeting_invitees import invited_emails
 
 logger = logging.getLogger(__name__)
 
@@ -348,12 +349,13 @@ def _iso_start_from_slot(ts: Optional[dict]) -> Optional[str]:
 
 def _vp_meeting_dto(m: dict, participant_repo) -> dict:
     participants = participant_repo.get_for_meeting(m.get("meeting_id", ""))
+    invited = invited_emails(m, participants)
     return {
         "meeting_index": VP_MEETING_INDEX,
         "event_id": m.get("meeting_id"),
         "teams_meeting_url": m.get("teams_meeting_url"),
         "web_link": m.get("web_link"),
-        "attendee_count": len(participants) + 1,
+        "attendee_count": len(invited),
         "status": m.get("status"),
         "time_slot": m.get("time_slot"),
         # Scheduled date/time so the UI can render it after a refresh.
@@ -361,7 +363,9 @@ def _vp_meeting_dto(m: dict, participant_repo) -> dict:
         "time_zone": m.get("time_zone"),
         "duration_minutes": m.get("duration_minutes"),
         "title": m.get("title"),
-        "attendee_emails": [p.get("user_id") for p in participants],
+        # Organiser first: they are stored outside the participant rows but are on the
+        # invite, so omitting them made the invited set look one person short.
+        "attendee_emails": invited,
     }
 
 

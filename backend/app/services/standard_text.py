@@ -15,6 +15,8 @@ months is a plain hyphen (-). Both are as specified.
 """
 from __future__ import annotations
 
+from html import escape
+
 # Month abbreviations by quarter. The governance cycle is named for the quarter it
 # REVIEWS, so Q1 covers Jan–Mar of that same year.
 _QUARTER_MONTHS: dict[str, tuple[str, str]] = {
@@ -140,11 +142,17 @@ def split_body(body: str) -> tuple[list[str], str]:
 
 def as_html(body: str) -> str:
     """Render a standard text as simple HTML paragraphs, preserving the line break
-    inside the sign-off. Escaping is the caller's job where a value is untrusted."""
+    inside the sign-off.
+
+    The text is escaped first. Every builder above returns plain text with a vendor
+    or attendee name interpolated into it, and a vendor name is free text typed by a
+    coordinator, so an unescaped "&" or "<" would break the markup or inject into it.
+    The frontend mirror escapes the same values (frontend/src/lib/standardText.ts),
+    so escaping here also keeps the two renderings in step."""
     paras = [p for p in body.split("\n\n") if p.strip()]
     return "".join(
         '<p style="font-size:14px;line-height:1.6;margin:0 0 16px 0;color:#1e293b;">'
-        + p.replace("\n", "<br>")
+        + escape(p, quote=False).replace("\n", "<br>")
         + "</p>"
         for p in paras
     )

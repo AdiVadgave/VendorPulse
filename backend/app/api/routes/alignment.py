@@ -30,6 +30,7 @@ from app.models.common import AgentResponse
 from app.services.graph_service import GraphService
 from app.services.standard_text import alignment_invite_body, spr_title
 from app.utils.prompts import ALIGNMENT_SYSTEM_PROMPT
+from app.utils.meeting_invitees import invited_emails
 
 logger = logging.getLogger(__name__)
 
@@ -276,13 +277,19 @@ def _iso_start_from_slot(ts: Optional[dict]) -> Optional[str]:
 
 
 def _alignment_meeting_dto(m: dict, participant_repo) -> dict:
-    participant_count = len(participant_repo.get_for_meeting(m.get("meeting_id", "")))
+    participants = participant_repo.get_for_meeting(m.get("meeting_id", ""))
+    # WHO was actually invited, not just how many. Without this the UI could only guess,
+    # and it guessed "everyone currently on the roster" — so a stakeholder left out of the
+    # invite looked already-invited and was never offered one. The count is derived from
+    # the same list so the two can never disagree.
+    invited = invited_emails(m, participants)
     return {
+        "attendee_emails": invited,
         "meeting_index": int(m.get("alignment_index", 1)),
         "event_id": m.get("meeting_id"),
         "teams_meeting_url": m.get("teams_meeting_url"),
         "web_link": m.get("web_link"),
-        "attendee_count": participant_count + 1,
+        "attendee_count": len(invited),
         "status": m.get("status"),
         "time_slot": m.get("time_slot"),
         # Scheduled date/time so the UI can render it after a refresh.

@@ -48,6 +48,23 @@ function p(text: string): string {
 }
 
 /**
+ * Escape a value interpolated into one of these HTML bodies.
+ *
+ * The result is rendered with dangerouslySetInnerHTML (DraftReviewDialog) and is sent
+ * as the invite body, so a vendor or attendee name carrying `<`, `&` or a quote would
+ * otherwise break the markup — or inject into it. Vendor names are free text typed by
+ * a coordinator, so they are not trustworthy input.
+ */
+function esc(value: string | number): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
  * The approved SPR invite body, as HTML.
  *
  * `extraHtml` is appended after the approved paragraphs and before the sign-off — used
@@ -63,8 +80,8 @@ export function sprInviteBody(
 ): string {
   const [from, to] = cyclePeriod(quarter, year)
   return (
-    p(`Dear ${attendeeName},`) +
-    p(`You are invited to the Shell/${vendorName} SPR, covering the ${from} - ${to} period.`) +
+    p(`Dear ${esc(attendeeName)},`) +
+    p(`You are invited to the Shell/${esc(vendorName)} SPR, covering the ${from} - ${to} period.`) +
     p(
       'The preceding preparation sessions will be scheduled shortly, and any additional ' +
       'details relevant to this call will be shared by the meeting organiser through a ' +
@@ -98,9 +115,9 @@ export function alignmentInviteBody(
   const [from, to] = cyclePeriod(quarter, year)
   const n = Math.max(1, Math.trunc(Number(session) || 1))
   return (
-    p(`Dear ${attendeeName},`) +
+    p(`Dear ${esc(attendeeName)},`) +
     p(
-      `You are invited to the Internal Alignment Session ${n} for the Shell/${vendorName} ` +
+      `You are invited to the Internal Alignment Session ${n} for the Shell/${esc(vendorName)} ` +
       `SPR covering the ${from} - ${to} period.`,
     ) +
     p(ORGANISER_NOTE) +
@@ -128,9 +145,9 @@ export function vendorPrepInviteBody(
 ): string {
   const [from, to] = cyclePeriod(quarter, year)
   return (
-    p(`Dear ${attendeeName},`) +
+    p(`Dear ${esc(attendeeName)},`) +
     p(
-      `You are invited to the Prep Call for the Shell/${vendorName} SPR covering the ` +
+      `You are invited to the Prep Call for the Shell/${esc(vendorName)} SPR covering the ` +
       `${from} - ${to} period.`,
     ) +
     p('The main objective of this session is to present and discuss the SPR scorecard.') +

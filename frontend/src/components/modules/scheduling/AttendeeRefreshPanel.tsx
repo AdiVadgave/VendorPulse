@@ -789,42 +789,46 @@ export default function AttendeeRefreshPanel({
                     </td>
                     <td className="px-4 py-3">
                       {isInternal ? (
-                        <select
-                          value={a.is_key ? 'key' : 'not'}
-                          onChange={(e) => handleUpdateAttendee(a, { is_key: e.target.value === 'key' })}
-                          title={a.is_key ? 'Key attendee (fills scorecard)' : 'Not a key attendee'}
-                          className={cn(
-                            'px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500',
-                            a.is_key
-                              ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
-                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                        // Flex row with a gap: the two selects used to sit flush against
+                        // each other, so the focus ring of one spilled over the other.
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select
+                            value={a.is_key ? 'key' : 'not'}
+                            onChange={(e) => handleUpdateAttendee(a, { is_key: e.target.value === 'key' })}
+                            title={a.is_key ? 'Key attendee (fills scorecard)' : 'Not a key attendee'}
+                            className={cn(
+                              'px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500',
+                              a.is_key
+                                ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                            )}
+                          >
+                            <option value="key">Yes</option>
+                            <option value="not">No</option>
+                          </select>
+                          {/* Same choice as the add form, so a reviewer can be switched to
+                              scorecard-only (or back) after they have been added. */}
+                          {a.is_key && (
+                            <select
+                              value={a.attends_spr === false ? 'no' : 'yes'}
+                              onChange={(e) => handleUpdateAttendee(a, { attends_spr: e.target.value === 'yes' })}
+                              title={a.attends_spr === false
+                                ? 'Scorecard only — not invited to the SPR'
+                                : 'Also attends the SPR'}
+                              className={cn(
+                                'px-2 py-1 text-[11px] border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500',
+                                a.attends_spr === false
+                                  ? 'border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                              )}
+                            >
+                              <option value="yes">Attends SPR</option>
+                              <option value="no">Scorecard only</option>
+                            </select>
                           )}
-                        >
-                          <option value="key">Yes</option>
-                          <option value="not">No</option>
-                        </select>
+                        </div>
                       ) : (
                         <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
-                      )}
-                      {/* Same choice as the add form, so a reviewer can be switched to
-                          scorecard-only (or back) after they have been added. */}
-                      {isInternal && a.is_key && (
-                        <select
-                          value={a.attends_spr === false ? 'no' : 'yes'}
-                          onChange={(e) => handleUpdateAttendee(a, { attends_spr: e.target.value === 'yes' })}
-                          title={a.attends_spr === false
-                            ? 'Scorecard only — not invited to the SPR'
-                            : 'Also attends the SPR'}
-                          className={cn(
-                            'mt-1 px-2 py-1 text-[11px] border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500',
-                            a.attends_spr === false
-                              ? 'border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                          )}
-                        >
-                          <option value="yes">Attends SPR</option>
-                          <option value="no">Scorecard only</option>
-                        </select>
                       )}
                     </td>
                     <td className="px-4 py-3">

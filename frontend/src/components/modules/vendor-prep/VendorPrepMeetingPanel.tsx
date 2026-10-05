@@ -283,11 +283,15 @@ export default function VendorPrepMeetingPanel({
     if (actions.length && onActionsExtracted) onActionsExtracted(actions)
   }
 
-  const showScheduler = !meetingResult || rescheduling
+  // Gated on persistenceChecked: until that fetch resolves we do not know whether this
+  // prep call is already scheduled, and showing the scheduler meanwhile made the whole
+  // slot picker and its tick list flash up on every refresh before being replaced.
+  const showScheduler = persistenceChecked && (!meetingResult || rescheduling)
   // Unlike the alignment panel, the tick list here is only rendered while the scheduler
   // is up — once the meeting exists the roster below is read-only, so there is nothing
   // to lock. What WAS still live after sending is the per-row remove button.
   const inviteSent = Boolean(meetingResult) && !rescheduling
+  const rosterLocked = inviteSent || !persistenceChecked
 
   return (
     <div className="space-y-5">
@@ -299,7 +303,9 @@ export default function VendorPrepMeetingPanel({
 
         <div className="p-5 space-y-4">
           {/* Scheduled state */}
-          {meetingResult && !rescheduling ? (
+          {!persistenceChecked ? (
+            <p className="text-xs text-slate-400">Checking for an existing meeting…</p>
+          ) : meetingResult && !rescheduling ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 font-medium">
                 <CheckCircle2 size={16} /> Vendor prep meeting scheduled — {meetingResult.attendeeCount} attendee{meetingResult.attendeeCount === 1 ? '' : 's'} invited.
@@ -391,7 +397,7 @@ export default function VendorPrepMeetingPanel({
                           </div>
                           <button
                             onClick={() => handleRemoveAttendee(a.attendee_id)}
-                            disabled={removeLoading === a.attendee_id || inviteSent}
+                            disabled={removeLoading === a.attendee_id || rosterLocked}
                             className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-500 disabled:opacity-30 shrink-0 ml-2"
                             title="Remove attendee"
                           >

@@ -193,6 +193,12 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
   // which changed the on-screen count but did nothing to the Teams meeting, so the
   // header read "4/4" while the confirmation underneath still said 5 were invited.
   const inviteSent = Boolean(meetingResult) && !rescheduling
+  // Until the persistence check resolves we do not yet KNOW whether this meeting was
+  // already scheduled. Rendering the roster as editable in the meantime made the tick
+  // boxes, Select-all and the remove buttons appear for a moment on every refresh of a
+  // scheduled meeting, then vanish. Treat "not yet known" as locked, so the controls
+  // only ever appear once we are sure they belong there.
+  const rosterLocked = inviteSent || !persistenceChecked
 
   const selectedInternalAttendees = internalAttendees.filter(
     (a) => !!a.email && selected.has((a.email || '').toLowerCase())
@@ -240,7 +246,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Invitees ({selectedInternalAttendees.length}/{internalAttendees.length})
               </span>
-              {selectableEmails.length > 0 && !inviteSent && (
+              {selectableEmails.length > 0 && !rosterLocked && (
                 <button
                   type="button"
                   onClick={toggleAll}
@@ -269,13 +275,15 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
                     <input
                       type="checkbox"
                       checked={selected.has((a.email || '').toLowerCase())}
-                      disabled={!a.email || inviteSent}
+                      disabled={!a.email || rosterLocked}
                       onChange={() => toggle(a.email || '')}
                       className="accent-violet-600 disabled:opacity-60"
                       title={
-                        inviteSent
-                          ? 'The invite has been sent — reschedule to change who attends'
-                          : a.email ? 'Include in the invite' : 'No email — cannot invite'
+                        !persistenceChecked
+                          ? 'Checking whether this meeting has already been scheduled…'
+                          : inviteSent
+                            ? 'The invite has been sent — reschedule to change who attends'
+                            : a.email ? 'Include in the invite' : 'No email — cannot invite'
                       }
                     />
                     <div className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-[10px] font-semibold text-violet-600 dark:text-violet-400">
@@ -293,7 +301,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
                   </div>
                   <button
                     onClick={() => handleRemoveAttendee(a.attendee_id)}
-                    disabled={removeLoading === a.attendee_id || inviteSent}
+                    disabled={removeLoading === a.attendee_id || rosterLocked}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-500 disabled:opacity-30"
                     title="Remove attendee"
                   >
@@ -308,7 +316,9 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
 
           {/* Vendor exclusion note */}
           <p className="text-[10px] text-slate-400 mt-2 italic">
-            {inviteSent
+            {!persistenceChecked
+              ? 'Checking whether this meeting has already been scheduled…'
+              : inviteSent
                 ? 'The invite has been sent, so this list is now a record of who received it. Add someone and use "Send invite to added attendees", or Reschedule to change the time.'
                 : 'Untick anyone who should not be invited. Only internal stakeholders are included — vendor attendees are excluded from alignment meetings.'}
           </p>
@@ -350,7 +360,11 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
           </ul>
         </div>
 
-        {meetingResult && !rescheduling ? (
+        {!persistenceChecked ? (
+          /* Still resolving whether a meeting exists. Render neither branch yet, or the
+             scheduler flashes up on refresh and is replaced a moment later. */
+          <p className="text-xs text-slate-400">Checking for an existing meeting…</p>
+        ) : meetingResult && !rescheduling ? (
           /* Meeting already scheduled — show confirmation */
           <>
           <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-4 py-3 space-y-2">

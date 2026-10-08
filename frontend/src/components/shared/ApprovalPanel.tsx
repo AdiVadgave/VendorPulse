@@ -1,4 +1,4 @@
-import { X, AlertTriangle, Send } from 'lucide-react'
+import { X, AlertTriangle, Send, Pencil } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
 interface ApprovalPanelProps {
@@ -11,6 +11,11 @@ interface ApprovalPanelProps {
   onCancel: () => void
   approveLabel?: string
   isProcessing?: boolean
+  /** Optional third action, shown on the left of the footer. Used for "Edit" so the
+   *  reviewer can change the content from the same dialog that asks them to sign it
+   *  off, instead of having to cancel out first. */
+  secondaryLabel?: string
+  onSecondary?: () => void
 }
 
 export default function ApprovalPanel({
@@ -23,6 +28,8 @@ export default function ApprovalPanel({
   onCancel,
   approveLabel = 'Approve & Send',
   isProcessing = false,
+  secondaryLabel,
+  onSecondary,
 }: ApprovalPanelProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -115,6 +122,16 @@ export default function ApprovalPanel({
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-800">
+          {secondaryLabel && onSecondary && (
+            <button
+              onClick={onSecondary}
+              disabled={isProcessing}
+              className="mr-auto flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-60"
+            >
+              <Pencil size={14} />
+              {secondaryLabel}
+            </button>
+          )}
           <button
             onClick={onCancel}
             className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"

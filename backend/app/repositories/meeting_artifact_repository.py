@@ -17,7 +17,7 @@ class MeetingArtifactRepository(BaseRepository):
     pk = "artifact_id"
     columns = (
         "artifact_id", "cycle_id", "meeting_id", "notes", "minutes",
-        "parsed_at", "minutes_generated_at",
+        "parsed_at", "minutes_generated_at", "minutes_approved_at", "minutes_approved_by",
     )
     json_columns = frozenset({"notes", "minutes"})
 
@@ -39,6 +39,8 @@ class MeetingArtifactRepository(BaseRepository):
             "minutes": None,
             "parsed_at": None,
             "minutes_generated_at": None,
+            "minutes_approved_at": None,
+            "minutes_approved_by": None,
             **patch,
         }
         return self.insert(record)

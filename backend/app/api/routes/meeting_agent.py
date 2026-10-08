@@ -59,6 +59,10 @@ def get_meeting_artifact(
         "notes": artifact.get("notes", []),
         "minutes": artifact.get("minutes"),
         "parsed_at": artifact.get("parsed_at"),
+        # Without these the Meeting tab had no way to know the minutes were already
+        # signed off, so it re-offered "Approve minutes" after every refresh.
+        "minutes_approved_at": artifact.get("minutes_approved_at"),
+        "minutes_approved_by": artifact.get("minutes_approved_by"),
     }
 
 
@@ -283,7 +287,10 @@ def extract_transcript_file(cycleId: str, payload: TranscriptFileRequest):
 
 
 class ApproveMinutesRequest(BaseModel):
-    run_id: str
+    # run_id is optional: after a page refresh the browser no longer holds the id of
+    # the run that generated these minutes, but the approval still has to persist.
+    run_id: str = ""
+    meeting_id: str = ""
     approved_by: str = "coordinator"
 
 
@@ -292,22 +299,35 @@ def approve_minutes(cycleId: str, payload: ApproveMinutesRequest):
     """Mark generated meeting minutes as approved and finalised."""
     logger.info("MEETING-AGENT: approve minutes — cycleId=%s, run_id=%s", sanitize_for_log(cycleId), sanitize_for_log(payload.run_id))
 
-    repo = get_agent_run_repo()
-    record = repo.get_by_run_id(payload.run_id)
-    if not record:
-        raise HTTPException(status_code=404, detail=f"Agent run '{payload.run_id}' not found")
-
     now = datetime.now(timezone.utc).isoformat()
-    repo.update_by_id("run_id", payload.run_id, {
-        "approval_status": "APPROVED",
-        "approved_by": payload.approved_by,
-        "approved_at": now,
+
+    # The agent-run row is the audit trail of WHO approved WHICH generation. It only
+    # exists while the browser still holds the run id, so it is updated when we have
+    # one and is not required.
+    if payload.run_id:
+        repo = get_agent_run_repo()
+        record = repo.get_by_run_id(payload.run_id)
+        if not record:
+            raise HTTPException(status_code=404, detail=f"Agent run '{payload.run_id}' not found")
+        repo.update_by_id("run_id", payload.run_id, {
+            "approval_status": "APPROVED",
+            "approved_by": payload.approved_by,
+            "approved_at": now,
+        })
+
+    # The artifact row is what the UI reads back on load, so this is the write that
+    # actually makes the approval survive a refresh.
+    mid = payload.meeting_id or f"mtg-{cycleId}"
+    get_meeting_artifact_repo().upsert(cycleId, mid, {
+        "minutes_approved_at": now,
+        "minutes_approved_by": payload.approved_by,
     })
 
     logger.info("MEETING-AGENT: minutes approved — run_id=%s, by=%s", sanitize_for_log(payload.run_id), sanitize_for_log(payload.approved_by))
     return {
         "status": "approved",
         "run_id": payload.run_id,
+        "meeting_id": mid,
         "approved_by": payload.approved_by,
         "approved_at": now,
     }

@@ -379,6 +379,11 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             minutes              JSONB,
             parsed_at            TEXT,
             minutes_generated_at TEXT,
+            -- Approval is part of the artifact, not just the agent run that produced it:
+            -- the Meeting tab restores from here, so without these the UI re-offered
+            -- "Approve minutes" on every refresh of already-approved minutes.
+            minutes_approved_at  TEXT,
+            minutes_approved_by  TEXT,
             seq                  BIGSERIAL UNIQUE NOT NULL,
             UNIQUE (cycle_id, meeting_id)
         )
@@ -458,6 +463,10 @@ _ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
     "action_items": [
         ("details", "TEXT"),
     ],
+    "meeting_artifacts": [
+        ("minutes_approved_at", "TEXT"),
+        ("minutes_approved_by", "TEXT"),
+    ],
     "agent_runs": [
         ("approval_status", "TEXT"),
         ("approved_by", "TEXT"),
@@ -498,6 +507,7 @@ _TIMESTAMP_COLUMNS: list[tuple[str, str]] = [
     ("action_items", "updated_at"),
     ("meeting_artifacts", "parsed_at"),
     ("meeting_artifacts", "minutes_generated_at"),
+    ("meeting_artifacts", "minutes_approved_at"),
     ("agent_runs", "created_at"),
     ("agent_runs", "approved_at"),
 ]

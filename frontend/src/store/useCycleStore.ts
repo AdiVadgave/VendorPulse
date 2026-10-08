@@ -121,8 +121,21 @@ export const useCycleStore = create<CycleStore>()(
         })
         // Sync to backend so progress survives localStorage clears and cross-device
         // use. Skip mock cycles — they don't exist server-side.
+        //
+        // This deliberately does NOT skip when `didAdvance` is false. `didAdvance` only
+        // reports whether the LOCAL override changed, and that override is persisted to
+        // localStorage — so once it ran ahead of the server (an advance fired while the
+        // backend was unreachable is treated as success, by design, to stay usable
+        // offline) every later call found the override already at the target, returned
+        // early, and never told the server. The result was a cycle that looked complete
+        // in the detail view while the dashboard card and the database stayed pinned to
+        // an earlier state, with no path back into sync.
+        //
+        // The endpoint is idempotent — already at or past the target returns 200 "No
+        // change" — so an extra call costs nothing and lets any divergence heal on the
+        // next advance.
         const advancedTo = resolvedState
-        if (!didAdvance || !advancedTo || getMockCycleById(cycleId)) return { ok: true }
+        if (!advancedTo || getMockCycleById(cycleId)) return { ok: true }
 
         const { rejected } = await setBackendWorkflowState(cycleId, advancedTo)
         if (!rejected) return { ok: true }
@@ -130,6 +143,9 @@ export const useCycleStore = create<CycleStore>()(
         // The backend refused (e.g. the archive guard's 409). Undo the optimistic
         // advance, otherwise the persisted copy pins a state the database never
         // reached and pickMostAdvanced keeps it winning on every later fetch.
+        // Only roll back what this call actually changed. When didAdvance is false the
+        // local state was already there and is not ours to revert.
+        if (!didAdvance) return { ok: false, error: rejected }
         set((s) => {
           if (s.workflowStates[cycleId] !== advancedTo) return s  // a later advance won
           const nextStates = { ...s.workflowStates }

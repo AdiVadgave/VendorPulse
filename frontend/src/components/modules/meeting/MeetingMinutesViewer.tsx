@@ -21,6 +21,9 @@ interface Props {
   notes: MeetingNote[]
   /** Previously-generated minutes, restored on load so the MoM isn't regenerated. */
   initialMinutes?: MeetingMinutes | null
+  /** Whether those minutes were already approved. Without this the viewer reset to
+   *  "needs approval" on every refresh and re-offered a decision already taken. */
+  initialApproved?: boolean
   vendorName: string
   quarter: string
   year: number
@@ -32,13 +35,18 @@ interface Props {
   heading?: string
 }
 
-export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = null, vendorName, quarter, year, onApproved, meetingId: meetingIdProp, heading = 'Meeting Minutes' }: Props) {
+export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = null, initialApproved = false, vendorName, quarter, year, onApproved, meetingId: meetingIdProp, heading = 'Meeting Minutes' }: Props) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(initialMinutes ? 'complete' : 'idle')
   const [minutes, setMinutes] = useState<MeetingMinutes | null>(initialMinutes)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<MeetingMinutes | null>(null)
   const [showApproval, setShowApproval] = useState(false)
-  const [approved, setApproved] = useState(false)
+  // Approved EITHER because the server says so (restored with the artifact, and it
+  // arrives after first paint) OR because it was approved in this session. Derived
+  // rather than an effect, so a slow or failed reload can never un-approve minutes
+  // that are already signed off.
+  const [approvedInSession, setApprovedInSession] = useState(false)
+  const approved = initialApproved || approvedInSession
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [runId, setRunId] = useState<string | null>(null)
@@ -138,15 +146,20 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
   async function handleApprove() {
     setIsApproving(true)
     try {
-      if (runId) {
-        await approveMinutes(cycleId, runId)
-      }
-    } catch {
-      // Approval persisting failed — still approve locally so UI isn't stuck
+      // Always persist, with or without a run id. The old `if (runId)` guard meant
+      // that after a refresh (which loses runId) approving did nothing server-side —
+      // it flipped the local flag and the prompt came back on the next reload.
+      await approveMinutes(cycleId, runId, meetingIdProp ?? `mtg-${cycleId}`)
+    } catch (e) {
+      // Approval could not be persisted. Say so rather than showing a finalised state
+      // that will not survive a refresh.
+      setError(e instanceof Error ? e.message : 'Could not save the approval. Please try again.')
+      setIsApproving(false)
+      return
     }
     setShowApproval(false)
     setAgentStatus('complete')
-    setApproved(true)
+    setApprovedInSession(true)
     setIsApproving(false)
     onApproved()
   }
@@ -666,14 +679,30 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
           title="Approve Meeting Minutes"
           summary={`Approve and finalise the ${vendorName} ${quarter} ${year} EGB/QBR minutes.`}
           previewContent={
-            <div className="space-y-2 text-sm">
+            /* Summarise the WHOLE document, not just the executive summary. Showing one
+               paragraph made the dialog look like a different, shorter document than the
+               minutes that were finalised, so it read as if approving changed the content. */
+            <div className="space-y-3 text-sm">
               <p className="font-medium text-slate-800 dark:text-slate-200">{vendorName} {quarter} {year} EGB/QBR Meeting Minutes</p>
-              <p className="text-slate-600 dark:text-slate-400">{minutes.executive_summary}</p>
-              <p className="text-xs text-slate-400">{minutes.action_items.length} action items will be merged into the unified Action Log.</p>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Executive summary</p>
+                <p className="text-slate-600 dark:text-slate-400">{minutes.executive_summary}</p>
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-700 pt-2">
+                <span><strong className="text-slate-700 dark:text-slate-300">{minutes.key_decisions.length}</strong> key decisions</span>
+                <span><strong className="text-slate-700 dark:text-slate-300">{minutes.agenda_summaries.length}</strong> agenda summaries</span>
+                <span><strong className="text-slate-700 dark:text-slate-300">{minutes.action_items.length}</strong> action items</span>
+              </div>
+              <p className="text-xs text-slate-400">
+                This finalises the full minutes shown on the page — summary, decisions, agenda
+                notes and actions. The {minutes.action_items.length} action items are merged into the unified Action Log.
+              </p>
             </div>
           }
           approveLabel="Approve & Finalise"
           isProcessing={isApproving}
+          secondaryLabel="Edit minutes"
+          onSecondary={() => { setShowApproval(false); startEdit() }}
           onApprove={handleApprove}
           onCancel={() => { setShowApproval(false); if (agentStatus === 'awaiting_approval') setAgentStatus('idle') }}
         />

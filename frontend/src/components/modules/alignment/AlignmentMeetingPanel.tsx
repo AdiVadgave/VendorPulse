@@ -41,6 +41,8 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
   const meetingId = `align-${cycleId}-${index}`
   const [parsedNotes, setParsedNotes] = useState<MeetingNote[]>([])
   const [savedMinutes, setSavedMinutes] = useState<MeetingMinutes | null>(null)
+  // Restored alongside the minutes so an already-approved MoM does not re-prompt.
+  const [minutesApproved, setMinutesApproved] = useState(false)
 
   // Restore the parsed notes + minutes for this meeting on mount so the MoM survives a refresh.
   useEffect(() => {
@@ -50,6 +52,7 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
         if (cancelled) return
         if (a.notes?.length) setParsedNotes(a.notes)
         if (a.minutes) setSavedMinutes(a.minutes)
+        if (a.minutes_approved_at) setMinutesApproved(true)
       })
       .catch(() => { /* backend offline / never parsed */ })
     return () => { cancelled = true }
@@ -97,10 +100,11 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
           heading={`Alignment Meeting ${index} Minutes`}
           notes={parsedNotes}
           initialMinutes={savedMinutes}
+          initialApproved={minutesApproved}
           vendorName={vendorName}
           quarter={quarter}
           year={year}
-          onApproved={() => { /* per-meeting MoM — no workflow gate */ }}
+          onApproved={() => setMinutesApproved(true)}
         />
       )}
     </div>

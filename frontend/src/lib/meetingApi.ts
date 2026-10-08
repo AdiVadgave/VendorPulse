@@ -90,6 +90,10 @@ export interface MeetingArtifact {
   notes: MeetingNote[]
   minutes: MeetingMinutes | null
   parsed_at: string | null
+  /** Set once the minutes have been approved — lets the viewer restore the finalised
+   *  state after a refresh instead of offering "Approve minutes" all over again. */
+  minutes_approved_at?: string | null
+  minutes_approved_by?: string | null
 }
 
 /** Fetch the persisted parsed notes + minutes for a meeting (empty if never parsed). */
@@ -141,14 +145,22 @@ export interface ApprovalResult {
 
 export async function approveMinutes(
   cycleId: string,
-  runId: string,
+  runId: string | null,
+  meetingId?: string,
   approvedBy = 'coordinator'
 ): Promise<ApprovalResult> {
+  // `runId` is null after a refresh — the browser no longer holds the id of the run
+  // that produced these minutes. The approval is keyed on the meeting, so it still
+  // persists; the run id is sent only when we have it, to stamp the audit trail.
   return apiFetch<ApprovalResult>(
     `/api/cycles/${cycleId}/meeting/minutes/approve`,
     {
       method: 'POST',
-      body: JSON.stringify({ run_id: runId, approved_by: approvedBy }),
+      body: JSON.stringify({
+        run_id: runId ?? '',
+        meeting_id: meetingId ?? '',
+        approved_by: approvedBy,
+      }),
     }
   )
 }

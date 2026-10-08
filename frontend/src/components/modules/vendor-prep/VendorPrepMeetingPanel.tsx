@@ -75,6 +75,8 @@ export default function VendorPrepMeetingPanel({
   const meetingId = `vprep-${cycleId}`
   const [parsedNotes, setParsedNotes] = useState<MeetingNote[]>([])
   const [savedMinutes, setSavedMinutes] = useState<MeetingMinutes | null>(null)
+  // Restored alongside the minutes so an already-approved MoM does not re-prompt.
+  const [minutesApproved, setMinutesApproved] = useState(false)
 
   const [rescheduling, setRescheduling] = useState(false)
   const [addingInvitee, setAddingInvitee] = useState(false)
@@ -165,6 +167,7 @@ export default function VendorPrepMeetingPanel({
         if (cancelled) return
         if (a.notes?.length) setParsedNotes(a.notes)
         if (a.minutes) setSavedMinutes(a.minutes)
+        if (a.minutes_approved_at) setMinutesApproved(true)
       })
       .catch(() => { /* backend offline / never parsed */ })
     return () => { cancelled = true }
@@ -577,10 +580,11 @@ export default function VendorPrepMeetingPanel({
           heading="Vendor Prep Meeting Minutes"
           notes={parsedNotes}
           initialMinutes={savedMinutes}
+          initialApproved={minutesApproved}
           vendorName={vendorName}
           quarter={quarter}
           year={year}
-          onApproved={() => { /* per-meeting MoM — no workflow gate */ }}
+          onApproved={() => setMinutesApproved(true)}
         />
       )}
     </div>

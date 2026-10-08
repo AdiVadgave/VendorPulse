@@ -225,6 +225,8 @@ export default function CycleDetail() {
   // Persisted minutes for the QBR/vendor meeting — hydrated on load so the MoM isn't
   // regenerated after a refresh.
   const [meetingMinutes, setMeetingMinutes] = useState<MeetingMinutes | null>(null)
+  // Restored with the minutes so an already-approved MoM is not re-offered for approval.
+  const [meetingMinutesApproved, setMeetingMinutesApproved] = useState(false)
   const [vendorMeetingTeamsUrl, setVendorMeetingTeamsUrl] = useState<string | null>(
     cycle?.teams_meeting_url ?? null
   )
@@ -372,6 +374,7 @@ export default function CycleDetail() {
       .then((a) => {
         if (a.notes?.length) setMeetingNotes(a.notes)
         if (a.minutes) setMeetingMinutes(a.minutes)
+        if (a.minutes_approved_at) setMeetingMinutesApproved(true)
       })
       .catch(() => { /* backend not ready / demo cycle — keep seeded notes */ })
   }, [cycleId])
@@ -653,6 +656,9 @@ export default function CycleDetail() {
   // Action items now come from the transcript extraction (shared queue), not mocks.
   function handleMinutesApproved() {
     setMinutesApproved(true)
+    // Keep the restore flag in step too, so switching tabs and back does not re-prompt
+    // before the next artifact fetch has run.
+    setMeetingMinutesApproved(true)
     advanceWorkflow(cycle!.cycle_id, 'POST_MEETING_COMPLETE')
   }
 
@@ -813,6 +819,7 @@ export default function CycleDetail() {
             cycle={cycle}
             meetingNotes={meetingNotes}
             initialMinutes={meetingMinutes}
+            initialMinutesApproved={meetingMinutesApproved}
             minutesApproved={minutesApproved}
             teamsMeetingUrl={vendorMeetingTeamsUrl}
             onNoteAdd={handleNoteAdd}
@@ -1909,12 +1916,13 @@ function VendorPrepTab({
 
 /* ── Meeting Tab ──────────────────────────────────────────── */
 function MeetingTab({
-  cycleId, cycle, meetingNotes, initialMinutes, teamsMeetingUrl, onNoteAdd, onTranscriptParsed, onMinutesApproved, onActionsExtracted, alreadyExtracted,
+  cycleId, cycle, meetingNotes, initialMinutes, initialMinutesApproved, teamsMeetingUrl, onNoteAdd, onTranscriptParsed, onMinutesApproved, onActionsExtracted, alreadyExtracted,
 }: {
   cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   meetingNotes: MeetingNote[]
   initialMinutes: MeetingMinutes | null
+  initialMinutesApproved: boolean
   minutesApproved: boolean
   teamsMeetingUrl: string | null
   onNoteAdd: (n: Omit<MeetingNote, 'note_id' | 'meeting_id'>) => void
@@ -1966,6 +1974,7 @@ function MeetingTab({
         cycleId={cycleId}
         notes={meetingNotes}
         initialMinutes={initialMinutes}
+        initialApproved={initialMinutesApproved}
         vendorName={cycle.vendor_name}
         quarter={cycle.quarter}
         year={cycle.year}

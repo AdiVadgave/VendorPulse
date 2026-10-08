@@ -94,6 +94,10 @@ export interface MeetingArtifact {
    *  state after a refresh instead of offering "Approve minutes" all over again. */
   minutes_approved_at?: string | null
   minutes_approved_by?: string | null
+  /** Set once the minutes have been emailed — restores the "sent to N recipients"
+   *  confirmation instead of re-offering the send button after a refresh. */
+  minutes_sent_at?: string | null
+  minutes_sent_to?: { name: string; email: string }[]
 }
 
 /** Fetch the persisted parsed notes + minutes for a meeting (empty if never parsed). */

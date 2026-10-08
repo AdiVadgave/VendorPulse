@@ -43,6 +43,7 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
   const [savedMinutes, setSavedMinutes] = useState<MeetingMinutes | null>(null)
   // Restored alongside the minutes so an already-approved MoM does not re-prompt.
   const [minutesApproved, setMinutesApproved] = useState(false)
+  const [minutesSentTo, setMinutesSentTo] = useState<{ name: string; email: string }[]>([])
 
   // Restore the parsed notes + minutes for this meeting on mount so the MoM survives a refresh.
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
         if (a.notes?.length) setParsedNotes(a.notes)
         if (a.minutes) setSavedMinutes(a.minutes)
         if (a.minutes_approved_at) setMinutesApproved(true)
+        if (a.minutes_sent_to?.length) setMinutesSentTo(a.minutes_sent_to)
       })
       .catch(() => { /* backend offline / never parsed */ })
     return () => { cancelled = true }
@@ -101,6 +103,7 @@ export default function AlignmentMeetingPanel({ cycleId, index, vendorName, quar
           notes={parsedNotes}
           initialMinutes={savedMinutes}
           initialApproved={minutesApproved}
+          initialSentTo={minutesSentTo}
           vendorName={vendorName}
           quarter={quarter}
           year={year}

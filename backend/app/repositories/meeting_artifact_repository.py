@@ -18,8 +18,9 @@ class MeetingArtifactRepository(BaseRepository):
     columns = (
         "artifact_id", "cycle_id", "meeting_id", "notes", "minutes",
         "parsed_at", "minutes_generated_at", "minutes_approved_at", "minutes_approved_by",
+        "minutes_sent_at", "minutes_sent_to",
     )
-    json_columns = frozenset({"notes", "minutes"})
+    json_columns = frozenset({"notes", "minutes", "minutes_sent_to"})
 
     def get(self, cycle_id: str, meeting_id: str) -> Optional[dict]:
         return next(
@@ -41,6 +42,8 @@ class MeetingArtifactRepository(BaseRepository):
             "minutes_generated_at": None,
             "minutes_approved_at": None,
             "minutes_approved_by": None,
+            "minutes_sent_at": None,
+            "minutes_sent_to": None,
             **patch,
         }
         return self.insert(record)

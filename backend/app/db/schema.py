@@ -384,6 +384,11 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             -- "Approve minutes" on every refresh of already-approved minutes.
             minutes_approved_at  TEXT,
             minutes_approved_by  TEXT,
+            -- Dispatch is recorded here for the same reason as approval: the viewer
+            -- restores from this row, so without it a refresh re-offered the send
+            -- button on minutes that had already gone out.
+            minutes_sent_at      TEXT,
+            minutes_sent_to      JSONB,
             seq                  BIGSERIAL UNIQUE NOT NULL,
             UNIQUE (cycle_id, meeting_id)
         )
@@ -466,6 +471,8 @@ _ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
     "meeting_artifacts": [
         ("minutes_approved_at", "TEXT"),
         ("minutes_approved_by", "TEXT"),
+        ("minutes_sent_at", "TEXT"),
+        ("minutes_sent_to", "JSONB"),
     ],
     "agent_runs": [
         ("approval_status", "TEXT"),
@@ -508,6 +515,7 @@ _TIMESTAMP_COLUMNS: list[tuple[str, str]] = [
     ("meeting_artifacts", "parsed_at"),
     ("meeting_artifacts", "minutes_generated_at"),
     ("meeting_artifacts", "minutes_approved_at"),
+    ("meeting_artifacts", "minutes_sent_at"),
     ("agent_runs", "created_at"),
     ("agent_runs", "approved_at"),
 ]

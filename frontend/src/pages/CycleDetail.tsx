@@ -227,6 +227,7 @@ export default function CycleDetail() {
   const [meetingMinutes, setMeetingMinutes] = useState<MeetingMinutes | null>(null)
   // Restored with the minutes so an already-approved MoM is not re-offered for approval.
   const [meetingMinutesApproved, setMeetingMinutesApproved] = useState(false)
+  const [meetingMinutesSentTo, setMeetingMinutesSentTo] = useState<{ name: string; email: string }[]>([])
   const [vendorMeetingTeamsUrl, setVendorMeetingTeamsUrl] = useState<string | null>(
     cycle?.teams_meeting_url ?? null
   )
@@ -375,6 +376,7 @@ export default function CycleDetail() {
         if (a.notes?.length) setMeetingNotes(a.notes)
         if (a.minutes) setMeetingMinutes(a.minutes)
         if (a.minutes_approved_at) setMeetingMinutesApproved(true)
+        if (a.minutes_sent_to?.length) setMeetingMinutesSentTo(a.minutes_sent_to)
       })
       .catch(() => { /* backend not ready / demo cycle — keep seeded notes */ })
   }, [cycleId])
@@ -820,6 +822,7 @@ export default function CycleDetail() {
             meetingNotes={meetingNotes}
             initialMinutes={meetingMinutes}
             initialMinutesApproved={meetingMinutesApproved}
+            initialMinutesSentTo={meetingMinutesSentTo}
             minutesApproved={minutesApproved}
             teamsMeetingUrl={vendorMeetingTeamsUrl}
             onNoteAdd={handleNoteAdd}
@@ -1916,13 +1919,14 @@ function VendorPrepTab({
 
 /* ── Meeting Tab ──────────────────────────────────────────── */
 function MeetingTab({
-  cycleId, cycle, meetingNotes, initialMinutes, initialMinutesApproved, teamsMeetingUrl, onNoteAdd, onTranscriptParsed, onMinutesApproved, onActionsExtracted, alreadyExtracted,
+  cycleId, cycle, meetingNotes, initialMinutes, initialMinutesApproved, initialMinutesSentTo, teamsMeetingUrl, onNoteAdd, onTranscriptParsed, onMinutesApproved, onActionsExtracted, alreadyExtracted,
 }: {
   cycleId: string
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   meetingNotes: MeetingNote[]
   initialMinutes: MeetingMinutes | null
   initialMinutesApproved: boolean
+  initialMinutesSentTo: { name: string; email: string }[]
   minutesApproved: boolean
   teamsMeetingUrl: string | null
   onNoteAdd: (n: Omit<MeetingNote, 'note_id' | 'meeting_id'>) => void
@@ -1975,6 +1979,7 @@ function MeetingTab({
         notes={meetingNotes}
         initialMinutes={initialMinutes}
         initialApproved={initialMinutesApproved}
+        initialSentTo={initialMinutesSentTo}
         vendorName={cycle.vendor_name}
         quarter={cycle.quarter}
         year={cycle.year}

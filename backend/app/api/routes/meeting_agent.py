@@ -63,6 +63,10 @@ def get_meeting_artifact(
         # signed off, so it re-offered "Approve minutes" after every refresh.
         "minutes_approved_at": artifact.get("minutes_approved_at"),
         "minutes_approved_by": artifact.get("minutes_approved_by"),
+        # Who the minutes were already emailed to. Without this the viewer re-offered
+        # the send button after a refresh, inviting a duplicate send to real people.
+        "minutes_sent_at": artifact.get("minutes_sent_at"),
+        "minutes_sent_to": artifact.get("minutes_sent_to") or [],
     }
 
 
@@ -521,11 +525,24 @@ def send_minutes(cycleId: str, payload: SendMinutesRequest):
         sanitize_for_log(cycleId), len(sent_to), len(failed),
     )
 
+    sent_at = datetime.now(timezone.utc).isoformat()
+    # Record the dispatch against the meeting so a refresh shows what was sent instead
+    # of a primed send button. Only the recipients that actually received it are
+    # stored, so a partial failure still leaves the rest offerable via a retry.
+    mid = payload.meeting_id or f"mtg-{cycleId}"
+    try:
+        get_meeting_artifact_repo().upsert(cycleId, mid, {
+            "minutes_sent_at": sent_at,
+            "minutes_sent_to": sent_to,
+        })
+    except Exception:  # noqa: BLE001 — the mail is already out; never fail the call here
+        logger.exception("MEETING-AGENT: minutes sent but the dispatch record could not be saved")
+
     return {
         "status": "sent",
         "run_id": payload.run_id,
         "sent_to": sent_to,
         "count": len(sent_to),
         "failed": failed,
-        "sent_at": datetime.now(timezone.utc).isoformat(),
+        "sent_at": sent_at,
     }

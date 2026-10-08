@@ -24,6 +24,10 @@ interface Props {
   /** Whether those minutes were already approved. Without this the viewer reset to
    *  "needs approval" on every refresh and re-offered a decision already taken. */
   initialApproved?: boolean
+  /** Who the minutes were already emailed to. Same reasoning as initialApproved, but
+   *  the consequence is worse: a primed send button after a refresh invites a second
+   *  delivery of the same minutes to real stakeholders. */
+  initialSentTo?: SendMinutesRecipient[]
   vendorName: string
   quarter: string
   year: number
@@ -35,7 +39,7 @@ interface Props {
   heading?: string
 }
 
-export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = null, initialApproved = false, vendorName, quarter, year, onApproved, meetingId: meetingIdProp, heading = 'Meeting Minutes' }: Props) {
+export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = null, initialApproved = false, initialSentTo, vendorName, quarter, year, onApproved, meetingId: meetingIdProp, heading = 'Meeting Minutes' }: Props) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(initialMinutes ? 'complete' : 'idle')
   const [minutes, setMinutes] = useState<MeetingMinutes | null>(initialMinutes)
   const [editing, setEditing] = useState(false)
@@ -208,6 +212,14 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
     setEditing(false)
     setDraft(null)
   }
+
+  // The artifact load lands after first paint, so the server's dispatch record is
+  // folded in by derivation rather than an effect: a previous send shows as done the
+  // moment it loads, while anything that happened in this session still wins.
+  const serverSentTo = initialSentTo ?? []
+  const shownSentRecipients = sentRecipients.length ? sentRecipients : serverSentTo
+  const shownSendStatus =
+    sendStatus === 'idle' && serverSentTo.length > 0 ? 'sent' : sendStatus
 
   async function handleSend() {
     // Never bail silently — the coordinator must see why the click did nothing.
@@ -500,7 +512,7 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
                 </div>
 
                 {/* Send to stakeholders — pick who receives the minutes */}
-                {sendStatus === 'idle' || sendStatus === 'failed' ? (
+                {shownSendStatus === 'idle' || shownSendStatus === 'failed' ? (
                   <div className="space-y-3 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -543,13 +555,13 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
                         ? 'Select recipients to send'
                         : `Send Minutes to ${selectedCount} recipient${selectedCount !== 1 ? 's' : ''}`}
                     </button>
-                    {sendStatus === 'failed' && sendError && (
+                    {shownSendStatus === 'failed' && sendError && (
                       <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
                         {sendError}
                       </p>
                     )}
                   </div>
-                ) : sendStatus === 'sending' ? (
+                ) : shownSendStatus === 'sending' ? (
                   <div className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
                     <div className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
                     <span className="text-sm text-emerald-700 dark:text-emerald-400">Sending minutes...</span>
@@ -559,10 +571,10 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
                     <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg px-4 py-3 space-y-2">
                       <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 font-medium">
                         <CheckCircle2 size={15} />
-                        Sent to {sentRecipients.length} recipient{sentRecipients.length !== 1 ? 's' : ''}
+                        Sent to {shownSentRecipients.length} recipient{shownSentRecipients.length !== 1 ? 's' : ''}
                       </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {sentRecipients.map((r) => (
+                        {shownSentRecipients.map((r) => (
                           <span
                             key={r.email}
                             className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-xs rounded-full"

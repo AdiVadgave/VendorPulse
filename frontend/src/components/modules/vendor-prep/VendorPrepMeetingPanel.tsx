@@ -77,6 +77,7 @@ export default function VendorPrepMeetingPanel({
   const [savedMinutes, setSavedMinutes] = useState<MeetingMinutes | null>(null)
   // Restored alongside the minutes so an already-approved MoM does not re-prompt.
   const [minutesApproved, setMinutesApproved] = useState(false)
+  const [minutesSentTo, setMinutesSentTo] = useState<{ name: string; email: string }[]>([])
 
   const [rescheduling, setRescheduling] = useState(false)
   const [addingInvitee, setAddingInvitee] = useState(false)
@@ -168,6 +169,7 @@ export default function VendorPrepMeetingPanel({
         if (a.notes?.length) setParsedNotes(a.notes)
         if (a.minutes) setSavedMinutes(a.minutes)
         if (a.minutes_approved_at) setMinutesApproved(true)
+        if (a.minutes_sent_to?.length) setMinutesSentTo(a.minutes_sent_to)
       })
       .catch(() => { /* backend offline / never parsed */ })
     return () => { cancelled = true }
@@ -581,6 +583,7 @@ export default function VendorPrepMeetingPanel({
           notes={parsedNotes}
           initialMinutes={savedMinutes}
           initialApproved={minutesApproved}
+          initialSentTo={minutesSentTo}
           vendorName={vendorName}
           quarter={quarter}
           year={year}

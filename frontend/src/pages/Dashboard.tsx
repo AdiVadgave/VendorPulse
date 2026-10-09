@@ -688,8 +688,19 @@ export default function Dashboard() {
     return (
       <div
         key={cycle.cycle_id}
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm transition-all cursor-pointer"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+        role="button"
+        tabIndex={0}
         onClick={() => navigate(`/cycles/${cycle.cycle_id}?tab=${defaultTab}`)}
+        onKeyDown={(e) => {
+          // Only when the CARD itself has focus. The delete button sits inside this
+          // element, so without the target check Enter on Delete would also navigate.
+          if (e.target !== e.currentTarget) return
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            navigate(`/cycles/${cycle.cycle_id}?tab=${defaultTab}`)
+          }
+        }}
       >
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-3 min-w-0">

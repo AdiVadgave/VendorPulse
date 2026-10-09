@@ -12,6 +12,7 @@ from typing import Callable, Optional
 
 from psycopg.types.json import Jsonb
 
+from app.core.logging_config import sanitize_for_log
 from app.db.pool import get_pool
 from app.repositories.base_repository import BaseRepository
 from app.repositories.vendor_repository import VendorRepository
@@ -121,7 +122,7 @@ class CycleRepository(BaseRepository):
             # is visible rather than silently degrading on every send.
             logger.exception(
                 "mark_scorecard_dispatched: atomic UPDATE failed for cycle=%s — "
-                "falling back to a non-atomic merge", cycle_id,
+                "falling back to a non-atomic merge", sanitize_for_log(cycle_id),
             )
             current = self.get_by_cycle_id(cycle_id) or {}
             existing = current.get("scorecard_dispatched_to")
@@ -183,7 +184,7 @@ class CycleRepository(BaseRepository):
             # deleted (the caller clears them first), so fall back rather than propagate.
             logger.exception(
                 "unmark_scorecard_dispatched: atomic UPDATE failed for cycle=%s — "
-                "falling back to a non-atomic merge", cycle_id,
+                "falling back to a non-atomic merge", sanitize_for_log(cycle_id),
             )
             current = self.get_by_cycle_id(cycle_id) or {}
             existing = current.get("scorecard_dispatched_to")
@@ -242,7 +243,7 @@ class CycleRepository(BaseRepository):
             # loudly rather than degrade silently on every save.
             logger.exception(
                 "set_scorecard_reminders: atomic UPDATE failed for cycle=%s — "
-                "falling back to a non-atomic merge", cycle_id,
+                "falling back to a non-atomic merge", sanitize_for_log(cycle_id),
             )
             current = self.get_by_cycle_id(cycle_id) or {}
             cfg = current.get("scorecard_config")
@@ -287,7 +288,7 @@ class CycleRepository(BaseRepository):
                     (cycle_id,),
                 ).fetchone()
                 if row is None:
-                    logger.warning("mutate_scorecard_config: cycle not found — %s", cycle_id)
+                    logger.warning("mutate_scorecard_config: cycle not found — %s", sanitize_for_log(cycle_id))
                     return None
                 current = row[0] if isinstance(row[0], dict) else {}
                 new_cfg = mutate(current)

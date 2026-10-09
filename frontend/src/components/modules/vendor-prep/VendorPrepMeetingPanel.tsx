@@ -121,7 +121,9 @@ export default function VendorPrepMeetingPanel({
   const latestAlignmentStart = alignmentMeetings
     .map((m) => m.start_time)
     .filter((s): s is string => !!s)
-    .sort()
+    // Same as ManualMeetingPanel: ISO-8601 UTC instants sort chronologically by code
+    // unit. (Not reported by the scan - this file moved after it ran.)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
     .slice(-1)[0] ?? null
 
   // Load this vendor-prep meeting's OWN roster (separate from the cycle attendees);

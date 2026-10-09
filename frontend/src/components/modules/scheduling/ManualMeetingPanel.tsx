@@ -86,7 +86,10 @@ export default function ManualMeetingPanel({
       if (cancelled) return
       const starts = [...aligns.map((m) => m.start_time), vp?.start_time ?? null]
         .filter((s): s is string => !!s)
-        .sort()
+        // Explicit comparator: these are ISO-8601 UTC instants, where lexicographic
+        // order is chronological order. Not localeCompare - locale-aware collation can
+        // reorder digits and would be wrong for timestamps.
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
       setEarliestAllowed(starts.length ? starts[starts.length - 1] : null)
     })
     return () => { cancelled = true }

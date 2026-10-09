@@ -423,7 +423,12 @@ export default function ScorecardDispatchPanel({ vendorName, cycleId, quarter, y
   // scorecard_dispatched_to) stays masked by `sentEmails`, permanently hiding the
   // team-scoped resend. Keyed on CONTENTS, not array identity — the parent rebuilds the
   // array each render — so it can't fire before the refetch and wipe the stop-gap.
-  const dispatchedKey = (dispatchedEmails ?? []).map((e) => (e || '').trim().toLowerCase()).sort().join('|')
+  const dispatchedKey = (dispatchedEmails ?? [])
+    .map((e) => (e || '').trim().toLowerCase())
+    // Any stable order works - this key is only ever compared with itself to decide
+    // whether the effect should re-run - but the comparator has to be explicit.
+    .sort((a, b) => a.localeCompare(b))
+    .join('|')
   useEffect(() => {
     const propSet = new Set(dispatchedKey ? dispatchedKey.split('|') : [])
     setSentEmails((prev) => {

@@ -120,7 +120,9 @@ def _detect_batch_with_ai(batch: dict[str, str], llm) -> dict[str, list[tuple[st
     )
     response = (raw or "").strip()
     if response.startswith("```") and response.endswith("```"):
-        response = re.sub(r"^```(?:json)?\s*|\s*```$", "", response).strip()
+        # Groups made explicit: `|` binds loosest, so this is (leading fence) OR
+        # (trailing fence) -- which is the intent, now stated rather than implied.
+        response = re.sub(r"(?:^```(?:json)?\s*)|(?:\s*```$)", "", response).strip()
 
     try:
         redacted = json.loads(response)

@@ -140,14 +140,11 @@ class Settings(BaseSettings):
     # Separate identity from Graph Mail.Send: this authenticates the *user* who
     # logs in (SPA + OIDC), whereas graph_* authenticates the *app* that sends
     # mail. While sso_enabled is False, get_current_user() returns a dev principal
-    # and NO route is gated — the whole API is open, including the user-directory
-    # write routes.
-    #
-    # Secure by default: this is True, so an environment that simply forgets to set
-    # SSO_ENABLED gets authentication rather than an open API on a public hostname.
-    # Turning it OFF is the deliberate act, and it is what local development does —
-    # .env.example ships SSO_ENABLED=false for exactly that.
-    sso_enabled: bool = True
+    # and no route is gated, so the app runs unchanged.
+    # PRODUCTION: SSO_ENABLED must be true so every API call requires a valid
+    # Entra ID token. With SSO off the API is open (dev principal) — intended for
+    # local development/testing only.
+    sso_enabled: bool = False
     sso_client_id: str = ""            # Application (client) ID of the SPA registration
     sso_tenant_id: str = ""            # Directory (tenant) ID (Shell: db1e96a8-...)
     # Extra accepted audiences (comma-separated) beyond sso_client_id.

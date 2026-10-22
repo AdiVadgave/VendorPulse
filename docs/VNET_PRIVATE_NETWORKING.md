@@ -612,28 +612,6 @@ az webapp restart -g AZ-AS-RGP-EX-N-SEQ02296-NVM-DEV -n AZ-AS-N-Mobility-VendorP
 During the August 2026 deployment, the backend failed to start for hours because of a
 Key Vault reference issue. Here's what happened and how to avoid it.
 
-### The problem: two secrets storing the same credential
-The backend had **two** App Settings that contained the database password:
-
-| App Setting | Key Vault Secret | Content |
-|-------------|-----------------|----------|
-| `PG_PASSWORD` | `VENDORPULSE-PG-PASSWORD` | Just the password: `Mobility@12345` |
-| `DATABASE_URL` | `VENDORPULSE-DATABASE-URL` | Full connection string with password baked in |
-
-The code checks `DATABASE_URL` **first** (see `config.py` → `effective_database_url`).
-If it exists, all `PG_*` settings are ignored.
-
-When the PostgreSQL password was changed:
-1. `VENDORPULSE-PG-PASSWORD` was updated ✅
-2. `VENDORPULSE-DATABASE-URL` was **not** updated — still had the old password ❌
-3. The app used `DATABASE_URL` (old password) → `FATAL: password authentication failed`
-
-### The fix
-We **removed the `DATABASE_URL` App Setting** entirely. Now the app constructs the DSN
-from individual `PG_*` settings, where `PG_PASSWORD` points to the correct Key Vault
-secret. The `effective_database_url` property in `config.py` handles URL-encoding
-(`quote_plus`) automatically.
-
 ### Lessons learned
 - **Don't store the same credential in multiple Key Vault secrets.** If you must, document
   which ones need to be updated together.

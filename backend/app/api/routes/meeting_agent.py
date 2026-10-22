@@ -201,7 +201,7 @@ def _extract_docx(data: bytes) -> str:
     xml = re.sub(r"<w:tab\b[^>]*/?>", "\t", xml)
     xml = re.sub(r"<w:br\b[^>]*/?>", "\n", xml)
     # Drop every remaining tag, then decode XML entities.
-    text = unescape(re.sub(r"<[^>]+>", "", xml))
+    text = unescape(_strip_tags(xml))
     lines = [ln.rstrip() for ln in text.split("\n")]
     # Collapse runs of 3+ blank lines down to a single blank line.
     out: list[str] = []
@@ -215,6 +215,76 @@ def _extract_docx(data: bytes) -> str:
             if blank == 1:
                 out.append("")
     return "\n".join(out).strip()
+
+
+def _strip_tags(text: str) -> str:
+    """Linear-time equivalent of ``re.sub(r"<[^>]+>", "", text)``.
+
+    The regex is polynomial (CodeQL py/polynomial-redos): on input with many "<" and
+    no ">", the engine restarts the inner scan at every "<", so cost grows with the
+    square of the length. The upload cap is 15 MB, which is far more than enough to
+    hang a worker. This scan is single-pass: once there is no ">" left, it stops.
+
+    Semantics are preserved exactly, including the awkward edges -- "<>" is NOT a tag
+    (the pattern needs one or more non-">" characters), and an unterminated "<..." at
+    the end of the string is literal text, not a tag.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        lt = text.find("<", i)
+        if lt == -1:
+            out.append(text[i:])
+            break
+        gt = text.find(">", lt + 1)
+        if gt == -1:
+            out.append(text[i:])          # no closing ">" anywhere -> rest is literal
+            break
+        if gt == lt + 1:                  # "<>" - not a match, keep the "<"
+            out.append(text[i:lt + 1])
+            i = lt + 1
+            continue
+        out.append(text[i:lt])
+        i = gt + 1
+    return "".join(out)
+
+
+def _match_voice_tag(line: str) -> tuple[str, str] | None:
+    """Linear-time equivalent of ``re.search(r"<v\\s+([^>]+)>(.*?)</v>", line)``.
+
+    Returns (speaker, spoken) for the first WebVTT voice span, or None. Same
+    polynomial concern as _strip_tags: a line of repeated "<v " with no ">" makes the
+    regex restart at every candidate.
+    """
+    i = 0
+    n = len(line)
+    while True:
+        lt = line.find("<v", i)
+        if lt == -1:
+            return None
+        k = lt + 2
+        ws = k
+        while ws < n and line[ws].isspace():
+            ws += 1
+        if ws == k:                        # needs at least one space after "<v"
+            i = lt + 1
+            continue
+        gt = line.find(">", ws)
+        if gt == -1:
+            return None                    # no ">" left at all -> no match anywhere
+        if gt == ws:                       # [^>]+ needs at least one character
+            i = lt + 1
+            continue
+        # `(.*?)` has no DOTALL, so the captured span cannot cross a newline --
+        # confine the search for the closing tag to the current line. (Callers already
+        # pass one line at a time; this keeps the helper faithful on its own.)
+        nl = line.find("\n", gt + 1)
+        close = line.find("</v>", gt + 1, n if nl == -1 else nl)
+        if close == -1:
+            i = lt + 1
+            continue
+        return line[ws:gt], line[gt + 1:close]
 
 
 def _extract_vtt(data: bytes) -> str:
@@ -236,13 +306,13 @@ def _extract_vtt(data: bytes) -> str:
             continue
         if re.fullmatch(r"\d+", s):  # numeric cue identifier
             continue
-        m = re.search(r"<v\s+([^>]+)>(.*?)</v>", s)
-        if m:
-            speaker = m.group(1).strip()
-            spoken = re.sub(r"<[^>]+>", "", m.group(2)).strip()
+        voice = _match_voice_tag(s)
+        if voice:
+            speaker = voice[0].strip()
+            spoken = _strip_tags(voice[1]).strip()
             formatted = f"{speaker}: {spoken}" if spoken else ""
         else:
-            formatted = re.sub(r"<[^>]+>", "", s).strip()
+            formatted = _strip_tags(s).strip()
         formatted = unescape(formatted)
         if formatted and formatted != last:
             out.append(formatted)
@@ -507,8 +577,17 @@ def send_minutes(cycleId: str, payload: SendMinutesRequest):
             sent_to.append({"name": name, "email": email_addr})
             logger.info("MEETING-AGENT: minutes sent to %s (%s)", sanitize_for_log(name), sanitize_for_log(email_addr))
         except MailSendError as exc:
-            logger.warning("MEETING-AGENT: failed to send to %s — %s", sanitize_for_log(email_addr), exc)
-            failed.append({"name": name, "email": email_addr, "error": str(exc)})
+            # Full provider text server-side (sanitised -- it can carry attacker-shaped
+            # content); the client gets a generic message. Returning str(exc) leaked
+            # mail-provider internals to the browser (CWE-209).
+            logger.warning(
+                "MEETING-AGENT: failed to send to %s — %s",
+                sanitize_for_log(email_addr), sanitize_for_log(str(exc)),
+            )
+            failed.append({
+                "name": name, "email": email_addr,
+                "error": "Delivery failed. See the server log for details.",
+            })
 
     if not sent_to and failed:
         logger.error(

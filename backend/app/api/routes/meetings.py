@@ -48,9 +48,10 @@ def create_meeting(
     try:
         meeting, warnings = svc.create_meeting(payload)
     except ValueError as exc:
-        logger.warning("create_meeting validation error: %s", exc)
+        logger.warning("create_meeting validation error: %s", sanitize_for_log(str(exc)))
         raise HTTPException(status_code=400, detail="Invalid meeting payload")
-    logger.info("create_meeting success — meeting_id=%s, warnings=%s", meeting.get("meeting_id"), warnings)
+    logger.info("create_meeting success — meeting_id=%s, warnings=%s",
+                sanitize_for_log(meeting.get("meeting_id")), sanitize_for_log(warnings))
     return {
         "meeting": meeting,
         "warnings": warnings,

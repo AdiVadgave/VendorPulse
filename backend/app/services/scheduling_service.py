@@ -74,7 +74,7 @@ class SchedulingService:
         If `seed_from_previous=True` and the cycle is new (CYCLE_CREATED) and has no
         attendees, attempt to import them from the previous cycle for the same vendor.
         """
-        logger.info("get_attendees — cycle_id=%s, seed_from_previous=%s", sanitize_for_log(cycle_id), seed_from_previous)
+        logger.info("get_attendees — cycle_id=%s, seed_from_previous=%s", sanitize_for_log(cycle_id), sanitize_for_log(seed_from_previous))
         current_attendees = self._attendees.get_for_cycle(cycle_id)
         if current_attendees:
             logger.info("get_attendees: found %d existing attendees for cycle %s", len(current_attendees), sanitize_for_log(cycle_id))

@@ -1966,8 +1966,14 @@ def dispatch_inapp(payload: InAppDispatchRequest):
                             "message_id": res.get("id"), "error": None})
             sent += 1
         except MailSendError as exc:
+            # Detail stays server-side; the response carries a generic message (CWE-209).
+            logger.warning(
+                "scorecard dispatch: send failed for %s — %s",
+                sanitize_for_log(email), sanitize_for_log(str(exc)),
+            )
             results.append({"name": r.name, "email": email, "status": "failed",
-                            "error": str(exc), "message_id": None})
+                            "error": "Delivery failed. See the server log for details.",
+                            "message_id": None})
 
     if sent > 0:
         now = datetime.now(timezone.utc).isoformat()

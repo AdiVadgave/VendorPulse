@@ -62,7 +62,7 @@ def _check_workflow_state(cycle: dict, required_state: str) -> None:
             "workflow-state gate failed — cycle_id=%s required=%s error=%s",
             sanitize_for_log(cycle.get("cycle_id")),
             sanitize_for_log(required_state),
-            exc,
+            sanitize_for_log(exc),
         )
         raise HTTPException(status_code=409, detail=f"Cycle must reach '{required_state}' before this action")
 
@@ -217,7 +217,7 @@ def create_cycle(
         "scorecard_config": inherited_config or default_scorecard_config(),
     }
     result = cycle_repo.insert(cycle)
-    logger.info("create_cycle success — cycle_id=%s", cycle["cycle_id"])
+    logger.info("create_cycle success — cycle_id=%s", sanitize_for_log(cycle["cycle_id"]))
     return {"cycle": result, "message": "Cycle created"}
 
 
@@ -427,7 +427,7 @@ def get_attendees(
     seedFromPrevious: bool = False,
     svc: SchedulingService = Depends(get_scheduling_service),
 ):
-    logger.info("get_attendees called — cycleId=%s, seedFromPrevious=%s", sanitize_for_log(cycleId), seedFromPrevious)
+    logger.info("get_attendees called — cycleId=%s, seedFromPrevious=%s", sanitize_for_log(cycleId), sanitize_for_log(seedFromPrevious))
     attendees = svc.get_attendees(cycleId, seed_from_previous=seedFromPrevious)
     logger.info("get_attendees returning %d attendees for cycleId=%s", len(attendees), sanitize_for_log(cycleId))
     return {"attendees": attendees}

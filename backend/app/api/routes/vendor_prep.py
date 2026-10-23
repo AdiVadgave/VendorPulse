@@ -91,7 +91,7 @@ def generate_vendor_brief(
             },
         },
     )
-    logger.info("VENDOR-PREP: brief generated — status=%s", response.status)
+    logger.info("VENDOR-PREP: brief generated — status=%s", sanitize_for_log(response.status))
     return response
 
 
@@ -106,7 +106,7 @@ def handle_pushback(
     """
     logger.info(
         "VENDOR-PREP: handle pushback — cycleId=%s, pushback_id=%s, category=%s, legal=%s",
-        sanitize_for_log(cycleId), sanitize_for_log(payload.pushback_id), sanitize_for_log(payload.category), payload.needs_legal_review,
+        sanitize_for_log(cycleId), sanitize_for_log(payload.pushback_id), sanitize_for_log(payload.category), sanitize_for_log(payload.needs_legal_review),
     )
 
     if payload.cycle_id != cycleId:
@@ -126,7 +126,7 @@ def handle_pushback(
             },
         },
     )
-    logger.info("VENDOR-PREP: pushback handled — status=%s", response.status)
+    logger.info("VENDOR-PREP: pushback handled — status=%s", sanitize_for_log(response.status))
     return response
 
 
@@ -500,7 +500,7 @@ def delete_vendor_prep_meeting(
             res = asyncio.run(GraphService(token).delete_event(event_id))
             cancelled = bool(res.get("deleted"))
         except Exception as e:
-            logger.warning("VENDOR-PREP: Graph cancel failed: %s", e)
+            logger.warning("VENDOR-PREP: Graph cancel failed: %s", sanitize_for_log(e))
 
     deleted = False
     if event_id:

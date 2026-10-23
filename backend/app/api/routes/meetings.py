@@ -48,9 +48,9 @@ def create_meeting(
     try:
         meeting, warnings = svc.create_meeting(payload)
     except ValueError as exc:
-        logger.warning("create_meeting validation error: %s", exc)
+        logger.warning("create_meeting validation error: %s", sanitize_for_log(exc))
         raise HTTPException(status_code=400, detail="Invalid meeting payload")
-    logger.info("create_meeting success — meeting_id=%s, warnings=%s", meeting.get("meeting_id"), warnings)
+    logger.info("create_meeting success — meeting_id=%s, warnings=%s", sanitize_for_log(meeting.get("meeting_id")), sanitize_for_log(warnings))
     return {
         "meeting": meeting,
         "warnings": warnings,
@@ -93,7 +93,7 @@ def cancel_meeting(
     try:
         meeting = svc.cancel_meeting(meetingId, payload.organizer_id)
     except PermissionError as exc:
-        logger.warning("cancel_meeting permission denied: %s", exc)
+        logger.warning("cancel_meeting permission denied: %s", sanitize_for_log(exc))
         raise HTTPException(status_code=403, detail="Not allowed to cancel this meeting")
     if meeting is None:
         logger.warning("cancel_meeting: meeting %s not found", sanitize_for_log(meetingId))
@@ -112,7 +112,7 @@ def respond_to_meeting(
     try:
         meeting = svc.respond_to_meeting(meetingId, payload.user_id, payload.status)
     except PermissionError as exc:
-        logger.warning("respond_to_meeting permission denied: %s", exc)
+        logger.warning("respond_to_meeting permission denied: %s", sanitize_for_log(exc))
         raise HTTPException(status_code=403, detail="Not allowed to respond to this meeting")
     if meeting is None:
         logger.warning("respond_to_meeting: meeting %s not found", sanitize_for_log(meetingId))

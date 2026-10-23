@@ -184,16 +184,23 @@ if _FRONTEND_DIST.is_dir():
 
     _INDEX_HTML = _FRONTEND_DIST / "index.html"
 
+    # Resolved ONCE, at import time, from string literals. The request value is only
+    # ever used as a dictionary KEY -- it never reaches path construction, so no
+    # user-controlled data can flow into a path expression (CWE-22). The previous
+    # form was already safe (allowlist + resolve + is_relative_to), but it still read
+    # as taint-into-path to a scanner, and to a reviewer.
+    _ROOT_ASSETS: dict[str, Path] = {
+        name: (_FRONTEND_DIST / name).resolve()
+        for name in ("favicon.ico", "vite.svg", "manifest.json", "robots.txt")
+    }
+
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa_fallback(full_path: str):
         # Only serve known root assets directly; everything else should resolve
         # through index.html for the SPA router.
-        if full_path:
-            root_assets = {"favicon.ico", "vite.svg", "manifest.json", "robots.txt"}
-            if full_path in root_assets:
-                candidate = (_FRONTEND_DIST / full_path).resolve()
-                if candidate.is_file() and candidate.is_relative_to(_FRONTEND_DIST):
-                    return FileResponse(candidate)
+        asset = _ROOT_ASSETS.get(full_path)
+        if asset is not None and asset.is_file():
+            return FileResponse(asset)
         return FileResponse(_INDEX_HTML)
 
     logger.info("Serving frontend static build from %s", _FRONTEND_DIST)

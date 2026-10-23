@@ -17,5 +17,6 @@ cryptography>=50.0.0       # PYSEC-2026-3552 fixed in 50.0.0
 pyjwt>=2.15.0              # 2.13.x carried 28 OSV advisories; 2.14.0 still left 4, 2.15.0 is clean
 apscheduler>=3.10.0
 python-pptx>=1.0.2         # editable PPTX scorecard export (app/services/scorecard_pptx.py)
+pillow>=13.0.0             # transitive (python-pptx); 12.3.0 carried ~47 OSV advisories
 openai>=1.50.0
 truststore>=0.10.0

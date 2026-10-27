@@ -33,9 +33,9 @@ class Settings(BaseSettings):
     pg_pool_min: int = 1
     pg_pool_max: int = 10
 
-    # Legacy JSON data directory — no longer the live store; still read by the
-    # one-time migration script (scripts/migrate_json_to_postgres.py) to seed
-    # Postgres from the historical *.json files.
+    # Unused. The repositories still accept a ``data_dir`` argument left over from
+    # the former JSON store (see dependencies.py), so the setting is kept; nothing
+    # reads or writes this directory any more.
     data_dir: Path = Path(__file__).parent.parent / "data"
 
     # ── Scheduling: legacy / deterministic algorithm ─────────────────────────

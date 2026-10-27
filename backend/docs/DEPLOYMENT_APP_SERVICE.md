@@ -192,16 +192,20 @@ az webapp deploy --resource-group $RG --name $APP --src-path deploy.zip --type z
 
 ---
 
-## 9. First-run: seed the database (once)
+## 9. First-run: create the database (once)
 
-If this Postgres is fresh, seed it the same way as locally (from your machine, which
-already reaches Azure PG):
+If this Postgres server is fresh, create the database from your machine (which
+already reaches Azure PG). The app creates every table itself on startup
+(`ensure_schema`), so nothing else is needed for an empty database:
 
 ```bash
 cd backend
 python scripts/create_database.py          # if the DB doesn't exist yet
-python scripts/migrate_json_to_postgres.py # loads the seed data
 ```
+
+To bring existing data across from another server, use `pg_dump` / `pg_restore`
+as described in `AZURE_SUBSCRIPTION_MIGRATION.md`. (The old JSON seed files and
+`migrate_json_to_postgres.py` were removed once the Postgres migration was done.)
 
 *(Skip if the database is already populated.)*
 

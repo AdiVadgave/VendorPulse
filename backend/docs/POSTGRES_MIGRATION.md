@@ -70,14 +70,12 @@ app **fails fast on startup** if the database is unreachable.
    ```
    python scripts/create_database.py
    ```
-5. Seed Postgres from the historical JSON files. The script **drops & recreates**
-   all tables then loads them (idempotent — safe to re-run; also cleanly replaces
-   any earlier-shaped tables). It deletes orphaned child rows whose parent cycle
-   no longer exists so the FK constraints hold, and de-duplicates people into
-   `persons`:
-   ```
-   python scripts/migrate_json_to_postgres.py
-   ```
+5. *(Historical, one-time.)* Postgres was seeded once from the old JSON files with
+   `scripts/migrate_json_to_postgres.py`, which dropped and recreated every table,
+   removed orphaned child rows so the FK constraints held, and de-duplicated people
+   into `persons`. That script and the `data/*.json` files have since been removed;
+   to copy data between servers use `pg_dump` / `pg_restore` (see
+   `AZURE_SUBSCRIPTION_MIGRATION.md`).
 6. Start the app (`python run.py`). Schema is also ensured on startup, so a
    fresh empty database works even without step 5.
 

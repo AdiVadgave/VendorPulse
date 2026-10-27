@@ -78,7 +78,7 @@ def generate_minutes(
 ):
     """
     Generate formal meeting minutes from captured notes.
-    Uses Azure OpenAI when ENABLE_LLM=true, otherwise returns deterministic minutes.
+    Uses the LLM (APIM gateway) when ENABLE_LLM=true, otherwise returns deterministic minutes.
     """
     logger.info(
         "MEETING-AGENT: generate minutes — cycleId=%s, meetingId=%s, notes=%d",
@@ -145,7 +145,7 @@ def parse_transcript(
 ):
     """
     Parse a raw meeting transcript into structured notes.
-    Uses Azure OpenAI to identify questions, decisions, objections, actions, etc.
+    Uses the LLM to identify questions, decisions, objections, actions, etc.
     """
     logger.info(
         "MEETING-AGENT: parse transcript — cycleId=%s, meetingId=%s, len=%d",

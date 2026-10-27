@@ -85,31 +85,24 @@ class Settings(BaseSettings):
     scheduling_llm_nudge_max_tokens: int = 120       # per-person conflict nudge message
     scheduling_llm_invite_max_tokens: int = 300      # full invite email body draft
 
-    # AI / LLM — set ENABLE_LLM=true and fill in provider credentials in .env
+    # ── AI / LLM: Shell Enterprise Foundry via APIM (AI gateway) ─────────────
+    # Set ENABLE_LLM=true and the APIM_* settings (.env / App Settings). The app
+    # calls the OpenAI-compatible /openai/v1 surface that Shell's API Management
+    # gateway fronts. Auth is an APIM subscription key sent in a request header:
+    # APIM's default name is Ocp-Apim-Subscription-Key; if the gateway is
+    # configured for "api-key" instead, set APIM_SUBSCRIPTION_KEY_HEADER — no
+    # code change.
+    # Base URL format: https://<apim>.azure-api.net/<api-path>/openai/v1
     enable_llm: bool = False
-    ai_provider: str = "azure"          # "azure" | "openai" | "foundry"
-
-    # Azure OpenAI
-    azure_openai_api_key: str = ""
-    azure_openai_endpoint: str = ""
-    azure_openai_deployment_name: str = ""
-    azure_openai_api_version: str = "2024-12-01-preview"
-
-    # Standard OpenAI (fallback)
-    openai_api_key: str = ""
-    llm_model: str = "gpt-4o"
-
-    # ── Microsoft Foundry (ai.azure.com) — Shape-2 PoC ───────────────────────
-    # Set AI_PROVIDER=foundry to route the agent layer through a Foundry project
-    # via the Responses API, authenticated with Entra ID (DefaultAzureCredential,
-    # falling back to an interactive browser login on dev boxes without the CLI).
-    # Endpoint format: https://<resource>.services.ai.azure.com/api/projects/<project>
-    foundry_project_endpoint: str = ""
-    foundry_model: str = ""             # deployed model/deployment name (e.g. gpt-4o)
-    azure_tenant_id: str = ""           # optional — pin the Entra tenant for login
-    # When the Foundry client is active, drive the agent loop with the Responses
-    # API (Foundry's single entry point) instead of Chat Completions.
-    use_responses_api: bool = True
+    apim_base_url: str = ""
+    apim_subscription_key: str = ""
+    apim_subscription_key_header: str = "Ocp-Apim-Subscription-Key"
+    apim_model: str = ""                # deployment name on the Foundry resource (gpt-5)
+    # GPT-5 is a reasoning model: at its default effort it spends the app's whole
+    # 1-2k token budget thinking and returns empty text, so every AI feature falls
+    # back to its non-AI output. "minimal" leaves the budget for the answer. Set
+    # it empty for non-reasoning models (e.g. gpt-4o), which reject the parameter.
+    apim_reasoning_effort: str = "minimal"
 
     # Microsoft Graph API
     graph_access_token: str = ""

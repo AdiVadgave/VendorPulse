@@ -18,7 +18,7 @@ This is the single biggest time-saver in the whole exercise:
 |---|---|---|
 | PostgreSQL Flexible Server | Subscription | **Yes — must be migrated** |
 | App Services (**two**: frontend + backend) + Plan | Subscription | **Yes — must be migrated** |
-| Azure OpenAI resource | Subscription | **Yes — must be migrated** |
+| AI (LLM) | Shell Enterprise Foundry via APIM (Foundry team) | **No — nothing to migrate.** Point the `APIM_*` settings at the gateway (§5). |
 | Key Vault (if the Mail cert lives in one) | Subscription | **Yes — must be migrated** |
 | **Entra ID app registration — SSO (SPA)** | **Tenant** | **No. Leave it alone.** |
 | **Entra ID app registration — Graph Mail.Send** | **Tenant** | **No. Leave it alone.** |
@@ -53,8 +53,7 @@ on the SSO app registration (section 7). That's a two-minute edit, not a re-regi
 | App Service — **backend/API** | `________________` | `app-vendorpulse-dev-api` |
 | App Service — **frontend/SPA** | `________________` | `app-vendorpulse-dev-web` |
 | App Service Plan / SKU | `________________` | `asp-vendorpulse-dev`, B1, shared by both apps |
-| Azure OpenAI resource | `gaura-mgt924zq-eastus2` | `aoai-vendorpulse-dev` |
-| OpenAI deployment | `gpt-4o` | `gpt-4o` (keep the name) |
+| AI gateway (APIM) | `https://useaifoundryapim.azure-api.net/usevendorpulsetfdrydevaif/openai/v1` | unchanged — model `gpt-5` |
 | Key Vault (cert + secrets) | `________________` | `kv-vendorpulse-dev` (optional — see 2.4) |
 | Region | `________________` | **North Europe** (`northeurope`) — matches the resource group |
 
@@ -66,9 +65,8 @@ The subscription also contains four Shell-managed resource groups —
 resources in them and do not modify them.** Everything we create goes in
 `rg-vendorpulse-dev`.
 
-> The current Azure OpenAI endpoint is `gaura-mgt924zq-eastus2` — an auto-generated
-> personal-looking name. This migration is a good moment to create a properly named
-> resource rather than carrying that name forward.
+> VendorPulse does not own an AI resource: it calls Shell's Enterprise Foundry through
+> an APIM gateway that the Foundry team runs. There is no AI resource to create or move.
 
 ---
 
@@ -79,7 +77,7 @@ resources in them and do not modify them.** Everything we create goes in
 - [ ] `az login` works and `az account list -o table` shows the new subscription.
 - [ ] **`pg_dump` / `pg_restore` are version 16 or newer.** The server is PG 16.15; an older client refuses the dump. Check with `pg_dump --version`.
 - [ ] You have the `.pfx` Mail.Send certificate and its password (empty if it was a Key Vault export).
-- [ ] You have the current secret values to hand: `PG_PASSWORD`, `AZURE_OPENAI_API_KEY`. **Never commit these. `backend/.env` is git-ignored and must stay that way.**
+- [ ] You have the current secret values to hand: `PG_PASSWORD`, `APIM_SUBSCRIPTION_KEY` (or its Key Vault reference). **Never commit these. `backend/.env` is git-ignored and must stay that way.**
 - [ ] Agree a maintenance window — the app is down between the final dump and the cutover.
 
 Select the new subscription:
@@ -152,9 +150,6 @@ export PGSERVER=psql-vendorpulse-dev          # globally unique
 export PGDB=vendorpulse
 export PGADMIN=vendorpulse_admin
 
-export AOAI=aoai-vendorpulse-dev
-export AOAI_DEPLOYMENT=gpt-4o
-
 export PLAN=asp-vendorpulse-dev
 export API_APP=app-vendorpulse-dev-api        # globally unique
 export WEB_APP=app-vendorpulse-dev-web        # globally unique
@@ -190,7 +185,7 @@ Create in this order. Each row depends on the ones above it.
 | # | Create | Why this position | Time |
 |---|---|---|---|
 | 0 | **Policy pre-flight** (2.1) | Can invalidate the whole plan | 10 min |
-| 1 | **Azure OpenAI + `gpt-4o` deployment** (§5) | **Start first.** Creation is instant, but if quota is short the request takes **days**. Everything else can proceed while it's pending. | 10 min, or days if quota blocks |
+| 1 | **AI gateway access** (§5) | **Start first.** The new backend app's managed identity needs **Key Vault Secrets User** on the Foundry team's vault; that request can take **days**. Everything else can proceed while it's pending. | 10 min, or days waiting on access |
 | 2 | **PostgreSQL server + database** (§4.2) | Slowest to provision; the backend cannot start without it | 10–15 min |
 | 3 | **Firewall rules** (§4.3) | Needed before you can restore | 2 min |
 | 4 | **Restore the dump** (§4.4–4.5) | Needs 2 and 3 | 5 min |
@@ -212,8 +207,8 @@ Vault buys you two things:
 
 - the Mail cert **auto-renews** before it expires on **16 Jul 2027** (it will otherwise
   expire silently and all outbound mail stops),
-- `PG_PASSWORD` and `AZURE_OPENAI_API_KEY` become Key Vault **references** instead of
-  readable plaintext in the portal.
+- `PG_PASSWORD` becomes a Key Vault **reference** instead of readable plaintext in the
+  portal (`APIM_SUBSCRIPTION_KEY` is already a reference to the Foundry team's vault).
 
 It is not required for the migration to work, so it sits at step 10. If you do want it:
 
@@ -383,33 +378,23 @@ SELECT count(*) FROM scorecard_submissions s
 
 ---
 
-## 5. Azure OpenAI
+## 5. AI gateway (Shell Enterprise Foundry via APIM)
 
-The LLM resource is subscription-scoped and does not move with the app registrations.
+VendorPulse calls Shell's Enterprise Foundry through an APIM gateway that the Foundry
+team runs, so there is nothing to create here — only settings to point at it.
 
-```bash
-AOAI=aoai-vendorpulse-dev
-az cognitiveservices account create \
-  --name $AOAI --resource-group $RG --location eastus2 \
-  --kind OpenAI --sku S0
+| App Setting | Value |
+|---|---|
+| `ENABLE_LLM` | `true` |
+| `APIM_BASE_URL` | `https://useaifoundryapim.azure-api.net/usevendorpulsetfdrydevaif/openai/v1` |
+| `APIM_MODEL` | `gpt-5` |
+| `APIM_SUBSCRIPTION_KEY` | `@Microsoft.KeyVault(SecretUri=https://usevendorpulsetfdrydevkv.vault.azure.net/secrets/usevendorpulsetfdrydevaif-mobility-dev-eastus-SubscriptionKey/)` |
 
-az cognitiveservices account deployment create \
-  --name $AOAI --resource-group $RG \
-  --deployment-name gpt-4o \
-  --model-name gpt-4o --model-version "2024-11-20" \
-  --model-format OpenAI --sku-name Standard --sku-capacity 10
-```
-
-Then take the new endpoint and key:
-
-```bash
-az cognitiveservices account show --name $AOAI --resource-group $RG --query properties.endpoint -o tsv
-az cognitiveservices account keys list --name $AOAI --resource-group $RG --query key1 -o tsv
-```
-
-- Keep the deployment name **`gpt-4o`** so `AZURE_OPENAI_DEPLOYMENT_NAME` is unchanged.
-- Azure OpenAI capacity is quota-limited per subscription. If the deployment is
-  refused, raise a quota request early — this is the step most likely to block you.
+- The key reference resolves only if the backend app's **managed identity** has
+  **Key Vault Secrets User** on the Foundry team's vault — ask them to grant it for the
+  new app's identity. In the portal the setting then shows **Resolved**.
+- Check the gateway from `backend/` with `python scripts/check_llm.py`: it prints
+  `RESULT: ALL GOOD` when both a plain and a tool-calling request work.
 - **If the LLM is not ready on cutover day**, the app still runs with `ENABLE_LLM=false`.
   Scheduling, scorecards and email all work. What stops is AI insights, comment
   summaries — and **scorecard comment submission**, which deliberately refuses to save
@@ -592,8 +577,7 @@ No new consent, no new client secret, no new app.
 |---|---|
 | `PG_HOST`, `PG_PASSWORD` | **Yes** — new server |
 | `PG_DATABASE`, `PG_PORT`, `PG_SSLMODE`, `PG_POOL_*` | No |
-| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY` | **Yes** — new resource |
-| `AZURE_OPENAI_DEPLOYMENT_NAME`, `AZURE_OPENAI_API_VERSION` | No (if you kept `gpt-4o`) |
+| `APIM_BASE_URL`, `APIM_MODEL`, `APIM_SUBSCRIPTION_KEY` | No — same gateway; only the new app's managed identity needs Key Vault access |
 | `CORS_ORIGINS` (backend app) | **Yes** — must be the **frontend** app's URL |
 | `VITE_API_URL` (build time) | **Yes** — must be the **backend** app's URL |
 | `GRAPH_CERT_PATH`, `WEBSITE_LOAD_CERTIFICATES` | Path yes; thumbprint no |
@@ -676,8 +660,8 @@ Once the new environment has run clean for a week **and** someone has signed off
 - [ ] Remove the old redirect URI from the SSO app registration
 - [ ] Remove old firewall rules
 - [ ] **Rotate the secrets that were in flight during the migration** — the old
-      `PG_PASSWORD` and the old `AZURE_OPENAI_API_KEY` passed through shells, clipboards
-      and possibly chat during this exercise. Treat them as exposed and retire them.
+      `PG_PASSWORD` passed through shells, clipboards and possibly chat during this
+      exercise. Treat it as exposed and retire it.
 - [ ] Delete local `.dump` files — they contain real personal data
 
 ---
@@ -697,7 +681,7 @@ Once the new environment has run clean for a week **and** someone has signed off
 | SSO loops or `AADSTS50011` | redirect URI not registered | add the new URL to the SSO app registration (7) |
 | Mail 503 `ErrorAccessDenied` | cert not loaded into the new app | check `WEBSITE_LOAD_CERTIFICATES` and that `/var/ssl/private/<thumb>.p12` exists |
 | Scorecard submit returns 503 | LLM not configured — redaction unavailable, save refused | finish section 5; this refusal is intentional |
-| Azure OpenAI deployment refused | subscription quota | raise a quota request; start this early |
+| AI calls fail / `APIM_SUBSCRIPTION_KEY` not **Resolved** | managed identity lacks access to the Foundry vault | ask the Foundry team for **Key Vault Secrets User**; then run `scripts/check_llm.py` |
 | `RequestDisallowedByPolicy` on create | landing-zone Azure Policy | see 2.1 — usually public network access, a missing required tag, or a blocked SKU |
 | Postgres refuses `--public-access` | policy denies public PaaS endpoints | private endpoint + VNet-integrate both App Services; involve the platform team |
 

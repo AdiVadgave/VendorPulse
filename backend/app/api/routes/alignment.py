@@ -57,7 +57,7 @@ class ManualAlignmentMeetingRequest(BaseModel):
 def extract_actions(cycleId: str, payload: ExtractActionsRequest):
     """
     Extract structured action items from internal alignment meeting notes.
-    Uses Azure OpenAI when ENABLE_LLM=true, otherwise uses keyword heuristics.
+    Uses the LLM (APIM gateway) when ENABLE_LLM=true, otherwise uses keyword heuristics.
     """
     logger.info("ALIGNMENT: extract actions — cycleId=%s, text_len=%d", sanitize_for_log(cycleId), len(payload.notes_text))
 

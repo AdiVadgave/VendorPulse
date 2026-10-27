@@ -4,7 +4,7 @@ MeetingAgent — Module E agent.
 Uses call_simple() for one-shot LLM generation (minutes, action extraction).
 These are single-prompt tasks — no need for the multi-step tool-calling loop.
 
-When LLM is enabled  -> call_simple() sends notes to Azure OpenAI, gets structured JSON back
+When LLM is enabled  -> call_simple() sends notes to the LLM (APIM gateway), gets structured JSON back
 When LLM is disabled -> deterministic fallback builds template-based output
 """
 from __future__ import annotations

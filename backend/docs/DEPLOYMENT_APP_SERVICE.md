@@ -117,15 +117,16 @@ az webapp config appsettings set --name $APP --resource-group $RG --settings \
   GRAPH_CERT_THUMBPRINT="E3B27F913B430B93718E3B12BDFE7E4FFF65DFC5" \
   GRAPH_CERT_PASSWORD="" \
   ENABLE_LLM=true \
-  AI_PROVIDER="azure" \
-  AZURE_OPENAI_API_KEY="<key>" \
-  AZURE_OPENAI_ENDPOINT="https://gaura-mgt924zq-eastus2.openai.azure.com/" \
-  AZURE_OPENAI_DEPLOYMENT_NAME="gpt-4o" \
-  AZURE_OPENAI_API_VERSION="2024-12-01-preview" \
+  APIM_BASE_URL="https://useaifoundryapim.azure-api.net/usevendorpulsetfdrydevaif/openai/v1" \
+  APIM_SUBSCRIPTION_KEY="<subscription-key>" \
+  APIM_MODEL="gpt-5" \
   CORS_ORIGINS="https://$APP.azurewebsites.net"
 ```
 
 `GRAPH_CERT_PATH` is set in the next step (depends on how the cert is provided).
+
+Prefer a Key Vault reference for `APIM_SUBSCRIPTION_KEY` over the plain key:
+`@Microsoft.KeyVault(SecretUri=https://usevendorpulsetfdrydevkv.vault.azure.net/secrets/usevendorpulsetfdrydevaif-mobility-dev-eastus-SubscriptionKey/)` (the app's managed identity needs **Key Vault Secrets User** on that vault).
 
 ---
 

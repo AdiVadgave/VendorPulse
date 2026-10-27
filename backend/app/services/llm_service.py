@@ -1,17 +1,13 @@
 """
-LLM Service — Azure OpenAI / OpenAI wrapper.
+LLM Service — Shell Enterprise Foundry via APIM (OpenAI-compatible gateway).
 
 Configure in .env:
   ENABLE_LLM=true
-  AI_PROVIDER=azure
-  AZURE_OPENAI_API_KEY=...
-  AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-  AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
-  AZURE_OPENAI_API_VERSION=2024-12-01-preview   (optional, has default)
-
-  # Or for standard OpenAI:
-  AI_PROVIDER=openai
-  OPENAI_API_KEY=sk-...
+  APIM_BASE_URL=https://<apim>.azure-api.net/<api-path>/openai/v1
+  APIM_SUBSCRIPTION_KEY=...
+  APIM_MODEL=gpt-5
+  APIM_SUBSCRIPTION_KEY_HEADER=Ocp-Apim-Subscription-Key   (optional, has default)
+  APIM_REASONING_EFFORT=minimal                            (optional, has default)
 """
 from __future__ import annotations
 
@@ -25,80 +21,59 @@ class LLMService:
         self._enabled = settings.enable_llm
         self._client: Any = None
         self._model: str = ""
-        # When True, drive agents via the Responses API instead of Chat Completions.
-        self._use_responses: bool = False
+        self._reasoning_effort: str = settings.apim_reasoning_effort.strip()
 
         if not self._enabled:
             return
 
         try:
-            if settings.ai_provider == "foundry":
-                self._init_foundry_client()
-            elif settings.ai_provider == "azure":
-                from openai import AzureOpenAI  # type: ignore[import]
-
-                self._client = AzureOpenAI(
-                    api_key=settings.azure_openai_api_key,
-                    azure_endpoint=settings.azure_openai_endpoint,
-                    api_version=settings.azure_openai_api_version,
-                )
-                self._model = settings.azure_openai_deployment_name
-            else:
-                from openai import OpenAI  # type: ignore[import]
-
-                self._client = OpenAI(api_key=settings.openai_api_key)
-                self._model = settings.llm_model
-
+            self._init_apim_client()
         except ImportError as exc:
             raise RuntimeError(
                 "LLM is enabled but a required package is not installed. "
-                f"({exc}) Run: pip install openai azure-ai-projects azure-identity"
+                f"({exc}) Run: pip install openai"
             )
 
-    def _init_foundry_client(self) -> None:
+    def _init_apim_client(self) -> None:
         """
-        Build an OpenAI-compatible client backed by a Microsoft Foundry project.
+        Build an OpenAI client for Shell's Enterprise Foundry behind APIM.
 
-        Auth uses DefaultAzureCredential (picks up Managed Identity / az CLI / azd /
-        Az PowerShell / env vars) and falls back to an interactive browser login so a
-        dev box without the Azure CLI can still authenticate. The returned client
-        targets the Foundry project's /openai/v1 surface and supports the Responses API.
+        The gateway exposes the OpenAI-compatible /openai/v1 surface, so the plain
+        `OpenAI` client with `base_url` builds the right path
+        (.../openai/v1/chat/completions). `AzureOpenAI` would not — it builds
+        /openai/deployments/{model}/...?api-version= instead. APIM authenticates the
+        subscription key from its own header; `api_key` is mandatory for the client
+        (it goes out as a bearer token), so it carries the same key.
         """
-        from azure.identity import (  # type: ignore[import]
-            ChainedTokenCredential,
-            DefaultAzureCredential,
-            InteractiveBrowserCredential,
-        )
-        from azure.ai.projects import AIProjectClient  # type: ignore[import]
+        from openai import OpenAI  # type: ignore[import]
 
-        if not settings.foundry_project_endpoint:
+        base_url = settings.apim_base_url.strip()
+        key = settings.apim_subscription_key.strip()
+        model = settings.apim_model.strip()
+        missing = [
+            name
+            for name, value in (
+                ("APIM_BASE_URL", base_url),
+                ("APIM_SUBSCRIPTION_KEY", key),
+                ("APIM_MODEL", model),
+            )
+            if not value
+        ]
+        if missing:
             raise RuntimeError(
-                "AI_PROVIDER=foundry but FOUNDRY_PROJECT_ENDPOINT is not set in .env"
+                f"ENABLE_LLM=true but {', '.join(missing)} is not set (.env / App Settings)"
             )
 
-        tenant = settings.azure_tenant_id or None
-        browser = (
-            InteractiveBrowserCredential(tenant_id=tenant)
-            if tenant
-            else InteractiveBrowserCredential()
+        self._client = OpenAI(
+            base_url=base_url,
+            api_key=key,
+            default_headers={settings.apim_subscription_key_header: key},
         )
-        credential = ChainedTokenCredential(DefaultAzureCredential(), browser)
-
-        project = AIProjectClient(
-            endpoint=settings.foundry_project_endpoint, credential=credential
-        )
-        self._client = project.get_openai_client()
-        self._model = settings.foundry_model or settings.azure_openai_deployment_name
-        self._use_responses = bool(settings.use_responses_api)
+        self._model = model
 
     @property
     def is_enabled(self) -> bool:
         return self._enabled and self._client is not None
-
-    @property
-    def use_responses(self) -> bool:
-        """True when agents should use the Responses API loop instead of Chat Completions."""
-        return self._use_responses
 
     @property
     def model(self) -> str:
@@ -116,74 +91,22 @@ class LLMService:
         """
         if not self.is_enabled:
             raise RuntimeError(
-                "LLM is not enabled. Set ENABLE_LLM=true and provider credentials in .env"
+                "LLM is not enabled. Set ENABLE_LLM=true and the APIM_* settings in .env"
             )
 
-        return self._client.chat.completions.create(
-            model=self._model,
+        return self._create(
             max_completion_tokens=max_tokens,
             messages=messages,
             tools=tools,
             tool_choice="auto",
         )
 
-    def call_responses(
-        self,
-        input: Any,
-        tools: list[dict],
-        instructions: str = "",
-        previous_response_id: str | None = None,
-        max_output_tokens: int = 4096,
-    ) -> Any:
-        """
-        Call the Responses API with tool-calling support (Foundry's single entry point).
-
-        `input` is either the initial input (string / message list) or, on follow-up
-        turns, a list of `function_call_output` items. `previous_response_id` chains
-        turns server-side so we don't resend the full transcript each iteration.
-        Tools must be in Responses format: {"type":"function","name","description","parameters"}.
-        """
-        if not self.is_enabled:
-            raise RuntimeError(
-                "LLM is not enabled. Set ENABLE_LLM=true and provider credentials in .env"
-            )
-
-        kwargs: dict[str, Any] = {
-            "model": self._model,
-            "input": input,
-            "tools": tools,
-            "tool_choice": "auto",
-            "max_output_tokens": max_output_tokens,
-        }
-        if instructions:
-            kwargs["instructions"] = instructions
-        if previous_response_id:
-            kwargs["previous_response_id"] = previous_response_id
-
-        return self._client.responses.create(**kwargs)
-
     def call_simple(self, prompt: str, system: str = "", max_tokens: int = 1024) -> str:
-        """
-        Simple text-in, text-out call without tools.
-
-        On the Foundry path this uses the **Responses API** (`responses.create`) so
-        one-shot agents (VendorPrep, Memory, Meeting) go through Foundry's single
-        entry point too; otherwise it uses Chat Completions.
-        """
+        """Simple text-in, text-out call without tools."""
         if not self.is_enabled:
             raise RuntimeError("LLM is not enabled.")
 
-        if self._use_responses:
-            response = self._client.responses.create(
-                model=self._model,
-                input=prompt,
-                instructions=system or "You are a helpful assistant.",
-                max_output_tokens=max_tokens,
-            )
-            return getattr(response, "output_text", "") or ""
-
-        response = self._client.chat.completions.create(
-            model=self._model,
+        response = self._create(
             max_completion_tokens=max_tokens,
             messages=[
                 {"role": "system", "content": system or "You are a helpful assistant."},
@@ -191,3 +114,9 @@ class LLMService:
             ],
         )
         return response.choices[0].message.content or ""
+
+    def _create(self, **kwargs: Any) -> Any:
+        """Chat Completions request with the model and, if configured, reasoning effort."""
+        if self._reasoning_effort:
+            kwargs["reasoning_effort"] = self._reasoning_effort
+        return self._client.chat.completions.create(model=self._model, **kwargs)

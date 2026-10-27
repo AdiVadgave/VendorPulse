@@ -643,7 +643,7 @@ def submit_scorecard(payload: ScorecardSubmission):
             known_names,
         )
     except Exception as exc:  # noqa: BLE001 — deliberately broad; see below
-        # The Azure OpenAI SDK raises APIConnectionError / RateLimitError /
+        # The OpenAI SDK raises APIConnectionError / RateLimitError /
         # AuthenticationError, which derive from OpenAIError -> Exception and NOT from
         # RuntimeError, and main.py registers no global handler — so an outage or a 429
         # escaped as a bare 500 with a stack trace instead of the honest "nothing was

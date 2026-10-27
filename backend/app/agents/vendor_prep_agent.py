@@ -4,7 +4,7 @@ VendorPrepAgent — Module D agent.
 Uses call_simple() for one-shot LLM generation (briefs, pushback responses).
 These are single-prompt tasks — no need for the multi-step tool-calling loop.
 
-When LLM is enabled  -> call_simple() sends scorecard/pushback data to Azure OpenAI
+When LLM is enabled  -> call_simple() sends scorecard/pushback data to the LLM (APIM gateway)
 When LLM is disabled -> deterministic fallback builds template-based output
 """
 from __future__ import annotations

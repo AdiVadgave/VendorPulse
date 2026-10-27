@@ -391,15 +391,14 @@ def load_secrets_from_keyvault():
     client = SecretClient(vault_url=vault, credential=DefaultAzureCredential())
     mapping = {
         "POSTGRES-PASSWORD":    "POSTGRES_PASSWORD",
-        "AZURE-OPENAI-API-KEY": "AZURE_OPENAI_API_KEY",
+        "APIM-SUBSCRIPTION-KEY": "APIM_SUBSCRIPTION_KEY",
         "ENTRA-CLIENT-SECRET":  "ENTRA_CLIENT_SECRET",
     }
     for secret_name, env_name in mapping.items():
         os.environ.setdefault(env_name, client.get_secret(secret_name).value)
 ```
-> `DefaultAzureCredential` is the same passwordless mechanism the app already uses for Azure OpenAI /
-> Foundry ([llm_service.py](VendorPulse-code/backend/app/services/llm_service.py)), so this fits the
-> existing pattern.
+> On App Service, a Key Vault reference in the App Setting (`@Microsoft.KeyVault(SecretUri=...)`)
+> does the same job with no code — that is how `APIM_SUBSCRIPTION_KEY` (the AI gateway key) is supplied.
 
 ---
 
@@ -830,7 +829,7 @@ action that **persists** → with **no manual step on any VM**. When this passes
 - [ ] PostgreSQL **public access off**, **private endpoint on**, `sslmode=require`.
 - [ ] **HTTPS everywhere** (PaaS gives it free; on the VM add a reverse proxy + certificate).
 - [ ] **SSO required** on all routes; **CORS** restricted to the real frontend origin (not `*`).
-- [ ] **Managed identity** used for Key Vault, PostgreSQL, and Azure OpenAI (no keys where avoidable).
+- [ ] **Managed identity** used for Key Vault and PostgreSQL (no keys where avoidable); the AI gateway key is a Key Vault reference.
 - [ ] CI/CD uses **passwordless OIDC** (no stored Azure secret in GitHub); least‑privilege roles.
 - [ ] Deploys go through a **GitHub Environment with required reviewers**; `shell-feature`/`main` branch‑protected.
 - [ ] Container images run as a **non‑root** user and expose a **health check**.

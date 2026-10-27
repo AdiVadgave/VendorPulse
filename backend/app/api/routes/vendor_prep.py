@@ -61,7 +61,7 @@ def generate_vendor_brief(
 ):
     """
     Generate a narrative vendor brief from compiled scorecard data.
-    Uses Azure OpenAI when ENABLE_LLM=true, otherwise returns a deterministic brief.
+    Uses the LLM (APIM gateway) when ENABLE_LLM=true, otherwise returns a deterministic brief.
     """
     logger.info("VENDOR-PREP: generate brief — cycleId=%s, vendor=%s", sanitize_for_log(cycleId), sanitize_for_log(payload.vendor_name))
 

@@ -143,7 +143,7 @@ ignores that file** — it only reads App Settings.
 | App Setting | Where the value should ultimately live |
 |---|---|
 | `PG_PASSWORD` (or `DATABASE_URL`) | Key Vault (`VENDORPULSE-DATABASE-URL`) |
-| `AZURE_OPENAI_API_KEY` | Key Vault (`VENDORPULSE-AZURE-OPENAI-API-KEY`) |
+| `APIM_SUBSCRIPTION_KEY` | Key Vault reference to the Foundry team's vault: `@Microsoft.KeyVault(SecretUri=https://usevendorpulsetfdrydevkv.vault.azure.net/secrets/usevendorpulsetfdrydevaif-mobility-dev-eastus-SubscriptionKey/)` |
 | `GRAPH_CERT_PASSWORD` | (empty — our cert has no password) |
 
 **Non-secret config (safe as plain values):**
@@ -153,10 +153,8 @@ ignores that file** — it only reads App Settings.
 | `PG_PORT` / `PG_DATABASE` / `PG_USER` | `5432` / `vendorpulse` / `vendorpulse_admin` | DB connection parts |
 | `PG_SSLMODE` | `require` | Azure Postgres needs SSL |
 | `ENABLE_LLM` | `true` | Turn AI features on/off |
-| `AI_PROVIDER` | `azure` | Which AI provider |
-| `AZURE_OPENAI_ENDPOINT` | `https://gaura-mgt924zq-eastus2.openai.azure.com/` | AI endpoint |
-| `AZURE_OPENAI_DEPLOYMENT_NAME` | `gpt-4o` | AI model deployment |
-| `AZURE_OPENAI_API_VERSION` | `2024-12-01-preview` | AI API version |
+| `APIM_BASE_URL` | `https://useaifoundryapim.azure-api.net/usevendorpulsetfdrydevaif/openai/v1` | AI gateway (Shell Enterprise Foundry via APIM) |
+| `APIM_MODEL` | `gpt-5` | Deployment name on the Foundry resource |
 | `MAIL_PROVIDER` | `graph` | Send mail via Microsoft Graph |
 | `GRAPH_MAIL_SENDER` | `Mobility-VendorPulse@shell.com` | The "from" mailbox |
 | `GRAPH_CLIENT_ID` / `GRAPH_TENANT_ID` | (public IDs) | The Mail.Send app identity |

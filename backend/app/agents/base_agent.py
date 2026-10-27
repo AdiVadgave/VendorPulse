@@ -138,10 +138,7 @@ class BaseAgent(ABC):
 
         try:
             if settings.enable_llm and self._llm is not None:
-                if getattr(self._llm, "use_responses", False):
-                    result = self._tool_calling_loop_responses(user_message)
-                else:
-                    result = self._tool_calling_loop(user_message)
+                result = self._tool_calling_loop(user_message)
             else:
                 result = self._deterministic_run(user_message, ctx)
 
@@ -162,7 +159,7 @@ class BaseAgent(ABC):
 
     @staticmethod
     def _tool_name(tool: dict) -> Optional[str]:
-        """Extract a tool's name from either Chat Completions or Responses format."""
+        """Extract a tool's name from a Chat Completions tool definition."""
         fn = tool.get("function", tool)
         return fn.get("name")
 
@@ -199,7 +196,7 @@ class BaseAgent(ABC):
 
     def _tool_calling_loop(self, user_message: str) -> dict:
         """
-        Implements the OpenAI / Azure OpenAI tool-calling loop.
+        Implements the Chat Completions tool-calling loop (via the APIM gateway).
 
         Runs until the model returns finish_reason='stop' or max iterations reached.
         Each tool_calls block is dispatched to execute_tool().
@@ -270,7 +267,7 @@ class BaseAgent(ABC):
         return self._finalize_model_text(message.content or "")
 
     # ------------------------------------------------------------------
-    # Final-text → envelope parsing (shared by both tool-calling loops)
+    # Final-text → envelope parsing
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -359,98 +356,6 @@ class BaseAgent(ABC):
                 "requires_approval": False,
             }
         return self._coerce_envelope(parsed, fallback_text=text)
-
-    # ------------------------------------------------------------------
-    # Responses API tool-calling loop (Microsoft Foundry / AI_PROVIDER=foundry)
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _to_responses_tools(chat_tools: list[dict]) -> list[dict]:
-        """
-        Convert Chat Completions tool defs to Responses API format.
-
-        Chat:      {"type":"function","function":{"name","description","parameters"}}
-        Responses: {"type":"function","name","description","parameters"}
-
-        This lets each agent's get_tools() stay unchanged across both code paths.
-        """
-        out: list[dict] = []
-        for t in chat_tools:
-            fn = t.get("function", t)
-            out.append(
-                {
-                    "type": "function",
-                    "name": fn.get("name"),
-                    "description": fn.get("description", ""),
-                    "parameters": fn.get("parameters", {"type": "object", "properties": {}}),
-                }
-            )
-        return out
-
-    def _tool_calling_loop_responses(self, user_message: str) -> dict:
-        """
-        Implements the tool-calling loop against the Responses API.
-
-        Mirrors _tool_calling_loop() but uses responses.create + previous_response_id
-        for server-side conversation state. execute_tool() and get_tools() are reused
-        verbatim, so per-agent behaviour and the app-layer approval gate are identical.
-        """
-        tools = self._to_responses_tools(self._model_facing_tools())
-        instructions = self.get_system_prompt()
-
-        # First turn: send the user message. Subsequent turns: send only tool outputs
-        # and chain via previous_response_id.
-        next_input: Any = user_message
-        previous_response_id: Optional[str] = None
-
-        max_iterations = 10
-        for _ in range(max_iterations):
-            response = self._llm.call_responses(
-                input=next_input,
-                tools=tools,
-                instructions=instructions,
-                previous_response_id=previous_response_id,
-            )
-
-            function_calls = [
-                item
-                for item in (response.output or [])
-                if getattr(item, "type", None) == "function_call"
-            ]
-
-            if not function_calls:
-                return self._extract_final_result_responses(response)
-
-            # Execute each tool call and feed the outputs back on the next turn.
-            tool_outputs: list[dict] = []
-            for call in function_calls:
-                try:
-                    tool_input = json.loads(call.arguments or "{}")
-                except (json.JSONDecodeError, ValueError):
-                    tool_input = {}
-                tool_result = self._dispatch_tool(call.name, tool_input)
-                tool_outputs.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": call.call_id,
-                        "output": tool_result,
-                    }
-                )
-
-            next_input = tool_outputs
-            previous_response_id = response.id
-
-        return {
-            "summary": "Agent completed after reaching max iterations.",
-            "data": {},
-            "warnings": ["Agent reached max iterations (10)."],
-            "next_actions": ["APPROVE_SLOT"],
-            "requires_approval": True,
-        }
-
-    def _extract_final_result_responses(self, response: Any) -> dict:
-        """Parse the Responses-API final text into the AgentResponse envelope."""
-        return self._finalize_model_text(getattr(response, "output_text", "") or "")
 
     # ------------------------------------------------------------------
     # Response construction

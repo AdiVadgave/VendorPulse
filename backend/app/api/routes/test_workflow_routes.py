@@ -168,6 +168,27 @@ class MinutesTests(unittest.TestCase):
         self.assertEqual([c["email"] for c in candidates], ["going@shell.com"])
 
 
+class TranscriptContextTests(unittest.TestCase):
+    """The date a transcript's "today" / "11 April" refer to: the scheduled meeting's."""
+
+    def test_meeting_day_comes_from_the_scheduled_meeting(self):
+        cycles = mock.Mock(get_by_cycle_id=lambda cid: {"teams_meeting_scheduled_at": "2026-04-08T09:00:00+00:00"})
+        meetings = mock.Mock(get_for_cycle=lambda cid: [
+            {"meeting_type": "INTERNAL_ALIGNMENT", "alignment_index": 2, "status": "scheduled", "time_slot": {"date": "2026-04-01"}},
+            {"meeting_type": "VENDOR_PREP", "status": "scheduled", "time_slot": {"date": "2026-04-05"}},
+        ])
+        with mock.patch.object(minutes_routes, "get_cycle_repo", lambda: cycles), \
+             mock.patch.object(minutes_routes, "get_meeting_repo", lambda: meetings):
+            self.assertEqual(minutes_routes._meeting_day_for("c1", "mtg-c1"), "2026-04-08")
+            self.assertEqual(minutes_routes._meeting_day_for("c1", "align-c1-2"), "2026-04-01")
+            self.assertEqual(minutes_routes._meeting_day_for("c1", "vprep-c1"), "2026-04-05")
+            self.assertIsNone(minutes_routes._meeting_day_for("c1", "align-c1-9"))
+
+    def test_a_failed_lookup_never_blocks_parsing(self):
+        with mock.patch.object(minutes_routes, "get_cycle_repo", side_effect=RuntimeError("db down")):
+            self.assertIsNone(minutes_routes._meeting_day_for("c1", "mtg-c1"))
+
+
 class VendorPrepInviteTests(unittest.TestCase):
     def test_people_added_only_to_the_meeting_roster_are_recorded_as_invited(self):
         attendees = mock.Mock(get_for_cycle=lambda cycle_id: [{"email": "cycle.member@shell.com"}])

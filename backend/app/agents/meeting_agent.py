@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional
+from datetime import date, datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Iterable, Optional
 
 from app.agents.base_agent import BaseAgent
 from app.core.logging_config import sanitize_for_log
@@ -157,6 +158,10 @@ class MeetingAgent(BaseAgent):
         params = context.get("params", {})
         meeting_id = params.get("meeting_id", "")
         transcript = params.get("transcript", "")
+        # The day the meeting took place — what "today" / "11 April" in it refer to. The
+        # route passes the scheduled date when it knows it.
+        meeting_day = _valid_date(params.get("meeting_date")) or datetime.now(timezone.utc).date()
+        known_names = [n for n in (params.get("known_names") or []) if isinstance(n, str) and n.strip()]
         warnings: list[str] = []
 
         if self._llm and self._llm.is_enabled:
@@ -171,7 +176,17 @@ class MeetingAgent(BaseAgent):
                 f"  note_id (generate a short id like 'n1','n2'...), meeting_id (use '{meeting_id}'),\n"
                 "  note_type (MUST be one of: QUESTION, OBJECTION, DECISION, APPRECIATION, ACTION),\n"
                 "  content (the substance of the statement), raised_by (speaker name),\n"
-                "  timestamp (HH:MM from the transcript if available, else empty string).\n"
+                "  timestamp (HH:MM from the transcript if available, else empty string),\n"
+                "  owner (ACTION notes only: the person, team or company the action is ASSIGNED\n"
+                "    to — in 'Action: Alex to send the report' it is Alex, not the speaker; in\n"
+                "    'Raj, that is an action for you' it is Raj. Use the speaker only when they take\n"
+                "    the action on themselves, e.g. 'I will send it'. Empty string when nobody is\n"
+                "    named — never guess),\n"
+                "  due_date (ACTION notes only: the deadline as YYYY-MM-DD, only when one is stated.\n"
+                f"    The meeting took place on {meeting_day.isoformat()}: 'today' or 'close of business'\n"
+                "    means that date, and a day + month means that year. Empty string otherwise).\n"
+                "When one statement assigns several actions, return one ACTION note per action,\n"
+                "each with its own owner and due_date.\n"
                 "Return ONLY the JSON array, no markdown or explanation."
             )
             raw = self._llm.call_simple(prompt, system=MEETING_SYSTEM_PROMPT, max_tokens=_TRANSCRIPT_MAX_TOKENS)
@@ -195,7 +210,7 @@ class MeetingAgent(BaseAgent):
         else:
             notes = _build_fallback_parsed_notes(transcript, meeting_id)
 
-        notes = _normalize_parsed_notes(notes, meeting_id)
+        notes = _normalize_parsed_notes(notes, meeting_id, meeting_day=meeting_day, known_names=known_names)
 
         return {
             "summary": f"Parsed {len(notes)} notes from transcript.",
@@ -251,8 +266,6 @@ class MeetingAgent(BaseAgent):
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
-
-import re
 
 def _strip_markdown_json(text: str) -> str:
     """Extract JSON from LLM responses that may include prose and markdown fences."""
@@ -314,19 +327,170 @@ def _coerce_note_type(raw_type: str, content: str = "") -> str:
     return "QUESTION"
 
 
-def _normalize_parsed_notes(notes: list[dict], meeting_id: str) -> list[dict]:
-    """Ensure every note returned from parse-transcript satisfies the MeetingNote schema."""
+# ── Action owner + due date ──────────────────────────────────────────────────
+# An ACTION note's owner is whoever the action is ASSIGNED to. The chair usually reads
+# the actions out, so taking the speaker made almost every action the chair's.
+
+_PLACEHOLDER_OWNERS = {"", "tbd", "unknown", "none", "n/a", "na", "unassigned", "nobody"}
+# "Action: Alex to escalate…" / "Action item: Shell delivery team to review…"
+_ACTION_ASSIGNEE = re.compile(r"\baction(?:\s+item)?\s*:\s*(.+?)\s+to\s+[a-z]", re.IGNORECASE)
+# Words that start an instruction rather than name someone ("Action: Send the deck to Bob").
+_IMPERATIVES = {
+    "send", "share", "provide", "review", "prepare", "update", "circulate", "schedule",
+    "confirm", "follow", "set", "create", "check", "raise", "submit", "escalate", "draft",
+    "arrange", "book", "organise", "organize", "investigate", "agree", "issue", "add",
+}
+_MONTHS = {
+    name: number
+    for number, full in enumerate(
+        ("january", "february", "march", "april", "may", "june", "july",
+         "august", "september", "october", "november", "december"), start=1)
+    for name in (full, full[:3])
+}
+_MONTHS["sept"] = 9
+_ISO_DATE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
+# Optional trailing year: "11 April 2027" / "April 11, 2027".
+_DAY_MONTH = re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([A-Za-z]{3,9})\b(?:,?\s+(\d{4})\b)?")
+_MONTH_DAY = re.compile(r"\b([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:,?\s+(\d{4})\b)?")
+_SAME_DAY = re.compile(r"\b(?:today|close of business|end of (?:the )?day|eod|cob)\b", re.IGNORECASE)
+_NEXT_DAY = re.compile(r"\btomorrow\b", re.IGNORECASE)
+
+
+def _valid_date(value) -> Optional[date]:
+    """A YYYY-MM-DD (or ISO timestamp) string as a date; None for anything else."""
+    if not isinstance(value, str) or not re.match(r"^\d{4}-\d{2}-\d{2}", value.strip()):
+        return None
+    try:
+        return date.fromisoformat(value.strip()[:10])
+    except ValueError:
+        return None
+
+
+def _stated_due_date(text: str, meeting_day: date) -> Optional[str]:
+    """The deadline a statement spells out, as YYYY-MM-DD, or None.
+
+    Explicit forms only — an ISO date, "11 April" / "April 11" (with its year if given,
+    else the meeting's year — or the next one when that would be months before the
+    meeting, e.g. "10 January" said in December), and "today" / "close of business" /
+    "tomorrow" relative to the meeting.
+    When a statement holds several, the first one mentioned wins: it belongs to the
+    first action in it."""
+    found: list[tuple[int, date]] = []
+    for m in _ISO_DATE.finditer(text):
+        d = _valid_date(m.group(0))
+        if d:
+            found.append((m.start(), d))
+    for pattern, day_at, month_at in ((_DAY_MONTH, 1, 2), (_MONTH_DAY, 2, 1)):
+        for m in pattern.finditer(text):
+            month = _MONTHS.get(m.group(month_at).lower())
+            if not month:
+                continue
+            try:
+                if m.group(3):
+                    d = date(int(m.group(3)), month, int(m.group(day_at)))
+                else:
+                    d = date(meeting_day.year, month, int(m.group(day_at)))
+                    if d < meeting_day - timedelta(days=60):
+                        d = date(d.year + 1, month, d.day)
+            except ValueError:
+                continue
+            found.append((m.start(), d))
+    for pattern, offset in ((_SAME_DAY, 0), (_NEXT_DAY, 1)):
+        m = pattern.search(text)
+        if m:
+            found.append((m.start(), meeting_day + timedelta(days=offset)))
+    return min(found)[1].isoformat() if found else None
+
+
+def _owner_from_text(content: str) -> Optional[str]:
+    """The assignee in a statement of the form "Action: <who> to <do something>"."""
+    m = _ACTION_ASSIGNEE.search(content)
+    if not m:
+        return None
+    who = m.group(1).strip(" ,.;:")
+    words = who.split()
+    if not words or len(words) > 5 or not words[0][:1].isupper() or words[0].lower() in _IMPERATIVES:
+        return None
+    return who
+
+
+def _grounded_owner(raw, content: str, speaker: str) -> Optional[str]:
+    """The model's owner, kept only if it is grounded in the statement.
+
+    It must be the speaker (who took the action on themselves) or a name that appears in
+    the statement itself — so the model cannot invent an owner."""
+    owner = " ".join(str(raw or "").split()).strip(" ,.;:")
+    if owner.lower() in _PLACEHOLDER_OWNERS:
+        return None
+    if speaker and owner.casefold() == speaker.casefold():
+        return speaker
+    text = content.casefold()
+    for probe in (owner, owner.split()[0]):
+        if re.search(rf"(?<!\w){re.escape(probe.casefold())}(?!\w)", text):
+            return owner
+    return None
+
+
+def _first_name(name: str) -> str:
+    """First name from "First Last" or the directory's "Last, First M ORG" form."""
+    rest = name.split(",", 1)[1] if "," in name else name
+    parts = rest.split()
+    return parts[0] if parts else ""
+
+
+def _match_known_name(owner: str, known_names: Iterable[str]) -> str:
+    """The attendee's full name for an owner given by name ("Raj" → "Raj Kumar").
+
+    Only an exact full-name match, or a first name that exactly one attendee has; teams
+    and companies ("Zensar", "Shell delivery team") are left as written."""
+    names = [n.strip() for n in known_names if n and n.strip()]
+    folded = owner.casefold()
+    for name in names:
+        if name.casefold() == folded:
+            return name
+    if len(owner.split()) == 1:
+        matches = {name for name in names if _first_name(name).casefold() == folded}
+        if len(matches) == 1:
+            return matches.pop()
+    return owner
+
+
+def _normalize_parsed_notes(
+    notes: list[dict],
+    meeting_id: str,
+    *,
+    meeting_day: Optional[date] = None,
+    known_names: Iterable[str] = (),
+) -> list[dict]:
+    """Ensure every note returned from parse-transcript satisfies the MeetingNote schema.
+
+    ACTION notes also get `owner` (who it is assigned to — grounded in the statement,
+    resolved to an attendee's full name where possible, else None) and `due_date`
+    (a stated deadline, else None). Other notes carry neither."""
+    meeting_day = meeting_day or datetime.now(timezone.utc).date()
+    known_names = list(known_names)
     normalized: list[dict] = []
     for idx, note in enumerate(notes, start=1):
         if not isinstance(note, dict):
             continue
         original = note.get("note_type", "")
-        coerced = _coerce_note_type(original, note.get("content", ""))
+        content = note.get("content", "") or ""
+        coerced = _coerce_note_type(original, content)
         if coerced != original:
             logger.info(
                 "PARSE-TRANSCRIPT: coerced note_type %r -> %r",
                 sanitize_for_log(original), sanitize_for_log(coerced),
             )
+        speaker = note.get("raised_by", "Unknown") or "Unknown"
+        owner = due_date = None
+        if coerced == "ACTION":
+            owner = _grounded_owner(note.get("owner"), content, speaker) or _owner_from_text(content)
+            if owner:
+                owner = _match_known_name(owner, known_names)
+            # The statement's own words first; the model's date only if they name none.
+            stated = _stated_due_date(content, meeting_day)
+            model_date = _valid_date(note.get("due_date"))
+            due_date = stated or (model_date.isoformat() if model_date else None)
         normalized.append({
             "note_id": note.get("note_id") or f"n{idx}",
             # The requested id wins over whatever the model echoed back: minutes are
@@ -334,9 +498,11 @@ def _normalize_parsed_notes(notes: list[dict], meeting_id: str) -> list[dict]:
             # approve/send/reload calls (which use the requested id) never look.
             "meeting_id": meeting_id or note.get("meeting_id") or "",
             "note_type": coerced,
-            "content": note.get("content", ""),
-            "raised_by": note.get("raised_by", "Unknown") or "Unknown",
+            "content": content,
+            "raised_by": speaker,
             "timestamp": note.get("timestamp", "") or "",
+            "owner": owner,
+            "due_date": due_date,
         })
     return normalized
 
@@ -368,7 +534,9 @@ def _build_minutes_prompt(
         "  agenda_summaries (array of {{topic, summary}}),\n"
         "  key_decisions (array of strings),\n"
         "  qa_log (array of {{question, raised_by, response}}),\n"
-        "  action_items (array of {{description, owner, due_date}}),\n"
+        "  action_items (array of {{description, owner, due_date}} — take owner and due_date\n"
+        "    from each ACTION note; never use whoever merely read the action out as its owner;\n"
+        "    'TBD' / empty string when the note has none),\n"
         "  generated_at (ISO timestamp).\n"
         "Return ONLY the JSON, no markdown or explanation."
     )
@@ -476,8 +644,9 @@ def _build_fallback_minutes(
         "action_items": [
             {
                 "description": a["content"],
-                "owner": a.get("raised_by", "TBD"),
-                "due_date": "",
+                # The assignee, never the speaker (usually the chair reading it out).
+                "owner": a.get("owner") or "TBD",
+                "due_date": a.get("due_date") or "",
             }
             for a in actions
         ],
@@ -511,7 +680,8 @@ def _build_fallback_parsed_notes(transcript: str, meeting_id: str) -> list[dict]
 
         lower = content.lower()
 
-        if any(lower.startswith(kw) for kw in action_kw):
+        # "Please do. Action: …" — the action can follow a reply in the same turn.
+        if any(lower.startswith(kw) for kw in action_kw) or re.search(r"\baction(?:\s+item)?\s*:", lower):
             note_type = "ACTION"
         elif any(lower.startswith(kw) for kw in decision_kw):
             note_type = "DECISION"

@@ -23,6 +23,11 @@ export interface MeetingNote {
   content: string
   raised_by: string
   timestamp: string
+  /** ACTION notes: who the action is assigned to (not who read it out); null when the
+   *  transcript names nobody. */
+  owner?: string | null
+  /** ACTION notes: the stated deadline (YYYY-MM-DD), or null. */
+  due_date?: string | null
 }
 
 export interface MeetingMinutes {

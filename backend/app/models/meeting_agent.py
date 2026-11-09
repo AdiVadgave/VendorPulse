@@ -53,6 +53,10 @@ class MeetingNote(BaseModel):
     content: str
     raised_by: str
     timestamp: str = Field(..., description="HH:MM format")
+    # ACTION notes only: who the action is assigned to (not who read it out) and its
+    # deadline (YYYY-MM-DD), when the transcript states them. None = not stated.
+    owner: Optional[str] = None
+    due_date: Optional[str] = None
 
     @field_validator("note_type", mode="before")
     @classmethod

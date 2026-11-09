@@ -153,5 +153,99 @@ class PushbackTests(unittest.TestCase):
         self.assertTrue(result["summary"].startswith("3 response options"))
 
 
+KNOWN = ["Alex Thompson", "David Okafor", "Kumar, Raj", "Sarah Chen", "Tom Hughes"]
+
+
+def _note(content, speaker, owner="", due="", note_type="ACTION"):
+    return {"note_id": "n1", "note_type": note_type, "content": content,
+            "raised_by": speaker, "owner": owner, "due_date": due}
+
+
+class _RecordingLLM(FakeLLM):
+    prompt = ""
+
+    def call_simple(self, prompt, system="", max_tokens=1024):
+        self.prompt = prompt
+        return self.reply
+
+
+class ActionOwnerTests(unittest.TestCase):
+    """An action belongs to whoever it is assigned to — not to whoever read it out."""
+
+    def parse(self, notes, meeting_date="2026-04-08", known=KNOWN):
+        llm = _RecordingLLM(json.dumps(notes))
+        result = _meeting_agent(llm)._deterministic_parse_transcript({"params": {
+            "meeting_id": "mtg-c1", "transcript": "(transcript)", "meeting_date": meeting_date, "known_names": known,
+        }})
+        self.prompt = llm.prompt
+        return result["data"]["notes"]
+
+    def test_the_assignee_not_the_speaker_owns_the_action(self):
+        notes = self.parse([
+            _note("Action: Alex to escalate the GDPR incident to Shell's DPO by close of business today.",
+                  "David Okafor", owner="Alex"),
+            _note("Raj, that's an action for you — written position on the CVE timeline by 11 April.",
+                  "Sarah Chen", owner="Raj", due="2026-04-11"),
+            _note("Action: Zensar to provide a skills matrix by 18 April.", "David Okafor", owner="Zensar"),
+        ])
+        self.assertEqual([(n["owner"], n["due_date"]) for n in notes], [
+            ("Alex Thompson", "2026-04-08"),   # first name → attendee; "today" → meeting day
+            ("Kumar, Raj", "2026-04-11"),      # directory "Last, First" form resolved too
+            ("Zensar", "2026-04-18"),          # a company stays as said
+        ])
+        self.assertIn("2026-04-08", self.prompt)
+
+    def test_an_owner_the_statement_does_not_name_becomes_tbd(self):
+        [n] = self.parse([_note("Action: send the RCA to the VMO by 18 April.", "David Okafor", owner="Priya")])
+        self.assertIsNone(n["owner"])
+
+    def test_a_speaker_who_takes_the_action_on_owns_it(self):
+        [n] = self.parse([_note("I'll circulate the updated deck tomorrow.", "Tom Hughes", owner="Tom Hughes")])
+        self.assertEqual((n["owner"], n["due_date"]), ("Tom Hughes", "2026-04-09"))
+
+    def test_the_statements_own_date_beats_the_models(self):
+        [n] = self.parse([_note("Action: Zensar to provide a skills matrix by 18 April.", "David Okafor",
+                                owner="Zensar", due="2026-05-01")])
+        self.assertEqual(n["due_date"], "2026-04-18")
+
+    def test_nothing_stated_means_no_owner_and_no_date(self):
+        [n] = self.parse([_note("Someone should look into the invoice backlog.", "David Okafor", due="next week")])
+        self.assertEqual((n["owner"], n["due_date"]), (None, None))
+
+    def test_only_actions_carry_an_owner(self):
+        [n] = self.parse([_note("Agreed to keep the SLA at 95% by 18 April.", "David Okafor",
+                                owner="David Okafor", note_type="DECISION")])
+        self.assertEqual((n["owner"], n["due_date"]), (None, None))
+
+    def test_an_ambiguous_first_name_is_left_as_said(self):
+        [n] = self.parse([_note("Action: Alex to send the deck.", "Sarah Chen", owner="Alex")],
+                         known=["Alex Thompson", "Alex Brown"])
+        self.assertEqual(n["owner"], "Alex")
+
+    def test_dates_roll_into_next_year_and_respect_an_explicit_year(self):
+        a, b = self.parse([
+            _note("Action: Zensar to send the plan by 10 January.", "Chair", owner="Zensar"),
+            _note("Action: Zensar to close it by 11 April 2027.", "Chair", owner="Zensar"),
+        ], meeting_date="2026-12-15")
+        self.assertEqual((a["due_date"], b["due_date"]), ("2027-01-10", "2027-04-11"))
+
+    def test_keyword_parser_finds_the_assignee_without_the_ai(self):
+        result = _meeting_agent(None)._deterministic_parse_transcript({"params": {
+            "meeting_id": "mtg-c1", "meeting_date": "2026-04-08", "known_names": KNOWN,
+            "transcript": "David Okafor [10:28]: Please do. Action: Alex to escalate it formally by 16 April.",
+        }})
+        [n] = result["data"]["notes"]
+        self.assertEqual((n["note_type"], n["owner"], n["due_date"]), ("ACTION", "Alex Thompson", "2026-04-16"))
+
+    def test_fallback_minutes_use_the_assignee(self):
+        minutes = _meeting_agent(None)._deterministic_generate_minutes({"params": {
+            "meeting_id": "mtg-c1", "attendees": ["David Okafor"], "meeting_date": "2026-04-08",
+            "notes": [_note("Action: Alex to escalate it.", "David Okafor", owner="Alex Thompson", due="2026-04-08"),
+                      _note("Follow up on invoices.", "David Okafor")],
+        }})["data"]["minutes"]
+        self.assertEqual([(a["owner"], a["due_date"]) for a in minutes["action_items"]],
+                         [("Alex Thompson", "2026-04-08"), ("TBD", "")])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -290,8 +290,9 @@ export default function VendorPrepMeetingPanel({
       .map((n, i) => ({
         action_id: n.note_id || `vprep-act-${i}`,
         description: n.content,
-        owner: n.raised_by || 'TBD',
-        due_date: null,
+        // The assignee, never the speaker (usually the chair reading the actions out).
+        owner: n.owner || 'TBD',
+        due_date: n.due_date ?? null,
         source: 'vendor_prep',
         status: 'OPEN',
       }))

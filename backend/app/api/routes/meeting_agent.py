@@ -26,10 +26,12 @@ from app.core.logging_config import sanitize_for_log
 from app.dependencies import (
     get_agent_run_repo,
     get_attendee_repo,
+    get_cycle_repo,
     get_meeting_agent,
     get_meeting_artifact_repo,
     get_meeting_attendee_repo,
     get_meeting_attendee_seed_repo,
+    get_meeting_repo,
 )
 from app.models.common import AgentResponse
 from app.models.meeting_agent import GenerateMinutesRequest, ParseTranscriptRequest
@@ -137,6 +139,40 @@ def extract_actions(
     return response
 
 
+def _meeting_day_for(cycle_id: str, meeting_id: str) -> Optional[str]:
+    """The date (YYYY-MM-DD) the meeting was scheduled for, or None when unknown — the
+    agent then uses today. Never lets a lookup failure block parsing."""
+    try:
+        if not meeting_id or meeting_id == f"mtg-{cycle_id}":
+            cycle = get_cycle_repo().get_by_cycle_id(cycle_id) or {}
+            return (cycle.get("teams_meeting_scheduled_at") or "")[:10] or None
+        live = [m for m in get_meeting_repo().get_for_cycle(cycle_id) if m.get("status") != "cancelled"]
+        meeting = None
+        if meeting_id.startswith(f"align-{cycle_id}-"):
+            index = int(meeting_id.rsplit("-", 1)[1])
+            meeting = next((m for m in live if m.get("meeting_type") == "INTERNAL_ALIGNMENT"
+                            and int(m.get("alignment_index") or 1) == index), None)
+        elif meeting_id.startswith(f"vprep-{cycle_id}"):
+            meeting = next((m for m in live if m.get("meeting_type") == "VENDOR_PREP"), None)
+        return ((meeting or {}).get("time_slot") or {}).get("date") or None
+    except Exception as exc:  # noqa: BLE001 — best effort
+        logger.warning("parse-transcript: meeting date lookup failed for %s: %s", sanitize_for_log(meeting_id), exc)
+        return None
+
+
+def _attendee_names(cycle_id: str, meeting_id: str) -> list[str]:
+    """Everyone an action could be assigned to by name: the cycle's attendees plus this
+    meeting's own roster (read-only — parsing must not seed it)."""
+    try:
+        names = {a.get("name") for a in get_attendee_repo().get_for_cycle(cycle_id)}
+        roster, _ = _resolve_minutes_candidates(cycle_id, meeting_id, read_only=True)
+        names.update(a.get("name") for a in roster)
+        return sorted(n for n in names if n)
+    except Exception as exc:  # noqa: BLE001 — best effort
+        logger.warning("parse-transcript: attendee lookup failed for %s: %s", sanitize_for_log(meeting_id), exc)
+        return []
+
+
 @router.post("/parse-transcript", response_model=AgentResponse)
 def parse_transcript(
     cycleId: str,
@@ -165,6 +201,10 @@ def parse_transcript(
             "params": {
                 "meeting_id": payload.meeting_id,
                 "transcript": payload.transcript,
+                # For each action's owner and deadline: what "today" / "11 April" refer
+                # to, and the attendees a first name ("Raj") can be resolved to.
+                "meeting_date": _meeting_day_for(cycleId, payload.meeting_id),
+                "known_names": _attendee_names(cycleId, payload.meeting_id),
             },
         },
     )

@@ -22,9 +22,14 @@ _DETECTION_PLACEHOLDERS: dict[str, str] = {
     "employee_ids": "[EMPLOYEE ID]",
     "usernames": "[USERNAME]",
 }
+# A capitalised word pair — the SHAPE of a full name. On its own it also matches
+# "Service Desk", "Change Management" or "Microsoft Azure", so it only redacts when one
+# of its words is a first name or surname from the directory (see redact_person_names).
 _PERSON_NAME = re.compile(
     r"\b[A-Z][a-z]{1,}(?:[-'][A-Z][a-z]{1,})?\s+[A-Z][a-z]{1,}(?:[-'][A-Z][a-z]{1,})?\b"
 )
+# Straight and curly apostrophes, which a model often normalises when echoing a name.
+_APOSTROPHES = "'’‘"
 
 
 class CommentRedactionError(ValueError):
@@ -39,8 +44,21 @@ def _token_pattern(token: str) -> re.Pattern[str]:
     apostrophe, which is not a word character, so the name is replaced while the "'s" and
     the rest of the sentence are left exactly as the reviewer wrote them. The lookarounds
     are Unicode-aware, so accented and hyphenated names behave the same way.
+
+    Any run of whitespace matches any other, and any apostrophe matches any other: the
+    model echoes a detected name as plain text, so "John<NBSP>Smith" pasted from Outlook,
+    a name split across a line break, or "O’Neil" returned as "O'Neil" must still match
+    the comment. Otherwise the grounding check rejected the detection on every attempt
+    and the reviewer could never submit.
     """
-    return re.compile(rf"(?<!\w){re.escape(token)}(?!\w)", flags=re.IGNORECASE)
+    def word(w: str) -> str:
+        return "".join(f"[{_APOSTROPHES}]" if ch in _APOSTROPHES else re.escape(ch) for ch in w)
+
+    words = token.split()
+    if not words:
+        return re.compile(r"(?!)")  # an empty token must match nothing, not everywhere
+    body = r"\s+".join(word(w) for w in words)
+    return re.compile(rf"(?<!\w){body}(?!\w)", flags=re.IGNORECASE)
 
 
 def _replace_detections(text: str, detections: Iterable[tuple[str, str]]) -> str:
@@ -196,11 +214,36 @@ def redact_scorecard_comments_with_ai(
     if set(detections) != set(comments):
         raise CommentRedactionError("AI comment redaction returned an invalid comment map.")
 
-    directory = [(name, _PERSON_NAME_PLACEHOLDER) for name in known_names]
+    directory = [(name, _PERSON_NAME_PLACEHOLDER) for name in _full_names(known_names)]
     return {
         measure_key: _replace_detections(comment, [*directory, *detections[measure_key]])
         for measure_key, comment in comments.items()
     }
+
+
+def _full_names(names: Iterable[str]) -> list[str]:
+    """Directory names with at least a first name and a surname.
+
+    A one-word directory entry is not matched as a whole token: users recorded as just
+    "Will", "June" or "Mark" turned "the vendor will deliver the June invoice" into "the
+    vendor TEAM deliver the TEAM invoice". A first name on its own is left to the AI
+    detection, which judges it in context; it still anchors the full-name check below."""
+    return [name for name in names if len(name.split()) >= 2]
+
+
+def _fold_name(word: str) -> str:
+    return word.casefold().replace("’", "'").replace("‘", "'")
+
+
+def _name_anchors(names: Iterable[str]) -> set[str]:
+    """First names and surnames from the directory, normalised for comparison."""
+    anchors: set[str] = set()
+    for name in names:
+        parts = name.split()
+        if parts:
+            anchors.add(_fold_name(parts[0]))
+            anchors.add(_fold_name(parts[-1]))
+    return anchors
 
 
 def _redact_known_full_name_variations(text: str, known_names: Iterable[str]) -> str:
@@ -226,13 +269,30 @@ def _redact_known_full_name_variations(text: str, known_names: Iterable[str]) ->
 
 
 def redact_person_names(text: str, known_names: Iterable[str] = ()) -> str:
-    """Replace known and likely full personal names with a stable marker."""
+    """Replace known and likely full personal names with a stable marker.
+
+    "Likely" means a capitalised word pair with a directory first name or surname in it
+    ("Jane Doe" when the directory has a Jane). Every capitalised pair used to be
+    replaced, which permanently rewrote ordinary business wording in every stored
+    comment — "Service Desk missed two P1 SLAs; Change Management was weak" was saved as
+    "TEAM Desk missed two P1 SLAs; TEAM was weak". Names with no directory link at all
+    are the AI detection's job, which runs before this on every submission."""
     names = sorted({name.strip() for name in known_names if name and name.strip()}, key=len, reverse=True)
     redacted = _redact_known_full_name_variations(text, names)
     # Shared with the AI path so a directory name and a detected name redact identically
     # — whole-token, every occurrence, possessive suffix left intact.
-    redacted = _replace_detections(redacted, [(name, _PERSON_NAME_PLACEHOLDER) for name in names])
-    return _PERSON_NAME.sub(_PERSON_NAME_PLACEHOLDER, redacted)
+    redacted = _replace_detections(redacted, [(name, _PERSON_NAME_PLACEHOLDER) for name in _full_names(names)])
+    anchors = _name_anchors(names)
+    if not anchors:
+        return redacted
+
+    def likely_person(match: re.Match[str]) -> str:
+        words = match.group(0).split()
+        if _fold_name(words[0]) in anchors or _fold_name(words[-1]) in anchors:
+            return _PERSON_NAME_PLACEHOLDER
+        return match.group(0)
+
+    return _PERSON_NAME.sub(likely_person, redacted)
 
 
 def redact_scorecard_comments(comments: dict[str, str], known_names: Iterable[str] = ()) -> dict[str, str]:

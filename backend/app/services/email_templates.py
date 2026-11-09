@@ -253,15 +253,28 @@ def build_reminder_email(
     """A scorecard reminder email. `days_left` drives the urgency copy/colour."""
     urgent = days_left <= 0
     accent = "#dc2626" if urgent else ("#d97706" if days_left <= 2 else "#6366f1")
-    when = (
-        "is due <strong>today</strong>" if days_left <= 0
-        else f"is due in <strong>{days_left} day{'s' if days_left != 1 else ''}</strong> (by {deadline})"
-    )
+    if not deadline:
+        # A manual send before any deadline is set: there is no date to quote, and this
+        # used to read "is due in 5 days (by )" with a subject ending "— due ".
+        when = when_text = "is still outstanding"
+        due_suffix = "action needed"
+    elif days_left < 0:
+        when = f"was due on <strong>{deadline}</strong> and is now overdue"
+        when_text = f"was due on {deadline} and is now overdue"
+        due_suffix = f"overdue since {deadline}"
+    elif days_left == 0:
+        when = "is due <strong>today</strong>"
+        when_text = "is due today"
+        due_suffix = "due today"
+    else:
+        when = f"is due in <strong>{days_left} day{'s' if days_left != 1 else ''}</strong> (by {deadline})"
+        when_text = f"is due in {days_left} day(s) (by {deadline})"
+        due_suffix = f"due {deadline}"
     # Approved title, prefixed with the urgency so it is still scannable in an inbox.
     subject = (
         f"{'FINAL REMINDER' if urgent else 'Reminder'}: "
         + spr_title(vendor_name, quarter, year, "Scorecard")
-        + f" — {'due today' if urgent else f'due {deadline}'}"
+        + f" — {due_suffix}"
     )
     html_body = f"""\
 <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
@@ -288,8 +301,7 @@ def build_reminder_email(
 """
     text_body = (
         f"Dear {attendee_name},\n\n"
-        f"Reminder: your scorecard for {vendor_name} {quarter} {year} "
-        f"{'is due today' if urgent else f'is due in {days_left} day(s) (by {deadline})'}.\n\n"
+        f"Reminder: your scorecard for {vendor_name} {quarter} {year} {when_text}.\n\n"
         f"Complete it here: {form_url}\n\n"
         f"If already submitted, please disregard.\n\nVendorPulse"
     )

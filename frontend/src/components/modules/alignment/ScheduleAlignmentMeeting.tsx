@@ -463,17 +463,20 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
             } : undefined}
             onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl, attendeeCount }) => {
               if (selectedInternalAttendees.length === 0) { setError('Tick at least one attendee to invite.'); return }
-              await scheduleAlignmentMeetingManual(cycleId, {
-                startTime, durationMinutes, timeZone, meetingUrl: teamsUrl, meetingIndex,
-              })
               // Drop anyone left unticked from this meeting's roster so only the
               // invited people remain (persists). Re-add later via "Add invitee".
+              // BEFORE recording the meeting: the backend stores the roster as the
+              // invited list, so doing this afterwards recorded people who never got
+              // the invite (inflated count, and no "send invite" prompt if re-added).
               const unticked = internalAttendees.filter(
                 (a) => !(a.email && selected.has((a.email || '').toLowerCase()))
               )
               for (const u of unticked) {
                 try { await removeAlignmentAttendee(cycleId, u.attendee_id, meetingIndex) } catch { /* best effort */ }
               }
+              await scheduleAlignmentMeetingManual(cycleId, {
+                startTime, durationMinutes, timeZone, meetingUrl: teamsUrl, meetingIndex,
+              })
               // The invited set is now the baseline — only people added AFTER this
               // become "pending" and surface the "Send invite to added attendees" button.
               const invited = new Set(selectedInternalAttendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean))

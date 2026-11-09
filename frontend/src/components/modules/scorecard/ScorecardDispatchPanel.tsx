@@ -52,7 +52,9 @@ interface Props {
 interface ReminderTier {
   offset: number
   fire_date: string | null
-  status: 'sent' | 'due' | 'scheduled'
+  /** due = the next daily run sends it; skipped = superseded by a later tier, or the
+   *  deadline passed before it could go out — it will not be sent. */
+  status: 'sent' | 'due' | 'scheduled' | 'skipped'
 }
 interface ReminderStatus {
   cycle_id: string
@@ -174,6 +176,7 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
     sent: { label: 'Sent', cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' },
     due: { label: 'Due now', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400' },
     scheduled: { label: 'Scheduled', cls: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
+    skipped: { label: 'Skipped', cls: 'bg-slate-100 text-slate-400 line-through dark:bg-slate-800 dark:text-slate-500' },
   } as const
 
   return (
@@ -223,6 +226,9 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
             {offsets.map((o, i) => {
               const tone = toneFor(o)
               const tier = status?.tiers.find((t) => t.offset === o)
+              // Fall back rather than crash the panel if the server sends a status this
+              // build does not know yet.
+              const badge = tier ? (STATUS_BADGE[tier.status] ?? STATUS_BADGE.scheduled) : null
               return (
                 <div key={i} className={`flex items-center justify-between gap-2 p-2.5 rounded-lg ${tone.bg}`}>
                   <div className="flex items-center gap-2">
@@ -239,9 +245,12 @@ function ReminderScheduleCard({ cycleId }: { cycleId: string }) {
                     <span className={`text-xs font-medium ${tone.color}`}>· {tone.label}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {tier && (
-                      <span className={cn('px-2 py-0.5 rounded-full text-[11px] font-medium', STATUS_BADGE[tier.status].cls)}>
-                        {STATUS_BADGE[tier.status].label}
+                    {tier && badge && (
+                      <span
+                        className={cn('px-2 py-0.5 rounded-full text-[11px] font-medium', badge.cls)}
+                        title={tier.status === 'skipped' ? 'A later reminder replaced this one, or the deadline passed — it will not be sent.' : undefined}
+                      >
+                        {badge.label}
                         {tier.fire_date ? ` · ${tier.fire_date}` : ''}
                       </span>
                     )}

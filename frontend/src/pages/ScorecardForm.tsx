@@ -104,6 +104,12 @@ export default function ScorecardForm() {
           setLoadError('This scorecard link does not match a known reviewer for this cycle.')
           return
         }
+        // The server would refuse the submission (the review meeting has already taken
+        // place, or this person is no longer a reviewer) — say so before they fill it in.
+        if (m.closed_reason) {
+          setLoadError(m.closed_reason)
+          return
+        }
         // Nothing assigned to this team: there is no form to draft, submit or compare
         // against, so skip the remaining fetches and let the render explain why. This
         // returns BEFORE checkAlreadySubmitted, so `alreadySubmitted` is never set for a

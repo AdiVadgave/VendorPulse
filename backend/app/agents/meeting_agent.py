@@ -22,6 +22,13 @@ from app.utils.prompts import MEETING_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
+# Output budgets. The parsed transcript is one JSON object per notable statement, so a
+# one-hour meeting (~40 notes) overran the old 2048 cap; the cut-off JSON then failed to
+# parse and the notes silently came from the keyword fallback instead. A cap only bounds
+# what the model may write — tokens are billed as used.
+_TRANSCRIPT_MAX_TOKENS = 8192
+_MINUTES_MAX_TOKENS = 4096
+
 if TYPE_CHECKING:
     from app.repositories.agent_run_repository import AgentRunRepository
     from app.repositories.meeting_repository import MeetingRepository
@@ -113,20 +120,29 @@ class MeetingAgent(BaseAgent):
         notes = params.get("notes", [])
         meeting_id = params.get("meeting_id", "")
         attendees = params.get("attendees", [])
-        meeting_date = params.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        # `or`, not a .get() default: the route always passes the key, as None when the
+        # browser sends no date, which printed "Governance meeting held on None".
+        meeting_date = params.get("meeting_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        cycle_id = self.cycle_id or ""
 
         grouped = _group_notes_by_type(notes)
 
+        minutes = None
         if self._llm and self._llm.is_enabled:
-            prompt = _build_minutes_prompt(meeting_id, meeting_date, attendees, grouped, self.cycle_id or "")
-            raw = self._llm.call_simple(prompt, system=MEETING_SYSTEM_PROMPT, max_tokens=2048)
+            prompt = _build_minutes_prompt(meeting_id, meeting_date, attendees, grouped, cycle_id)
+            raw = self._llm.call_simple(prompt, system=MEETING_SYSTEM_PROMPT, max_tokens=_MINUTES_MAX_TOKENS)
             try:
-                minutes = json.loads(_strip_markdown_json(raw))
+                minutes = _normalize_minutes(
+                    json.loads(_strip_markdown_json(raw)),
+                    meeting_id=meeting_id, cycle_id=cycle_id, meeting_date=meeting_date, attendees=attendees,
+                )
             except json.JSONDecodeError:
-                minutes = _build_fallback_minutes(meeting_id, meeting_date, attendees, grouped, self.cycle_id or "")
+                minutes = None
+            if minutes is None:
+                minutes = _build_fallback_minutes(meeting_id, meeting_date, attendees, grouped, cycle_id)
                 minutes["_llm_raw"] = raw
         else:
-            minutes = _build_fallback_minutes(meeting_id, meeting_date, attendees, grouped, self.cycle_id or "")
+            minutes = _build_fallback_minutes(meeting_id, meeting_date, attendees, grouped, cycle_id)
 
         return {
             "summary": "Meeting minutes generated.",
@@ -141,6 +157,7 @@ class MeetingAgent(BaseAgent):
         params = context.get("params", {})
         meeting_id = params.get("meeting_id", "")
         transcript = params.get("transcript", "")
+        warnings: list[str] = []
 
         if self._llm and self._llm.is_enabled:
             prompt = (
@@ -157,7 +174,7 @@ class MeetingAgent(BaseAgent):
                 "  timestamp (HH:MM from the transcript if available, else empty string).\n"
                 "Return ONLY the JSON array, no markdown or explanation."
             )
-            raw = self._llm.call_simple(prompt, system=MEETING_SYSTEM_PROMPT, max_tokens=2048)
+            raw = self._llm.call_simple(prompt, system=MEETING_SYSTEM_PROMPT, max_tokens=_TRANSCRIPT_MAX_TOKENS)
             logger.info(
                 "PARSE-TRANSCRIPT: LLM raw response (%d chars): %s",
                 len(raw),
@@ -171,6 +188,10 @@ class MeetingAgent(BaseAgent):
             except json.JSONDecodeError as e:
                 logger.warning("PARSE-TRANSCRIPT: JSON parse failed: %s", e)
                 notes = _build_fallback_parsed_notes(transcript, meeting_id)
+                warnings.append(
+                    "The AI reply could not be read, so a simpler keyword parser was used. "
+                    "Check the extracted notes before generating minutes."
+                )
         else:
             notes = _build_fallback_parsed_notes(transcript, meeting_id)
 
@@ -179,7 +200,7 @@ class MeetingAgent(BaseAgent):
         return {
             "summary": f"Parsed {len(notes)} notes from transcript.",
             "data": {"notes": notes},
-            "warnings": [],
+            "warnings": warnings,
             "next_actions": ["GENERATE_MINUTES"],
             "requires_approval": False,
         }
@@ -308,7 +329,10 @@ def _normalize_parsed_notes(notes: list[dict], meeting_id: str) -> list[dict]:
             )
         normalized.append({
             "note_id": note.get("note_id") or f"n{idx}",
-            "meeting_id": note.get("meeting_id") or meeting_id,
+            # The requested id wins over whatever the model echoed back: minutes are
+            # generated under the notes' meeting id, so a drifted id stored them where the
+            # approve/send/reload calls (which use the requested id) never look.
+            "meeting_id": meeting_id or note.get("meeting_id") or "",
             "note_type": coerced,
             "content": note.get("content", ""),
             "raised_by": note.get("raised_by", "Unknown") or "Unknown",
@@ -350,6 +374,69 @@ def _build_minutes_prompt(
     )
 
 
+def _normalize_minutes(
+    minutes,
+    *,
+    meeting_id: str,
+    cycle_id: str,
+    meeting_date: str,
+    attendees: list[str],
+) -> Optional[dict]:
+    """Coerce the model's minutes into the shape the UI and the email renderer read.
+
+    Returns None when the reply is not a minutes object at all, so the caller uses the
+    deterministic minutes instead. Saved as-is, a reply wrapped in {"minutes": {...}},
+    a missing list or an action item without an owner blanked the Meeting tab (it maps
+    over these lists) and made Send fail, with no way to regenerate them."""
+    if isinstance(minutes, dict) and len(minutes) == 1:
+        inner = next(iter(minutes.values()))
+        if isinstance(inner, dict):
+            minutes = inner
+    content_keys = ("executive_summary", "agenda_summaries", "key_decisions", "qa_log", "action_items")
+    if not isinstance(minutes, dict) or not any(k in minutes for k in content_keys):
+        return None
+
+    def items(key: str) -> list:
+        value = minutes.get(key)
+        return value if isinstance(value, list) else []
+
+    def text(value, default: str = "") -> str:
+        return value.strip() if isinstance(value, str) and value.strip() else default
+
+    return {
+        **minutes,
+        "minutes_id": text(minutes.get("minutes_id")) or str(uuid.uuid4()),
+        "attendees": [a.strip() for a in items("attendees") if isinstance(a, str) and a.strip()] or list(attendees),
+        "executive_summary": text(minutes.get("executive_summary")),
+        "agenda_summaries": [
+            {"topic": text(a.get("topic")), "summary": text(a.get("summary"))}
+            for a in items("agenda_summaries") if isinstance(a, dict)
+        ],
+        "key_decisions": [d.strip() for d in items("key_decisions") if isinstance(d, str) and d.strip()],
+        "qa_log": [
+            {
+                "question": text(q.get("question")),
+                "raised_by": text(q.get("raised_by"), "Unknown"),
+                "response": text(q.get("response")),
+            }
+            for q in items("qa_log") if isinstance(q, dict)
+        ],
+        "action_items": [
+            {
+                "description": text(a.get("description")),
+                "owner": text(a.get("owner"), "TBD"),
+                "due_date": text(a.get("due_date")),
+            }
+            for a in items("action_items") if isinstance(a, dict) and text(a.get("description"))
+        ],
+        # Known values, never the model's: it echoes or invents ids, dates and timestamps.
+        "meeting_id": meeting_id,
+        "cycle_id": cycle_id,
+        "meeting_date": meeting_date,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def _build_fallback_minutes(
     meeting_id: str,
     meeting_date: str,
@@ -361,6 +448,13 @@ def _build_fallback_minutes(
     decisions = [n["content"] for n in grouped_notes.get("DECISION", [])]
     questions = grouped_notes.get("QUESTION", [])
     actions = grouped_notes.get("ACTION", [])
+    # Objections and appreciation are part of the record too (the vendor's objections
+    # especially); they used to be dropped from these minutes entirely.
+    agenda = [{"topic": "General Discussion", "summary": "Meeting notes captured."}]
+    for note_type, topic in (("OBJECTION", "Objections raised"), ("APPRECIATION", "Appreciation")):
+        items = [n.get("content", "") for n in grouped_notes.get(note_type, []) if n.get("content")]
+        if items:
+            agenda.append({"topic": topic, "summary": "; ".join(items)})
 
     return {
         "minutes_id": str(uuid.uuid4()),
@@ -369,7 +463,7 @@ def _build_fallback_minutes(
         "meeting_date": meeting_date,
         "attendees": attendees,
         "executive_summary": f"Governance meeting held on {meeting_date} with {len(attendees)} attendees.",
-        "agenda_summaries": [{"topic": "General Discussion", "summary": "Meeting notes captured."}],
+        "agenda_summaries": agenda,
         "key_decisions": decisions,
         "qa_log": [
             {

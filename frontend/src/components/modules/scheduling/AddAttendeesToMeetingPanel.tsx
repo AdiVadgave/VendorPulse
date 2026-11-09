@@ -115,7 +115,8 @@ export default function AddAttendeesToMeetingPanel({
       }
 
       // Genuinely no existing event to patch → re-create for everyone at the same time.
-      const created = await createMeetingEvent({ slot, attendees, subject: draft.subject, bodyText: draft.body })
+      // SPR attendees only, as in the PATCH above: scorecard-only reviewers are never on the event.
+      const created = await createMeetingEvent({ slot, attendees: sprAttendees, subject: draft.subject, bodyText: draft.body })
       await apiFetch(`/api/cycles/${cycleId}/scheduling/manual-meeting`, {
         method: 'POST',
         body: JSON.stringify({

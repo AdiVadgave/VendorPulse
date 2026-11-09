@@ -34,6 +34,8 @@ interface AttendeeRefreshPanelProps {
   hideScheduleHint?: boolean
   /** Open the "Add attendee" search form immediately on mount (skips the nested Add click). */
   defaultShowAddForm?: boolean
+  /** Demo cycle (not on the server): keep add/edit/delete locally when the API fails. */
+  isMockCycle?: boolean
 }
 
 // ── Search & Add Attendee Form ───────────────────────────────────────────────
@@ -67,9 +69,11 @@ interface SearchAddAttendeeFormProps {
   hideKey?: boolean
   /** Hide the Type (Internal/Vendor) control — e.g. alignment is internal-only. */
   hideType?: boolean
+  /** Keep a failed add locally even when the server rejected it (demo cycles only). */
+  allowOfflineFallback?: boolean
 }
 
-export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel, submitOverride, hideKey, hideType }: SearchAddAttendeeFormProps) {
+export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, onCancel, submitOverride, hideKey, hideType, allowOfflineFallback }: SearchAddAttendeeFormProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<PeopleSearchResult[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
@@ -241,9 +245,16 @@ export function SearchAddAttendeeForm({ cycleId, existingAttendeeIds, onAdded, o
         // Backend skipped it as a duplicate (same email already on the cycle).
         setError('This person is already in the attendee list.')
       }
-    } catch {
+    } catch (e) {
       if (submitOverride) {
         setError('Could not add the attendee to this meeting. Please try again.')
+        return
+      }
+      // A local-only attendee is for demo cycles and an unreachable backend. When the
+      // server answered with an error it was a real failure: the made-up id below was
+      // shown as added and could even be sent a scorecard link that never resolves.
+      if (!allowOfflineFallback && !(e instanceof TypeError)) {
+        setError(e instanceof Error ? e.message : 'Could not add the attendee. Please try again.')
         return
       }
       const localAttendee: CycleAttendee = {
@@ -541,14 +552,23 @@ export default function AttendeeRefreshPanel({
   onBackToAttendance,
   hideScheduleHint,
   defaultShowAddForm,
+  isMockCycle,
 }: AttendeeRefreshPanelProps) {
   const [showAddForm, setShowAddForm] = useState(Boolean(defaultShowAddForm))
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [rowError, setRowError] = useState<string | null>(null)
+
+  // Applying a change locally after a failed request is only right for a demo cycle or
+  // an unreachable backend (TypeError). A server error means it did NOT happen — showing
+  // it anyway left a deleted reviewer still pending, or an edit that reverted on reload.
+  const keepLocally = (e: unknown) => Boolean(isMockCycle) || e instanceof TypeError
+  const failure = (e: unknown, fallback: string) => (e instanceof Error && e.message ? e.message : fallback)
 
   async function handleUpdateAttendee(
     attendee: CycleAttendee,
     patch: Partial<Pick<CycleAttendee, 'type' | 'is_key' | 'attends_spr' | 'attendance_requirement' | 'lt_status' | 'shell_department'>>
   ) {
+    setRowError(null)
     try {
       const updated = await apiFetch<{ attendee: CycleAttendee }>(
         `/api/cycles/${cycleId}/attendees/${attendee.attendee_id}`,
@@ -559,8 +579,11 @@ export default function AttendeeRefreshPanel({
           a.attendee_id === attendee.attendee_id ? { ...a, ...updated.attendee } : a
         )
       )
-    } catch {
-      // optimistic update if backend is unavailable
+    } catch (e) {
+      if (!keepLocally(e)) {
+        setRowError(`Could not update ${attendee.name || 'the attendee'}: ${failure(e, 'please try again.')}`)
+        return
+      }
       onAttendeesChanged(
         attendees.map((a) =>
           a.attendee_id === attendee.attendee_id ? { ...a, ...patch } : a
@@ -571,13 +594,17 @@ export default function AttendeeRefreshPanel({
 
   async function handleDeleteAttendee(attendee: CycleAttendee) {
     setDeletingId(attendee.attendee_id)
+    setRowError(null)
     try {
       await apiFetch(`/api/cycles/${cycleId}/attendees/${attendee.attendee_id}`, {
         method: 'DELETE',
       })
       onAttendeesChanged(attendees.filter((a) => a.attendee_id !== attendee.attendee_id))
-    } catch {
-      // still remove from UI optimistically
+    } catch (e) {
+      if (!keepLocally(e)) {
+        setRowError(`Could not remove ${attendee.name || 'the attendee'}: ${failure(e, 'please try again.')}`)
+        return
+      }
       onAttendeesChanged(attendees.filter((a) => a.attendee_id !== attendee.attendee_id))
     } finally {
       setDeletingId(null)
@@ -659,8 +686,15 @@ export default function AttendeeRefreshPanel({
               existingAttendeeIds={attendees.map((a) => a.user_id ?? a.attendee_id)}
               onAdded={handleAttendeeAdded}
               onCancel={() => setShowAddForm(false)}
+              allowOfflineFallback={isMockCycle}
             />
           </div>
+        )}
+
+        {rowError && (
+          <p className="mx-4 mt-3 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+            {rowError}
+          </p>
         )}
 
         {attendees.length === 0 ? (

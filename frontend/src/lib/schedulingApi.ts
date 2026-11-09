@@ -78,11 +78,7 @@ export async function setBackendWorkflowState(
   try {
     const res = await apiFetch<{ cycle: GovernanceCycle }>(
       `/api/cycles/${cycleId}/workflow-state`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target }),
-      }
+      { method: 'POST', body: JSON.stringify({ target }) }
     )
     return { cycle: res.cycle ?? null, rejected: null }
   } catch (err) {

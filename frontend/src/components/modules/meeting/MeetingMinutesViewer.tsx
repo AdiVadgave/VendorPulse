@@ -129,7 +129,10 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
     setAgentStatus('running')
     setError(null)
     try {
-      const meetingId = meetingIdProp ?? notes[0]?.meeting_id ?? `mtg-${cycleId}`
+      // The same id approve, send and reload use. Taking it from the notes stored the SPR
+      // minutes under 'm1' (live-capture notes) or whatever id the model echoed, so after
+      // a reload they were gone while the approval, saved under mtg-…, still showed.
+      const meetingId = meetingIdProp ?? `mtg-${cycleId}`
       const attendees = [...new Set(notes.map((n) => n.raised_by))]
       const response = await generateMeetingMinutes(cycleId, meetingId, notes, attendees)
       if (response.status === 'success' && response.data) {
@@ -153,7 +156,9 @@ export default function MeetingMinutesViewer({ cycleId, notes, initialMinutes = 
       // Always persist, with or without a run id. The old `if (runId)` guard meant
       // that after a refresh (which loses runId) approving did nothing server-side —
       // it flipped the local flag and the prompt came back on the next reload.
-      await approveMinutes(cycleId, runId, meetingIdProp ?? `mtg-${cycleId}`)
+      // Send the minutes too: edits made with "Edit minutes" lived only in this page, so
+      // after a reload the unedited draft came back approved and was what got sent.
+      await approveMinutes(cycleId, runId, meetingIdProp ?? `mtg-${cycleId}`, minutes)
     } catch (e) {
       // Approval could not be persisted. Say so rather than showing a finalised state
       // that will not survive a refresh.

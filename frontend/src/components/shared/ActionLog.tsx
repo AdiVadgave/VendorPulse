@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CheckCircle2, Clock, AlertCircle, Filter, CheckCheck, Pencil, Trash2, Check, X, CalendarClock, Archive } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import type { ExtractedAction } from '@/types/alignment.types'
 import { cn } from '@/utils/cn'
 
@@ -234,7 +234,9 @@ export default function ActionLog({ actions, showCycleRef = false, onStatusChang
                     </span>
                     {action.due_date && (
                       <span className="text-xs text-slate-400 dark:text-slate-500">
-                        Due: {format(new Date(action.due_date), 'd MMM yyyy')}
+                        {/* parseISO reads a date-only string as a local date; new Date()
+                            read it as UTC midnight, a day early for anyone west of UTC. */}
+                        Due: {format(parseISO(action.due_date), 'd MMM yyyy')}
                       </span>
                     )}
                     {showCycleRef && (action as never as { cycle_ref?: string }).cycle_ref && (

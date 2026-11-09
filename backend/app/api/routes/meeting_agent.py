@@ -372,6 +372,11 @@ class ApproveMinutesRequest(BaseModel):
     run_id: str = ""
     meeting_id: str = ""
     approved_by: str = "coordinator"
+    # The minutes as the coordinator approved them, edits included. Edits used to live
+    # only in the browser, so after a reload the unedited draft came back marked approved
+    # (the Edit button is hidden by then) and that draft was what got sent. Optional so
+    # an older client that omits it still records the approval.
+    minutes: Optional[dict[str, Any]] = None
 
 
 @router.post("/minutes/approve")
@@ -398,10 +403,13 @@ def approve_minutes(cycleId: str, payload: ApproveMinutesRequest):
     # The artifact row is what the UI reads back on load, so this is the write that
     # actually makes the approval survive a refresh.
     mid = payload.meeting_id or f"mtg-{cycleId}"
-    get_meeting_artifact_repo().upsert(cycleId, mid, {
+    approval: dict[str, Any] = {
         "minutes_approved_at": now,
         "minutes_approved_by": payload.approved_by,
-    })
+    }
+    if payload.minutes:
+        approval["minutes"] = payload.minutes
+    get_meeting_artifact_repo().upsert(cycleId, mid, approval)
 
     logger.info("MEETING-AGENT: minutes approved — run_id=%s, by=%s", sanitize_for_log(payload.run_id), sanitize_for_log(payload.approved_by))
     return {
@@ -477,7 +485,12 @@ def _resolve_minutes_candidates(cycleId: str, meeting_id: str, read_only: bool =
         all_attendees = _meeting_roster(cycleId, "vendor_prep", 1, True, attendee_repo, read_only)
         allow_external = True
     else:
-        all_attendees = attendee_repo.get_for_cycle(cycleId)
+        # Never someone who declined attendance — the rule every other meeting's roster
+        # and every scorecard mail already follows (utils/scorecard_recipients.py).
+        all_attendees = [
+            a for a in attendee_repo.get_for_cycle(cycleId)
+            if a.get("confirmation_status") != "DECLINED"
+        ]
         # Only the QBR — and legacy callers that omit meeting_id — may include the
         # vendor; every other id is unrecognised, so bar external recipients.
         allow_external = meeting_id in ("", f"mtg-{cycleId}")

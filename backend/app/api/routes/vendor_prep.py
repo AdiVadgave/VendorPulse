@@ -217,15 +217,23 @@ def _cycle_attendee_emails(attendee_repo, cycleId: str) -> list[str]:
     return [e for e in emails if e and not (e in seen or seen.add(e))]
 
 
-def _resolve_invite_emails(payload_emails: Optional[list[str]], attendee_repo, cycleId: str) -> list[str]:
-    """Use the frontend's edited selection when provided (restricted to real cycle
-    attendees), otherwise default to every internal + vendor attendee."""
+def _resolve_invite_emails(
+    payload_emails: Optional[list[str]], attendee_repo, cycleId: str, roster_emails: Optional[list[str]] = None,
+) -> list[str]:
+    """Use the frontend's edited selection when provided (restricted to people on this
+    meeting's roster or the cycle's attendees), otherwise default to the roster.
+
+    The roster matters: people added with "Add invitee" exist only there, so checking
+    the selection against the cycle list alone dropped them from the recorded invite
+    list (short attendee count, and shown as "pending invite" after a reload)."""
     all_emails = _cycle_attendee_emails(attendee_repo, cycleId)
+    roster = [e for e in (roster_emails or []) if e]
+    default = roster or all_emails
     if not payload_emails:
-        return all_emails
-    allowed = set(all_emails)
+        return default
+    allowed = set(all_emails) | set(roster)
     chosen = [e.strip().lower() for e in payload_emails if e and e.strip().lower() in allowed]
-    return chosen or all_emails
+    return chosen or default
 
 
 # ── Per-meeting attendee roster (independent of the cycle attendees) ──────────
@@ -377,6 +385,8 @@ def schedule_vendor_prep_meeting_manual(
     attendee_repo=Depends(get_attendee_repo),
     meeting_repo=Depends(get_meeting_repo),
     participant_repo=Depends(get_meeting_participant_repo),
+    ma_repo=Depends(get_meeting_attendee_repo),
+    seed_repo=Depends(get_meeting_attendee_seed_repo),
 ):
     """Record the vendor-prep meeting at a coordinator-chosen time with no Microsoft
     Graph / calendar access. Invites the internal team + vendor (or the edited subset)
@@ -388,7 +398,11 @@ def schedule_vendor_prep_meeting_manual(
     if not cycle:
         raise HTTPException(status_code=404, detail=f"Cycle '{cycleId}' not found")
 
-    invite_emails = _resolve_invite_emails(payload.attendee_emails, attendee_repo, cycleId)
+    roster = list_meeting_attendees(
+        ma_repo, seed_repo, attendee_repo, cycleId, "vendor_prep", 1, include_vendors=True
+    )
+    roster_emails = [(a.get("email") or "").strip().lower() for a in roster if a.get("email")]
+    invite_emails = _resolve_invite_emails(payload.attendee_emails, attendee_repo, cycleId, roster_emails)
     if not invite_emails:
         raise HTTPException(status_code=400, detail="No attendee emails found for this cycle")
 

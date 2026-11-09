@@ -41,11 +41,32 @@ class ScorecardCommentRedactionTests(unittest.TestCase):
         self.assertEqual(actual, {"delivery": "TEAM did not provide the monthly report."})
 
     def test_redacts_likely_full_names(self):
+        """A capitalised pair carrying a directory first name or surname is a likely
+        person even when that exact full name is not in the directory."""
         comments = {"delivery": "Jane Doe and Alex Brown confirmed the recovery plan."}
 
-        actual = redact_scorecard_comments(comments)
+        actual = redact_scorecard_comments(comments, ["Jane Smith", "Priya Brown"])
 
         self.assertEqual(actual, {"delivery": "TEAM and TEAM confirmed the recovery plan."})
+
+    def test_business_terms_survive(self):
+        """A capitalised pair with no directory name in it is ordinary wording. Every
+        such pair used to become TEAM, rewriting stored comments permanently."""
+        comments = {
+            "delivery": "The Service Desk missed two P1 SLAs; Change Management was weak.",
+            "cost": "Migration to Microsoft Azure reduced run cost; Goal Zero incidents nil.",
+        }
+
+        actual = redact_scorecard_comments(comments, ["Jane Smith", "Alex Brown"])
+
+        self.assertEqual(actual, comments)
+
+    def test_one_word_directory_names_do_not_replace_ordinary_words(self):
+        comments = {"delivery": "The vendor will deliver the June invoice and the admin portal."}
+
+        actual = redact_scorecard_comments(comments, ["Will", "June", "Admin"])
+
+        self.assertEqual(actual, comments)
 
     def test_preserves_non_name_content(self):
         comments = {"delivery": "The service level was below target for June."}
@@ -247,3 +268,33 @@ class AiCommentRedactionTests(unittest.TestCase):
 
         with self.assertRaises(CommentRedactionError):
             redact_scorecard_comments_with_ai({"delivery": "Jane Doe"}, Disabled())
+
+    def test_detection_matches_despite_whitespace_and_apostrophe_differences(self):
+        """The model echoes a name as plain text. A non-breaking space (Outlook paste),
+        a line break inside the name, or a curly apostrophe returned straight used to
+        fail the grounding check on both attempts, so the reviewer could never submit."""
+        comments = {
+            "a": "Escalated to John Smith twice.",
+            "b": "Raised by Jane\nDoe at the review.",
+            "c": "Mary O’Neil confirmed.",
+        }
+        llm = FakeRedactionLLM(
+            '{"a": {"names": ["John Smith"]}, "b": {"names": ["Jane Doe"]},'
+            ' "c": {"names": ["Mary O\'Neil"]}}'
+        )
+
+        actual = redact_scorecard_comments_with_ai(comments, llm)
+
+        self.assertEqual(
+            actual,
+            {"a": "Escalated to TEAM twice.", "b": "Raised by TEAM at the review.", "c": "TEAM confirmed."},
+        )
+
+    def test_one_word_directory_names_are_left_to_the_model(self):
+        comments = {"delivery": "The vendor will deliver the June invoice."}
+
+        actual = redact_scorecard_comments_with_ai(
+            comments, FakeRedactionLLM('{"delivery": {"names": []}}'), ["Will", "June"]
+        )
+
+        self.assertEqual(actual, comments)

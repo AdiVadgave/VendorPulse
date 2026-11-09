@@ -24,11 +24,13 @@ from here goes through `_write_reminders` — see the caveat documented there.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from contextlib import contextmanager
+from datetime import date, datetime, timedelta, timezone
 from html import escape as _html_escape
-from typing import Optional
+from typing import Iterator, Optional
 
 from app.config import settings
+from app.db.pool import get_pool
 from app.dependencies import (
     get_attendee_repo,
     get_cycle_repo,
@@ -49,6 +51,10 @@ logger = logging.getLogger(__name__)
 # is used only as a ceiling.
 _MAX_STATE_IDX = WORKFLOW_STATES.index("SCORECARD_COMPILED")
 DEFAULT_OFFSETS = [5, 2, 0]
+
+# Postgres advisory-lock key naming "the daily reminder run". Any constant works as long
+# as nothing else in the database uses the same one.
+_RUN_LOCK_KEY = 0x56505F52454D  # "VP_REM"
 
 
 def _is_collecting(cycle: dict) -> bool:
@@ -183,26 +189,15 @@ def _coordinators(cycle: dict, pending_ids: set) -> list[dict]:
     This used to return *every* key internal reviewer, i.e. a superset of `pending` —
     so each late reviewer got an escalation addressed to them listing themselves as
     delinquent, and every reviewer was handed the names and email addresses of all
-    the others. Instead: the coordinator address configured on the reminder settings;
-    else the key reviewers who are NOT themselves late (nobody is escalated about
-    themselves); else the service mailbox, so a blown deadline is never silent."""
+    the others. A later version still fell back to the reviewers who were NOT late,
+    which handed peers the same list of their delinquent colleagues. The escalation
+    is the coordinator's: the address configured on the reminder settings, else the
+    service mailbox, so a blown deadline is never silent and never goes to peers.
+    `pending_ids` is unused now but kept so callers need not change."""
     configured = (get_settings(cycle).get("coordinator_email") or "").strip()
     if configured:
         return [{"name": "VMO Coordinator", "email": configured}]
     cycle_id = cycle.get("cycle_id")
-    attendees = get_attendee_repo().get_for_cycle(cycle_id)
-    others = [
-        {"name": a.get("name", ""), "email": (a.get("email") or "").strip()}
-        for a in attendees
-        if is_scorecard_recipient(a)
-        and a.get("attendee_id") not in pending_ids
-        and (a.get("email") or "").strip()
-    ]
-    if others:
-        return others
-    # Commonest case while nobody has submitted yet: pending == every reviewer, so
-    # both branches above are empty. Fall back to the service mailbox rather than let
-    # the escalation silently evaporate exactly when it matters most.
     fallback = (settings.graph_mail_sender or "").strip()
     if fallback:
         return [{"name": "VMO Coordinator", "email": fallback}]
@@ -295,23 +290,49 @@ def send_tier(
     return {"offset": offset, "pending": len(pending), "sent": sent, "failed": failed, "escalated": escalated}
 
 
+def current_tier(offsets, deadline: date, today: date) -> Optional[int]:
+    """The reminder tier whose window `today` falls in: the latest offset whose day has
+    arrived. None before the first tier's day and after the deadline.
+
+    Shared by the scheduler and the status view so "due" means exactly "the next
+    scheduler run sends this"."""
+    if today > deadline:
+        return None
+    arrived = [int(o) for o in offsets if deadline - timedelta(days=int(o)) <= today]
+    return min(arrived) if arrived else None
+
+
 def run_due(cycle: dict, *, today: date, base_url: Optional[str] = None) -> list[dict]:
-    """Fire any offsets whose day is exactly today and that haven't been sent yet."""
+    """Fire the reminder tier that is due, unless it has already gone out.
+
+    The due tier is the latest one whose day has arrived, not only one whose day is
+    exactly today. The scheduler runs once a day at 08:00 UTC, so an exact-day match
+    silently dropped a tier whenever that run was missed (restart, deploy) or the
+    deadline/dispatch was saved after 08:00 on the tier's day — while the panel kept
+    showing it "Due now". An earlier tier that a later one has superseded is skipped,
+    never sent late, and nothing fires after the deadline.
+
+    The tier is recorded as sent only if a reminder actually left (or nobody was left
+    to remind). A run in which every send failed is retried on the next run instead of
+    being shown as "Sent"."""
     settings_ = get_settings(cycle)
     deadline = _parse_deadline(settings_.get("deadline"))
     if deadline is None:
         return []
+    offset = current_tier(settings_.get("offsets") or DEFAULT_OFFSETS, deadline, today)
     sent_offsets = set(str(o) for o in (settings_.get("sent") or []))
-    results = []
-    for offset in settings_.get("offsets") or DEFAULT_OFFSETS:
-        offset = int(offset)
-        fire_day = deadline.fromordinal(deadline.toordinal() - offset)  # deadline - offset days
-        if today == fire_day and str(offset) not in sent_offsets:
-            days_left = (deadline - today).days
-            res = send_tier(cycle, offset, base_url=base_url or settings_.get("form_base_url"), days_left=days_left)
-            _mark_sent(cycle.get("cycle_id"), offset)
-            results.append(res)
-    return results
+    if offset is None or str(offset) in sent_offsets:
+        return []
+    days_left = (deadline - today).days
+    # Escalate only for the deadline-day tier itself. A caught-up earlier tier can also
+    # land on the deadline day, and must not escalate when no T-0 tier was configured.
+    res = send_tier(
+        cycle, offset, base_url=base_url or settings_.get("form_base_url"), days_left=days_left,
+        escalate=offset == 0,
+    )
+    if res["sent"] or not res["pending"]:
+        _mark_sent(cycle.get("cycle_id"), offset)
+    return [res]
 
 
 def send_now(
@@ -343,17 +364,43 @@ def send_now(
     )
 
 
+@contextmanager
+def _exclusive_run() -> Iterator[bool]:
+    """Yield whether this process won the database-wide lock for the daily run.
+
+    Production runs several gunicorn workers (and may run several instances), and each
+    one starts its own scheduler, so at 08:00 UTC every worker calls `run_all_due` at
+    the same moment. The "already sent" check is read-then-write, so without this lock
+    every reviewer received each reminder once per worker. A session advisory lock lets
+    exactly one run proceed; the others skip. It is held on one pooled connection for
+    the whole run and released before that connection goes back to the pool (a crashed
+    process releases it when its session ends)."""
+    with get_pool().connection() as conn:
+        acquired = bool(conn.execute("SELECT pg_try_advisory_lock(%s)", (_RUN_LOCK_KEY,)).fetchone()[0])
+        try:
+            yield acquired
+        finally:
+            if acquired:
+                conn.execute("SELECT pg_advisory_unlock(%s)", (_RUN_LOCK_KEY,))
+
+
 def run_all_due(today: Optional[date] = None) -> dict:
     """Scheduler entry point — evaluate every actively-collecting cycle."""
     today = today or datetime.now(timezone.utc).date()
-    cycles = [c for c in get_cycle_repo().find_all() if _is_collecting(c)]
-    fired = []
-    for cycle in cycles:
-        try:
-            res = run_due(cycle, today=today)
-            if res:
-                fired.append({"cycle_id": cycle.get("cycle_id"), "tiers": res})
-        except Exception as exc:  # noqa: BLE001 — never let one cycle kill the run
-            logger.warning("reminder run failed for cycle=%s: %s", cycle.get("cycle_id"), exc)
-    logger.info("reminder scheduler run — %d active cycle(s), %d fired", len(cycles), len(fired))
-    return {"active_cycles": len(cycles), "fired": fired}
+    with _exclusive_run() as acquired:
+        if not acquired:
+            logger.info("reminder scheduler run skipped — another worker is already running it")
+            return {"active_cycles": 0, "fired": [], "skipped": True}
+        # Read inside the lock: a run that starts after another has finished must see
+        # the tiers that run already marked as sent.
+        cycles = [c for c in get_cycle_repo().find_all() if _is_collecting(c)]
+        fired = []
+        for cycle in cycles:
+            try:
+                res = run_due(cycle, today=today)
+                if res:
+                    fired.append({"cycle_id": cycle.get("cycle_id"), "tiers": res})
+            except Exception as exc:  # noqa: BLE001 — never let one cycle kill the run
+                logger.warning("reminder run failed for cycle=%s: %s", cycle.get("cycle_id"), exc)
+        logger.info("reminder scheduler run — %d active cycle(s), %d fired", len(cycles), len(fired))
+        return {"active_cycles": len(cycles), "fired": fired}

@@ -122,6 +122,7 @@ class VendorPrepAgent(BaseAgent):
         # them (it fabricates/back-dates them). See Shell IRM 3.6.6 (hallucination).
         if isinstance(brief, dict):
             brief["generated_at"] = datetime.now(timezone.utc).isoformat()
+            _normalize_category_trends(brief)
 
         return {
             "summary": f"Vendor brief generated for {vendor_name}.",
@@ -154,16 +155,19 @@ class VendorPrepAgent(BaseAgent):
             prompt = _build_pushback_prompt(pushback_id, category, description, scorecard)
             raw = self._llm.call_simple(prompt, system=VENDOR_PREP_SYSTEM_PROMPT, max_tokens=1536)
             try:
-                responses = json.loads(_strip_markdown_json(raw))
-                if not isinstance(responses, list):
-                    responses = responses.get("responses", [])
+                parsed = json.loads(_strip_markdown_json(raw))
+                if isinstance(parsed, dict):
+                    parsed = parsed.get("responses", [])
+                responses = _normalize_pushback_responses(parsed, pushback_id)
             except json.JSONDecodeError:
+                responses = []
+            if not responses:
                 responses = _build_fallback_pushback_responses(pushback_id, description)
         else:
             responses = _build_fallback_pushback_responses(pushback_id, description)
 
         return {
-            "summary": f"3 response options drafted for pushback '{pushback_id}'.",
+            "summary": f"{len(responses)} response options drafted for pushback '{pushback_id}'.",
             "data": {"pushback_id": pushback_id, "responses": responses},
             "warnings": [],
             "next_actions": ["SELECT_RESPONSE"],
@@ -235,7 +239,8 @@ def _build_brief_prompt(
         f"Key recommendations: {recs}\n\n"
         "Return a valid JSON object with these exact keys:\n"
         "  overall_score (float 0-5), overall_trend (improving|declining|stable),\n"
-        "  category_ratings (array of {category, score, rationale, trend}),\n"
+        "  category_ratings (array of {category, score, rationale, trend (up|down|flat)};\n"
+        "    leave out any theme whose internal_avg is null — it was not scored),\n"
         "  key_concerns (max 5 strings), positive_areas (max 5 strings),\n"
         "  open_actions (int).\n"
         "Base ALL scores and figures strictly on the data above — do NOT invent or "
@@ -307,10 +312,15 @@ def _build_fallback_brief(scorecard: dict, previous: Optional[dict] = None) -> d
     positives = []
 
     for cat in categories:
-        avg = cat.get("internal_avg") or 0
+        avg = cat.get("internal_avg")
+        if avg is None:
+            # No consolidated score this cycle (every team marked it N/A, it has only RAG
+            # measures, or no team was asked): nothing to rate. Treating it as 0 told the
+            # vendor brief the theme was "below target at 0/5" and declining.
+            continue
         label = cat["category_label"]
         prev_score = prev_by_theme.get(label)
-        cat_trend = _trend(avg, prev_score) if prev_score is not None else "flat"
+        cat_trend = _CATEGORY_TREND[_trend(avg, prev_score)] if prev_score is not None else "flat"
         declined = prev_score is not None and avg - prev_score <= -0.5
         if avg >= 4.0:
             positives.append(f"{label}: strong at {avg}/5")
@@ -340,6 +350,60 @@ def _build_fallback_brief(scorecard: dict, previous: Optional[dict] = None) -> d
         "open_actions": 0,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# Per-theme trends are up/down/flat (CategoryRating, and the brief panel's icon map);
+# the overall trend stays improving/declining/stable.
+_CATEGORY_TREND = {"improving": "up", "declining": "down", "stable": "flat"}
+_TREND_ALIASES = {
+    "up": "up", "improving": "up", "improved": "up", "increasing": "up", "rising": "up",
+    "down": "down", "declining": "down", "declined": "down", "decreasing": "down", "falling": "down",
+    "flat": "flat", "stable": "flat", "steady": "flat", "unchanged": "flat",
+}
+
+
+def _normalize_category_trends(brief: dict) -> None:
+    """Map each theme's trend onto up/down/flat, in place.
+
+    The fallback brief produced improving/declining/stable, and the LLM is free to, so
+    the per-theme trend icon (keyed up/down/flat) never rendered."""
+    for rating in brief.get("category_ratings") or []:
+        if isinstance(rating, dict):
+            rating["trend"] = _TREND_ALIASES.get(str(rating.get("trend") or "").strip().lower(), "flat")
+
+
+_STANCES = ("factual", "neutral", "escalation")
+
+
+def _normalize_pushback_responses(items: Any, pushback_id: str) -> list[dict]:
+    """Keep well-formed drafts only, one per stance, in the shape the UI and the save
+    endpoint require.
+
+    A stance the model capitalised ("Factual") or invented crashed the response cards
+    (they look the stance up in a fixed map) and was rejected by PUT /responses, which
+    accepts exactly these three lowercase values — so the drafts were silently lost.
+    Ids are assigned here rather than trusted from the model."""
+    if not isinstance(items, list):
+        return []
+    out: list[dict] = []
+    used: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("content"), str) or not item["content"].strip():
+            continue
+        stance = str(item.get("stance") or "").strip().lower()
+        if stance not in _STANCES or stance in used:
+            stance = next((s for s in _STANCES if s not in used), "")
+        if not stance:
+            break
+        used.add(stance)
+        out.append({
+            "response_id": str(uuid.uuid4()),
+            "pushback_id": pushback_id,
+            "stance": stance,
+            "content": item["content"].strip(),
+            "is_selected": False,
+        })
+    return out
 
 
 def _build_fallback_pushback_responses(pushback_id: str, description: str) -> list[dict]:

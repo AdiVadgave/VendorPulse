@@ -37,8 +37,9 @@ def start_reminder_scheduler() -> None:
             logger.warning("scorecard reminder job error: %s", exc)
 
     sched = BackgroundScheduler(daemon=True, timezone="UTC")
-    # Daily at 08:00 UTC. Idempotent per (deadline, offset), so a missed/duplicate
-    # run never double-sends within the same deadline window.
+    # Daily at 08:00 UTC. Every worker starts one of these; run_all_due takes a
+    # database lock so only one run proceeds, and a missed run is caught up by the
+    # next one (see reminder_service.run_due).
     sched.add_job(_job, "cron", hour=8, minute=0, id="scorecard_reminders", replace_existing=True)
     sched.start()
     _scheduler = sched

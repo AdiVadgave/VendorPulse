@@ -310,6 +310,9 @@ export interface ScorecardFormMeta {
   year: number
   structure: WeightedCategoryDef[]
   respondent: ScorecardRespondent | null
+  /** Why this respondent can no longer submit (the review meeting has happened, or
+   *  they are no longer a scorecard reviewer); null/absent when they can. */
+  closed_reason?: string | null
   /** The vendor's most recent prior cycle with scores (for the "previous scorecard"
    *  view), plus a human label like "Q1 2026". Null when this is the first cycle. */
   previous_cycle_id?: string | null

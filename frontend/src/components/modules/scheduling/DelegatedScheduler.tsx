@@ -115,6 +115,13 @@ export default function DelegatedScheduler({
   // creating a duplicate — same behaviour as the main QBR reschedule. The reviewed
   // subject/body come from the draft dialog.
   async function scheduleSlot(slot: SlotProposal, tz: TZ, draftSubject: string, draftBody: string) {
+    // Checked before any Graph call: with nobody ticked this used to create a Teams
+    // event with no attendees, then the parent refused it and the spinner never stopped.
+    if (inviteAttendees.length === 0) {
+      setError('Tick at least one attendee to invite.')
+      setPending(null)
+      return
+    }
     setCreating(true)
     setError(null)
     const durationMinutes = slot.duration_minutes ?? defaultDuration
@@ -140,6 +147,9 @@ export default function DelegatedScheduler({
         teamsUrl,
         attendeeCount: inviteAttendees.length,
       })
+      // Usually the parent hides this component on success, but if it kept it (e.g. it
+      // reported a problem instead of throwing), the spinner must not stay up forever.
+      setCreating(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to schedule the meeting.')
       setCreating(false)

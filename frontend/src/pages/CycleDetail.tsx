@@ -433,7 +433,14 @@ export default function CycleDetail() {
         action_id: a.action_id, description: a.description, owner: a.owner,
         due_date: a.due_date, source: a.source, status: a.status, origin: origin ?? null,
       }))
-    ).catch(() => { /* keep optimistic local copy */ })
+    )
+      // The server mints its own ids (and drops near-duplicates), so replace the
+      // optimistic rows — keyed by the transcript's note ids ("n1", "n2"…) — with the
+      // stored records. Edits, status changes and deletes sent with a note id 404'd
+      // silently and were lost on reload.
+      .then(() => getActions(cycleId))
+      .then((r) => setActions(r.actions))
+      .catch(() => { /* keep optimistic local copy */ })
   }, [cycleId])
 
   const handleAddAction = useCallback((input: NewActionInput) => {
@@ -728,6 +735,7 @@ export default function CycleDetail() {
             selectedSlot={selectedSlot}
             selectedSlotTimeZone={selectedSlotTimeZone}
             onPhaseChange={advanceScheduling}
+            onPhaseNavigate={setSchedulingPhase}
             onAttendeesUpdated={setSchedulingAttendees}
             onSlotsReceived={setApiSlots}
             onSlotSelected={setSelectedSlotId}
@@ -1067,7 +1075,7 @@ function OverviewTab({
 
 /* ── Scheduling Tab ───────────────────────────────────────── */
 function SchedulingTab({
-  cycle, schedulingPhase, attendees, slots, selectedSlot, onPhaseChange,
+  cycle, schedulingPhase, attendees, slots, selectedSlot, onPhaseChange, onPhaseNavigate,
   onAttendeesUpdated, onSlotsReceived, onSlotSelected,
   selectedSlotTimeZone, onSlotTimeZoneSelected,
   isMockCycle, onScorecardProceed, onTeamsMeetingUrlCaptured, onMeetingScheduled, meetingUrl,
@@ -1079,7 +1087,10 @@ function SchedulingTab({
   slots: SlotProposal[]
   selectedSlot: SlotProposal | null
   selectedSlotTimeZone: TimeZoneId
+  /** Move to a phase AND advance the server workflow to match (panel Proceed buttons). */
   onPhaseChange: (p: SchedulingPhase) => void
+  /** Show a phase without touching the workflow (the step pills). */
+  onPhaseNavigate: (p: SchedulingPhase) => void
   onAttendeesUpdated: (a: CycleAttendee[]) => void
   onSlotsReceived: (slots: SlotProposal[]) => void
   onSlotSelected: (id: string | null) => void
@@ -1142,7 +1153,9 @@ function SchedulingTab({
       conflicts: [],
       ranking_rationale: 'Manually chosen time',
     }
-    onSlotsReceived([...slots, manual])
+    // Replace any earlier manual pick: they share this id, and the selected slot is
+    // found by id, so a second pick kept resolving to the first time.
+    onSlotsReceived([...slots.filter((s) => s.slot_id !== 'manual-slot'), manual])
     onSlotSelected('manual-slot')
     onSlotTimeZoneSelected(tz)
     onPhaseChange('invite_approval')
@@ -1164,7 +1177,11 @@ function SchedulingTab({
               <div key={step.key} className="flex items-center flex-1 min-w-0">
                 <button
                   type="button"
-                  onClick={() => { if (!locked) onPhaseChange(step.key) }}
+                  // Navigation only. Going through onPhaseChange also advanced the
+                  // server workflow, so clicking "Confirmation" marked the cycle
+                  // MEETING_SCHEDULED with no meeting. The panels' own Proceed buttons
+                  // still advance it.
+                  onClick={() => { if (!locked) onPhaseNavigate(step.key) }}
                   disabled={locked}
                   title={locked ? 'Meeting scheduled — only Confirmation is available' : `Go to ${step.label}`}
                   className={cn(
@@ -1221,6 +1238,7 @@ function SchedulingTab({
         <div className="space-y-4">
           <AttendeeRefreshPanel
             cycleId={cycle.cycle_id}
+            isMockCycle={isMockCycle}
             attendees={attendees}
             onAttendeesChanged={onAttendeesUpdated}
             onDispatchComplete={() => {}}

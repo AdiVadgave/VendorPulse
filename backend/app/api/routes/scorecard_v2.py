@@ -69,6 +69,32 @@ _RAG_ORDER = {"red": 0, "amber": 1, "green": 2}
 # 1500-char textarea cap, so a reviewer typing in the UI can never be hard-failed here.
 _COMMENT_MAX_CHARS = 4000
 
+# Submissions close once the review meeting is done (minutes approved). Emailed links
+# never expire, and every scorecard view recomputes live, so a late submission would
+# silently change an archived cycle's score, the vendor's trend and the next cycle's
+# "previous" figures. Not earlier: the VMO may move on to alignment with only some
+# submissions in, and late ones still count until the meeting.
+_SUBMISSIONS_CLOSE_IDX = WORKFLOW_STATES.index("POST_MEETING_COMPLETE")
+_CLOSED_DETAIL = "This scorecard is closed — the review meeting for this cycle has already taken place."
+_NOT_REVIEWER_DETAIL = (
+    "You are not currently listed as a scorecard reviewer for this cycle. "
+    "Please contact the VMO coordinator."
+)
+
+
+def _submission_block_reason(cycle: dict, att: dict) -> Optional[str]:
+    """Why this attendee may not submit for this cycle, or None if they may.
+
+    Only key internal reviewers are compiled and tracked (`is_key_internal_reviewer`),
+    so a submission from anyone else was accepted, counted nowhere, and still locked the
+    scorecard configuration."""
+    ws = cycle.get("workflow_state") or ""
+    if ws in WORKFLOW_STATES and WORKFLOW_STATES.index(ws) >= _SUBMISSIONS_CLOSE_IDX:
+        return _CLOSED_DETAIL
+    if not is_key_internal_reviewer(att):
+        return _NOT_REVIEWER_DETAIL
+    return None
+
 
 def _effective_config(cycle: dict) -> dict:
     """The cycle's scorecard config, or the default structure if unconfigured."""
@@ -495,6 +521,7 @@ def get_form_meta(cycle_id: str, attendee: str = ""):
 
     respondent = None
     respondent_team: str | None = None
+    closed_reason: str | None = None
     att = get_attendee_repo().find_by_id("attendee_id", attendee) if attendee else None
     if att and att.get("cycle_id") == cycle_id:
         respondent_team = _respondent_team(att)
@@ -504,6 +531,9 @@ def get_form_meta(cycle_id: str, attendee: str = ""):
             "email": att.get("email", ""),
             "team": respondent_team,
         }
+        # Same rule as /submit, so the form says so up front instead of failing the
+        # reviewer only after they have filled everything in.
+        closed_reason = _submission_block_reason(cycle, att)
     else:
         # The link didn't resolve to a reviewer (the frontend shows "does not match a
         # known reviewer"). This is NOT a timeout — the request succeeded. Log the
@@ -543,6 +573,7 @@ def get_form_meta(cycle_id: str, attendee: str = ""):
         "year": cycle.get("year"),
         "structure": structure,
         "respondent": respondent,
+        "closed_reason": closed_reason,
         "previous_cycle_id": prev_id,
         "previous_label": prev_label,
     }
@@ -569,6 +600,9 @@ def submit_scorecard(payload: ScorecardSubmission):
     att = _get_cycle_attendee(payload.cycle_id, payload.attendee_id)
     if att is None:
         raise HTTPException(status_code=404, detail="Attendee not found in this cycle")
+    blocked = _submission_block_reason(cycle, att)
+    if blocked:
+        raise HTTPException(status_code=409, detail=blocked)
 
     # The form renders only the measures this respondent's team is asked (form-meta
     # filters with exactly this call). Re-check on WRITE: the VMO can narrow a team's
@@ -688,9 +722,13 @@ def submit_scorecard(payload: ScorecardSubmission):
         )
 
     # Advance workflow SCORECARD_REQUEST_SENT -> SCORECARD_COLLECTION on first submission.
+    # Re-read first: `cycle` was loaded before the AI redaction call (seconds ago), and
+    # advancing from that snapshot would write SCORECARD_COLLECTION over a cycle the
+    # VMO moved on in the meantime.
     try:
-        if workflow_engine.can_transition(cycle.get("workflow_state", ""), "SCORECARD_COLLECTION"):
-            workflow_engine.advance(cycle, cycle_repo, now)
+        fresh = cycle_repo.get_by_cycle_id(payload.cycle_id) or cycle
+        if workflow_engine.can_transition(fresh.get("workflow_state", ""), "SCORECARD_COLLECTION"):
+            workflow_engine.advance(fresh, cycle_repo, now)
     except Exception as exc:  # best-effort
         logger.warning("submit_scorecard: workflow advance skipped: %s", exc)
 
@@ -2092,14 +2130,20 @@ def _reminder_status(cycle: dict) -> dict:
         except ValueError:
             dl = None
     sent = {str(o) for o in (s.get("sent") or [])}
+    # "due" is exactly the tier the next scheduler run sends; an earlier tier a later
+    # one superseded (or any tier once the deadline has passed) is never sent late, so
+    # calling it "due" left the panel promising a reminder that would never go out.
+    current = reminder_service.current_tier(s.get("offsets") or [], dl, today) if dl else None
     tiers = []
     for off in s.get("offsets") or []:
         off = int(off)
         fire = (dl - timedelta(days=off)) if dl else None
         if str(off) in sent:
             status = "sent"
-        elif fire is not None and fire <= today:
+        elif off == current:
             status = "due"
+        elif fire is not None and fire <= today:
+            status = "skipped"
         else:
             status = "scheduled"
         tiers.append({"offset": off, "fire_date": fire.isoformat() if fire else None, "status": status})
@@ -2131,10 +2175,17 @@ def put_reminders(cycle_id: str, payload: ReminderSettingsUpdate):
         raise HTTPException(status_code=400, detail="Add at least one reminder offset (days before the deadline).")
     if any(o < 0 for o in payload.offsets):
         raise HTTPException(status_code=400, detail="Reminder offsets must be 0 or more days before the deadline.")
+    # save_settings reads None as "not supplied, keep the stored address" (the send-now
+    # path relies on that). The settings form sends an explicit null when the field is
+    # blanked, so pass that through as "" — otherwise a cleared address could never be
+    # removed and escalations kept going to it.
+    coordinator_email = payload.coordinator_email
+    if coordinator_email is None and "coordinator_email" in payload.model_fields_set:
+        coordinator_email = ""
     try:
         reminder_service.save_settings(
             cycle_id, deadline=payload.deadline, offsets=payload.offsets, form_base_url=payload.form_base_url,
-            coordinator_email=payload.coordinator_email,
+            coordinator_email=coordinator_email,
         )
     except ValueError as exc:
         logger.warning("reminder settings update failed for cycle=%s: %s", sanitize_for_log(cycle_id), exc)

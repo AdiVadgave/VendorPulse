@@ -46,9 +46,12 @@ export async function apiFetch<T>(
     }
 
     try {
+      // `...init` FIRST: spread after `headers`, a caller's own `headers` replaced the
+      // merged object wholesale and dropped the bearer token, so with SSO on the
+      // backend answered 401 and the UI rolled the workflow advance back.
       const res = await fetch(url, {
-        headers: { 'Content-Type': 'application/json', ...auth, ...(init.headers ?? {}) },
         ...init,
+        headers: { 'Content-Type': 'application/json', ...auth, ...(init.headers ?? {}) },
       })
 
       if (!res.ok) {

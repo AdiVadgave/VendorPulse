@@ -348,11 +348,13 @@ def set_manual_meeting(
         "meeting_time_zone": payload.time_zone,
         "meeting_duration_minutes": payload.duration_minutes,
     })
-    # Advance forward to MEETING_SCHEDULED (never regress if already past it).
-    current = cycle.get("workflow_state", "CYCLE_CREATED")
+    # Advance forward to MEETING_SCHEDULED (never regress if already past it). Count the
+    # steps from the same fresh read they are walked from, so a state change between
+    # the two reads cannot over-advance the cycle.
+    updated = cycle_repo.get_by_cycle_id(cycleId) or cycle
+    current = updated.get("workflow_state", "CYCLE_CREATED")
     current_idx = WORKFLOW_STATES.index(current) if current in WORKFLOW_STATES else 0
     target_idx = WORKFLOW_STATES.index("MEETING_SCHEDULED")
-    updated = cycle_repo.get_by_cycle_id(cycleId)
     if current_idx < target_idx:
         for _ in range(target_idx - current_idx):
             updated = workflow_engine.advance(updated, cycle_repo)

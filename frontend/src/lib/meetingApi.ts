@@ -151,11 +151,14 @@ export async function approveMinutes(
   cycleId: string,
   runId: string | null,
   meetingId?: string,
+  minutes?: MeetingMinutes | null,
   approvedBy = 'coordinator'
 ): Promise<ApprovalResult> {
   // `runId` is null after a refresh — the browser no longer holds the id of the run
   // that produced these minutes. The approval is keyed on the meeting, so it still
   // persists; the run id is sent only when we have it, to stamp the audit trail.
+  // `minutes` are the minutes as approved, edits included, so the server stores what
+  // was signed off rather than the original draft.
   return apiFetch<ApprovalResult>(
     `/api/cycles/${cycleId}/meeting/minutes/approve`,
     {
@@ -164,6 +167,7 @@ export async function approveMinutes(
         run_id: runId ?? '',
         meeting_id: meetingId ?? '',
         approved_by: approvedBy,
+        ...(minutes ? { minutes } : {}),
       }),
     }
   )

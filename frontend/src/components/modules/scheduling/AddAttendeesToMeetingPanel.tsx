@@ -27,6 +27,9 @@ interface Props {
   onUpdated: (eventId: string | null, meetingUrl: string | null) => void
   /** Close the add-attendee section. */
   onClose: () => void
+  /** Set when the signed-in user did not schedule the meeting: they can still add people
+   *  to the roster, but only the scheduler can invite them to the Teams meeting. */
+  inviteBlockedReason?: string | null
 }
 
 /**
@@ -51,6 +54,7 @@ export default function AddAttendeesToMeetingPanel({
   timeZone,
   onUpdated,
   onClose,
+  inviteBlockedReason,
 }: Props) {
   const [status, setStatus] = useState<'idle' | 'working' | 'done' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -156,12 +160,15 @@ export default function AddAttendeesToMeetingPanel({
         )}
         <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Added people join the same Teams meeting — same time &amp; link. Existing attendees aren&rsquo;t re-invited.
+            {inviteBlockedReason
+              ? `${inviteBlockedReason} Ask them to send the invite.`
+              : <>Added people join the same Teams meeting — same time &amp; link. Existing attendees aren&rsquo;t re-invited.</>}
           </p>
           <button
             type="button"
             onClick={openDraft}
-            disabled={status === 'working' || sprAttendees.length === 0}
+            disabled={status === 'working' || sprAttendees.length === 0 || !!inviteBlockedReason}
+            title={inviteBlockedReason ?? undefined}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shrink-0"
           >
             {status === 'working' ? (

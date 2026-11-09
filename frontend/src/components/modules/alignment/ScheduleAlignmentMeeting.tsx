@@ -7,6 +7,7 @@ import SendAddedInvitePanel from '@/components/modules/scheduling/SendAddedInvit
 import MeetingReferenceBanner from '@/components/modules/scheduling/MeetingReferenceBanner'
 import { formatMeetingTime } from '@/utils/formatMeetingTime'
 import { alignmentInviteBody, sprTitle } from '@/lib/standardText'
+import { canChangeMeeting, onlySchedulerNote, useCurrentUser } from '@/lib/auth/currentUser'
 import type { CycleAttendee } from '@/types/scheduling.types'
 
 export interface AlignmentMeetingResult {
@@ -20,6 +21,10 @@ export interface AlignmentMeetingResult {
   startISO?: string | null
   timeZone?: string | null
   durationMinutes?: number | null
+  /** Outlook id of the Teams meeting — lets it be moved / cancelled reliably. */
+  graphEventId?: string | null
+  /** Who scheduled it (SSO email) — only they may reschedule or cancel it. */
+  scheduledBy?: string | null
 }
 
 interface Props {
@@ -112,6 +117,8 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
             startISO: res.meeting.start_time,
             timeZone: res.meeting.time_zone,
             durationMinutes: res.meeting.duration_minutes,
+            graphEventId: res.meeting.graph_event_id ?? null,
+            scheduledBy: res.meeting.scheduled_by ?? null,
           })
         }
       } catch {
@@ -217,6 +224,13 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
   const pendingInvitees = invitedBaseline
     ? internalAttendees.filter((a) => a.email && !invitedBaseline.has((a.email || '').toLowerCase()))
     : []
+
+  // Only whoever scheduled the meeting can move it, cancel it or invite more people to
+  // it — the Teams meeting lives in their mailbox. Everyone else sees it read-only.
+  const me = useCurrentUser()
+  const changeBlocked = meetingResult && !canChangeMeeting(meetingResult.scheduledBy, me)
+    ? onlySchedulerNote(meetingResult.scheduledBy, 'change')
+    : null
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -414,17 +428,25 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
                     setError(e instanceof Error ? e.message : 'Failed to reload attendees')
                   }
                 }}
-                className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 font-medium"
+                disabled={!!changeBlocked}
+                title={changeBlocked ?? undefined}
+                className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-slate-500"
               >
                 <CalendarClock size={11} />
                 Reschedule
               </button>
             </div>
+            {changeBlocked && (
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{changeBlocked}</p>
+            )}
           </div>
           {meetingResult.teamsUrl && pendingInvitees.length > 0 && (
             <SendAddedInvitePanel
               attendees={internalAttendees}
               meetingUrl={meetingResult.teamsUrl}
+              eventId={meetingResult.graphEventId}
+              startISO={meetingResult.startISO}
+              disabledReason={changeBlocked}
               subject={inviteSubject}
               body={inviteBody}
               onSent={() => {
@@ -451,7 +473,9 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
             inviteAttendees={selectedInternalAttendees}
             defaultDuration={30}
             qbrMeetingDate={qbrMeetingDate}
+            existingEventId={rescheduling ? (meetingResult?.graphEventId ?? null) : null}
             existingMeetingUrl={rescheduling ? (meetingResult?.teamsUrl ?? null) : null}
+            existingStartISO={rescheduling ? (meetingResult?.startISO ?? null) : null}
             subject={inviteSubject}
             bodyHtml={inviteBody}
             onCancel={rescheduling ? () => {
@@ -461,7 +485,7 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
               if (invited.size) { invitedRef.current = invited; setSelected(invited) }
               setRescheduling(false)
             } : undefined}
-            onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl, attendeeCount }) => {
+            onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl, attendeeCount, eventId }) => {
               if (selectedInternalAttendees.length === 0) { setError('Tick at least one attendee to invite.'); return }
               // Drop anyone left unticked from this meeting's roster so only the
               // invited people remain (persists). Re-add later via "Add invitee".
@@ -474,8 +498,9 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
               for (const u of unticked) {
                 try { await removeAlignmentAttendee(cycleId, u.attendee_id, meetingIndex) } catch { /* best effort */ }
               }
-              await scheduleAlignmentMeetingManual(cycleId, {
+              const saved = await scheduleAlignmentMeetingManual(cycleId, {
                 startTime, durationMinutes, timeZone, meetingUrl: teamsUrl, meetingIndex,
+                graphEventId: eventId,
               })
               // The invited set is now the baseline — only people added AFTER this
               // become "pending" and surface the "Send invite to added attendees" button.
@@ -489,6 +514,8 @@ export default function ScheduleAlignmentMeeting({ cycleId, vendorName, quarter,
                 // not only after the next reload refetches it from the server.
                 invitedEmails: selectedInternalAttendees.map((a) => (a.email || '').toLowerCase()).filter(Boolean),
                 startISO: startTime, timeZone, durationMinutes,
+                graphEventId: saved.graph_event_id ?? eventId,
+                scheduledBy: saved.scheduled_by ?? null,
               })
               setRescheduling(false)
               await fetchAttendees()

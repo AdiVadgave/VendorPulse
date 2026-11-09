@@ -28,7 +28,7 @@ class CycleRepository(BaseRepository):
         "workflow_state", "created_at", "updated_at", "meeting_plan", "scorecard_config",
         "teams_meeting_url", "teams_meeting_web_link", "teams_meeting_event_id",
         "teams_meeting_scheduled_at", "scorecard_dispatched_at", "scorecard_dispatched_to",
-        "meeting_time_zone", "meeting_duration_minutes",
+        "meeting_time_zone", "meeting_duration_minutes", "teams_meeting_scheduled_by",
     )
     json_columns = frozenset({"meeting_plan", "scorecard_config", "scorecard_dispatched_to"})
 
@@ -315,15 +315,33 @@ class CycleRepository(BaseRepository):
         web_link: Optional[str],
         event_id: Optional[str],
         scheduled_at: str,
+        scheduled_by: Optional[str] = None,
     ) -> Optional[dict]:
-        """Persist the Graph-returned Teams meeting metadata on the cycle."""
+        """Persist the Graph-returned Teams meeting metadata on the cycle.
+
+        `scheduled_by` (the scheduler's SSO email) is written only when given, so a
+        caller that does not know it never blanks the recorded scheduler."""
+        updates = {
+            "teams_meeting_url": teams_meeting_url,
+            "teams_meeting_web_link": web_link,
+            "teams_meeting_event_id": event_id,
+            "teams_meeting_scheduled_at": scheduled_at,
+        }
+        if scheduled_by is not None:
+            updates["teams_meeting_scheduled_by"] = scheduled_by
+        return self.update_by_id("cycle_id", cycle_id, updates)
+
+    def clear_teams_meeting(self, cycle_id: str) -> Optional[dict]:
+        """Forget the SPR meeting (after it was cancelled in Outlook) so a new time can be
+        scheduled. The time zone / duration preferences are kept for the next one."""
         return self.update_by_id(
             "cycle_id",
             cycle_id,
             {
-                "teams_meeting_url": teams_meeting_url,
-                "teams_meeting_web_link": web_link,
-                "teams_meeting_event_id": event_id,
-                "teams_meeting_scheduled_at": scheduled_at,
+                "teams_meeting_url": None,
+                "teams_meeting_web_link": None,
+                "teams_meeting_event_id": None,
+                "teams_meeting_scheduled_at": None,
+                "teams_meeting_scheduled_by": None,
             },
         )

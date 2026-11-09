@@ -143,6 +143,15 @@ export async function scheduleManualMeeting(
   })
 }
 
+/** Clear the cycle's SPR meeting after its Teams meeting was cancelled in Outlook (see
+ *  lib/meetingCancel.ts), so a new time can be scheduled. Scheduler only (403 otherwise). */
+export async function cancelSprMeeting(cycleId: string): Promise<{ cycle: GovernanceCycle; cancelled: boolean }> {
+  return apiFetch<{ cycle: GovernanceCycle; cancelled: boolean }>(
+    `/api/cycles/${cycleId}/scheduling/cancel-meeting`,
+    { method: 'POST' }
+  )
+}
+
 // ── RSVP ─────────────────────────────────────────────────────────────────────
 
 export async function fetchRsvpStatus(cycleId: string) {

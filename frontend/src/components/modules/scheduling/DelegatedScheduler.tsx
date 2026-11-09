@@ -45,12 +45,17 @@ interface Props {
    *  Provide its join link (and/or Graph event id) so we can locate + patch it. */
   existingEventId?: string | null
   existingMeetingUrl?: string | null
+  /** Current start of the meeting being rescheduled — narrows the join-link search. */
+  existingStartISO?: string | null
   onScheduled: (r: {
     startTime: string
     timeZone: TZ
     durationMinutes: number
     teamsUrl: string | null
     attendeeCount: number
+    /** Outlook id of the Teams meeting created or moved — persist it so the meeting
+     *  can be moved or cancelled later. */
+    eventId: string | null
   }) => Promise<void> | void
   onCancel?: () => void
 }
@@ -68,6 +73,7 @@ export default function DelegatedScheduler({
   afterLabel = 'the earlier meeting',
   existingEventId,
   existingMeetingUrl,
+  existingStartISO,
   onScheduled,
   onCancel,
 }: Props) {
@@ -130,7 +136,7 @@ export default function DelegatedScheduler({
       // Resolve the existing event (stored id, else look it up by join link).
       let eventId: string | null = existingEventId ?? null
       if (!eventId && existingMeetingUrl) {
-        eventId = await findEventIdByJoinUrl(existingMeetingUrl)
+        eventId = await findEventIdByJoinUrl(existingMeetingUrl, existingStartISO)
       }
       if (eventId) {
         const updated = await updateMeetingTime({ eventId, startISO: slot.proposed_time, durationMinutes, subject: draftSubject, bodyHtml: draftBody })
@@ -138,6 +144,7 @@ export default function DelegatedScheduler({
       } else {
         const created = await createMeetingEvent({ slot, attendees: inviteAttendees, subject: draftSubject, bodyText: draftBody })
         teamsUrl = created.teams_meeting_url
+        eventId = created.event_id
       }
       setPending(null)
       await onScheduled({
@@ -146,6 +153,7 @@ export default function DelegatedScheduler({
         durationMinutes,
         teamsUrl,
         attendeeCount: inviteAttendees.length,
+        eventId,
       })
       // Usually the parent hides this component on success, but if it kept it (e.g. it
       // reported a problem instead of throwing), the spinner must not stay up forever.

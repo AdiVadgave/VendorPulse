@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import {
-  CalendarPlus, Users, ExternalLink, CheckCircle2, RotateCcw, Building2, Link2Off, UserPlus, X, CalendarCheck, Trash2,
+  CalendarPlus, Users, ExternalLink, CheckCircle2, RotateCcw, Building2, Link2Off, UserPlus, X, CalendarCheck, Trash2, Ban,
 } from 'lucide-react'
 import {
-  scheduleVendorPrepMeetingManual, getVendorPrepMeeting,
+  scheduleVendorPrepMeetingManual, getVendorPrepMeeting, deleteVendorPrepMeeting,
   getVendorPrepAttendees, addVendorPrepAttendee, removeVendorPrepAttendee, resetVendorPrepAttendees,
 } from '@/lib/vendorPrepApi'
+import { cancelTeamsMeeting } from '@/lib/meetingCancel'
+import { canChangeMeeting, isMeetingScheduler, onlySchedulerNote, useCurrentUser } from '@/lib/auth/currentUser'
 import { SearchAddAttendeeForm } from '@/components/modules/scheduling/AttendeeRefreshPanel'
 import SendAddedInvitePanel from '@/components/modules/scheduling/SendAddedInvitePanel'
 import DelegatedScheduler from '@/components/modules/scheduling/DelegatedScheduler'
@@ -49,6 +51,10 @@ interface MeetingResult {
   startISO?: string | null
   timeZone?: string | null
   durationMinutes?: number | null
+  /** Outlook id of the Teams meeting — lets it be moved / cancelled reliably. */
+  graphEventId?: string | null
+  /** Who scheduled it (SSO email) — only they may reschedule or cancel it. */
+  scheduledBy?: string | null
 }
 
 /**
@@ -154,6 +160,8 @@ export default function VendorPrepMeetingPanel({
             startISO: res.meeting.start_time,
             timeZone: res.meeting.time_zone,
             durationMinutes: res.meeting.duration_minutes,
+            graphEventId: res.meeting.graph_event_id ?? null,
+            scheduledBy: res.meeting.scheduled_by ?? null,
           })
         }
       })
@@ -300,6 +308,59 @@ export default function VendorPrepMeetingPanel({
   const inviteSent = Boolean(meetingResult) && !rescheduling
   const rosterLocked = inviteSent || !persistenceChecked
 
+  // Only whoever scheduled the prep call can move it, cancel it or invite more people
+  // to it — the Teams meeting lives in their mailbox. Everyone else sees it read-only.
+  const me = useCurrentUser()
+  const changeBlocked = meetingResult && !canChangeMeeting(meetingResult.scheduledBy, me)
+    ? onlySchedulerNote(meetingResult.scheduledBy, 'change')
+    : null
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelBusy, setCancelBusy] = useState(false)
+  const [cancelProblem, setCancelProblem] = useState<{ message: string; allowRecordOnly: boolean } | null>(null)
+  const [cancelNotice, setCancelNotice] = useState<string | null>(null)
+
+  // Cancel the Teams meeting in Outlook FIRST (as its scheduler), then forget it here.
+  // `recordOnly` skips Outlook, when the coordinator chooses that after a cancellation
+  // could not be done. The roster is kept for the next time the call is scheduled.
+  async function handleCancelMeeting(recordOnly = false) {
+    if (!meetingResult) return
+    setCancelBusy(true)
+    setCancelProblem(null)
+    try {
+      let outlookNote = ''
+      if (!recordOnly) {
+        const attempt = await cancelTeamsMeeting({
+          eventId: meetingResult.graphEventId,
+          joinUrl: meetingResult.teamsUrl,
+          startISO: meetingResult.startISO,
+          scheduledByMe: isMeetingScheduler(meetingResult.scheduledBy, me),
+        })
+        if (!attempt.cleared) {
+          setCancelProblem({ message: attempt.message, allowRecordOnly: attempt.allowRecordOnly })
+          return
+        }
+        outlookNote = attempt.message
+      }
+      try {
+        await deleteVendorPrepMeeting(cycleId)
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : 'Could not cancel the meeting.'
+        setCancelProblem({
+          message: outlookNote ? `${outlookNote} But VendorPulse could not remove the meeting: ${reason}` : reason,
+          allowRecordOnly: !!outlookNote,
+        })
+        return
+      }
+      setMeetingResult(null)
+      setInvitedBaseline(null)
+      setConfirmCancel(false)
+      setCancelNotice(`Vendor prep meeting cancelled.${outlookNote ? ` ${outlookNote}` : ''}`)
+      await loadAttendees()
+    } finally {
+      setCancelBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -351,7 +412,9 @@ export default function VendorPrepMeetingPanel({
                       setError(e instanceof Error ? e.message : 'Failed to reload attendees')
                     }
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  disabled={!!changeBlocked}
+                  title={changeBlocked ?? undefined}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RotateCcw size={13} /> Reschedule
                 </button>
@@ -362,7 +425,56 @@ export default function VendorPrepMeetingPanel({
                   {addingInvitee ? <X size={13} /> : <UserPlus size={13} />}
                   {addingInvitee ? 'Cancel' : 'Add invitee'}
                 </button>
+                <button
+                  onClick={() => { setConfirmCancel(true); setCancelProblem(null); setCancelNotice(null) }}
+                  disabled={!!changeBlocked || cancelBusy}
+                  title={changeBlocked ?? 'Cancel the prep call in Outlook and notify the attendees'}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Ban size={13} /> Cancel meeting
+                </button>
               </div>
+              {changeBlocked && (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">{changeBlocked}</p>
+              )}
+              {confirmCancel && (
+                <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30">
+                  <span className="text-sm text-rose-700 dark:text-rose-300">
+                    {cancelProblem
+                      ? cancelProblem.message
+                      : 'Cancel the vendor prep meeting? Its Teams meeting will be cancelled in Outlook and the attendees notified.'}
+                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {cancelProblem ? (
+                      cancelProblem.allowRecordOnly && (
+                        <button
+                          onClick={() => handleCancelMeeting(true)}
+                          disabled={cancelBusy}
+                          title="Remove it from VendorPulse without changing Outlook — cancel the Teams meeting there yourself"
+                          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-rose-300 text-rose-700 dark:text-rose-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-60"
+                        >
+                          {cancelBusy ? 'Removing…' : 'Remove from VendorPulse only'}
+                        </button>
+                      )
+                    ) : (
+                      <button
+                        onClick={() => handleCancelMeeting()}
+                        disabled={cancelBusy}
+                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60"
+                      >
+                        {cancelBusy ? 'Cancelling…' : 'Cancel meeting'}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setConfirmCancel(false); setCancelProblem(null) }}
+                      disabled={cancelBusy}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800"
+                    >
+                      Keep meeting
+                    </button>
+                  </div>
+                </div>
+              )}
               {addInviteeForm}
 
               {/* Persistent invitee roster — visible after the meeting is scheduled. */}
@@ -421,6 +533,9 @@ export default function VendorPrepMeetingPanel({
                 <SendAddedInvitePanel
                   attendees={attendees}
                   meetingUrl={meetingResult.teamsUrl}
+                  eventId={meetingResult.graphEventId}
+                  startISO={meetingResult.startISO}
+                  disabledReason={changeBlocked}
                   subject={inviteSubject}
                   body={inviteBody}
                   onSent={() => {
@@ -435,9 +550,23 @@ export default function VendorPrepMeetingPanel({
               )}
             </div>
           ) : (
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Schedule the prep call with the internal team and the vendor. Untick anyone who should not be invited.
-            </p>
+            <>
+              {cancelNotice && (
+                <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30">
+                  <span className="text-sm text-emerald-700 dark:text-emerald-300">{cancelNotice}</span>
+                  <button
+                    onClick={() => setCancelNotice(null)}
+                    aria-label="Dismiss"
+                    className="p-1 rounded text-emerald-700 dark:text-emerald-300 hover:bg-white/70 dark:hover:bg-slate-800"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Schedule the prep call with the internal team and the vendor. Untick anyone who should not be invited.
+              </p>
+            </>
           )}
 
           {showScheduler && (
@@ -529,14 +658,17 @@ export default function VendorPrepMeetingPanel({
                 earliestMeetingDate={latestAlignmentStart}
                 beforeLabel="the SPR meeting"
                 afterLabel="the Internal Alignment call"
+                existingEventId={rescheduling ? (meetingResult?.graphEventId ?? null) : null}
                 existingMeetingUrl={rescheduling ? (meetingResult?.teamsUrl ?? null) : null}
+                existingStartISO={rescheduling ? (meetingResult?.startISO ?? null) : null}
                 subject={inviteSubject}
                 bodyHtml={inviteBody}
                 onCancel={rescheduling ? () => setRescheduling(false) : undefined}
-                onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl }) => {
+                onScheduled={async ({ startTime, timeZone, durationMinutes, teamsUrl, eventId }) => {
                   if (selectedEmails.length === 0) { setError('Select at least one attendee to invite.'); return }
                   const res = await scheduleVendorPrepMeetingManual(cycleId, {
                     startTime, durationMinutes, timeZone, attendeeEmails: selectedEmails, meetingUrl: teamsUrl,
+                    graphEventId: eventId,
                   })
                   // Drop anyone left unticked from this meeting's roster so only the
                   // invited people remain (persists). Re-add later via "Add invitee".
@@ -553,6 +685,8 @@ export default function VendorPrepMeetingPanel({
                     teamsUrl: res.teams_meeting_url, webLink: res.web_link, attendeeCount: res.attendee_count,
                     invitedEmails: res.attendee_emails,
                     startISO: startTime, timeZone, durationMinutes,
+                    graphEventId: res.graph_event_id ?? eventId,
+                    scheduledBy: res.scheduled_by ?? null,
                   })
                   setRescheduling(false)
                   await loadAttendees()

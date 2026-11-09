@@ -412,15 +412,121 @@ export async function addAttendeesToEvent(params: {
 // ── Find an existing event by its Teams join link ────────────────────────────
 // Used when we don't have the stored event id (e.g. a meeting scheduled before ids
 // were persisted) so reschedule can MOVE that event instead of creating a duplicate.
-export async function findEventIdByJoinUrl(joinUrl: string): Promise<string | null> {
+
+/** The parts of a calendar event needed to decide whether — and how — to change it. */
+export interface CalendarEventRef {
+  id: string
+  /** Only the organiser can move or cancel a meeting; an attendee's copy is read-only. */
+  isOrganizer: boolean
+  isCancelled: boolean
+  organizer: string | null
+}
+
+const EVENT_REF_FIELDS = 'id,isOrganizer,isCancelled,organizer,onlineMeeting'
+
+type GraphEvent = {
+  id: string
+  isOrganizer?: boolean
+  isCancelled?: boolean
+  organizer?: { emailAddress?: { address?: string; name?: string } }
+  onlineMeeting?: { joinUrl?: string }
+}
+
+function toEventRef(e: GraphEvent): CalendarEventRef {
+  return {
+    id: e.id,
+    isOrganizer: e.isOrganizer !== false,
+    isCancelled: e.isCancelled === true,
+    organizer: e.organizer?.emailAddress?.address ?? e.organizer?.emailAddress?.name ?? null,
+  }
+}
+
+/**
+ * Locate a meeting on the signed-in user's calendar by its Teams join link. With the
+ * meeting's start time, searches that day's calendar (calendarView); without it,
+ * falls back to the first 250 events — which a busy calendar can outgrow, so the
+ * search could miss the meeting and a reschedule created a duplicate instead.
+ */
+export async function findEventByJoinUrl(joinUrl: string, startISO?: string | null): Promise<CalendarEventRef | null> {
   if (!joinUrl) return null
-  const res = await fetch(`${GRAPH}/me/events?$select=id,onlineMeeting&$top=250`, {
+  const start = startISO ? new Date(startISO) : null
+  let url = `${GRAPH}/me/events?$select=${EVENT_REF_FIELDS}&$top=250`
+  if (start && !Number.isNaN(start.getTime())) {
+    const day = 24 * 60 * 60 * 1000
+    const from = new Date(start.getTime() - day).toISOString()
+    const to = new Date(start.getTime() + day).toISOString()
+    url = `${GRAPH}/me/calendarView?startDateTime=${encodeURIComponent(from)}&endDateTime=${encodeURIComponent(to)}&$select=${EVENT_REF_FIELDS}&$top=250`
+  }
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${await token()}` } })
+  if (!res.ok) return null
+  const data = (await res.json()) as { value?: GraphEvent[] }
+  const match = (data.value ?? []).find((e) => !!e.onlineMeeting?.joinUrl && e.onlineMeeting.joinUrl === joinUrl)
+  return match ? toEventRef(match) : null
+}
+
+export async function findEventIdByJoinUrl(joinUrl: string, startISO?: string | null): Promise<string | null> {
+  return (await findEventByJoinUrl(joinUrl, startISO))?.id ?? null
+}
+
+/** The event with this id on the signed-in user's calendar, or null when it isn't there
+ *  (already deleted — or an id from someone else's mailbox: event ids are per mailbox). */
+async function getEventRef(eventId: string): Promise<CalendarEventRef | null> {
+  const res = await fetch(`${GRAPH}/me/events/${encodeURIComponent(eventId)}?$select=${EVENT_REF_FIELDS}`, {
     headers: { Authorization: `Bearer ${await token()}` },
   })
-  if (!res.ok) return null
-  const data = (await res.json()) as { value?: Array<{ id: string; onlineMeeting?: { joinUrl?: string } }> }
-  const match = (data.value ?? []).find((e) => !!e.onlineMeeting?.joinUrl && e.onlineMeeting.joinUrl === joinUrl)
-  return match?.id ?? null
+  if (res.status === 404) return null
+  if (!res.ok) {
+    const t = await res.text()
+    throw new Error(`Graph read event ${res.status}: ${t.slice(0, 200)}`)
+  }
+  return toEventRef((await res.json()) as GraphEvent)
+}
+
+// ── Cancel a meeting (as its organiser) ──────────────────────────────────────
+export type CancelMeetingOutcome =
+  /** Outlook cancelled it and sent the attendees a cancellation. */
+  | { kind: 'cancelled' }
+  /** It is already cancelled / gone from the organiser's calendar. */
+  | { kind: 'already_gone' }
+  /** The signed-in user is only an attendee; only `organizer` can cancel it. */
+  | { kind: 'not_organizer'; organizer: string | null }
+  /** Not on the signed-in user's calendar at all (cancelled, or someone else's). */
+  | { kind: 'not_found' }
+  | { kind: 'failed'; message: string }
+
+/**
+ * Cancel a Teams meeting in Outlook (POST /me/events/{id}/cancel), which also emails the
+ * attendees a cancellation. Prefers the stored event id; falls back to finding the
+ * meeting by its join link near its start time (meetings saved before ids were stored).
+ * Never throws — every outcome is returned so the caller can explain it.
+ */
+export async function cancelMeetingEvent(params: {
+  eventId?: string | null
+  joinUrl?: string | null
+  startISO?: string | null
+  comment?: string
+}): Promise<CancelMeetingOutcome> {
+  if (!isSchedulingAvailable()) {
+    return { kind: 'failed', message: "You're not signed in with Shell (SSO), so Outlook can't be reached from here." }
+  }
+  try {
+    let event = params.eventId ? await getEventRef(params.eventId) : null
+    if (!event && params.joinUrl) event = await findEventByJoinUrl(params.joinUrl, params.startISO)
+    if (!event) return { kind: 'not_found' }
+    if (event.isCancelled) return { kind: 'already_gone' }
+    if (!event.isOrganizer) return { kind: 'not_organizer', organizer: event.organizer }
+    const res = await fetch(`${GRAPH}/me/events/${encodeURIComponent(event.id)}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment: params.comment ?? '' }),
+    })
+    if (res.ok) return { kind: 'cancelled' }
+    if (res.status === 404) return { kind: 'already_gone' }
+    const t = await res.text()
+    return { kind: 'failed', message: `Outlook did not cancel the meeting (${res.status}): ${t.slice(0, 200)}` }
+  } catch (e) {
+    return { kind: 'failed', message: e instanceof Error ? e.message : 'Could not reach Outlook.' }
+  }
 }
 
 // ── Read live RSVP responses from the meeting event ──────────────────────────

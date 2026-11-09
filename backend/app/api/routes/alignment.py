@@ -6,7 +6,6 @@ POST /api/cycles/{cycleId}/alignment/schedule-meeting      Create Teams meeting 
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
@@ -17,7 +16,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.config import Settings, settings
+from app.config import settings
+from app.core.auth import CurrentUser, get_current_user
 from app.core.logging_config import sanitize_for_log
 from app.dependencies import (
     get_llm_service, get_cycle_repo, get_attendee_repo, get_meeting_repo,
@@ -27,10 +27,10 @@ from app.services.meeting_attendee_service import (
     list_meeting_attendees, add_meeting_attendee, remove_meeting_attendee, reset_meeting_attendees,
 )
 from app.models.common import AgentResponse
-from app.services.graph_service import GraphService
 from app.services.standard_text import alignment_invite_body, spr_title
 from app.utils.prompts import ALIGNMENT_SYSTEM_PROMPT
 from app.utils.meeting_invitees import invited_emails
+from app.utils.meeting_owner import ensure_can_change_meeting, graph_event_id_for, scheduler_email
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,11 @@ class ManualAlignmentMeetingRequest(BaseModel):
     time_zone: str = Field("IST", description="Timezone for meeting")
     meeting_url: Optional[str] = Field(default=None, description="Optional meeting link the coordinator pastes")
     meeting_index: int = Field(1, description="Which alignment meeting (1-based) — a cycle may have several")
+    graph_event_id: Optional[str] = Field(
+        default=None,
+        description="Outlook/Graph id of the Teams meeting the browser created or moved, so deleting "
+        "this meeting can cancel it in Outlook.",
+    )
 
 
 @router.post("/extract-actions", response_model=AgentResponse)
@@ -119,14 +124,6 @@ def extract_actions(cycleId: str, payload: ExtractActionsRequest):
     )
 
 
-def _get_graph_token() -> str:
-    fresh_settings = Settings()
-    token = (fresh_settings.graph_access_token or settings.graph_access_token or "").strip()
-    if token.lower().startswith("bearer "):
-        token = token[7:].strip()
-    return token
-
-
 def _get_internal_emails(attendee_repo, cycleId: str) -> list[str]:
     attendees = attendee_repo.get_for_cycle(cycleId)
     internal_emails = [
@@ -160,11 +157,13 @@ def schedule_alignment_meeting_manual(
     participant_repo=Depends(get_meeting_participant_repo),
     ma_repo=Depends(get_meeting_attendee_repo),
     seed_repo=Depends(get_meeting_attendee_seed_repo),
+    user: CurrentUser = Depends(get_current_user),
 ):
     """Record an internal-alignment meeting at a coordinator-chosen time with no
     Microsoft Graph / calendar access. Invites all internal stakeholders and
     persists to the shared meetings store (meeting_type=INTERNAL_ALIGNMENT) so the
-    state survives a refresh. Reschedules the same index in place."""
+    state survives a refresh. Reschedules the same index in place — which only the
+    meeting's scheduler may do."""
     logger.info("ALIGNMENT: manual meeting — cycleId=%s, index=%s", sanitize_for_log(cycleId), sanitize_for_log(payload.meeting_index))
 
     cycle = cycle_repo.get_by_cycle_id(cycleId)
@@ -208,7 +207,10 @@ def schedule_alignment_meeting_manual(
         None,
     )
     is_reschedule = bool(existing and existing.get("meeting_id"))
+    if is_reschedule:
+        ensure_can_change_meeting(existing.get("scheduled_by"), user, "reschedule")
     event_id = (existing.get("meeting_id") if existing else None) or f"m{uuid.uuid4().hex}"
+    graph_event_id = graph_event_id_for(payload.graph_event_id, existing, meeting_url)
 
     # Treat the first internal stakeholder as the organiser so the attendee_count
     # (participant rows + 1) matches the internal-stakeholder count.
@@ -237,6 +239,8 @@ def schedule_alignment_meeting_manual(
             "alignment_index": meeting_index,
             "teams_meeting_url": meeting_url,
             "web_link": meeting_url,
+            "graph_event_id": graph_event_id,
+            "scheduled_by": scheduler_email(user),
         }
         if is_reschedule:
             meeting_repo.replace_by_id("meeting_id", event_id, meeting_record)
@@ -255,6 +259,8 @@ def schedule_alignment_meeting_manual(
         "event_id": event_id,
         "teams_meeting_url": meeting_url,
         "web_link": meeting_url,
+        "graph_event_id": graph_event_id,
+        "scheduled_by": scheduler_email(user),
         "attendee_count": len(internal_emails),
         "attendee_emails": internal_emails,
     }
@@ -289,6 +295,10 @@ def _alignment_meeting_dto(m: dict, participant_repo) -> dict:
         "event_id": m.get("meeting_id"),
         "teams_meeting_url": m.get("teams_meeting_url"),
         "web_link": m.get("web_link"),
+        # The Outlook id (for cancelling / moving the Teams meeting) and who scheduled
+        # it — only they may reschedule or cancel it. Both null on older meetings.
+        "graph_event_id": m.get("graph_event_id"),
+        "scheduled_by": m.get("scheduled_by"),
         "attendee_count": len(invited),
         "status": m.get("status"),
         "time_slot": m.get("time_slot"),
@@ -345,12 +355,17 @@ def delete_alignment_meeting(
     index: int = 1,
     meeting_repo=Depends(get_meeting_repo),
     participant_repo=Depends(get_meeting_participant_repo),
+    user: CurrentUser = Depends(get_current_user),
 ):
     """Delete an internal-alignment meeting (e.g. one the admin added by mistake).
 
-    Cancels the underlying Teams event (best-effort so a Graph failure never blocks
-    removal) and deletes the local record + its participant rows. If nothing was
-    scheduled at that index yet, still returns 200 (nothing to do)."""
+    The browser cancels its Teams meeting in Outlook first — only the scheduler's own
+    delegated Graph session can, which is also why only the scheduler may delete it —
+    then this deletes the local record + its participant rows. If nothing was scheduled
+    at that index yet, still returns 200 (nothing to do).
+
+    (This used to "cancel" with a static backend token against VendorPulse's own record
+    id, which Outlook never knew — the 404 was then counted as a success.)"""
     meeting = next(
         (m for m in meeting_repo.get_for_cycle(cycleId)
          if m.get("meeting_type") == "INTERNAL_ALIGNMENT"
@@ -359,25 +374,17 @@ def delete_alignment_meeting(
         None,
     )
     if not meeting:
-        return {"deleted": False, "cancelled": False, "message": "No scheduled meeting at that index."}
-
-    cancelled = False
-    event_id = meeting.get("meeting_id")
-    token = _get_graph_token()
-    if event_id and token:
-        try:
-            result = asyncio.run(GraphService(token).delete_event(event_id))
-            cancelled = bool(result.get("deleted"))
-        except Exception as e:  # best-effort — never block local removal
-            logger.warning("ALIGNMENT: Graph cancel failed for %s: %s", sanitize_for_log(event_id), e)
+        return {"deleted": False, "message": "No scheduled meeting at that index."}
+    ensure_can_change_meeting(meeting.get("scheduled_by"), user, "cancel")
 
     # Guard: only delete by a real id. delete_by_id(None) would match every record
     # whose meeting_id is None and wipe them all.
+    event_id = meeting.get("meeting_id")
     if event_id:
         meeting_repo.delete_by_id("meeting_id", event_id)
         participant_repo.delete_for_meeting(event_id)
-    logger.info("ALIGNMENT: deleted meeting index=%s (event=%s, cancelled=%s)", sanitize_for_log(index), sanitize_for_log(event_id), cancelled)
-    return {"deleted": True, "cancelled": cancelled, "meeting_index": int(index)}
+    logger.info("ALIGNMENT: deleted meeting index=%s (meeting=%s, by=%s)", sanitize_for_log(index), sanitize_for_log(event_id), sanitize_for_log(user.email))
+    return {"deleted": True, "meeting_index": int(index)}
 
 
 # ── Internal attendees endpoint ───────────────────────────────────────────────

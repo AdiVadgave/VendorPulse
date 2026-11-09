@@ -95,18 +95,24 @@ export default function ManualMeetingPanel({
     return () => { cancelled = true }
   }, [cycleId])
 
+  // With no existing meeting (e.g. the previous one was cancelled) this schedules a brand
+  // new Teams meeting, so the copy must not say "rescheduled" / "Updated Time".
+  const isReschedule = Boolean(existingEventId || existingMeetingUrl)
+
   // Default subject/body for the updated invite (the coordinator can edit before sending).
   const prettyTime = startLocal ? `${startLocal.replace('T', ' ')} ${timeZone}` : ''
   // Approved standard text (see src/lib/standardText.ts). "Updated Time" stays in the
   // subject so a rescheduled invite is distinguishable in a crowded inbox.
-  const defaultSubject = `${sprTitle(vendorName, quarter, year)} (Updated Time)`
-  const defaultBody = sprInviteBody(
-    'Team',
-    vendorName,
-    quarter,
-    year,
-    `<p style="font-size:14px;line-height:1.6;margin:0 0 16px 0;">This meeting has been <strong>rescheduled</strong>.${prettyTime ? `<br/><strong>New time:</strong> ${prettyTime}` : ''}<br/>The updated invitation will appear in your calendar.</p>`,
-  )
+  const defaultSubject = isReschedule ? `${sprTitle(vendorName, quarter, year)} (Updated Time)` : sprTitle(vendorName, quarter, year)
+  const defaultBody = isReschedule
+    ? sprInviteBody(
+      'Team',
+      vendorName,
+      quarter,
+      year,
+      `<p style="font-size:14px;line-height:1.6;margin:0 0 16px 0;">This meeting has been <strong>rescheduled</strong>.${prettyTime ? `<br/><strong>New time:</strong> ${prettyTime}` : ''}<br/>The updated invitation will appear in your calendar.</p>`,
+    )
+    : sprInviteBody('Team', vendorName, quarter, year)
 
   // "Reschedule" opens the draft editor first; the calendar event is only updated
   // once the coordinator confirms (with any edits) in the dialog.
@@ -186,9 +192,13 @@ export default function ManualMeetingPanel({
               <CalendarClock size={18} className="text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Reschedule the Meeting</h3>
+              <h3 className="font-semibold text-slate-900 dark:text-white text-sm">
+                {isReschedule ? 'Reschedule the Meeting' : 'Schedule the Meeting'}
+              </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Pick a new time — the Teams meeting is updated and attendees are re-notified automatically.
+                {isReschedule
+                  ? 'Pick a new time — the Teams meeting is updated and attendees are re-notified automatically.'
+                  : 'Pick a time — a Teams meeting is created and the attendees are invited.'}
               </p>
             </div>
           </div>
@@ -235,7 +245,7 @@ export default function ManualMeetingPanel({
 
         <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
           <Users size={13} className="text-slate-400" />
-          {sprAttendees.length} attendee{sprAttendees.length === 1 ? '' : 's'} will be re-notified
+          {sprAttendees.length} attendee{sprAttendees.length === 1 ? '' : 's'} will be {isReschedule ? 're-notified' : 'invited'}
         </div>
 
         {error && (
@@ -255,18 +265,18 @@ export default function ManualMeetingPanel({
           )}
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
-          {saving ? 'Rescheduling…' : 'Reschedule Meeting'}
+          {saving ? (isReschedule ? 'Rescheduling…' : 'Scheduling…') : (isReschedule ? 'Reschedule Meeting' : 'Schedule Meeting')}
         </button>
       </div>
 
       <DraftReviewDialog
         open={draftOpen}
         kind="invite"
-        title="Review updated invite"
+        title={isReschedule ? 'Review updated invite' : 'Review invite'}
         subject={defaultSubject}
         body={defaultBody}
         recipients={sprAttendees.filter((a) => a.email).map((a) => `${a.name} (${a.email})`)}
-        sendLabel="Update & send"
+        sendLabel={isReschedule ? 'Update & send' : 'Send invite'}
         busy={saving}
         onSend={doSave}
         onCancel={() => { if (!saving) setDraftOpen(false) }}

@@ -13,6 +13,7 @@ from app.api.routes import meeting_agent as minutes_routes
 from app.api.routes import scheduling as scheduling_routes
 from app.api.routes import scorecard_v2
 from app.api.routes import vendor_prep as vendor_prep_routes
+from app.core.auth import CurrentUser
 from app.services import reminder_service
 
 
@@ -194,6 +195,7 @@ class ManualMeetingTests(unittest.TestCase):
             "c1",
             scheduling_routes.ManualMeetingRequest(start_time="2026-12-01T10:00:00Z"),
             cycle_repo=repo, meeting_repo=meetings,
+            user=CurrentUser(sub="u1", email="coordinator@shell.com", name="Coordinator"),
         )
         self.assertEqual(repo.advanced, [])
 

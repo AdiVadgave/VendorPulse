@@ -13,6 +13,13 @@ interface Props {
   attendees: CycleAttendee[]
   /** Teams join link of the already-scheduled meeting — used to locate the Graph event. */
   meetingUrl: string | null
+  /** Stored Outlook id of the meeting (preferred over the join-link lookup). */
+  eventId?: string | null
+  /** The meeting's start — narrows the join-link lookup to that day's calendar. */
+  startISO?: string | null
+  /** Set when the signed-in user may not change this meeting (they did not schedule it):
+   *  the button is disabled and this explains why. */
+  disabledReason?: string | null
   /** Default invite subject (editable in the review dialog). */
   subject: string
   /** Default invite HTML body (editable in the review dialog). */
@@ -23,12 +30,13 @@ interface Props {
 
 /**
  * "Send invite to added attendees" for the alignment / vendor-prep meetings — the
- * same flow the QBR scheduling tab uses (see AddAttendeesToMeetingPanel). Resolves
- * the real Graph event from the stored Teams join link (these meetings don't persist
- * the Graph event id) and PATCHes the attendee list so new invitees receive the
- * Outlook/Teams invite. Delegated Calendars.ReadWrite, as the signed-in coordinator.
+ * same flow the QBR scheduling tab uses (see AddAttendeesToMeetingPanel). Uses the
+ * stored Outlook event id (meetings saved before ids were stored are found by their
+ * Teams join link) and PATCHes the attendee list so new invitees receive the
+ * Outlook/Teams invite. Delegated Calendars.ReadWrite, as the signed-in coordinator —
+ * which only works for the meeting's organiser, hence `disabledReason`.
  */
-export default function SendAddedInvitePanel({ attendees, meetingUrl, subject, body, onSent }: Props) {
+export default function SendAddedInvitePanel({ attendees, meetingUrl, eventId: storedEventId, startISO, disabledReason, subject, body, onSent }: Props) {
   const [status, setStatus] = useState<'idle' | 'working' | 'done' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [draftOpen, setDraftOpen] = useState(false)
@@ -49,7 +57,7 @@ export default function SendAddedInvitePanel({ attendees, meetingUrl, subject, b
     setStatus('working')
     setError(null)
     try {
-      const eventId = meetingUrl ? await findEventIdByJoinUrl(meetingUrl) : null
+      const eventId = storedEventId || (meetingUrl ? await findEventIdByJoinUrl(meetingUrl, startISO) : null)
       if (!eventId) {
         throw new Error(
           "Couldn't find this Teams meeting on your calendar. Try Reschedule to re-sync the invitee list."
@@ -79,12 +87,15 @@ export default function SendAddedInvitePanel({ attendees, meetingUrl, subject, b
       )}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          Newly added people join the same Teams meeting — same time &amp; link. Existing attendees aren&rsquo;t re-invited.
+          {disabledReason
+            ? `${disabledReason} Ask them to send the invite.`
+            : <>Newly added people join the same Teams meeting — same time &amp; link. Existing attendees aren&rsquo;t re-invited.</>}
         </p>
         <button
           type="button"
           onClick={openDraft}
-          disabled={status === 'working' || attendees.length === 0}
+          disabled={status === 'working' || attendees.length === 0 || !!disabledReason}
+          title={disabledReason ?? undefined}
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors shrink-0"
         >
           {status === 'working' ? (

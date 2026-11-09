@@ -132,6 +132,7 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             scorecard_dispatched_to    JSONB,
             meeting_time_zone          TEXT,
             meeting_duration_minutes   INTEGER,
+            teams_meeting_scheduled_by TEXT,
             seq                        BIGSERIAL UNIQUE NOT NULL
         )
         """,
@@ -191,6 +192,8 @@ _SCHEMA: dict[str, tuple[str, list[str]]] = {
             alignment_index   INTEGER,
             teams_meeting_url TEXT,
             web_link          TEXT,
+            graph_event_id    TEXT,
+            scheduled_by      TEXT,
             seq          BIGSERIAL UNIQUE NOT NULL
         )
         """,
@@ -444,6 +447,9 @@ _ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
     "cycles": [
         ("meeting_time_zone", "TEXT"),
         ("meeting_duration_minutes", "INTEGER"),
+        # Who scheduled the SPR meeting (SSO email). Only they may reschedule or cancel
+        # it — the Teams meeting lives in their mailbox. NULL on older cycles = anyone.
+        ("teams_meeting_scheduled_by", "TEXT"),
     ],
     "meetings": [
         ("time_zone", "TEXT"),
@@ -451,6 +457,10 @@ _ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
         ("alignment_index", "INTEGER"),
         ("teams_meeting_url", "TEXT"),
         ("web_link", "TEXT"),
+        # The Outlook/Graph id of the Teams meeting the browser created, so deleting the
+        # meeting can cancel it in Outlook, and who scheduled it (only they may change it).
+        ("graph_event_id", "TEXT"),
+        ("scheduled_by", "TEXT"),
     ],
     "slot_proposals": [
         ("tentative", "JSONB"),

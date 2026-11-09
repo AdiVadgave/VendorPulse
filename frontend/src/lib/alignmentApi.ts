@@ -67,6 +67,10 @@ export interface ScheduleMeetingResponse {
   event_id: string
   teams_meeting_url: string | null
   web_link: string | null
+  /** Outlook id of the Teams meeting, stored so it can be moved or cancelled later. */
+  graph_event_id?: string | null
+  /** Who scheduled it (SSO email) — only they may reschedule or cancel it. */
+  scheduled_by?: string | null
   attendee_count: number
   attendee_emails: string[]
 }
@@ -84,6 +88,8 @@ export async function scheduleAlignmentMeetingManual(
     timeZone?: string
     meetingUrl?: string | null
     meetingIndex?: number
+    /** Outlook id of the Teams meeting just created or moved in the browser. */
+    graphEventId?: string | null
   }
 ): Promise<ScheduleMeetingResponse> {
   return apiFetch<ScheduleMeetingResponse>(
@@ -96,6 +102,7 @@ export async function scheduleAlignmentMeetingManual(
         time_zone: opts.timeZone ?? 'IST',
         meeting_url: opts.meetingUrl ?? null,
         meeting_index: opts.meetingIndex ?? 1,
+        graph_event_id: opts.graphEventId ?? null,
       }),
     }
   )
@@ -108,6 +115,10 @@ export interface AlignmentMeeting {
   event_id: string
   teams_meeting_url: string | null
   web_link: string | null
+  /** Outlook id of the Teams meeting (null on meetings saved before ids were stored). */
+  graph_event_id?: string | null
+  /** Who scheduled it (SSO email) — only they may reschedule or cancel it. */
+  scheduled_by?: string | null
   attendee_count: number
   /** Who was actually invited (organiser + participants), so the UI never has to guess. */
   attendee_emails?: string[]
@@ -145,15 +156,15 @@ export async function listAlignmentMeetings(
 }
 
 /**
- * Delete an alignment meeting the admin added by mistake. Cancels the underlying
- * Teams event (best-effort) and removes the record. Safe to call even if nothing
- * was scheduled at that index yet.
+ * Remove an alignment meeting's record. Cancel its Teams meeting in Outlook FIRST
+ * (see lib/meetingCancel.ts) — the backend cannot. Only the scheduler may (403
+ * otherwise). Safe to call even if nothing was scheduled at that index yet.
  */
 export async function deleteAlignmentMeeting(
   cycleId: string,
   meetingIndex: number
-): Promise<{ deleted: boolean; cancelled: boolean; meeting_index?: number; message?: string }> {
-  return apiFetch<{ deleted: boolean; cancelled: boolean; meeting_index?: number; message?: string }>(
+): Promise<{ deleted: boolean; meeting_index?: number; message?: string }> {
+  return apiFetch<{ deleted: boolean; meeting_index?: number; message?: string }>(
     `/api/cycles/${cycleId}/alignment/meeting`,
     { method: 'DELETE', params: { index: String(meetingIndex) } }
   )

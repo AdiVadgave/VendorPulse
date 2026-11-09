@@ -14,6 +14,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 
+from app.core.auth import CurrentUser, get_current_user
 from app.core.logging_config import sanitize_for_log
 from app.core.workflow_engine import WORKFLOW_STATES, WorkflowStateError, WorkflowViolationError, workflow_engine
 from app.dependencies import (
@@ -33,6 +34,7 @@ from app.models.scheduling import (
     CycleAttendeeUpdate,
     CycleCreate,
 )
+from app.utils.meeting_owner import ensure_can_change_meeting, scheduler_email
 from app.utils.scorecard_structure import default_scorecard_config
 from app.services.scheduling_service import SchedulingService
 
@@ -322,14 +324,20 @@ def set_manual_meeting(
     payload: ManualMeetingRequest,
     cycle_repo=Depends(get_cycle_repo),
     meeting_repo=Depends(get_meeting_repo),
+    user: CurrentUser = Depends(get_current_user),
 ):
     """Record a manually-chosen meeting date/time (no Microsoft Graph / calendar access
     required). Persists the scheduled time — and an optional pasted meeting link — on the
-    cycle, then advances the workflow to MEETING_SCHEDULED so the date lives in the DB."""
+    cycle, then advances the workflow to MEETING_SCHEDULED so the date lives in the DB.
+
+    Records the caller as the meeting's scheduler. Moving an already-scheduled SPR is
+    reserved for its scheduler: the Teams meeting lives in their mailbox."""
     from datetime import datetime, timezone
     from app.utils.meeting_precedence import check_precedence, SPR
 
     cycle = _get_cycle_or_404(cycleId, cycle_repo)
+    if cycle.get("teams_meeting_scheduled_at") or cycle.get("teams_meeting_url"):
+        ensure_can_change_meeting(cycle.get("teams_meeting_scheduled_by"), user, "reschedule")
     # The SPR is the final meeting — it must start after every prep call (alignment /
     # vendor prep). Reject an out-of-order date (defense in depth behind the UI guard).
     conflict = check_precedence(SPR, payload.start_time, cycle=cycle, meetings=meeting_repo.get_for_cycle(cycleId))
@@ -341,6 +349,7 @@ def set_manual_meeting(
         web_link=None,
         event_id=(payload.event_id or None),
         scheduled_at=payload.start_time,
+        scheduled_by=scheduler_email(user),
     )
     # Persist the chosen timezone + duration so the Confirmation view rehydrates
     # correctly after a refresh.
@@ -367,6 +376,28 @@ def set_manual_meeting(
         "meeting_url": payload.meeting_url or None,
         "event_id": payload.event_id or None,
     }
+
+
+@router.post("/api/cycles/{cycleId}/scheduling/cancel-meeting")
+def cancel_spr_meeting(
+    cycleId: str,
+    cycle_repo=Depends(get_cycle_repo),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Forget the cycle's SPR meeting once its Teams meeting has been cancelled.
+
+    The browser cancels the Teams meeting in Outlook first — only the scheduler's own
+    delegated Graph session can — then calls this to clear the stored time, link and
+    event id so a new time can be scheduled. Reserved for the scheduler. The workflow
+    state is left alone (it is forward-only); the cycle simply has no SPR time until
+    the next one is set."""
+    cycle = _get_cycle_or_404(cycleId, cycle_repo)
+    if not (cycle.get("teams_meeting_scheduled_at") or cycle.get("teams_meeting_url")):
+        return {"cycle": cycle, "cancelled": False, "message": "No SPR meeting is scheduled."}
+    ensure_can_change_meeting(cycle.get("teams_meeting_scheduled_by"), user, "cancel")
+    updated = cycle_repo.clear_teams_meeting(cycleId) or cycle
+    logger.info("SPR meeting cancelled — cycleId=%s by=%s", sanitize_for_log(cycleId), sanitize_for_log(user.email))
+    return {"cycle": updated, "cancelled": True}
 
 
 @router.delete("/api/cycles/{cycleId}")

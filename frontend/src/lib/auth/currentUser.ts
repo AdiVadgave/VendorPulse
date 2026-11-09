@@ -14,6 +14,7 @@ export interface CurrentUser {
   subtitle: string      // email when signed in; a role label in dev
   initials: string
   authenticated: boolean // true only for a real SSO session (drives the logout button)
+  email: string | null  // SSO email (UPN), lower-cased; null in dev
 }
 
 // Dev default (SSO off) — keeps the existing demo identity in local dev.
@@ -22,6 +23,7 @@ const DEV_USER: CurrentUser = {
   subtitle: 'VMO Coordinator',
   initials: 'AT',
   authenticated: false,
+  email: null,
 }
 
 let current: CurrentUser = DEV_USER
@@ -65,7 +67,10 @@ export function setCurrentUser(user: { name?: string | null; email?: string | nu
   } else {
     const email = (user.email ?? '').trim()
     const name = (user.name ?? '').trim() || email || 'Signed in'
-    current = { name, subtitle: email, initials: computeInitials(name), authenticated: true }
+    current = {
+      name, subtitle: email, initials: computeInitials(name), authenticated: true,
+      email: email.toLowerCase() || null,
+    }
   }
   listeners.forEach((l) => l())
 }
@@ -84,4 +89,30 @@ function getSnapshot(): CurrentUser {
 /** React hook — re-renders when the signed-in user changes. */
 export function useCurrentUser(): CurrentUser {
   return useSyncExternalStore(subscribe, getSnapshot)
+}
+
+const normalise = (email: string | null | undefined) => (email ?? '').trim().toLowerCase()
+
+/**
+ * Whether `user` may change — reschedule, cancel, re-invite to — a meeting that
+ * `scheduledBy` scheduled. Only the scheduler can: the Teams meeting lives in their
+ * Outlook mailbox, and every coordinator sees the same cycles. Allowed when no
+ * scheduler is recorded (older meetings) or without an SSO session (local dev); the
+ * backend enforces the same rule either way.
+ */
+export function canChangeMeeting(scheduledBy: string | null | undefined, user: CurrentUser): boolean {
+  const owner = normalise(scheduledBy)
+  if (!owner || !user.authenticated || !user.email) return true
+  return owner === normalise(user.email)
+}
+
+/** True only when the meeting is recorded as scheduled by `user` (not merely allowed). */
+export function isMeetingScheduler(scheduledBy: string | null | undefined, user: CurrentUser): boolean {
+  const owner = normalise(scheduledBy)
+  return !!owner && !!user.email && owner === normalise(user.email)
+}
+
+/** Explains a meeting control that is disabled for everyone but its scheduler. */
+export function onlySchedulerNote(scheduledBy: string | null | undefined, action: string): string {
+  return `Only ${scheduledBy}, who scheduled this meeting, can ${action} it.`
 }

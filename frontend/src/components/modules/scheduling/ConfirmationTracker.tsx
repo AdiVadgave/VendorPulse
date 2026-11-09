@@ -14,6 +14,7 @@ import {
   UserPlus,
   RefreshCw,
   Loader2,
+  Ban,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import AgentStatusBadge from '@/components/shared/AgentStatusBadge'
@@ -29,6 +30,12 @@ interface ConfirmationTrackerProps {
   onProceed?: () => void
   /** Go back and change the manually-set meeting date/time. */
   onReschedule?: () => void
+  /** Cancel the meeting — in Outlook, then in VendorPulse. Resolves with why it could not
+   *  be done, or null once it has been. `recordOnly` skips Outlook. */
+  onCancelMeeting?: (recordOnly: boolean) => Promise<{ message: string; allowRecordOnly: boolean } | null>
+  /** Set when the signed-in user may not change this meeting (they did not schedule it):
+   *  Reschedule and Cancel are disabled and this explains why. */
+  changeBlockedReason?: string | null
   /** The meeting join link the coordinator pasted (if any). */
   meetingUrl?: string | null
   /** Graph event id — enables reading live RSVP responses from Outlook. */
@@ -76,6 +83,8 @@ export default function ConfirmationTracker({
   timeZoneOverride,
   onProceed,
   onReschedule,
+  onCancelMeeting,
+  changeBlockedReason,
   meetingUrl,
   eventId,
   onAddAttendee,
@@ -83,6 +92,22 @@ export default function ConfirmationTracker({
   addAttendeeSlot,
 }: ConfirmationTrackerProps) {
   const [nudgeSent, setNudgeSent] = useState<Set<string>>(new Set())
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelBusy, setCancelBusy] = useState(false)
+  const [cancelProblem, setCancelProblem] = useState<{ message: string; allowRecordOnly: boolean } | null>(null)
+
+  async function runCancel(recordOnly: boolean) {
+    if (!onCancelMeeting) return
+    setCancelBusy(true)
+    setCancelProblem(null)
+    try {
+      // On success the parent clears the meeting and this view goes away.
+      const problem = await onCancelMeeting(recordOnly)
+      if (problem) setCancelProblem(problem)
+    } finally {
+      setCancelBusy(false)
+    }
+  }
 
   // Live RSVP responses from the Outlook event (email → response).
   const [liveRsvp, setLiveRsvp] = useState<Record<string, RsvpResponse>>({})
@@ -192,15 +217,69 @@ export default function ConfirmationTracker({
             {onReschedule && (
               <button
                 onClick={onReschedule}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-white/60 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                disabled={!!changeBlockedReason}
+                title={changeBlockedReason ?? undefined}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-white/60 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <CalendarClock size={13} /> Reschedule
+              </button>
+            )}
+            {onCancelMeeting && (
+              <button
+                onClick={() => { setConfirmCancel(true); setCancelProblem(null) }}
+                disabled={!!changeBlockedReason || cancelBusy}
+                title={changeBlockedReason ?? 'Cancel the meeting in Outlook and notify the attendees'}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 bg-white/60 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Ban size={13} /> Cancel meeting
               </button>
             )}
             <AgentStatusBadge status="complete" label="Scheduled" />
           </div>
         </div>
+        {changeBlockedReason && (
+          <p className="mt-2 text-[11px] text-emerald-800/80 dark:text-emerald-300/80">{changeBlockedReason}</p>
+        )}
       </div>
+
+      {confirmCancel && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30">
+          <span className="text-sm text-rose-700 dark:text-rose-300">
+            {cancelProblem
+              ? cancelProblem.message
+              : 'Cancel the SPR meeting? Its Teams meeting will be cancelled in Outlook and the attendees notified. You can then schedule a new time.'}
+          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            {cancelProblem ? (
+              cancelProblem.allowRecordOnly && (
+                <button
+                  onClick={() => runCancel(true)}
+                  disabled={cancelBusy}
+                  title="Remove it from VendorPulse without changing Outlook — cancel the Teams meeting there yourself"
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-rose-300 text-rose-700 dark:text-rose-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {cancelBusy ? 'Removing…' : 'Remove from VendorPulse only'}
+                </button>
+              )
+            ) : (
+              <button
+                onClick={() => runCancel(false)}
+                disabled={cancelBusy}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60"
+              >
+                {cancelBusy ? 'Cancelling…' : 'Cancel meeting'}
+              </button>
+            )}
+            <button
+              onClick={() => { setConfirmCancel(false); setCancelProblem(null) }}
+              disabled={cancelBusy}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800"
+            >
+              Keep meeting
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Summary stats (Tentative tile shown only when someone responded tentatively) */}
       {(() => {

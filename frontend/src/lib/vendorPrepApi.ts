@@ -116,6 +116,10 @@ export interface VPScheduleResponse {
   event_id: string
   teams_meeting_url: string | null
   web_link: string | null
+  /** Outlook id of the Teams meeting, stored so it can be moved or cancelled later. */
+  graph_event_id?: string | null
+  /** Who scheduled it (SSO email) — only they may reschedule or cancel it. */
+  scheduled_by?: string | null
   attendee_count: number
   attendee_emails: string[]
 }
@@ -125,6 +129,10 @@ export interface VendorPrepMeeting {
   event_id: string
   teams_meeting_url: string | null
   web_link: string | null
+  /** Outlook id of the Teams meeting (null on meetings saved before ids were stored). */
+  graph_event_id?: string | null
+  /** Who scheduled it (SSO email) — only they may reschedule or cancel it. */
+  scheduled_by?: string | null
   attendee_count: number
   status: string
   time_slot: { date: string; start_time: string; end_time: string } | null
@@ -149,6 +157,8 @@ export async function scheduleVendorPrepMeetingManual(
     timeZone?: string
     attendeeEmails?: string[]
     meetingUrl?: string | null
+    /** Outlook id of the Teams meeting just created or moved in the browser. */
+    graphEventId?: string | null
   }
 ): Promise<VPScheduleResponse> {
   return apiFetch<VPScheduleResponse>(
@@ -161,6 +171,7 @@ export async function scheduleVendorPrepMeetingManual(
         time_zone: opts.timeZone ?? 'IST',
         attendee_emails: opts.attendeeEmails,
         meeting_url: opts.meetingUrl ?? null,
+        graph_event_id: opts.graphEventId ?? null,
       }),
     }
   )
@@ -171,6 +182,19 @@ export async function getVendorPrepMeeting(
 ): Promise<{ meeting: VendorPrepMeeting | null }> {
   return apiFetch<{ meeting: VendorPrepMeeting | null }>(
     `/api/cycles/${cycleId}/vendor-prep/meeting`
+  )
+}
+
+/**
+ * Remove the vendor-prep meeting's record. Cancel its Teams meeting in Outlook FIRST
+ * (see lib/meetingCancel.ts) — the backend cannot. Only the scheduler may (403 otherwise).
+ */
+export async function deleteVendorPrepMeeting(
+  cycleId: string
+): Promise<{ deleted: boolean; meeting_index?: number; message?: string }> {
+  return apiFetch<{ deleted: boolean; meeting_index?: number; message?: string }>(
+    `/api/cycles/${cycleId}/vendor-prep/meeting`,
+    { method: 'DELETE' }
   )
 }
 

@@ -18,15 +18,18 @@ import {
   AlertTriangle,
   FileText,
   Activity,
+  X,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { getMockCycleById as getMockCycleById } from '@/mock/cycles.mock'
 import { wallClockToUtcIso } from '@/lib/graphScheduling'
+import { cancelTeamsMeeting } from '@/lib/meetingCancel'
+import { canChangeMeeting, isMeetingScheduler, onlySchedulerNote, useCurrentUser } from '@/lib/auth/currentUser'
 import {
   MOCK_ATTENDEES_INITIAL,
   MOCK_SLOT_PROPOSALS,
 } from '@/mock/scheduling.mock'
-import { completeAttendanceConfirmation, fetchAttendeesSeeded, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
+import { cancelSprMeeting, completeAttendanceConfirmation, fetchAttendeesSeeded, fetchCycle, fetchSlots } from '@/lib/schedulingApi'
 import { getWeightedScorecard, getScorecardConfig, getScorecardBriefing } from '@/lib/scorecardApi'
 import type { ScorecardBriefing } from '@/lib/scorecardApi'
 import type { WeightedScorecard, TeamSubmissionsData, ScorecardConfig } from '@/types/scorecard.types'
@@ -91,7 +94,7 @@ import { attendsSpr } from '@/types/scheduling.types'
 import { getDefaultTimeZone, toTimeZoneId, type TimeZoneId } from '@/lib/timeZone'
 import type { SchedulingPhase, CycleAttendee, SlotProposal } from '@/types/scheduling.types'
 import type { ExtractedAction, AlignmentInsight } from '@/types/alignment.types'
-import { getAlignmentInsights, listAlignmentMeetings, deleteAlignmentMeeting } from '@/lib/alignmentApi'
+import { getAlignmentInsights, getAlignmentMeeting, listAlignmentMeetings, deleteAlignmentMeeting } from '@/lib/alignmentApi'
 import {
   getActions, addAction, addActionsBulk, updateAction, deleteAction, getLegacyActions,
   type ActionItem, type NewActionInput,
@@ -750,6 +753,15 @@ export default function CycleDetail() {
             }}
             onTeamsMeetingUrlCaptured={setVendorMeetingTeamsUrl}
             onEventIdCaptured={setScheduledEventId}
+            onMeetingCancelled={() => {
+              // The SPR's Teams meeting is cancelled and cleared on the cycle — drop every
+              // local trace of it so the Confirmation step offers a fresh schedule.
+              setVendorMeetingTeamsUrl(null)
+              setScheduledEventId(null)
+              setApiSlots([])
+              setSelectedSlotId(null)
+              void refetchCycle()
+            }}
             onMeetingScheduled={() => advanceWorkflow(cycle!.cycle_id, 'MEETING_SCHEDULED')}
             onScorecardProceed={() => {
               advanceWorkflow(cycle!.cycle_id, 'SCORECARD_REQUEST_SENT')
@@ -1079,7 +1091,7 @@ function SchedulingTab({
   onAttendeesUpdated, onSlotsReceived, onSlotSelected,
   selectedSlotTimeZone, onSlotTimeZoneSelected,
   isMockCycle, onScorecardProceed, onTeamsMeetingUrlCaptured, onMeetingScheduled, meetingUrl,
-  meetingScheduled, scheduledEventId, onEventUpdated, onEventIdCaptured,
+  meetingScheduled, scheduledEventId, onEventUpdated, onEventIdCaptured, onMeetingCancelled,
 }: {
   cycle: NonNullable<ReturnType<typeof getMockCycleById>>
   schedulingPhase: SchedulingPhase
@@ -1108,8 +1120,46 @@ function SchedulingTab({
   onEventUpdated: (eventId: string | null, meetingUrl: string | null) => void
   /** Capture the Graph event id when the initial invite is sent. */
   onEventIdCaptured: (eventId: string | null) => void
+  /** The SPR meeting was cancelled (Outlook + VendorPulse): forget it so a new time can be set. */
+  onMeetingCancelled: () => void
 }) {
   const currentPhaseIndex = PHASE_ORDER.indexOf(schedulingPhase)
+
+  // Only whoever scheduled the SPR can move it, cancel it or invite more people to it —
+  // the Teams meeting lives in their mailbox. Everyone else sees it read-only.
+  const me = useCurrentUser()
+  const sprScheduledBy = cycle.teams_meeting_scheduled_by ?? null
+  const sprChangeBlocked = canChangeMeeting(sprScheduledBy, me) ? null : onlySchedulerNote(sprScheduledBy, 'change')
+  const [sprNotice, setSprNotice] = useState<string | null>(null)
+
+  // Cancel the Teams meeting in Outlook FIRST (as its scheduler), then clear the SPR on
+  // the cycle so a new time can be scheduled. Returns why it stopped, or null when done.
+  async function cancelSpr(recordOnly: boolean): Promise<{ message: string; allowRecordOnly: boolean } | null> {
+    let outlookNote = ''
+    if (!recordOnly) {
+      const attempt = await cancelTeamsMeeting({
+        eventId: scheduledEventId,
+        joinUrl: meetingUrl,
+        startISO: selectedSlot?.proposed_time ?? cycle.teams_meeting_scheduled_at ?? null,
+        scheduledByMe: isMeetingScheduler(sprScheduledBy, me),
+      })
+      if (!attempt.cleared) return { message: attempt.message, allowRecordOnly: attempt.allowRecordOnly }
+      outlookNote = attempt.message
+    }
+    try {
+      await cancelSprMeeting(cycle.cycle_id)
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : 'Could not cancel the meeting.'
+      return {
+        message: outlookNote ? `${outlookNote} But VendorPulse could not clear the meeting: ${reason}` : reason,
+        allowRecordOnly: !!outlookNote,
+      }
+    }
+    setShowAddAttendee(false)
+    setSprNotice(`SPR meeting cancelled.${outlookNote ? ` ${outlookNote}` : ''} Schedule a new time below.`)
+    onMeetingCancelled()
+    return null
+  }
 
   // Everyone who actually attends the SPR. A scorecard-only reviewer is excluded from
   // every SPR-facing step — the invite, the RSVP tracker, the attendance confirmation
@@ -1346,6 +1396,8 @@ function SchedulingTab({
             eventId={scheduledEventId}
             onProceed={onScorecardProceed}
             onReschedule={() => onPhaseChange('schedule_meeting')}
+            onCancelMeeting={cancelSpr}
+            changeBlockedReason={sprChangeBlocked}
             onAddAttendee={() => setShowAddAttendee((v) => !v)}
             addAttendeeOpen={showAddAttendee}
             addAttendeeSlot={
@@ -1364,15 +1416,21 @@ function SchedulingTab({
                     timeZone={selectedSlotTimeZone}
                     onUpdated={onEventUpdated}
                     onClose={() => setShowAddAttendee(false)}
+                    inviteBlockedReason={sprChangeBlocked}
                   />
                 </div>
               ) : null
             }
           />
         ) : (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 text-sm text-slate-500 dark:text-slate-400">
-            No meeting scheduled yet.{' '}
-            <button onClick={() => onPhaseChange('schedule_meeting')} className="text-indigo-600 dark:text-indigo-400 underline">Schedule the meeting</button>.
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 text-sm text-slate-500 dark:text-slate-400 space-y-2">
+            {sprNotice && (
+              <p className="text-emerald-700 dark:text-emerald-300">{sprNotice}</p>
+            )}
+            <p>
+              No meeting scheduled yet.{' '}
+              <button onClick={() => onPhaseChange('schedule_meeting')} className="text-indigo-600 dark:text-indigo-400 underline">Schedule the meeting</button>.
+            </p>
           </div>
         )
       )}
@@ -1655,6 +1713,13 @@ function AlignmentTab({
   const [confirmAdd, setConfirmAdd] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
   const [busyDelete, setBusyDelete] = useState(false)
+  // Why the delete stopped (the Teams meeting could not be cancelled, or it isn't yours)
+  // and whether removing it from VendorPulse alone is still offered.
+  const [deleteProblem, setDeleteProblem] = useState<{ message: string; allowRecordOnly: boolean } | null>(null)
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null)
+  // Who scheduled each alignment meeting (by index) — only they may delete it.
+  const [scheduledByIndex, setScheduledByIndex] = useState<Record<number, string | null>>({})
+  const me = useCurrentUser()
   useEffect(() => {
     listAlignmentMeetings(cycleId)
       .then((r) => {
@@ -1662,6 +1727,7 @@ function AlignmentTab({
           const scheduled = r.meetings.map((m) => m.meeting_index)
           const merged = Array.from(new Set([1, ...scheduled])).sort((a, b) => a - b)
           setIndices(merged)
+          setScheduledByIndex(Object.fromEntries(r.meetings.map((m) => [m.meeting_index, m.scheduled_by ?? null])))
         }
       })
       .catch(() => { /* backend may not be ready */ })
@@ -1674,17 +1740,68 @@ function AlignmentTab({
     setConfirmAdd(false)
   }
 
-  async function handleDeleteMeeting(idx: number) {
+  function openDeleteConfirm(idx: number) {
+    setConfirmDelete(idx)
+    setDeleteProblem(null)
+    setDeleteNotice(null)
+  }
+
+  // Cancel the meeting's Teams meeting in Outlook FIRST (as its scheduler), and only then
+  // drop it from VendorPulse — otherwise the attendees keep a live invite for a meeting
+  // the app no longer knows about. `recordOnly` skips Outlook, when the coordinator
+  // chooses that after a cancellation could not be done.
+  async function handleDeleteMeeting(idx: number, recordOnly = false) {
+    const label = `Alignment Meeting ${indices.indexOf(idx) + 1}`
     setBusyDelete(true)
+    setDeleteProblem(null)
     try {
-      await deleteAlignmentMeeting(cycleId, idx).catch(() => { /* nothing scheduled — local only */ })
+      // Fresh read: the meeting may have been scheduled (or moved) since the tab loaded.
+      const meeting = await getAlignmentMeeting(cycleId, idx).then((r) => r.meeting).catch(() => null)
+      if (meeting && !canChangeMeeting(meeting.scheduled_by, me)) {
+        setDeleteProblem({ message: onlySchedulerNote(meeting.scheduled_by, 'delete'), allowRecordOnly: false })
+        return
+      }
+      let outlookNote = ''
+      if (meeting && !recordOnly) {
+        const attempt = await cancelTeamsMeeting({
+          eventId: meeting.graph_event_id,
+          joinUrl: meeting.teams_meeting_url,
+          startISO: meeting.start_time,
+          scheduledByMe: isMeetingScheduler(meeting.scheduled_by, me),
+        })
+        if (!attempt.cleared) {
+          setDeleteProblem({ message: attempt.message, allowRecordOnly: attempt.allowRecordOnly })
+          return
+        }
+        outlookNote = attempt.message
+      }
+      try {
+        await deleteAlignmentMeeting(cycleId, idx)
+      } catch (e) {
+        // Backend unreachable (or a demo cycle): drop it locally as before. A real
+        // refusal — e.g. someone else's meeting — stops here.
+        if (!(e instanceof TypeError)) {
+          const reason = e instanceof Error ? e.message : 'Could not delete the meeting.'
+          setDeleteProblem({
+            message: outlookNote ? `${outlookNote} But VendorPulse could not remove the meeting: ${reason}` : reason,
+            allowRecordOnly: !!outlookNote,
+          })
+          return
+        }
+      }
       const remaining = indices.filter((n) => n !== idx)
       const finalIndices = remaining.length > 0 ? remaining : [1]
       setIndices(finalIndices)
       if (activeMeeting === idx) setActiveMeeting(finalIndices[0])
+      setScheduledByIndex((prev) => {
+        const next = { ...prev }
+        delete next[idx]
+        return next
+      })
+      setConfirmDelete(null)
+      setDeleteNotice(`${label} deleted.${outlookNote ? ` ${outlookNote}` : ''}`)
     } finally {
       setBusyDelete(false)
-      setConfirmDelete(null)
     }
   }
 
@@ -1758,7 +1875,12 @@ function AlignmentTab({
 
         {/* Segmented control: one segment per meeting + trailing "Add" action. */}
         <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-1.5 mb-4">
-          {indices.map((n, pos) => (
+          {indices.map((n, pos) => {
+            // Someone else's meeting: visible, but only its scheduler can delete it.
+            const deleteBlocked = canChangeMeeting(scheduledByIndex[n], me)
+              ? null
+              : onlySchedulerNote(scheduledByIndex[n], 'delete')
+            return (
             <div key={n} className="relative flex-1 min-w-[180px]">
               <button
                 onClick={() => setActiveMeeting(n)}
@@ -1773,10 +1895,11 @@ function AlignmentTab({
               </button>
               {indices.length > 1 && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); setConfirmDelete(n) }}
-                  title="Delete this alignment meeting"
+                  onClick={(e) => { e.stopPropagation(); openDeleteConfirm(n) }}
+                  disabled={!!deleteBlocked}
+                  title={deleteBlocked ?? 'Delete this alignment meeting'}
                   className={cn(
-                    'absolute -top-1.5 -right-1.5 p-1 rounded-full border shadow-sm transition-colors',
+                    'absolute -top-1.5 -right-1.5 p-1 rounded-full border shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
                     activeMeeting === n
                       ? 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50'
                       : 'bg-white dark:bg-slate-800 text-slate-400 hover:text-rose-600 border-slate-200 dark:border-slate-700'
@@ -1786,7 +1909,8 @@ function AlignmentTab({
                 </button>
               )}
             </div>
-          ))}
+            )
+          })}
           {!confirmAdd ? (
             <button
               onClick={() => setConfirmAdd(true)}
@@ -1813,28 +1937,66 @@ function AlignmentTab({
           )}
         </div>
 
-        {/* Delete confirmation banner. */}
+        {/* Delete confirmation banner — or, if the delete stopped, why. */}
         {confirmDelete !== null && (
           <div className="flex items-center justify-between gap-3 mb-4 px-4 py-3 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30">
             <span className="text-sm text-rose-700 dark:text-rose-300">
-              Delete Alignment Meeting {indices.indexOf(confirmDelete) + 1}? Any scheduled Teams meeting will be cancelled.
+              {deleteProblem
+                ? deleteProblem.message
+                : `Delete Alignment Meeting ${indices.indexOf(confirmDelete) + 1}? If it has a Teams meeting, it will be cancelled in Outlook and the attendees notified.`}
             </span>
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => handleDeleteMeeting(confirmDelete)}
-                disabled={busyDelete}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60"
-              >
-                {busyDelete ? 'Deleting…' : 'Delete'}
-              </button>
-              <button
-                onClick={() => setConfirmDelete(null)}
-                disabled={busyDelete}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800"
-              >
-                Cancel
-              </button>
+              {deleteProblem ? (
+                <>
+                  {deleteProblem.allowRecordOnly && (
+                    <button
+                      onClick={() => handleDeleteMeeting(confirmDelete, true)}
+                      disabled={busyDelete}
+                      title="Remove it from VendorPulse without changing Outlook — cancel the Teams meeting there yourself"
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-rose-300 text-rose-700 dark:text-rose-300 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      {busyDelete ? 'Removing…' : 'Remove from VendorPulse only'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setConfirmDelete(null); setDeleteProblem(null) }}
+                    disabled={busyDelete}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800"
+                  >
+                    Keep meeting
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleDeleteMeeting(confirmDelete)}
+                    disabled={busyDelete}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60"
+                  >
+                    {busyDelete ? 'Deleting…' : 'Delete'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(null)}
+                    disabled={busyDelete}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800"
+                  >
+                    Cancel
+                  </button>
+                </>
+              )}
             </div>
+          </div>
+        )}
+        {deleteNotice && (
+          <div className="flex items-center justify-between gap-3 mb-4 px-4 py-2.5 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30">
+            <span className="text-sm text-emerald-700 dark:text-emerald-300">{deleteNotice}</span>
+            <button
+              onClick={() => setDeleteNotice(null)}
+              aria-label="Dismiss"
+              className="p-1 rounded text-emerald-700 dark:text-emerald-300 hover:bg-white/70 dark:hover:bg-slate-800"
+            >
+              <X size={14} />
+            </button>
           </div>
         )}
 

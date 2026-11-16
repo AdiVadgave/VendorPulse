@@ -7,7 +7,7 @@ by a recorder that answers with a minimal Chat Completions payload.
 """
 import json
 import unittest
-from unittest import mock
+import unittest.mock as mock
 
 import httpx
 from openai import AzureOpenAI, OpenAI

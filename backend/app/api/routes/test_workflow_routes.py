@@ -5,7 +5,7 @@ database, the LLM or mail."""
 import copy
 import unittest
 from datetime import datetime, timedelta, timezone
-from unittest import mock
+import unittest.mock as mock
 
 from fastapi import HTTPException
 

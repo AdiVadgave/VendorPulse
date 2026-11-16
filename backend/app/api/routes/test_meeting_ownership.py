@@ -4,7 +4,7 @@ Teams meeting is stored so it can be cancelled. Alice schedules; Bob is a teamma
 sees the same cycle. Repositories are fakes; nothing touches the database or Graph."""
 import copy
 import unittest
-from unittest import mock
+import unittest.mock as mock
 
 from fastapi import HTTPException
 

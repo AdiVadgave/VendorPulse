@@ -5,7 +5,7 @@ import copy
 import unittest
 from contextlib import contextmanager
 from datetime import date, timedelta
-from unittest import mock
+import unittest.mock as mock
 
 from app.services import reminder_service as rs
 from app.services.mail_provider import MailSendError

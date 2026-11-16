@@ -9,6 +9,7 @@ When LLM is disabled -> deterministic fallback builds template-based output
 """
 from __future__ import annotations
 
+import bisect
 import json
 import logging
 import re
@@ -269,8 +270,10 @@ class MeetingAgent(BaseAgent):
 
 def _strip_markdown_json(text: str) -> str:
     """Extract JSON from LLM responses that may include prose and markdown fences."""
-    # Find a ```json ... ``` or ``` ... ``` block anywhere in the text
-    m = re.search(r"```(?:json)?\s*\n(.*?)```", text, re.DOTALL)
+    # Find a ```json ... ``` or ``` ... ``` block anywhere in the text. `[^\S\n]*` (spaces
+    # and tabs, not newlines) keeps the fence unambiguous: `\s*\n` backtracked quadratically
+    # on long runs of blank lines. The block is stripped, so the result is unchanged.
+    m = re.search(r"```(?:json)?[^\S\n]*\n(.*?)```", text, re.DOTALL)
     if m:
         return m.group(1).strip()
 
@@ -333,7 +336,12 @@ def _coerce_note_type(raw_type: str, content: str = "") -> str:
 
 _PLACEHOLDER_OWNERS = {"", "tbd", "unknown", "none", "n/a", "na", "unassigned", "nobody"}
 # "Action: Alex to escalate…" / "Action item: Shell delivery team to review…"
-_ACTION_ASSIGNEE = re.compile(r"\baction(?:\s+item)?\s*:\s*(.+?)\s+to\s+[a-z]", re.IGNORECASE)
+# Only the label is a regex. The "<who> to <verb>" that follows is found by a linear scan
+# (_action_assignee): as one regex it backtracked cubically on long runs of whitespace,
+# which CodeQL rightly flags as a ReDoS on uncontrolled (transcript) data.
+_ACTION_LABEL = re.compile(r"\baction(?:\s+item)?\s*:", re.IGNORECASE)
+_TO_WORD = re.compile(r"to", re.IGNORECASE)
+_LETTER = re.compile(r"[a-z]", re.IGNORECASE)
 # Words that start an instruction rather than name someone ("Action: Send the deck to Bob").
 _IMPERATIVES = {
     "send", "share", "provide", "review", "prepare", "update", "circulate", "schedule",
@@ -402,12 +410,72 @@ def _stated_due_date(text: str, meeting_day: date) -> Optional[str]:
     return min(found)[1].isoformat() if found else None
 
 
+def _skip_space(text: str, i: int) -> int:
+    """Index of the first non-whitespace character at or after ``i`` (regex ``\\s``)."""
+    while i < len(text) and text[i].isspace():
+        i += 1
+    return i
+
+
+def _to_clause_gaps(text: str) -> list[int]:
+    """Every index at which ``\\s+to\\s+[a-z]`` (case-insensitive) matches, i.e. each
+    position inside the whitespace in front of "to <verb>". One pass, ascending."""
+    gaps: list[int] = []
+    i = 0
+    while i < len(text):
+        if not text[i].isspace():
+            i += 1
+            continue
+        run_end = _skip_space(text, i)
+        if _TO_WORD.match(text, run_end):
+            verb = _skip_space(text, run_end + 2)
+            if verb > run_end + 2 and _LETTER.match(text, verb):
+                gaps.extend(range(i, run_end))
+        i = run_end
+    return gaps
+
+
+def _action_assignee(text: str) -> Optional[str]:
+    """The raw "<who>" of a statement "Action: <who> to <do something>", or None.
+
+    Returns exactly what ``re.search(r"\\baction(?:\\s+item)?\\s*:\\s*(.+?)\\s+to\\s+[a-z]",
+    text, re.IGNORECASE).group(1)`` returns, in linear time: that regex backtracks
+    cubically when "Action:" is followed by a long run of spaces.
+    """
+    gaps: Optional[list[int]] = None
+    newlines: list[int] = []
+    for label in _ACTION_LABEL.finditer(text):
+        if gaps is None:                        # computed once, however many labels follow
+            gaps = _to_clause_gaps(text)
+            i = text.find("\n")
+            while i >= 0:
+                newlines.append(i)
+                i = text.find("\n", i + 1)
+        colon_end = label.end()
+        start = _skip_space(text, colon_end)    # the greedy `\s*` after the colon
+        n = bisect.bisect_left(newlines, start)  # `.+?` never spans a newline
+        line_end = newlines[n] if n < len(newlines) else len(text)
+        # `.+?` is lazy: the shortest "<who>" that is followed by " to <verb>".
+        k = bisect.bisect_right(gaps, start)
+        if k < len(gaps) and gaps[k] <= line_end:
+            return text[start:gaps[k]]
+        # The only other way the regex matches: "to <verb>" straight after the colon, with
+        # "<who>" being one whitespace character borrowed from before it ("Action:  to
+        # fix"). Never an owner, but it ends the search, so it is mirrored here.
+        verb = _skip_space(text, start + 2)
+        if _TO_WORD.match(text, start) and verb > start + 2 and _LETTER.match(text, verb):
+            for j in range(start - 2, colon_end - 1, -1):
+                if text[j] != "\n":
+                    return text[j]
+    return None
+
+
 def _owner_from_text(content: str) -> Optional[str]:
     """The assignee in a statement of the form "Action: <who> to <do something>"."""
-    m = _ACTION_ASSIGNEE.search(content)
-    if not m:
+    raw = _action_assignee(content)
+    if raw is None:
         return None
-    who = m.group(1).strip(" ,.;:")
+    who = raw.strip(" ,.;:")
     words = who.split()
     if not words or len(words) > 5 or not words[0][:1].isupper() or words[0].lower() in _IMPERATIVES:
         return None
@@ -654,6 +722,26 @@ def _build_fallback_minutes(
     }
 
 
+_TIMESTAMP = re.compile(r"\[(\d{1,2}:\d{2})\]")
+
+
+def _split_speaker_line(line: str) -> Optional[tuple[str, str, str]]:
+    """Split one transcript line "Name [mm:ss]: text" into (speaker, timestamp, text).
+
+    Same result as ``re.match(r"^(.+?)\\s*\\[(\\d{1,2}:\\d{2})\\]\\s*:\\s*(.+)$", line)`` with
+    speaker and text stripped, for a line without newlines (the caller splits on them).
+    That regex backtracked quadratically on long whitespace runs; this tries each
+    "[mm:ss]" once.
+    """
+    for stamp in _TIMESTAMP.finditer(line):
+        if stamp.start() == 0:                 # the speaker needs at least one character
+            continue
+        colon = _skip_space(line, stamp.end())
+        if colon < len(line) - 1 and line[colon] == ":":    # and the text at least one
+            return line[:stamp.start()].strip(), stamp.group(1), line[colon + 1:].strip()
+    return None
+
+
 def _build_fallback_parsed_notes(transcript: str, meeting_id: str) -> list[dict]:
     """Deterministic transcript parser — uses keyword heuristics when LLM is unavailable."""
     lines = [ln.strip() for ln in transcript.strip().splitlines() if ln.strip()]
@@ -672,16 +760,14 @@ def _build_fallback_parsed_notes(transcript: str, meeting_id: str) -> list[dict]
         timestamp = ""
         content = line
 
-        m = re.match(r"^(.+?)\s*\[(\d{1,2}:\d{2})\]\s*:\s*(.+)$", line)
-        if m:
-            speaker = m.group(1).strip()
-            timestamp = m.group(2)
-            content = m.group(3).strip()
+        parts = _split_speaker_line(line)
+        if parts:
+            speaker, timestamp, content = parts
 
         lower = content.lower()
 
         # "Please do. Action: …" — the action can follow a reply in the same turn.
-        if any(lower.startswith(kw) for kw in action_kw) or re.search(r"\baction(?:\s+item)?\s*:", lower):
+        if any(lower.startswith(kw) for kw in action_kw) or _ACTION_LABEL.search(lower):
             note_type = "ACTION"
         elif any(lower.startswith(kw) for kw in decision_kw):
             note_type = "DECISION"

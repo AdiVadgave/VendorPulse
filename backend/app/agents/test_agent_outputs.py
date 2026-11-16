@@ -3,10 +3,18 @@ can always render, transcript notes under the requested meeting id, a vendor bri
 never invents a 0/5 score, and pushback drafts the response cards can display and save.
 The LLM is a fake; no network, database or mail."""
 import json
+import time
 import unittest
 from datetime import datetime, timezone
 
-from app.agents.meeting_agent import MeetingAgent, _normalize_minutes
+from app.agents.meeting_agent import (
+    MeetingAgent,
+    _action_assignee,
+    _normalize_minutes,
+    _owner_from_text,
+    _split_speaker_line,
+    _strip_markdown_json,
+)
 from app.agents.vendor_prep_agent import (
     VendorPrepAgent,
     _build_fallback_brief,
@@ -245,6 +253,74 @@ class ActionOwnerTests(unittest.TestCase):
         }})["data"]["minutes"]
         self.assertEqual([(a["owner"], a["due_date"]) for a in minutes["action_items"]],
                          [("Alex Thompson", "2026-04-08"), ("TBD", "")])
+
+
+class TranscriptRegexSafetyTests(unittest.TestCase):
+    """Transcript text is user input. The patterns that read it used to backtrack
+    polynomially on long whitespace runs (CodeQL: polynomial ReDoS on uncontrolled data).
+    Their replacements must stay linear AND return exactly what the old regexes did."""
+
+    def assert_fast(self, fn, text):
+        started = time.perf_counter()
+        result = fn(text)
+        # The old patterns needed tens of seconds to hours on these inputs; linear code
+        # takes milliseconds. The bound is generous so a slow CI runner never flakes.
+        self.assertLess(time.perf_counter() - started, 1.0)
+        return result
+
+    def test_long_whitespace_never_stalls_owner_extraction(self):
+        for text in ("Action:" + " " * 5_000, "Action item:" + " " * 5_000 + "x", "Action: " * 5_000):
+            with self.subTest(text=text[:16]):
+                self.assertIsNone(self.assert_fast(_owner_from_text, text))
+
+    def test_long_whitespace_never_stalls_transcript_parsing(self):
+        self.assertIsNone(self.assert_fast(_split_speaker_line, "x" + " " * 200_000))
+        self.assertIsInstance(self.assert_fast(_strip_markdown_json, "```" + "\n" * 200_000), str)
+
+    def test_owner_extraction_keeps_the_old_regex_results(self):
+        # Recorded from the replaced regex: group 1 of
+        # \baction(?:\s+item)?\s*:\s*(.+?)\s+to\s+[a-z]  (re.IGNORECASE, re.search)
+        cases = [
+            ("Action: Alex to escalate the SLA breach.", "Alex"),
+            ("Action item: Shell delivery team to review the plan", "Shell delivery team"),
+            ("Please do. Action: Priya to send the deck by Friday", "Priya"),
+            ("Action:\nBob to fix", "Bob"),
+            ("Action: Bob\nto fix", "Bob"),
+            ("Action: Bob\nAlice to fix", None),                        # "<who>" never spans a line
+            ("Action: Bob\nAlice. Action: Carol to sign", "Carol"),     # a later label still counts
+            ("Action:  to fix. Action: Carol to sign", "to fix. Action: Carol"),
+            ("Action:  to fix", " "),                                   # whitespace-only, ends the search
+            ("Action: Kim to ſend", "Kim"),                        # IGNORECASE [a-z] matches U+017F
+            ("Action: Kim to 1x", None),
+            ("Action: Send the deck to Bob", "Send the deck"),
+            ("ACTION ITEM :  The Vendor  to   Confirm", "The Vendor"),
+        ]
+        for text, raw in cases:
+            with self.subTest(text=text):
+                self.assertEqual(_action_assignee(text), raw)
+        self.assertEqual(_owner_from_text("ACTION ITEM :  The Vendor  to   Confirm"), "The Vendor")
+        self.assertIsNone(_owner_from_text("Action: Send the deck to Bob"))   # an instruction, not a name
+        self.assertIsNone(_owner_from_text("Action:  to fix"))
+
+    def test_speaker_line_split_keeps_the_old_regex_results(self):
+        # Recorded from ^(.+?)\s*\[(\d{1,2}:\d{2})\]\s*:\s*(.+)$ with speaker/text stripped.
+        cases = [
+            ("Bob [00:12]: hi", ("Bob", "00:12", "hi")),
+            ("Alice Smith [1:23] :  Action: x", ("Alice Smith", "1:23", "Action: x")),
+            ("A [1] [00:12]: x", ("A [1]", "00:12", "x")),
+            ("Bob [00:12]x [00:13]: y", ("Bob [00:12]x", "00:13", "y")),
+            ("Bob [123:45]: hi", None),
+            ("[00:12]: hi", None),
+            ("Bob [00:12]:", None),
+            ("Bob [00:12] hi", None),
+        ]
+        for line, expected in cases:
+            with self.subTest(line=line):
+                self.assertEqual(_split_speaker_line(line), expected)
+
+    def test_json_fence_still_extracts_blocks(self):
+        self.assertEqual(_strip_markdown_json('Here:\n```json\n\n  {"a": 1}\n```'), '{"a": 1}')
+        self.assertEqual(_strip_markdown_json("```\r\n[1, 2]\r\n```"), "[1, 2]")
 
 
 if __name__ == "__main__":

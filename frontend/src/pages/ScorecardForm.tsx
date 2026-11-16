@@ -1,26 +1,59 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { ClipboardList, CheckCircle2, AlertCircle, AlertTriangle, Loader2, Send, User } from 'lucide-react'
 import { cn } from '@/utils/cn'
+import { useUIStore } from '@/store/useUIStore'
 import type { ScorecardFormMeta, WeightedScorecard } from '@/types/scorecard.types'
 import { WEIGHTED_SCORECARD_STRUCTURE } from '@/types/scorecard.types'
 import { getScorecardFormMeta, submitScorecard, checkAlreadySubmitted, getWeightedScorecard } from '@/lib/scorecardApi'
 import WeightedScorecardTable from '@/components/modules/scorecard/WeightedScorecardTable'
 import { RAG_OPTIONS, RAG_META } from '@/components/modules/scorecard/rag-constants'
 
-// Brand header shown at the top of the standalone scorecard form (dark themed).
+// Brand row — the same logo, wording and type as the app's sidebar.
 function BrandHeader() {
   return (
-    <div className="flex items-center gap-3">
-      <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center shrink-0">
+    <div className="flex items-center gap-3 min-w-0">
+      <div className="w-8 h-8 flex items-center justify-center shrink-0">
         <img src="/shell-logo.svg" alt="Shell" className="w-7 h-7" />
       </div>
       <div className="min-w-0">
-        <p className="font-semibold text-white text-sm leading-tight">Mobility Vendor Pulse</p>
-        <p className="text-xs text-slate-400">Governance Platform</p>
+        <p className="font-semibold text-slate-900 dark:text-white text-sm leading-tight">Mobility Vendor Pulse</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">Governance Platform</p>
       </div>
     </div>
   )
+}
+
+// This page is reached from the emailed link, outside AppLayout, so it applies the app's
+// theme itself — the same classes AppLayout puts on its root. The Shell theme is the
+// default (a reviewer who never opened the app gets it); someone who switched the app to
+// dark mode gets dark here too. The theme class must sit on an ANCESTOR of the page
+// surface: the Shell remaps in index.css are descendant selectors (`.theme-shell .bg-…`).
+function ScorecardPage({ title, subtitle, children }: { title?: string; subtitle?: string; children: ReactNode }) {
+  const theme = useUIStore((s) => s.theme)
+  return (
+    <div className={theme === 'dark' ? 'dark' : 'theme-shell'}>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+        {/* Same bar as the app's Topbar; in the Shell theme `header.border-b` picks up
+            the Shell-yellow underline from index.css. */}
+        <header className="sticky top-0 z-20 h-16 shrink-0 px-4 sm:px-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+          <BrandHeader />
+          {title && (
+            <div className="text-right hidden sm:block min-w-0">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white leading-tight truncate">{title}</p>
+              {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>}
+            </div>
+          )}
+        </header>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// Centred status message (loading, errors, thank-you) under the brand bar.
+function StatusBody({ children }: { children: ReactNode }) {
+  return <div className="flex-1 flex items-center justify-center p-6">{children}</div>
 }
 
 const SCORE_OPTIONS = [1, 2, 3, 4, 5]
@@ -278,37 +311,47 @@ export default function ScorecardForm() {
     }
   }
 
+  // Shown in the brand bar on every screen once the cycle is known.
+  const pageTitle = meta ? `${meta.cycle_type ?? 'SPR'} Scorecard — ${meta.vendor_name}` : undefined
+  const pageSubtitle = meta ? `${meta.quarter} ${meta.year}` : undefined
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center dark bg-slate-950">
-        <Loader2 className="animate-spin text-indigo-500" size={28} />
-      </div>
+      <ScorecardPage>
+        <StatusBody>
+          <Loader2 className="animate-spin text-indigo-500" size={28} />
+        </StatusBody>
+      </ScorecardPage>
     )
   }
 
   if (loadError) {
     return (
-      <div className="min-h-screen flex items-center justify-center dark bg-slate-950 p-6">
-        <div className="max-w-md text-center space-y-3">
-          <AlertCircle className="mx-auto text-red-500" size={32} />
-          <p className="text-sm text-slate-700 dark:text-slate-300">{loadError}</p>
-        </div>
-      </div>
+      <ScorecardPage title={pageTitle} subtitle={pageSubtitle}>
+        <StatusBody>
+          <div className="max-w-md text-center space-y-3">
+            <AlertCircle className="mx-auto text-red-500" size={32} />
+            <p className="text-sm text-slate-700 dark:text-slate-300">{loadError}</p>
+          </div>
+        </StatusBody>
+      </ScorecardPage>
     )
   }
 
   if (alreadySubmitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center dark bg-slate-950 p-6">
-        <div className="max-w-md text-center space-y-3">
-          <CheckCircle2 className="mx-auto text-emerald-500" size={40} />
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Already submitted</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            {respondent?.name ? `${respondent.name}'s ` : 'A '}scorecard for this cycle has already been submitted.
-            Each reviewer can submit only once. You can close this tab.
-          </p>
-        </div>
-      </div>
+      <ScorecardPage title={pageTitle} subtitle={pageSubtitle}>
+        <StatusBody>
+          <div className="max-w-md text-center space-y-3">
+            <CheckCircle2 className="mx-auto text-emerald-500" size={40} />
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Already submitted</h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {respondent?.name ? `${respondent.name}'s ` : 'A '}scorecard for this cycle has already been submitted.
+              Each reviewer can submit only once. You can close this tab.
+            </p>
+          </div>
+        </StatusBody>
+      </ScorecardPage>
     )
   }
 
@@ -316,50 +359,43 @@ export default function ScorecardForm() {
   // would read "All set — ready to submit" over a scorecard with no answers in it.
   if (noMeasures) {
     return (
-      <div className="min-h-screen flex items-center justify-center dark bg-slate-950 p-6">
-        <div className="max-w-md text-center space-y-3">
-          <ClipboardList className="mx-auto text-slate-400" size={40} />
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Nothing to score yet</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            No scorecard measures are assigned to {respondent?.team ? <strong>{respondent.team}</strong> : 'your team'} for
-            this cycle, so there is nothing for you to fill in. Please contact the VMO coordinator if you were expecting
-            to review {meta?.vendor_name ? <strong>{meta.vendor_name}</strong> : 'this vendor'}.
-          </p>
-        </div>
-      </div>
+      <ScorecardPage title={pageTitle} subtitle={pageSubtitle}>
+        <StatusBody>
+          <div className="max-w-md text-center space-y-3">
+            <ClipboardList className="mx-auto text-slate-400" size={40} />
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Nothing to score yet</h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              No scorecard measures are assigned to {respondent?.team ? <strong>{respondent.team}</strong> : 'your team'} for
+              this cycle, so there is nothing for you to fill in. Please contact the VMO coordinator if you were expecting
+              to review {meta?.vendor_name ? <strong>{meta.vendor_name}</strong> : 'this vendor'}.
+            </p>
+          </div>
+        </StatusBody>
+      </ScorecardPage>
     )
   }
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center dark bg-slate-950 p-6">
-        <div className="max-w-md text-center space-y-3">
-          <CheckCircle2 className="mx-auto text-emerald-500" size={40} />
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Thank you!</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Your scorecard for <strong>{meta?.vendor_name}</strong> ({meta?.quarter} {meta?.year}) has been submitted.
-          </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">
-            This tab will close automatically. You can close it now if it stays open.
-          </p>
-        </div>
-      </div>
+      <ScorecardPage title={pageTitle} subtitle={pageSubtitle}>
+        <StatusBody>
+          <div className="max-w-md text-center space-y-3">
+            <CheckCircle2 className="mx-auto text-emerald-500" size={40} />
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Thank you!</h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Your scorecard for <strong>{meta?.vendor_name}</strong> ({meta?.quarter} {meta?.year}) has been submitted.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              This tab will close automatically. You can close it now if it stays open.
+            </p>
+          </div>
+        </StatusBody>
+      </ScorecardPage>
     )
   }
 
   return (
-    <div className="dark min-h-screen bg-slate-950 flex flex-col">
-      {/* Constant top navbar */}
-      <header className="sticky top-0 z-20 bg-slate-900 border-b border-slate-800 px-5 py-3 flex items-center justify-between gap-4">
-        <BrandHeader />
-        <div className="text-right hidden sm:block">
-          <p className="text-sm font-semibold text-white leading-tight">
-            {meta?.cycle_type ?? 'SPR'} Scorecard — {meta?.vendor_name}
-          </p>
-          <p className="text-xs text-slate-400">{meta?.quarter} {meta?.year}</p>
-        </div>
-      </header>
-
+    <ScorecardPage title={pageTitle} subtitle={pageSubtitle}>
       {/* Two-pane: scrollable form (left) + pinned consolidated (right) */}
       <div className="flex-1 w-full max-w-[1500px] mx-auto flex flex-col lg:flex-row gap-5 p-4 items-start">
         {/* Left — form (scrolls with the page) */}
@@ -423,7 +459,7 @@ export default function ScorecardForm() {
                   <span className="text-[11px] text-slate-400">Weight {cat.weight}%</span>
                 </div>
                 <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 cursor-pointer">
-                  <input type="checkbox" checked={themeSkipped} onChange={() => toggleTheme(cat.key, measureKeys)} className="rounded border-slate-300" />
+                  <input type="checkbox" checked={themeSkipped} onChange={() => toggleTheme(cat.key, measureKeys)} className="rounded border-slate-300 accent-[#dd1d21]" />
                   Not applicable (skip theme)
                 </label>
               </div>
@@ -447,7 +483,7 @@ export default function ScorecardForm() {
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{m.description}</p>
                           </div>
                           <label className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 shrink-0 cursor-pointer">
-                            <input type="checkbox" checked={measureSkipped} onChange={() => toggleMeasure(m.key)} className="rounded border-slate-300" />
+                            <input type="checkbox" checked={measureSkipped} onChange={() => toggleMeasure(m.key)} className="rounded border-slate-300 accent-[#dd1d21]" />
                             N/A
                           </label>
                         </div>
@@ -560,7 +596,7 @@ export default function ScorecardForm() {
 
         {/* Right — Consolidated Scorecard (pinned), with a toggle to consult the
             previous cycle's scorecard (all teams) while filling this one in. */}
-        <aside className="w-full lg:w-[560px] shrink-0 lg:sticky lg:top-[76px] self-stretch lg:self-start">
+        <aside className="w-full lg:w-[560px] shrink-0 lg:sticky lg:top-20 self-stretch lg:self-start">
           <div className="flex items-center justify-between gap-2 mb-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               {scoreView === 'previous'
@@ -608,6 +644,6 @@ export default function ScorecardForm() {
           )}
         </aside>
       </div>
-    </div>
+    </ScorecardPage>
   )
 }
